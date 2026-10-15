@@ -36,43 +36,78 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </remarks>
 internal static class AeadDecryption
 {
+    // Each method's operation argument names the operation in its errors, e.g. "AES-GCM decrypt".
+
     /// <summary>
-    /// Single-part <c>C_Decrypt</c> of <paramref name="ciphertextAndTag"/>. If the tag does not verify,
-    /// <paramref name="plaintext"/>, the caller's destination, is cleared before the throw.
+    /// Single-part <c>C_Decrypt</c> of <paramref name="ciphertext"/> followed by <paramref name="tag"/>,
+    /// the input layout PKCS#11 expects, straight into <paramref name="plaintext"/>. The input is
+    /// assembled in a <see cref="ScratchBuffer"/>. If the tag does not verify, or the plaintext is not
+    /// exactly <paramref name="plaintext"/>'s length, <paramref name="plaintext"/> is cleared before the
+    /// throw.
     /// </summary>
-    public static byte[] Decrypt(
-        Pkcs11Key key, Mechanism mechanism, ReadOnlySpan<byte> ciphertextAndTag, Span<byte> plaintext)
+    public static void DecryptConcatenated(Pkcs11Key key, Mechanism mechanism, ReadOnlySpan<byte> ciphertext,
+        ReadOnlySpan<byte> tag, Span<byte> plaintext, string operation)
     {
+        int length = ciphertext.Length + tag.Length;
+        byte[] input = ScratchBuffer.Rent(length);
         try
         {
-            return key.Decrypt(mechanism, ciphertextAndTag);
+            ciphertext.CopyTo(input);
+            tag.CopyTo(input.AsSpan(ciphertext.Length));
+
+            bool fits;
+            int written;
+            try
+            {
+                fits = key.TryDecryptInto(mechanism, input.AsSpan(0, length), plaintext, out written);
+            }
+            catch (Pkcs11Exception ex) when (IsTagMismatch(ex.ReturnValue))
+            {
+                throw TagMismatch(ex, plaintext);
+            }
+            RequireWhole(fits, written, plaintext, operation);
         }
-        catch (Pkcs11Exception ex) when (IsTagMismatch(ex.ReturnValue))
+        finally
         {
-            throw TagMismatch(ex, plaintext);
+            ScratchBuffer.Return(input);
         }
     }
 
     /// <summary>
-    /// PKCS#11 v3.0 message-based <c>C_DecryptMessage</c> of <paramref name="ciphertext"/>. If the tag does
-    /// not verify, <paramref name="plaintext"/>, the caller's destination, is cleared before the throw.
+    /// PKCS#11 v3.0 message-based <c>C_DecryptMessage</c> of <paramref name="ciphertext"/> straight into
+    /// <paramref name="plaintext"/>. If the tag does not verify, or the plaintext is not exactly
+    /// <paramref name="plaintext"/>'s length, <paramref name="plaintext"/> is cleared before the throw.
     /// </summary>
-    public static byte[] MessageDecrypt(
+    public static void MessageDecrypt(
         Pkcs11Key key,
         Mechanism mechanism,
         MechanismParameters messageParams,
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> ciphertext,
-        Span<byte> plaintext)
+        Span<byte> plaintext,
+        string operation)
     {
+        bool fits;
+        int written;
         try
         {
-            return key.MessageDecrypt(mechanism, messageParams, associatedData, ciphertext);
+            fits = key.TryMessageDecryptInto(mechanism, messageParams, associatedData, ciphertext, plaintext, out written);
         }
         catch (Pkcs11Exception ex) when (IsTagMismatch(ex.ReturnValue))
         {
             throw TagMismatch(ex, plaintext);
         }
+        RequireWhole(fits, written, plaintext, operation);
+    }
+
+    // The token's plaintext must fill the caller's destination exactly; a shorter one is not this AEAD's
+    // output, and is not left behind.
+    private static void RequireWhole(bool fits, int written, Span<byte> plaintext, string operation)
+    {
+        if (fits && written == plaintext.Length)
+            return;
+        CryptographicOperations.ZeroMemory(plaintext);
+        throw new InvalidOperationException($"{operation} returned {written} bytes; expected {plaintext.Length}.");
     }
 
     /// <summary>Whether <paramref name="returnValue"/> is a module's report of a failed AEAD tag check.</summary>

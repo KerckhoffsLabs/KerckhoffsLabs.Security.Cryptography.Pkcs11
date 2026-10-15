@@ -402,15 +402,38 @@ public sealed class Pkcs11Key : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ObjectHandle handle = IsAsymmetricKeyType(_keyType)
-            ? PublicHandle
-            : PrivateHandle;
+        return _session.Core.Encrypt(mechanism, EncryptingHandle("Pkcs11Key.Encrypt (handle unavailable)"), plaintext);
+    }
 
+    /// <summary>
+    /// <see cref="Encrypt"/> into <paramref name="destination"/>; <see langword="false"/> only when the
+    /// ciphertext does not fit, with <paramref name="written"/> its length.
+    /// </summary>
+    internal bool TryEncryptInto(Mechanism mechanism, ReadOnlySpan<byte> plaintext, Span<byte> destination, out int written)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+
+        return _session.Core.TryEncryptInto(mechanism, EncryptingHandle("Pkcs11Key.Encrypt (handle unavailable)"),
+            plaintext, destination, out written);
+    }
+
+    // The public half for an asymmetric key, the key itself for a symmetric one.
+    private ObjectHandle EncryptingHandle(string unavailable)
+    {
+        ObjectHandle handle = IsAsymmetricKeyType(_keyType) ? PublicHandle : PrivateHandle;
         if (handle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.Encrypt (handle unavailable)");
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID, unavailable);
+        return handle;
+    }
 
-        return _session.Core.Encrypt(mechanism, handle, plaintext);
+    // The private half for an asymmetric key, the key itself for a symmetric one.
+    private ObjectHandle DecryptingHandle(string unavailable)
+    {
+        ObjectHandle handle = PrivateHandle;
+        if (handle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID, unavailable);
+        return handle;
     }
 
     /// <summary>
@@ -426,11 +449,21 @@ public sealed class Pkcs11Key : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (PrivateHandle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.Decrypt (no private handle)");
+        return _session.Core.Decrypt(mechanism, DecryptingHandle("Pkcs11Key.Decrypt (no private handle)"), ciphertext);
+    }
 
-        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext);
+    /// <summary>
+    /// <see cref="Decrypt"/> into <paramref name="destination"/>; <see langword="false"/> only when the
+    /// plaintext does not fit, with <paramref name="written"/> its length. On failure
+    /// <paramref name="destination"/> is cleared.
+    /// </summary>
+    internal bool TryDecryptInto(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, Span<byte> destination, out int written)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+
+        return _session.Core.TryDecryptInto(mechanism, DecryptingHandle("Pkcs11Key.Decrypt (no private handle)"),
+            ciphertext, destination, out written);
     }
 
     /// <summary>
@@ -472,12 +505,23 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        ObjectHandle handle = IsAsymmetricKeyType(_keyType) ? PublicHandle : PrivateHandle;
-        if (handle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.MessageEncrypt (handle unavailable)");
+        return _session.Core.MessageEncrypt(mechanism, EncryptingHandle("Pkcs11Key.MessageEncrypt (handle unavailable)"),
+            messageParams, associatedData, plaintext);
+    }
 
-        return _session.Core.MessageEncrypt(mechanism, handle, messageParams, associatedData, plaintext);
+    /// <summary>
+    /// <see cref="MessageEncrypt"/> into <paramref name="destination"/>; <see langword="false"/> only when
+    /// the ciphertext does not fit, with <paramref name="written"/> its length.
+    /// </summary>
+    internal bool TryMessageEncryptInto(Mechanism mechanism, MechanismParameters messageParams,
+        ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, Span<byte> destination, out int written)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(messageParams);
+
+        return _session.Core.TryMessageEncryptInto(mechanism, EncryptingHandle("Pkcs11Key.MessageEncrypt (handle unavailable)"),
+            messageParams, associatedData, plaintext, destination, out written);
     }
 
     /// <summary>
@@ -498,11 +542,24 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        if (PrivateHandle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.MessageDecrypt (no private handle)");
+        return _session.Core.MessageDecrypt(mechanism, DecryptingHandle("Pkcs11Key.MessageDecrypt (no private handle)"),
+            messageParams, associatedData, ciphertext);
+    }
 
-        return _session.Core.MessageDecrypt(mechanism, PrivateHandle, messageParams, associatedData, ciphertext);
+    /// <summary>
+    /// <see cref="MessageDecrypt"/> into <paramref name="destination"/>; <see langword="false"/> only when
+    /// the plaintext does not fit, with <paramref name="written"/> its length. On failure
+    /// <paramref name="destination"/> is cleared.
+    /// </summary>
+    internal bool TryMessageDecryptInto(Mechanism mechanism, MechanismParameters messageParams,
+        ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, Span<byte> destination, out int written)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(messageParams);
+
+        return _session.Core.TryMessageDecryptInto(mechanism, DecryptingHandle("Pkcs11Key.MessageDecrypt (no private handle)"),
+            messageParams, associatedData, ciphertext, destination, out written);
     }
 
     /// <summary>
