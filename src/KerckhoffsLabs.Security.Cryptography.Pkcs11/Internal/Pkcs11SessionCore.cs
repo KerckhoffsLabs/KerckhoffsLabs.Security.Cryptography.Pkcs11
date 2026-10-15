@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -580,8 +579,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
-        if (_logger.IsEnabled(LogLevel.Information))
-            Log.LoggingIn(_logger, Log.UserTypeName(userType), (ulong)_sessionId);
+        Log.LoggingIn(_logger, userType, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
         Pkcs11Exception.ThrowIfError(rv, OpLogin);
@@ -600,8 +598,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login (protected authentication path)");
 
-        if (_logger.IsEnabled(LogLevel.Information))
-            Log.LoggingInProtectedPath(_logger, Log.UserTypeName(userType), (ulong)_sessionId);
+        Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, default);
         Pkcs11Exception.ThrowIfError(rv, OpLogin);
@@ -630,8 +627,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "LoginUser");
 
-        if (_logger.IsEnabled(LogLevel.Information))
-            Log.LoggingInUser(_logger, Log.UserTypeName(userType), (ulong)_sessionId);
+        Log.LoggingInUser(_logger, userType, (ulong)_sessionId);
 
         byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try

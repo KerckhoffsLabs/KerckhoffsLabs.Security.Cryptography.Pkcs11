@@ -1,8 +1,8 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 // Verifies the source-generated [LoggerMessage] methods render the exact message text at the right
 // level. Pass a CapturingLogger directly (the methods take ILogger), so no global state is touched.
@@ -97,7 +97,7 @@ public sealed class LogTests
     public void LoggingIn_IsInformation()
     {
         var log = new CapturingLogger();
-        Log.LoggingIn(log, "normal user", 7);
+        Log.LoggingIn(log, CKU.CKU_USER, 7);
         var e = Only(log);
         Assert.Equal(LogLevel.Information, e.Level);
         Assert.Equal("Logging as normal user into session 7", e.Message);
@@ -107,7 +107,7 @@ public sealed class LogTests
     public void LoggingInProtectedPath_IsInformation()
     {
         var log = new CapturingLogger();
-        Log.LoggingInProtectedPath(log, "security officer", 7);
+        Log.LoggingInProtectedPath(log, CKU.CKU_SO, 7);
         var e = Only(log);
         Assert.Equal(LogLevel.Information, e.Level);
         Assert.Equal("Logging as security officer into session 7 via protected authentication path", e.Message);
@@ -117,7 +117,7 @@ public sealed class LogTests
     public void LoggingInUser_IsInformation()
     {
         var log = new CapturingLogger();
-        Log.LoggingInUser(log, "normal user", 7);
+        Log.LoggingInUser(log, CKU.CKU_USER, 7);
         var e = Only(log);
         Assert.Equal(LogLevel.Information, e.Level);
         Assert.Equal("Logging in as normal user (username supplied) on session 7", e.Message);

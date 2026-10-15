@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 // Source-generated, allocation-free logging — avoids the value-type boxing CA1873 flags on the
 // LoggerExtensions params-object overloads. Method-entry traces share one method per class with the
@@ -24,13 +24,13 @@ internal static partial class Log
     public static partial void SessionGetValidationFlags(ILogger logger, ulong sessionId, ulong type);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Logging as {UserType} into session {SessionId}")]
-    public static partial void LoggingIn(ILogger logger, string userType, ulong sessionId);
+    public static partial void LoggingIn(ILogger logger, UserTypeLabel userType, ulong sessionId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Logging as {UserType} into session {SessionId} via protected authentication path")]
-    public static partial void LoggingInProtectedPath(ILogger logger, string userType, ulong sessionId);
+    public static partial void LoggingInProtectedPath(ILogger logger, UserTypeLabel userType, ulong sessionId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Logging in as {UserType} (username supplied) on session {SessionId}")]
-    public static partial void LoggingInUser(ILogger logger, string userType, ulong sessionId);
+    public static partial void LoggingInUser(ILogger logger, UserTypeLabel userType, ulong sessionId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Logging out of session {SessionId}")]
     public static partial void LoggingOutSession(ILogger logger, ulong sessionId);
@@ -81,6 +81,17 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Session({SessionId}): policy restored {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyRestored(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
+
+    /// <summary>
+    /// A user type as a log argument: converts from <see cref="CKU"/> without work, and renders as
+    /// <see cref="UserTypeName"/> only when a message is formatted, so a disabled level costs nothing.
+    /// </summary>
+    public readonly struct UserTypeLabel(CKU userType)
+    {
+        public static implicit operator UserTypeLabel(CKU userType) => new(userType);
+
+        public override string ToString() => UserTypeName(userType);
+    }
 
     /// <summary>
     /// A short label for a user type in log messages (<c>"security officer"</c>, <c>"normal user"</c>, ...),
