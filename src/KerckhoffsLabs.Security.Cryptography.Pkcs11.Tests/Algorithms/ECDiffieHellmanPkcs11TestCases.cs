@@ -40,22 +40,17 @@ internal static class ECDiffieHellmanPkcs11TestCases
     /// Every <c>ECDiffieHellman</c> method returns <c>byte[]</c>, so this adapter reads the agreement
     /// off the token in all of them — it cannot be implemented without extraction. The single gate in
     /// <c>Pkcs11SessionCore.BuildSecureKeyDefaults</c> therefore refuses the whole adapter unless the
-    /// caller opts in, which is what these tests do. <c>WithEcdhStrict</c> keeps the default posture
-    /// so the refusal itself stays covered.
+    /// caller opts in, which is what these tests do. The refusal is made before the token is called, so
+    /// it does not vary by backend; <see cref="ECDiffieHellmanPkcs11Tests_Managed.WithoutAllowInsecure_EveryDerivationIsRefused"/>
+    /// covers it.
     /// </remarks>
-    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
-        WithEcdh(backend, body, allowExtraction: true);
-
-    private static void WithEcdhStrict(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
-        WithEcdh(backend, body, allowExtraction: false);
-
-    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
+    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDH1_DERIVE))
             Assert.Skip("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
 
         using var session = OpenSession(backend);
-        using IDisposable? insecure = allowExtraction ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"ecdh-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
