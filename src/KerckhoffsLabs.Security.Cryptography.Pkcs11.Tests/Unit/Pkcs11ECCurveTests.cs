@@ -210,4 +210,25 @@ public sealed class Pkcs11ECCurveTests
             Assert.Equal(curve, Pkcs11ECCurve.FromEcParams(curve.GetEcParams()));  // CKA_EC_PARAMS round-trip
         }
     }
+
+    public static TheoryData<Pkcs11ECCurve, int> CatalogFieldSizes() => new()
+    {
+        { Pkcs11ECCurve.NamedCurves.NistP256, 256 },
+        { Pkcs11ECCurve.NamedCurves.NistP521, 521 },
+        { Pkcs11ECCurve.NamedCurves.Secp256k1, 256 },
+        { Pkcs11ECCurve.NamedCurves.BrainpoolP512r1, 512 },
+    };
+
+    [Theory]
+    [MemberData(nameof(CatalogFieldSizes))]
+    public void FieldSizeBits_CatalogCurve_IsItsFieldSize(Pkcs11ECCurve curve, int bits)
+        => Assert.Equal(bits, curve.FieldSizeBits);
+
+    [Fact]
+    public void FieldSizeBits_OidOutsideTheCatalog_IsNull()
+        => Assert.Null(Pkcs11ECCurve.CreateFromValue("1.3.6.1.4.1.99999.1").FieldSizeBits);
+
+    [Fact]
+    public void FieldSizeBits_Default_IsNull()
+        => Assert.Null(default(Pkcs11ECCurve).FieldSizeBits);
 }
