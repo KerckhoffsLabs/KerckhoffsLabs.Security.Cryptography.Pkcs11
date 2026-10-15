@@ -225,7 +225,8 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         // ECDiffieHellmanPublicKey could otherwise report a short X and silently truncate the
         // shared secret the token derives. Falls back to the peer's (now curve-matched) length only
         // for a curve outside this library's field-size catalog.
-        int fieldSize = localCurve.FieldSizeBits is int bits ? bits / 8 : x.Length;
+        // Rounded up: P-521's 521-bit field takes 66 bytes, not 65.
+        int fieldSize = localCurve.FieldSizeBits is int bits ? (bits + 7) / 8 : x.Length;
 
         byte[] peerPoint = EncodeEcPointAsDerOctetString(x, y);
         var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peerPoint);
