@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters
 /// RFC/NIST vectors is the strongest cross-backend check: a parameter/key mis-encoding the wrapper
 /// and one token happen to share would still have to be reproduced bit-for-bit by an unrelated
 /// token. The shared <see cref="KnownAnswerTestCases"/> assertions (defined in
-/// KnownAnswerTests.SoftHsm2.cs) take an <c>IPkcs11Backend</c>, which this fixture is.
+/// KnownAnswerTests.cs) take an <c>IPkcs11Backend</c>, which this fixture is.
 /// </summary>
 [Collection("Kryoptic")]
 public sealed class KnownAnswerTests_Kryoptic(KryopticBackendFixture backend)
@@ -21,6 +21,9 @@ public sealed class KnownAnswerTests_Kryoptic(KryopticBackendFixture backend)
 
     [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void AesGcm_Kat() => KnownAnswerTestCases.Assert_AesGcm_Kat(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
+    public void AesGcm_Multipart_Kat() => KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat(_backend);
 
     [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void HmacSha256_Kat() => KnownAnswerTestCases.Assert_HmacSha256_Kat(_backend);

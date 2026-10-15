@@ -27,6 +27,9 @@ public sealed class KnownAnswerTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.ClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     public void AesGcm_Kat() { Require(CKM.CKM_AES_GCM); KnownAnswerTestCases.Assert_AesGcm_Kat(_backend); }
 
+    [Fact(SkipUnless = nameof(NssBackendFixture.ClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ClassicAesGcmAvailable))]
+    public void AesGcm_Multipart_Kat() { Require(CKM.CKM_AES_GCM); KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat(_backend); }
+
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void HmacSha256_Kat() { Require(CKM.CKM_SHA256_HMAC); KnownAnswerTestCases.Assert_HmacSha256_Kat(_backend); }
 
