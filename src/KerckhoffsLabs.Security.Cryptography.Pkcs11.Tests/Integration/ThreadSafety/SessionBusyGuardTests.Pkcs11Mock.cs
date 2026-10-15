@@ -24,14 +24,14 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
             {
                 using var lease = session.AcquireExclusive(nameof(ConcurrentCall_FromDifferentThread_Throws_InvalidOperationException));
                 startGate.Set();
-                holdGate.Wait();
+                holdGate.Wait(TestContext.Current.CancellationToken);
             });
 
             // Thread B: wait until A holds the lock, then call any public method.
             // The guard should detect cross-thread contention and throw.
             var threadB = new System.Threading.Thread(() =>
             {
-                startGate.Wait();
+                startGate.Wait(TestContext.Current.CancellationToken);
                 try
                 {
                     session.GetSessionInfo();

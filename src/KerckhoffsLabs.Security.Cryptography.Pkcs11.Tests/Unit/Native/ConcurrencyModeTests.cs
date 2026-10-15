@@ -162,7 +162,7 @@ public sealed class ConcurrencyModeTests
                 if (Interlocked.Increment(ref _getInfoCalls) == 1)
                 {
                     Parked.Set();
-                    Release.Wait(Generous);
+                    Release.Wait(Generous, Token);
                 }
                 return CKR.CKR_OK;
             }

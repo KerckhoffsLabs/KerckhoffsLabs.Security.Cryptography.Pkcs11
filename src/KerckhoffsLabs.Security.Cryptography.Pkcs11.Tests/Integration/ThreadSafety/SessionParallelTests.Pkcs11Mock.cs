@@ -39,7 +39,7 @@ public sealed class SessionParallelTests(MockBackendFixture f)
             int threadIndex = t;
             threads[t] = new System.Threading.Thread(() =>
             {
-                sessionSlot.Wait();
+                sessionSlot.Wait(TestContext.Current.CancellationToken);
                 try
                 {
                     var session = TestKeys.OpenLoggedInSession(_backend);

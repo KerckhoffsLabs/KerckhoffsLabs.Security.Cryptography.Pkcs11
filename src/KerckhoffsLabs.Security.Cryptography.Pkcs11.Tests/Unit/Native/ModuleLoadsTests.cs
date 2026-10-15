@@ -271,7 +271,7 @@ public sealed class ModuleLoadsTests
             if (ParkFirstGetInfo && !Entered.IsSet)
             {
                 Entered.Set();
-                Release.Wait(Generous);
+                Release.Wait(Generous, Token);
             }
             return Volatile.Read(ref _initialized) == 1 ? CKR.CKR_OK : CKR.CKR_CRYPTOKI_NOT_INITIALIZED;
         }

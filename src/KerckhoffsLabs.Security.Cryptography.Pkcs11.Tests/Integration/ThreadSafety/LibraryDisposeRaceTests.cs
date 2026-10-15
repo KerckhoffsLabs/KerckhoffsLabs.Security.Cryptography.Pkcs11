@@ -199,7 +199,7 @@ public sealed class LibraryDisposeRaceTests
                 return; // only the first call parks
             Interlocked.Exchange(ref _inFlight, 1);
             Entered.Set();
-            Release.Wait(Generous);
+            Release.Wait(Generous, Token);
             Interlocked.Exchange(ref _inFlight, 0);
         }
     }
@@ -220,7 +220,7 @@ public sealed class LibraryDisposeRaceTests
         protected override CKR C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot)
         {
             Waiting.Set();
-            return _finalized.Wait(Generous) ? CKR.CKR_CRYPTOKI_NOT_INITIALIZED : CKR.CKR_NO_EVENT;
+            return _finalized.Wait(Generous, Token) ? CKR.CKR_CRYPTOKI_NOT_INITIALIZED : CKR.CKR_NO_EVENT;
         }
     }
 }
