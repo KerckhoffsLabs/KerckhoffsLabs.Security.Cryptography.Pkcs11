@@ -136,7 +136,7 @@ public sealed class DSAPkcs11 : DSA
         ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.DsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
             return _key.Verify(combined, data, signature);
 
         byte[] hash = HashData(hashAlgorithm, data);
@@ -147,7 +147,7 @@ public sealed class DSAPkcs11 : DSA
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.DsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
             return _key.Sign(combined, data);
 
         byte[] hash = HashData(hashAlgorithm, data);

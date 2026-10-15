@@ -129,7 +129,7 @@ public sealed class ECDsaPkcs11 : ECDsa
         HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
         {
             return _key.Verify(combined, data, signature);
         }
@@ -242,7 +242,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
             return _key.Sign(combined, data);
         byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
         var raw = new Mechanism(CKM.CKM_ECDSA);

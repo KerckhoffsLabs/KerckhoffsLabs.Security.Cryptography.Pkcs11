@@ -100,13 +100,6 @@ public sealed class Pkcs11Key : IDisposable
     public bool SupportsMechanism(CKM mechanism) => _session.Core.SupportsMechanism(mechanism);
 
     /// <summary>
-    /// <see cref="SupportsMechanism(CKM)"/> for a <see cref="Mechanism"/>, without casting its type to
-    /// <see cref="CKM"/>: a value wider than 32 bits (legal where <c>CK_ULONG</c> is 64 bits) cannot be
-    /// in the enum-typed mechanism list, so it is reported as unsupported rather than overflowing.
-    /// </summary>
-    internal bool SupportsMechanism(Mechanism mechanism) => SupportsMechanism(mechanism.Type);
-
-    /// <summary>
     /// Reads the requested attribute values from this key. Uses the public-key handle for
     /// asymmetric keys when it is available (matching the rule <see cref="Encrypt"/> follows), and
     /// the private-key handle otherwise — covering both public-companion key pairs and private-only
