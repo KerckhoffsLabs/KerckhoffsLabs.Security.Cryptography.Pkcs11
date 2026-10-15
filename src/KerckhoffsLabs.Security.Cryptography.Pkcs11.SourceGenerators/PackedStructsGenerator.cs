@@ -155,7 +155,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
                 ? arr.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                 : f.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-            if (packedNames.TryGetValue(key, out _))
+            if (packedNames.ContainsKey(key))
             {
                 if (f.Type is IArrayTypeSymbol)
                 {
