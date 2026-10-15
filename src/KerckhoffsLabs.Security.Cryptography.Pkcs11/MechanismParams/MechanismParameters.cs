@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// so nothing needs releasing and sharing one instance across two mechanisms is safe — each
 /// marshals into its own scope.
 /// </para>
-/// The marshalling contract (<see cref="BuildMarshalable"/>) is <c>internal</c>: callers select from
+/// The marshalling contract (<see cref="BuildMarshalable"/>) is <see langword="internal"/>: callers select from
 /// the library-provided <c>Ckm*Params</c> types and cannot define their own through this path, which
 /// guarantees only blittable <c>[PackedForPkcs11]</c> structs ever reach unmanaged memory. For raw or
 /// vendor-specific parameter blocks, use the <c>Mechanism(type, byte[])</c> constructor instead.

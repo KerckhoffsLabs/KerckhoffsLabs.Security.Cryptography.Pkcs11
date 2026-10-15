@@ -63,7 +63,7 @@ internal static class Pkcs11Marshal
     /// </summary>
     /// <remarks>
     /// The non-Windows path is a blittable copy rather than <c>Marshal.PtrToStructure</c>: the
-    /// <c>unmanaged</c> constraint makes that sound by construction, and it needs no
+    /// <see langword="unmanaged"/> constraint makes that sound by construction, and it needs no
     /// <c>[DynamicallyAccessedMembers]</c> annotation because nothing reflects over
     /// <typeparamref name="T"/>.
     /// </remarks>

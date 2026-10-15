@@ -45,7 +45,7 @@ public sealed class Pkcs11Object : IDisposable
     /// <summary>The object's <c>CKA_CLASS</c> (e.g. <see cref="CKO.CKO_CERTIFICATE"/>, <see cref="CKO.CKO_DATA"/>).</summary>
     public CKO ObjectClass { get; }
 
-    /// <summary>The object's <c>CKA_LABEL</c>, or <c>null</c> if unset.</summary>
+    /// <summary>The object's <c>CKA_LABEL</c>, or <see langword="null"/> if unset.</summary>
     public string? Label { get; }
 
     /// <summary>The object's <c>CKA_ID</c>. Empty if unset.</summary>

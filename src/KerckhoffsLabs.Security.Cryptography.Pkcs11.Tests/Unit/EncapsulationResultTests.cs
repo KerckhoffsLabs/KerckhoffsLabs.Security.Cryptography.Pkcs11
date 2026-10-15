@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// <summary>
 /// <see cref="EncapsulationResult"/> in isolation: pairing, deconstruction, and the disposal
 /// contract documented on the type (the caller owns <c>SharedSecret</c>; disposing the result
-/// disposes the key). Constructed directly via the <c>internal</c> constructor (visible here via
+/// disposes the key). Constructed directly via the <see langword="internal"/> constructor (visible here via
 /// <c>InternalsVisibleTo</c>) with a generic AES key standing in for a real KEM-produced one — the
 /// result's own logic does not depend on how the key was produced, and ML-KEM's own encapsulate/
 /// decapsulate correctness is covered separately in <c>Algorithms/MLKemPkcs11TestCases.cs</c>.

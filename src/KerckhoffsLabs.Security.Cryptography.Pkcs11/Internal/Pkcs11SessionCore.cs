@@ -23,7 +23,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed. Written under <see cref="_busyLock"/>,
-    /// but read outside it by the property guards, so it is <c>volatile</c>: a disposal on one
+    /// but read outside it by the property guards, so it is <see langword="volatile"/>: a disposal on one
     /// thread has to be visible to the next caller on another without the reader taking the lock.
     /// </summary>
     private volatile bool _disposed = false;
@@ -190,7 +190,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// <summary>
     /// The policy currently enforced — the policy of the most recent open override lease, or
     /// <see cref="_basePolicy"/> when none is open. Written under <see cref="_policyLock"/>, but read
-    /// outside it by <see cref="Enforce(PolicyRequest)"/>, so it is <c>volatile</c>.
+    /// outside it by <see cref="Enforce(PolicyRequest)"/>, so it is <see langword="volatile"/>.
     /// </summary>
     private volatile ICryptoPolicy _effectivePolicy;
 
@@ -668,7 +668,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
     /// <summary>
     /// Operations (<c>CKF_SIGN</c>, <c>CKF_DECRYPT</c>, ...) begun on this session and not yet ended. Kept
-    /// here rather than in <see cref="OperationScope"/>: a <c>using</c> struct local is read-only, so the
+    /// here rather than in <see cref="OperationScope"/>: a <see langword="using"/> struct local is read-only, so the
     /// scope could not record anything in itself. The session lease makes this field exclusive.
     /// </summary>
     private ulong _operationsInProgress;
@@ -795,7 +795,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// Waits for the busy lock instead of going through <see cref="AcquireExclusive"/>, for the
     /// reason <see cref="Dispose(bool)"/> does: it runs from a disposal, where throwing on
     /// cross-thread contention would leave the session open and replace any exception a
-    /// surrounding <c>using</c> is unwinding. A session that is already disposed is left alone.
+    /// surrounding <see langword="using"/> is unwinding. A session that is already disposed is left alone.
     /// </summary>
     /// <exception cref="Pkcs11Exception">The token rejected the logout; the caller treats it as best-effort.</exception>
     /// <exception cref="ObjectDisposedException">The library has already closed the session.</exception>
@@ -1162,7 +1162,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// <remarks>
     /// Built directly rather than through <c>ObjectAttribute</c>, which is <see cref="IDisposable"/>
     /// and was being constructed here only to have its struct copied out and the wrapper dropped.
-    /// Adding a <c>using</c> would have been the wrong repair: the copy in the template shares the
+    /// Adding a <see langword="using"/> would have been the wrong repair: the copy in the template shares the
     /// wrapper's pointer, so disposing would leave the template pointing at freed memory the moment a
     /// type-only attribute ever allocated one. Not creating the disposable avoids the question.
     /// </remarks>
@@ -1573,7 +1573,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     }
 
     /// <summary>
-    /// Returns <c>true</c> when a <c>C_GetAttributeValue</c> return value should
+    /// Returns <see langword="true"/> when a <c>C_GetAttributeValue</c> return value should
     /// terminate the read with an exception. The PKCS#11 spec defines
     /// <c>CKR_ATTRIBUTE_SENSITIVE</c> ("the attribute exists but cannot be read") and
     /// <c>CKR_ATTRIBUTE_TYPE_INVALID</c> ("the attribute does not apply to this object")
@@ -1934,8 +1934,8 @@ internal sealed class Pkcs11SessionCore : IDisposable
     // ---- Marshalling helpers (shared by the wrapper methods) ----
 
     /// <summary>
-    /// Marshals a managed attribute list into a <c>CK_ATTRIBUTE[]</c> template, returning <c>null</c>
-    /// (and length 0) when <paramref name="attributes"/> is <c>null</c> — the PKCS#11 convention of a
+    /// Marshals a managed attribute list into a <c>CK_ATTRIBUTE[]</c> template, returning <see langword="null"/>
+    /// (and length 0) when <paramref name="attributes"/> is <see langword="null"/> — the PKCS#11 convention of a
     /// null template meaning "no attributes".
     /// </summary>
     /// <remarks>
@@ -1959,7 +1959,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
     /// <summary>
     /// Builds a key-creation template from the caller's <paramref name="attributes"/> followed by the
-    /// appended <paramref name="secureDefaults"/>. Returns <c>null</c> (length 0) only when both are
+    /// appended <paramref name="secureDefaults"/>. Returns <see langword="null"/> (length 0) only when both are
     /// empty, matching the "null template = no attributes" convention.
     /// </summary>
     private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, ReadOnlyDisposableList<ObjectAttribute> secureDefaults)
@@ -1979,7 +1979,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     }
 
     /// <summary>
-    /// Interprets a verify return value: <c>true</c> on <see cref="CKR.CKR_OK"/>, <c>false</c> on
+    /// Interprets a verify return value: <see langword="true"/> on <see cref="CKR.CKR_OK"/>, <see langword="false"/> on
     /// <see cref="CKR.CKR_SIGNATURE_INVALID"/>, and throws <see cref="Pkcs11Exception"/> for any other
     /// code (tagged with <paramref name="operation"/>).
     /// </summary>
@@ -3855,7 +3855,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// Unlike <c>Verify</c>, the signature is bound at init time so the data can be
     /// fed as a stream. This is a one-shot wrapper that supplies all data at once.
     /// </summary>
-    /// <returns><c>true</c> if the signature verifies; <c>false</c> on <see cref="CKR.CKR_SIGNATURE_INVALID"/>.</returns>
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> on <see cref="CKR.CKR_SIGNATURE_INVALID"/>.</returns>
     /// <exception cref="Pkcs11Exception">Any other PKCS#11 error.</exception>
     public bool VerifySignature(
         Mechanism mechanism,
@@ -3894,7 +3894,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// then feeds <paramref name="inputStream"/> through C_VerifySignatureUpdate and
     /// finalizes via C_VerifySignatureFinal.
     /// </summary>
-    /// <returns><c>true</c> if the signature verifies; <c>false</c> on <see cref="CKR.CKR_SIGNATURE_INVALID"/>.</returns>
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> on <see cref="CKR.CKR_SIGNATURE_INVALID"/>.</returns>
     public bool VerifySignature(
         Mechanism mechanism,
         ObjectHandle verificationKey,

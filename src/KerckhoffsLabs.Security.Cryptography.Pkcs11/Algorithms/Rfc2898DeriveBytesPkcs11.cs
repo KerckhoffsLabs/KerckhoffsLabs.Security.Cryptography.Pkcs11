@@ -69,7 +69,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <param name="salt">The salt.</param>
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/>, or <paramref name="salt"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/>, or <paramref name="salt"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     [Obsolete(ConstructorsObsoleteMessage, DiagnosticId = DiagnosticIds.Rfc2898DeriveBytesPkcs11Constructors, UrlFormat = DiagnosticIds.UrlFormat)]
@@ -155,7 +155,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// The salt. Setting this restarts <see cref="GetBytes"/>'s byte stream from the beginning,
     /// matching the BCL.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when set to <see langword="null"/>.</exception>
     public byte[] Salt
     {
         get => [.. _salt];
@@ -212,7 +212,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
     /// <param name="outputLength">Number of bytes to derive. Zero returns an empty array with no token call.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/>, or <paramref name="salt"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/>, or <paramref name="salt"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive, or <paramref name="outputLength"/> is negative.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
@@ -252,7 +252,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <param name="destination">Receives the derived bytes; its length is the derivation's output length. Left untouched if empty.</param>
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
@@ -318,7 +318,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
     /// <param name="template">The derived key's template; its <c>CKA_VALUE_LEN</c> (or key type) sets the length derived.</param>
     /// <returns>The derived key.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/> or <paramref name="template"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if <paramref name="password"/> has been disposed.</exception>
@@ -352,7 +352,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
     /// <param name="template">The derived key's template; its <c>CKA_VALUE_LEN</c> (or key type) sets the length derived.</param>
     /// <returns>The derived key.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/> or <paramref name="template"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses the PRF or the template.</exception>

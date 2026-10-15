@@ -48,7 +48,7 @@ public sealed class Mechanism
     /// </remarks>
     /// <param name="type">Mechanism type. A vendor mechanism is passed as its value cast to <see cref="CKM"/>.</param>
     /// <param name="parameter">Mechanism parameter</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c> (32 bits on Windows).</exception>
     public Mechanism(CKM type, MechanismParameters parameter)
     {
@@ -104,7 +104,7 @@ public sealed class Mechanism
 
     /// <summary>
     /// Exposes the high-level mechanism parameters for test inspection (visible to the test assembly via InternalsVisibleTo).
-    /// Returns <c>null</c> when the mechanism was constructed without parameters.
+    /// Returns <see langword="null"/> when the mechanism was constructed without parameters.
     /// </summary>
     internal MechanismParameters? Parameters => _mechanismParams;
 

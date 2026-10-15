@@ -21,7 +21,7 @@ internal static class NativeStructArray
 /// reads what the module wrote back with <see cref="CopyTo"/>.
 /// </summary>
 /// <remarks>
-/// The block is the caller's <c>stackalloc</c> buffer when the array fits it, which makes the common
+/// The block is the caller's <see langword="stackalloc"/> buffer when the array fits it, which makes the common
 /// template free of any allocation; otherwise it comes from <see cref="UnmanagedMemory"/>, so the leak
 /// harness tracks it. Either way it is zeroized on <see cref="Dispose"/>.
 /// </remarks>

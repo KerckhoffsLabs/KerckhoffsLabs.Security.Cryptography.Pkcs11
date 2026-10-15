@@ -24,7 +24,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 ///
 /// The library raises these from its PKCS#11 call sites; the CKR-to-subclass routing is not part
 /// of the public surface, so which subclass a code maps to can be refined without a breaking change
-/// to any caller other than a <c>catch</c>.
+/// to any caller other than a <see langword="catch"/>.
 /// </remarks>
 /// <remarks>
 /// Initializes a new instance carrying the CKR and method name. Used by
@@ -74,11 +74,11 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     /// <summary>
     /// Unconditionally throws the typed <see cref="Pkcs11Exception"/> subclass that
     /// categorizes <paramref name="returnValue"/>. Use this when there is no need to
-    /// satisfy definite-assignment analysis for an <c>out</c> parameter on the
+    /// satisfy definite-assignment analysis for an <see langword="out"/> parameter on the
     /// non-throwing branches of the surrounding control flow. When such analysis is
     /// required (e.g., the fall-through branch of a tri-state if/else-if/else),
     /// prefer <c>throw <see cref="Create(CKR, string)"/></c> — the C# compiler honors
-    /// only literal <c>throw</c> expressions for CS0177, not <c>[DoesNotReturn]</c>.
+    /// only literal <see langword="throw"/> expressions for CS0177, not <c>[DoesNotReturn]</c>.
     /// </summary>
     /// <param name="returnValue">The PKCS#11 return value to dispatch.</param>
     /// <param name="method">Name of the PKCS#11 method that produced the value.</param>
@@ -89,7 +89,7 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     /// <summary>
     /// Builds (but does not throw) the typed <see cref="Pkcs11Exception"/> subclass that
     /// categorizes <paramref name="returnValue"/>. Use as the operand of a literal
-    /// <c>throw</c> expression at call sites where definite-assignment analysis requires
+    /// <see langword="throw"/> expression at call sites where definite-assignment analysis requires
     /// it — e.g., <c>throw Pkcs11Exception.Create(rv, "C_Verify");</c> in the
     /// fall-through branch of a tri-state if/else-if/else pattern.
     /// </summary>

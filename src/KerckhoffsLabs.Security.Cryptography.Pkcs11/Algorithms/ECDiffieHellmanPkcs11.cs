@@ -24,7 +24,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// To read Z back the raw agreement is derived into an extractable session generic-secret; the
 /// private key itself stays non-extractable. <see cref="DeriveKeyTls"/> is not supported (no public
 /// TLS-PRF primitive). Private-parameter export is refused; <see cref="ExportParameters(bool)"/> with
-/// <c>false</c> reads the public point from the token.
+/// <see langword="false"/> reads the public point from the token.
 /// </para>
 /// <para>
 /// <b>Requires a policy that permits reading key material off the token, e.g.
@@ -46,7 +46,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// </summary>
     /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/> is
     /// <see cref="CKK.CKK_EC"/> and whose private half has <c>CKA_DERIVE</c> set.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an EC key.</exception>
     public ECDiffieHellmanPkcs11(Pkcs11Key key)
     {
@@ -106,7 +106,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     /// <inheritdoc/>
     /// <remarks>Hashes the raw agreement Z with SHA-256, matching the BCL's legacy default.</remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
@@ -118,7 +118,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <remarks>
     /// <para>Returns the raw shared secret Z (the x-coordinate), as the BCL does.</para>
     /// </remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
@@ -132,7 +132,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     /// <inheritdoc/>
     /// <remarks>Computes <c>Hash(secretPrepend ‖ Z ‖ secretAppend)</c> over the raw agreement Z.</remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
@@ -167,7 +167,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// HMAC key is <paramref name="hmacKey"/>, or Z itself when <paramref name="hmacKey"/> is null
     /// (matching the BCL).
     /// </remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
@@ -266,7 +266,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// Destroys an ephemeral derived key without letting a cleanup failure hide a real one.
     /// </summary>
     /// <remarks>
-    /// A throw from <c>finally</c> <i>replaces</i> an exception already in flight, so a failed
+    /// A throw from <see langword="finally"/> <i>replaces</i> an exception already in flight, so a failed
     /// <c>C_DestroyObject</c> would reach the caller in place of whatever actually went wrong. This
     /// suppresses the destroy failure only on that path: when the operation succeeded, the destroy
     /// failure is the only news and is allowed to surface. The key is a session object either way, so
@@ -327,7 +327,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">
-    /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
+    /// Always thrown when <paramref name="includePrivateParameters"/> is <see langword="true"/>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Thrown when the public point (<c>CKA_EC_POINT</c> / <c>CKA_EC_PARAMS</c>) is sensitive, cannot be read, or cannot be parsed as a named-curve uncompressed point.</exception>

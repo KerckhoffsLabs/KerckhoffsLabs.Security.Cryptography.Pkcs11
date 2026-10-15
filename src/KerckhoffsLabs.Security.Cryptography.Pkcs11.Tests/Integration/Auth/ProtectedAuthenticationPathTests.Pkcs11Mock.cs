@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 /// <summary>
 /// Coverage for the protected-authentication-path overloads: PKCS#11 signals
 /// "collect the PIN on the token's own pinpad" by passing <c>pPin = NULL_PTR</c>, and the interop
-/// layer already turns an empty span into a null pointer via <c>fixed</c> — what was missing was any
+/// layer already turns an empty span into a null pointer via <see langword="fixed"/> — what was missing was any
 /// public entry point that could produce an empty span at all, since every one required a non-empty
 /// <see cref="SecurePin"/>. pkcs11-mock does not advertise
 /// <see cref="TokenFlags.ProtectedAuthenticationPath"/> and its <c>C_Login</c>/<c>C_InitPIN</c>/

@@ -33,7 +33,7 @@ public sealed class RSAPkcs11 : RSA
     /// </summary>
     /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
     /// is <see cref="CKK.CKK_RSA"/>.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an RSA key.</exception>
     public RSAPkcs11(Pkcs11Key key)
     {
@@ -127,7 +127,7 @@ public sealed class RSAPkcs11 : RSA
     /// implementation calls the unimplemented <c>SignHash(byte[], …)</c> and throws
     /// <see cref="NotImplementedException"/>.
     /// </remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="offset"/> or <paramref name="count"/> is negative or outside the bounds of <paramref name="data"/>.</exception>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown for a broken-hash signature (e.g. SHA-1) or a SHA-224 one (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
@@ -176,7 +176,7 @@ public sealed class RSAPkcs11 : RSA
     /// Byte-array entry-point — the .NET 10 BCL routes
     /// <c>VerifyData(byte[], byte[], …)</c> through here, NOT through the span overload.
     /// </remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/>, <paramref name="signature"/>, or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/>, <paramref name="signature"/>, or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="offset"/> or <paramref name="count"/> is negative or outside the bounds of <paramref name="data"/>.</exception>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown for a broken-hash signature (e.g. SHA-1) or a SHA-224 one (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
@@ -204,7 +204,7 @@ public sealed class RSAPkcs11 : RSA
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>), or OAEP with a SHA-1 or SHA-224 hash, unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; use OAEP with SHA-256 or stronger instead.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Encrypt</c> call.</exception>
@@ -217,7 +217,7 @@ public sealed class RSAPkcs11 : RSA
     }
 
     /// <inheritdoc/>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>), or OAEP with a SHA-1 or SHA-224 hash, unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; use OAEP with SHA-256 or stronger instead.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> call.</exception>
@@ -235,7 +235,7 @@ public sealed class RSAPkcs11 : RSA
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">
-    /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
+    /// Always thrown when <paramref name="includePrivateParameters"/> is <see langword="true"/>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Thrown when the public material (<c>CKA_MODULUS</c> / <c>CKA_PUBLIC_EXPONENT</c>) is sensitive or cannot be read from any available handle.</exception>

@@ -80,9 +80,9 @@ internal sealed partial class LowLevelPkcs11Library
 
     /// <summary>
     /// Lists the interfaces a v3.0+ module exposes (PKCS#11 v3.0 §5.4.4). Standard two-call idiom:
-    /// pass <c>null</c> to learn the count, then a buffer of that size to receive the descriptors.
+    /// pass <see langword="null"/> to learn the count, then a buffer of that size to receive the descriptors.
     /// </summary>
-    /// <param name="interfaces">Buffer to receive the interface descriptors, or <c>null</c> to query the count.</param>
+    /// <param name="interfaces">Buffer to receive the interface descriptors, or <see langword="null"/> to query the count.</param>
     /// <param name="count">In/out count: receives the interface count on the null call.</param>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public unsafe CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
@@ -114,7 +114,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// Obtains a single interface descriptor by name (PKCS#11 v3.0 §5.4.5). The returned struct is
     /// read with the platform-correct layout, so no separate Windows path is needed.
     /// </summary>
-    /// <param name="interfaceName">NUL-terminated UTF-8 interface name, or <c>null</c> for the default.</param>
+    /// <param name="interfaceName">NUL-terminated UTF-8 interface name, or <see langword="null"/> for the default.</param>
     /// <param name="flags">Interface flags constraining the request (typically 0).</param>
     /// <param name="iface">Receives the token-owned interface descriptor on success.</param>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>

@@ -2,7 +2,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// <see cref="ReadOnlyDisposableList{T}"/> exists so a returned collection of disposables can be held
-/// by a <c>using</c>. What it must not do is release only part of the collection.
+/// by a <see langword="using"/>. What it must not do is release only part of the collection.
 /// </summary>
 public sealed class ReadOnlyDisposableListTests
 {
@@ -73,7 +73,7 @@ public sealed class ReadOnlyDisposableListTests
     }
 
     /// <summary>
-    /// Disposal never throws, however badly it goes. A <c>using</c> is usually unwinding when this
+    /// Disposal never throws, however badly it goes. A <see langword="using"/> is usually unwinding when this
     /// runs, and a throw here would replace the exception that started the unwind — hiding the
     /// failure the caller actually needs to see behind one about releasing memory.
     /// </summary>

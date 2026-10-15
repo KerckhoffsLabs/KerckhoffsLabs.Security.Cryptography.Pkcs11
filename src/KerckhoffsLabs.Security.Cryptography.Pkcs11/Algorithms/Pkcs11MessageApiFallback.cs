@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// been written yet and falling through to the v2.40 classic-params path is side-effect-free.
 /// </summary>
 /// <remarks>
-/// Not a <c>try</c>/<c>catch</c>-wrapping delegate helper: the message-API attempt takes and returns
+/// Not a <see langword="try"/>/<see langword="catch"/>-wrapping delegate helper: the message-API attempt takes and returns
 /// <c>Span&lt;byte&gt;</c>/<c>ReadOnlySpan&lt;byte&gt;</c> parameters, which cannot be captured by a
 /// lambda closure (CS9108) — the shared piece is this filter, not the control flow around it.
 /// </remarks>

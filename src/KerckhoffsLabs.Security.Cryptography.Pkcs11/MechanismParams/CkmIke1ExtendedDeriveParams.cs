@@ -21,7 +21,7 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     /// Initializes IKEv1 extended-derive parameters.
     /// </summary>
     /// <param name="prfMechanism">PRF mechanism.</param>
-    /// <param name="keygxy">The shared-secret key g^xy, or <c>null</c> when there is none.</param>
+    /// <param name="keygxy">The shared-secret key g^xy, or <see langword="null"/> when there is none.</param>
     /// <param name="extraData">Additional input data.</param>
     /// <exception cref="ArgumentException">Thrown if <paramref name="keygxy"/> has no secret-key object.</exception>
     public CkmIke1ExtendedDeriveParams(CKM prfMechanism, Pkcs11Key? keygxy, ReadOnlySpan<byte> extraData)

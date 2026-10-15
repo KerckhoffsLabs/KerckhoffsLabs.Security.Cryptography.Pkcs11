@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// <remarks>
 /// The wrappers take spans, which <see cref="MethodBase.Invoke(object, object[])"/> cannot pass, so each call
 /// is emitted as a <see cref="DynamicMethod"/> with a default value for every argument, a local for each
-/// <c>ref</c> or <c>out</c> one, and the result boxed.
+/// <see langword="ref"/> or <see langword="out"/> one, and the result boxed.
 /// </remarks>
 [Collection(FakeModuleCollection.Name)]
 public sealed class LowLevelPkcs11LibraryWrapperContractTests

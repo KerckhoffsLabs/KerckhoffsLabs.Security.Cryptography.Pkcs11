@@ -8,15 +8,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <remarks>
 /// <para>
 /// The caller owns <see cref="SharedSecret"/> and must dispose it — dispose this result (typically
-/// with a <c>using</c> statement), or dispose the key directly after deconstructing. Disposing
+/// with a <see langword="using"/> statement), or dispose the key directly after deconstructing. Disposing
 /// releases the managed handle only; as with every <see cref="Pkcs11Key"/>, the token object itself
 /// is removed by <see cref="Pkcs11Key.Destroy"/> or by the token's session-object lifetime rules.
 /// </para>
 /// <para>
 /// Instances are produced exclusively by <see cref="Pkcs11Key.EncapsulateKey"/>; the constructor is
-/// <c>internal</c> because a result fabricated around an arbitrary key would carry a meaningless
+/// <see langword="internal"/> because a result fabricated around an arbitrary key would carry a meaningless
 /// ciphertext/secret pairing. <c>default(EncapsulationResult)</c> is inert: both properties are
-/// <c>null</c> and <see cref="Dispose"/> is a no-op.
+/// <see langword="null"/> and <see cref="Dispose"/> is a no-op.
 /// </para>
 /// </remarks>
 public readonly record struct EncapsulationResult : IDisposable
@@ -56,7 +56,7 @@ public readonly record struct EncapsulationResult : IDisposable
     }
 
     /// <summary>
-    /// Disposes the <see cref="SharedSecret"/> key handle. Safe on <c>default</c> instances.
+    /// Disposes the <see cref="SharedSecret"/> key handle. Safe on <see langword="default"/> instances.
     /// </summary>
     public void Dispose() => SharedSecret?.Dispose();
 }

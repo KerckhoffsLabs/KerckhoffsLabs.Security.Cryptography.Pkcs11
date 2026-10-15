@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 /// </summary>
 /// <remarks>
 /// Every capability attribute (<c>CKA_VERIFY</c>, <c>CKA_VERIFY_RECOVER</c>, <c>CKA_ENCRYPT</c>,
-/// <c>CKA_WRAP</c>, <c>CKA_DERIVE</c>) defaults to <c>false</c>. PKCS#11's own spec default for an
+/// <c>CKA_WRAP</c>, <c>CKA_DERIVE</c>) defaults to <see langword="false"/>. PKCS#11's own spec default for an
 /// omitted capability attribute is <c>CK_TRUE</c> (verified against NSS and SoftHSM) — an
 /// omission-means-safe assumption would silently grant every role on every key this builder
 /// produces. Callers opt in to each role explicitly.
@@ -71,7 +71,7 @@ public sealed class PublicKeyTemplateBuilder : ObjectTemplateBuilderBase<PublicK
     /// Sets <c>CKA_WRAP_TEMPLATE</c> — the template a key must <b>match</b> to be wrapped by this
     /// key. Keys that do not match cannot be wrapped, so this narrows what this key can exfiltrate.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public PublicKeyTemplateBuilder WrapTemplate(Action<NestedKeyTemplateBuilder> configure)

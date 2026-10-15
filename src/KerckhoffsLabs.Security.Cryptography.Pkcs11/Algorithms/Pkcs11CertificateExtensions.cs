@@ -15,12 +15,12 @@ public static class Pkcs11CertificateExtensions
 
     /// <summary>
     /// Returns the certificate's on-token RSA private key (located by <see cref="Pkcs11Certificate.Id"/>)
-    /// as a token-backed <see cref="RSA"/>. Returns <c>null</c> when the certificate is not RSA, or
+    /// as a token-backed <see cref="RSA"/>. Returns <see langword="null"/> when the certificate is not RSA, or
     /// no private key with this certificate's <c>CKA_ID</c> exists on the token. The caller owns
     /// the returned instance. Both <c>rsaEncryption</c> and <c>id-RSASSA-PSS</c> SubjectPublicKeyInfo
     /// algorithm OIDs are recognized as RSA, mirroring the BCL.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="certificate"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="certificate"/> is <see langword="null"/>.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> lookup.</exception>
     public static RSA? GetRSAPrivateKey(this Pkcs11Certificate certificate)
     {
@@ -32,11 +32,11 @@ public static class Pkcs11CertificateExtensions
 
     /// <summary>
     /// Returns the certificate's on-token EC private key (located by <see cref="Pkcs11Certificate.Id"/>)
-    /// as a token-backed <see cref="ECDsa"/>. Returns <c>null</c> when the certificate is not EC,
+    /// as a token-backed <see cref="ECDsa"/>. Returns <see langword="null"/> when the certificate is not EC,
     /// or no private key with this certificate's <c>CKA_ID</c> exists on the token. The caller owns
     /// the returned instance.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="certificate"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="certificate"/> is <see langword="null"/>.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> lookup.</exception>
     public static ECDsa? GetECDsaPrivateKey(this Pkcs11Certificate certificate)
     {

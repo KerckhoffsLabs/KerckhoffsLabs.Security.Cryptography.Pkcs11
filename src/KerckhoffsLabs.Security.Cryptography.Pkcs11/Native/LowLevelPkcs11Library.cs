@@ -81,8 +81,8 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
     /// <summary>
     /// Verifies the resolved build's CK_ULONG width (<see cref="NativeCULong"/>) matches the
     /// host's native CK_ULONG: 4 bytes on Windows (LLP64), the pointer width on Unix (LP64/ILP32).
-    /// KerckhoffsLabs.Runtime.InteropServices ships <see cref="NativeCULong"/> as <c>nuint</c> in its
-    /// <c>lib/net10.0</c> assembly and as <c>uint</c> in its <c>runtimes/win-x64</c> and
+    /// KerckhoffsLabs.Runtime.InteropServices ships <see cref="NativeCULong"/> as <see langword="nuint"/> in its
+    /// <c>lib/net10.0</c> assembly and as <see langword="uint"/> in its <c>runtimes/win-x64</c> and
     /// <c>runtimes/win-arm64</c> assets, so 64-bit Windows running the <c>lib</c> assembly (8 bytes)
     /// would silently mis-marshal every CK_ULONG-bearing struct. Fail loudly instead: the
     /// runtime-specific asset was not resolved.

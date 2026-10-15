@@ -37,7 +37,7 @@ public sealed class CkmX2RatchetRespondParams : MechanismParameters
     /// <c>CK_ULONG</c> with no constants of its own, reusing the mechanism-type namespace — the
     /// same convention as <paramref name="aeadMechanism"/>.
     /// </param>
-    /// <exception cref="ArgumentNullException">Thrown if any key is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if any key is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="sk"/> is empty, or <paramref name="ownPrekey"/> has no private-key object, or an identity key has no public-key object.</exception>
     public CkmX2RatchetRespondParams(ReadOnlySpan<byte> sk, Pkcs11Key ownPrekey, Pkcs11Key initiatorIdentity, Pkcs11Key ownPublicIdentity, bool encryptedHeader, ulong curve, CKM aeadMechanism, CKM kdfMechanism)
     {

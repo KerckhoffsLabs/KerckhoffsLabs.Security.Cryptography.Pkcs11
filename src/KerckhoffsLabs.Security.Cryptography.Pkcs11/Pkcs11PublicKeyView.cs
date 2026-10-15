@@ -16,7 +16,7 @@ internal static class Pkcs11PublicKeyView
     /// <summary>
     /// Reads CKA_MODULUS + CKA_PUBLIC_EXPONENT from the private-key object identified by
     /// <paramref name="privateHandle"/> and returns the corresponding
-    /// <see cref="RSAParameters"/>. Returns <c>null</c> if either attribute is missing
+    /// <see cref="RSAParameters"/>. Returns <see langword="null"/> if either attribute is missing
     /// or marked sensitive.
     /// </summary>
     internal static RSAParameters? TrySynthesizeRsa(Pkcs11SessionCore session, ObjectHandle privateHandle)
@@ -39,7 +39,7 @@ internal static class Pkcs11PublicKeyView
     /// <summary>
     /// Parses raw <c>CKA_EC_POINT</c> + <c>CKA_EC_PARAMS</c> bytes into an <see cref="ECParameters"/>
     /// for a named curve (any curve in <see cref="Pkcs11ECCurve.NamedCurves"/>, and any other named-curve
-    /// OID the host BCL recognises). Returns <c>null</c> when the inputs don't decode as a
+    /// OID the host BCL recognises). Returns <see langword="null"/> when the inputs don't decode as a
     /// DER-OCTET-wrapped uncompressed point or <c>CKA_EC_PARAMS</c> isn't a DER-encoded curve OID.
     /// </summary>
     /// <param name="ecPoint">Raw <c>CKA_EC_POINT</c> bytes (DER OCTET STRING containing the uncompressed point).</param>
@@ -67,7 +67,7 @@ internal static class Pkcs11PublicKeyView
 
     /// <summary>
     /// Reads CKA_EC_POINT + CKA_EC_PARAMS from a CKO_PRIVATE_KEY object and returns the
-    /// corresponding <see cref="ECParameters"/>. Returns <c>null</c> if either attribute
+    /// corresponding <see cref="ECParameters"/>. Returns <see langword="null"/> if either attribute
     /// is unreadable (per PKCS#11 v3.1, CKA_EC_POINT is optional on private-key
     /// objects).
     /// </summary>

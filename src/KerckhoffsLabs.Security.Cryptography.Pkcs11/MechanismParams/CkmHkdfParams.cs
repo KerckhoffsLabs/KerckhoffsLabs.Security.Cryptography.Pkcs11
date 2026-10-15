@@ -82,7 +82,7 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// <param name="saltKey">The key whose value is the salt.</param>
     /// <param name="info">Application-specific context bytes.</param>
     /// <returns>The parameters.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="saltKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="saltKey"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="saltKey"/> has no secret-key object.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="operation"/> is not a defined <see cref="HkdfOperation"/> member.</exception>
     public static CkmHkdfParams WithSaltKey(HkdfOperation operation, CKM prfHashMechanism, Pkcs11Key saltKey, ReadOnlySpan<byte> info = default)

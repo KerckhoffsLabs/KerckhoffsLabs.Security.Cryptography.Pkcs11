@@ -187,7 +187,7 @@ internal static class InsecureOperationGateTestCases
     /// <summary>
     /// A strong-hash RSASSA-PKCS1-v1_5 signature mechanism (e.g. <c>CKM_SHA256_RSA_PKCS</c>) must
     /// NOT be gated: signing with it succeeds past the guard even with the session's crypto policy
-    /// left at its <c>false</c> default. The backend may still throw for unrelated reasons (the fake
+    /// left at its <see langword="false"/> default. The backend may still throw for unrelated reasons (the fake
     /// handle is bogus), but MUST NOT throw <see cref="CryptoPolicyViolationException"/>.
     /// </summary>
     internal static void Assert_Sign_MechanismNotGated(IPkcs11Backend backend, ulong mechanismId)

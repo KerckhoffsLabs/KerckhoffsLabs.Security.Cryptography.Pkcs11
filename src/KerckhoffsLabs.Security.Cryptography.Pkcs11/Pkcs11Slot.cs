@@ -107,7 +107,7 @@ public sealed class Pkcs11Slot
     /// 64 bits), which <see cref="CKM"/> cannot hold and which is therefore left out of this list. Such an entry is a <see cref="CKM"/> value with no declared member, so it
     /// compares and round-trips correctly but has no name — <c>ToString()</c> renders the number, and
     /// <c>Enum.IsDefined</c> is what distinguishes it. Pass one to <see cref="Mechanism"/>'s
-    /// <c>ulong</c> constructors to use it.
+    /// <see langword="ulong"/> constructors to use it.
     /// </remarks>
     /// <returns>Read-only list of mechanism types supported by a token.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetMechanismList</c> call.</exception>
@@ -224,8 +224,8 @@ public sealed class Pkcs11Slot
     /// Opens a session between an application and a token in a particular slot.
     /// </summary>
     /// <param name="readWrite">
-    /// When <c>true</c> (the default), opens a read-write session
-    /// (<c>CKF_SERIAL_SESSION | CKF_RW_SESSION</c>). When <c>false</c>, opens a
+    /// When <see langword="true"/> (the default), opens a read-write session
+    /// (<c>CKF_SERIAL_SESSION | CKF_RW_SESSION</c>). When <see langword="false"/>, opens a
     /// read-only session — token-object creation will fail per PKCS#11 spec.
     /// </param>
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means

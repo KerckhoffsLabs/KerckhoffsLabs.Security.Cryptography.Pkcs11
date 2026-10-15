@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <see cref="Pkcs11Marshal"/> based on <c>OperatingSystem.IsWindows()</c>.
 /// </summary>
 /// <remarks>
-/// The decorated struct MUST be declared <c>partial</c> and MUST carry
+/// The decorated struct MUST be declared <see langword="partial"/> and MUST carry
 /// <c>[StructLayout(LayoutKind.Sequential)]</c> explicitly. This attribute is a marker
 /// only — it does NOT itself set the layout.
 /// </remarks>

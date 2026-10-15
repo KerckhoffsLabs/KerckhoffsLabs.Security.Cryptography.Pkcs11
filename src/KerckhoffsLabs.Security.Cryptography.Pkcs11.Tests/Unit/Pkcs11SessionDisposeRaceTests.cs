@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// the guarantee <c>Pkcs11SessionCoreDisposeRaceTests</c> pins for the session itself: wait for a call
 /// in flight on another thread rather than throw. Taken through the throwing busy guard, the logout
 /// made Dispose fail with "Concurrent access" before the session was ever closed, leaking it and
-/// replacing whatever exception a surrounding <c>using</c> was unwinding.
+/// replacing whatever exception a surrounding <see langword="using"/> was unwinding.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionDisposeRaceTests

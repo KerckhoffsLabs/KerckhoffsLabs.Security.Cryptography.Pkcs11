@@ -87,8 +87,8 @@ public sealed class NestedKeyTemplateBuilderTests
     };
 
     /// <summary>
-    /// Each boolean setter defaults to <c>true</c> and honours an explicit <c>false</c> - which
-    /// matters in a <c>CKA_UNWRAP_TEMPLATE</c>, where <c>false</c> is the restriction being imposed.
+    /// Each boolean setter defaults to <see langword="true"/> and honours an explicit <see langword="false"/> - which
+    /// matters in a <c>CKA_UNWRAP_TEMPLATE</c>, where <see langword="false"/> is the restriction being imposed.
     /// </summary>
     [Theory]
     [MemberData(nameof(BooleanSetters))]

@@ -122,7 +122,7 @@ public sealed class Pkcs11SessionCoreDisposeRaceTests
     /// <summary>
     /// Dispose has to wait for the busy lock, not take it the way every operation does:
     /// <see cref="Pkcs11SessionCore.AcquireExclusive"/> throws on cross-thread contention, and Dispose
-    /// usually runs from a <c>using</c> that is already unwinding, where a throw would replace the
+    /// usually runs from a <see langword="using"/> that is already unwinding, where a throw would replace the
     /// exception that started the unwind.
     /// </summary>
     [Fact]

@@ -56,7 +56,7 @@ public sealed class Pkcs11ParameterWriter
     /// <param name="part">Which of the key's objects to use: its private-key or secret-key object (the
     /// default), or the public-key object of a key pair.</param>
     /// <returns>This writer, for chaining.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if <paramref name="key"/> has been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> belongs to another session, or has no object of the requested kind.</exception>
     public Pkcs11ParameterWriter Key(Pkcs11Key key, KeyHandlePart part = KeyHandlePart.Private)

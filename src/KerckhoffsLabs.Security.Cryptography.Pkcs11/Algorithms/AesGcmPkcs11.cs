@@ -40,7 +40,7 @@ public sealed class AesGcmPkcs11 : IDisposable
     /// is <see cref="CKK.CKK_AES"/>.</param>
     /// <param name="tagSizeInBytes">The authentication-tag size, in bytes, one of <see cref="TagByteSizes"/>.
     /// Prefer 16, the full tag.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an AES key, or
     /// <paramref name="tagSizeInBytes"/> is not a size in <see cref="TagByteSizes"/>.</exception>
     public AesGcmPkcs11(Pkcs11Key key, int tagSizeInBytes)

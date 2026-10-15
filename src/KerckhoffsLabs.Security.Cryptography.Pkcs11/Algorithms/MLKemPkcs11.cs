@@ -35,7 +35,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// ownership.
 /// </remarks>
 /// <param name="key">A token-resident ML-KEM key (<see cref="CKK.CKK_ML_KEM"/>).</param>
-/// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
+/// <exception cref="ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
 /// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-KEM key, or its parameter set is unrecognized / unreadable.</exception>
 public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 {
@@ -255,7 +255,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     /// Unlike a fully best-effort cleanup, a destroy failure is surfaced to the caller: if the
     /// object cannot be destroyed, an extractable copy of the shared secret lingers on-token, which
     /// the callers must not silently ignore. Disposal of the managed <see cref="Pkcs11Key"/> wrapper
-    /// is handled by the callers' <c>finally</c>.
+    /// is handled by the callers' <see langword="finally"/>.
     /// </summary>
     private static void DestroyExtractedSecret(Pkcs11Key sharedKey)
     {

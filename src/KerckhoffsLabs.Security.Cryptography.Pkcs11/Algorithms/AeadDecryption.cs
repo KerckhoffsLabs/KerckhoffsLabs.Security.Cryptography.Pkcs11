@@ -30,7 +30,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// On such modules the forgery is still rejected, as a <see cref="Pkcs11Exception"/>.
 /// </para>
 /// <para>
-/// Methods rather than a <c>try</c>/<c>catch</c>-wrapping delegate helper: the calls take
+/// Methods rather than a <see langword="try"/>/<see langword="catch"/>-wrapping delegate helper: the calls take
 /// <c>ReadOnlySpan&lt;byte&gt;</c> arguments, which a lambda closure cannot capture.
 /// </para>
 /// </remarks>

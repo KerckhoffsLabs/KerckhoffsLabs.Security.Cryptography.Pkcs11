@@ -178,9 +178,9 @@ public sealed class Pkcs11Session : IDisposable
     /// </summary>
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder.</param>
     /// <returns>A list of <see cref="Pkcs11Key"/>. May be empty. The list owns the keys: dispose it
-    /// (a <c>using</c> will do) to release them all.</returns>
+    /// (a <see langword="using"/> will do) to release them all.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <see langword="null"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public ReadOnlyDisposableList<Pkcs11Key> FindKeys(ObjectTemplate filter)
     {
@@ -203,9 +203,9 @@ public sealed class Pkcs11Session : IDisposable
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder
     /// (e.g. filter on <c>CKA_CLASS = CKO_CERTIFICATE</c>).</param>
     /// <returns>A list of <see cref="Pkcs11Object"/>. May be empty. The list owns the objects: dispose
-    /// it (a <c>using</c> will do) to release them all. Disposal does not destroy anything on the token.</returns>
+    /// it (a <see langword="using"/> will do) to release them all. Disposal does not destroy anything on the token.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <see langword="null"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public ReadOnlyDisposableList<Pkcs11Object> FindObjects(ObjectTemplate filter)
     {
@@ -226,7 +226,7 @@ public sealed class Pkcs11Session : IDisposable
     /// <c>CKA_ID</c>.
     /// </summary>
     /// <returns>A list of <see cref="Pkcs11Certificate"/>. May be empty. The list owns the certificates:
-    /// dispose it (a <c>using</c> will do) to release them all.</returns>
+    /// dispose it (a <see langword="using"/> will do) to release them all.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if a certificate's
     /// <c>CKA_VALUE</c> cannot be read; also propagated from the underlying <c>C_FindObjects</c> call.</exception>
@@ -260,7 +260,7 @@ public sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Finds the private-key object with the given <c>CKA_ID</c> and hydrates it (pairing its
-    /// public companion). Returns <c>null</c> when <paramref name="id"/> is empty or no matching
+    /// public companion). Returns <see langword="null"/> when <paramref name="id"/> is empty or no matching
     /// private key exists. Filters on <c>CKA_CLASS = CKO_PRIVATE_KEY</c> so it never matches the
     /// certificate (which shares the id). Used by <see cref="Pkcs11Certificate"/>.
     /// </summary>
@@ -299,7 +299,7 @@ public sealed class Pkcs11Session : IDisposable
     /// <param name="template">A fully-built template. Will not be modified.</param>
     /// <returns>A new <see cref="Pkcs11Key"/> wrapping the created object.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <see langword="null"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CreateObject</c> call.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when the template sets <c>CKA_SENSITIVE=false</c> and the session's <see cref="Policy"/> refuses it.</exception>
     public Pkcs11Key ImportKey(ObjectTemplate template)
@@ -317,7 +317,7 @@ public sealed class Pkcs11Session : IDisposable
     /// overload.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and the session's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
     public Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template)
@@ -346,7 +346,7 @@ public sealed class Pkcs11Session : IDisposable
     /// <param name="privateKeyTemplate">Template for the private key half.</param>
     /// <returns>The new key pair, carrying both handles.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/>, <paramref name="publicKeyTemplate"/>, or <paramref name="privateKeyTemplate"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/>, <paramref name="publicKeyTemplate"/>, or <paramref name="privateKeyTemplate"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="publicKeyTemplate"/> sets a <c>CKA_CLASS</c> other than <see cref="CKO.CKO_PUBLIC_KEY"/>, or <paramref name="privateKeyTemplate"/> one other than <see cref="CKO.CKO_PRIVATE_KEY"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure, or the requested key strength is below the secure-defaults baseline, and the session's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
@@ -794,7 +794,7 @@ public sealed class Pkcs11Session : IDisposable
     /// <param name="oldPin">The current PIN.</param>
     /// <param name="newPin">The replacement PIN.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="oldPin"/> or <paramref name="newPin"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="oldPin"/> or <paramref name="newPin"/> is <see langword="null"/>.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change (e.g. wrong old PIN, policy violation).</exception>
     public void SetPinWithPin(SecurePin oldPin, SecurePin newPin)
     {
@@ -824,7 +824,7 @@ public sealed class Pkcs11Session : IDisposable
     /// </summary>
     /// <param name="userPin">The user PIN to set.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <see langword="null"/>.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
     public void InitPinWithPin(SecurePin userPin)
     {
@@ -854,7 +854,7 @@ public sealed class Pkcs11Session : IDisposable
     /// <param name="data">The data to digest.</param>
     /// <returns>The digest bytes.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is a broken digest (e.g. <see cref="CKM.CKM_MD5"/> or <see cref="CKM.CKM_SHA_1"/>) and the session's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Digest</c> call.</exception>
     public byte[] Digest(Mechanism mechanism, ReadOnlySpan<byte> data)

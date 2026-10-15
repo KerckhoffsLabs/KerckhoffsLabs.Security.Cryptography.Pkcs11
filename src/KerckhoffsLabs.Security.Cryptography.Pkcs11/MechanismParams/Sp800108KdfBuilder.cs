@@ -69,7 +69,7 @@ public sealed class Sp800108KdfBuilder
 
     /// <summary>Appends the mandatory iteration counter (<c>CK_SP800_108_ITERATION_VARIABLE</c>).</summary>
     /// <param name="widthInBits">Counter width in bits (NIST default 32).</param>
-    /// <param name="littleEndian"><c>false</c> for big-endian (the NIST/BCL default).</param>
+    /// <param name="littleEndian"><see langword="false"/> for big-endian (the NIST/BCL default).</param>
     public Sp800108KdfBuilder IterationCounter(uint widthInBits = 32, bool littleEndian = false)
     {
         _segments.Add(new Sp800108Segment { Kind = Sp800108SegmentKind.IterationCounter, WidthInBits = widthInBits, LittleEndian = littleEndian });
@@ -108,7 +108,7 @@ public sealed class Sp800108KdfBuilder
     /// </remarks>
     /// <param name="key">The key whose value is spliced in.</param>
     /// <returns>This builder, for chaining.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> has no secret-key object.</exception>
     public Sp800108KdfBuilder Key(Pkcs11Key key)
     {
@@ -135,7 +135,7 @@ public sealed class Sp800108KdfBuilder
     /// The caller retains ownership of the <paramref name="template"/> attributes and must keep them
     /// alive (undisposed) until after the derive call.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <see langword="null"/>.</exception>
     public Sp800108KdfBuilder AddDerivedKey(IReadOnlyList<ObjectAttribute> template)
     {
         ArgumentNullException.ThrowIfNull(template);

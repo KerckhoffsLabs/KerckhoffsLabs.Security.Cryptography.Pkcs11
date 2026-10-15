@@ -5,7 +5,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Holds a PIN value in a pinned byte buffer that is zeroed on disposal.
-/// Prefer this over raw <c>byte[]</c> or <c>string</c> when passing PINs to PKCS#11.
+/// Prefer this over raw <c>byte[]</c> or <see langword="string"/> when passing PINs to PKCS#11.
 /// For the password of a password-based key derivation, use <see cref="SecurePassword"/>.
 /// </summary>
 /// <remarks>
@@ -40,7 +40,7 @@ public sealed class SecurePin : IDisposable
     /// <summary>Initializes a new <see cref="SecurePin"/> from characters, encoded as UTF-8.</summary>
     /// <remarks>
     /// <para>
-    /// The preferred input when the PIN is typed or read into a <c>char[]</c> or <c>stackalloc</c>
+    /// The preferred input when the PIN is typed or read into a <c>char[]</c> or <see langword="stackalloc"/>
     /// buffer: it is encoded straight into this instance's pinned buffer, so no string and no
     /// intermediate byte array ever holds the PIN. Zero your own character buffer once this returns.
     /// </para>

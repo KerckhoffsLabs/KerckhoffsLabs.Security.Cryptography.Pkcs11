@@ -21,7 +21,7 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     /// Initializes IKEv2 PRF+ derive parameters.
     /// </summary>
     /// <param name="prfMechanism">PRF mechanism (typically a CKM_*_HMAC variant).</param>
-    /// <param name="seedKey">Seed key, or <c>null</c> when there is none.</param>
+    /// <param name="seedKey">Seed key, or <see langword="null"/> when there is none.</param>
     /// <param name="seedData">Additional seed data bytes.</param>
     /// <exception cref="ArgumentException">Thrown if <paramref name="seedKey"/> has no secret-key object.</exception>
     public CkmIke2PrfPlusDeriveParams(CKM prfMechanism, Pkcs11Key? seedKey, ReadOnlySpan<byte> seedData)

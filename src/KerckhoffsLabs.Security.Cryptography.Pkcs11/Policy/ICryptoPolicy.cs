@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 /// </para>
 /// <para>
 /// <see cref="PolicyRequest"/> is a closed hierarchy that later library versions may extend. End every
-/// <c>switch</c> over it with an arm that returns <see cref="PolicyDecision.Deny(string)"/>, so a request
+/// <see langword="switch"/> over it with an arm that returns <see cref="PolicyDecision.Deny(string)"/>, so a request
 /// kind your policy has never seen is refused rather than silently allowed.
 /// </para>
 /// </remarks>

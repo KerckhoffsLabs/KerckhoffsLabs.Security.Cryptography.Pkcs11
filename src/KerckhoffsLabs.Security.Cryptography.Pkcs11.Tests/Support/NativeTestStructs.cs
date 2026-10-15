@@ -4,7 +4,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 
 /// <summary>
 /// Helpers for building the fixed-width native PKCS#11 structs that the decode tests assert against.
-/// Ambient (assembly-root namespace) so any test can use it without an extra <c>using</c>.
+/// Ambient (assembly-root namespace) so any test can use it without an extra <see langword="using"/>.
 /// </summary>
 internal static class NativeTestStructs
 {

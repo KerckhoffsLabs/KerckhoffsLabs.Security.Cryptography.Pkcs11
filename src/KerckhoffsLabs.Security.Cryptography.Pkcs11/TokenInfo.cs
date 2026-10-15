@@ -67,7 +67,7 @@ public sealed record TokenInfo
     /// <summary>Current time (the value of this field only makes sense for tokens equipped with a clock).</summary>
     public string UtcTimeString { get; }
 
-    /// <summary><see cref="UtcTimeString"/> converted to <see cref="DateTime"/>, or <c>null</c> if conversion failed.</summary>
+    /// <summary><see cref="UtcTimeString"/> converted to <see cref="DateTime"/>, or <see langword="null"/> if conversion failed.</summary>
     public DateTime? UtcTime { get; }
 
     internal TokenInfo(NativeCULong slotId, CK_TOKEN_INFO ck_token_info)

@@ -20,7 +20,7 @@ public static class CK
     /// same width everywhere: it is 32-bit on Windows and pointer-sized elsewhere. Values read back
     /// from a token widen to <see cref="ulong"/> unchanged, so the sentinel to compare them against
     /// is <c>0xFFFFFFFF</c> on Windows and <c>0xFFFFFFFFFFFFFFFF</c> on a 64-bit Unix — which is why
-    /// this is the one constant here that cannot be a compile-time <c>const</c>. Prefer
+    /// this is the one constant here that cannot be a compile-time <see langword="const"/>. Prefer
     /// <see cref="IsCkInformationUnavailable(ulong)"/> over comparing by hand.
     /// </remarks>
     public static readonly ulong CK_UNAVAILABLE_INFORMATION = (ulong)NativeCULong.MaxValue;

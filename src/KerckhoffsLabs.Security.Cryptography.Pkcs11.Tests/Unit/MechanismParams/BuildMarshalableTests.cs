@@ -609,8 +609,8 @@ public sealed class BuildMarshalableTests
     /// <summary>
     /// Walks the <c>CK_PRF_DATA_PARAM</c> array entry by entry: each tag, each length, and the values
     /// every format sub-struct behind it must decode to. The fixture uses non-default widths
-    /// throughout and mixes <c>littleEndian: true</c> with one <c>false</c> segment, so neither a
-    /// dropped assignment landing on a zero-initialised field nor a hardcoded <c>true</c> can pass.
+    /// throughout and mixes <c>littleEndian: true</c> with one <see langword="false"/> segment, so neither a
+    /// dropped assignment landing on a zero-initialised field nor a hardcoded <see langword="true"/> can pass.
     /// </summary>
     private static void AssertPrfSequence(
         IntPtr array, byte[] label, ulong spliceKey,
