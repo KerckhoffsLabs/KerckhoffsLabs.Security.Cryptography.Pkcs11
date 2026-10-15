@@ -111,7 +111,8 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
         ArgumentNullException.ThrowIfNull(oidValue);
         if (fieldSizeBits is int bits)
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bits, nameof(fieldSizeBits));
+            if (bits <= 0)
+                throw new ArgumentOutOfRangeException(nameof(fieldSizeBits), bits, "The field size must be positive.");
             if (Pkcs11CurveCatalog.Default.TryGetByOid(oidValue, out Pkcs11CurveInfo? builtIn) && builtIn.FieldSizeBits != bits)
                 throw new ArgumentException(
                     $"{builtIn.Name} ({oidValue}) has a {builtIn.FieldSizeBits}-bit field, not {bits}.", nameof(fieldSizeBits));

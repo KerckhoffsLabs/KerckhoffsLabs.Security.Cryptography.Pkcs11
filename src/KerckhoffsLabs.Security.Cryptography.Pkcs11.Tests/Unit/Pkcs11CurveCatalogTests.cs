@@ -92,14 +92,14 @@ public sealed class Pkcs11CurveCatalogTests
     [Theory]
     [InlineData("not an oid")]
     [InlineData("")]
-    public void Info_InvalidOid_Throws(string oid)
-        => Assert.Throws<ArgumentException>("oid", () => new Pkcs11CurveInfo(oid, "x", 256));
+    public void Info_InvalidOid_Throws(string invalidOid)
+        => Assert.Throws<ArgumentException>("oid", () => new Pkcs11CurveInfo(invalidOid, "x", 256));
 
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void Info_BlankName_Throws(string name)
-        => Assert.Throws<ArgumentException>("name", () => new Pkcs11CurveInfo("1.2.3.4", name, 256));
+    public void Info_BlankName_Throws(string blankName)
+        => Assert.Throws<ArgumentException>("name", () => new Pkcs11CurveInfo("1.2.3.4", blankName, 256));
 
     [Theory]
     [InlineData(0)]
