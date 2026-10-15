@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_IKE1_PRF_DERIVE_PARAMS
+internal struct CK_IKE1_PRF_DERIVE_PARAMS
 {
     /// <summary>
     /// PRF mechanism.

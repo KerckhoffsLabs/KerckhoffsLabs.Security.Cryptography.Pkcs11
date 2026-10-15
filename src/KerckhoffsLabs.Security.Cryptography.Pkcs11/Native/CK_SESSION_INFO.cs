@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_SESSION_INFO
+internal struct CK_SESSION_INFO
 {
     /// <summary>
     /// ID of the slot that interfaces with the token

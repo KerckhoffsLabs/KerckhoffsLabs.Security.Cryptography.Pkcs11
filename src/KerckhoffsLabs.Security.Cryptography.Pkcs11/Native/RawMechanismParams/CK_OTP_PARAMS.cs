@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_OTP_PARAMS
+internal struct CK_OTP_PARAMS
 {
     /// <summary>
     /// Pointer to an array of OTP parameters (CK_OTP_PARAM structures)

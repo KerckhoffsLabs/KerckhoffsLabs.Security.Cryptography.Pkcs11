@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_ASYNC_DATA
+internal struct CK_ASYNC_DATA
 {
     /// <summary>Struct version for forward compatibility.</summary>
     public NativeCULong Version;

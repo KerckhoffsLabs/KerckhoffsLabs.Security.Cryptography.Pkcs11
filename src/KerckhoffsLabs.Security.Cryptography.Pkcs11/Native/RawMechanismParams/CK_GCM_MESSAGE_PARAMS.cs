@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_GCM_MESSAGE_PARAMS
+internal struct CK_GCM_MESSAGE_PARAMS
 {
     /// <summary>Pointer to the IV / nonce.</summary>
     public IntPtr Iv;

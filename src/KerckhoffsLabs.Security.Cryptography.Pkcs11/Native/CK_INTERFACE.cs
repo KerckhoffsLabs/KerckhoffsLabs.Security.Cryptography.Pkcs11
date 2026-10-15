@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_INTERFACE
+internal struct CK_INTERFACE
 {
     /// <summary>Pointer to a null-terminated UTF-8 interface name (typically "PKCS 11").</summary>
     public IntPtr InterfaceName;

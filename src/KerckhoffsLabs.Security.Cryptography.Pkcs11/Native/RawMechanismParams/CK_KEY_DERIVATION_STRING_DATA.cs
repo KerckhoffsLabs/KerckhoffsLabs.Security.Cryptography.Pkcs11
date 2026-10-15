@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_KEY_DERIVATION_STRING_DATA
+internal struct CK_KEY_DERIVATION_STRING_DATA
 {
     /// <summary>
     /// Pointer to the byte string

@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_SP800_108_FEEDBACK_KDF_PARAMS
+internal struct CK_SP800_108_FEEDBACK_KDF_PARAMS
 {
     /// <summary>
     /// The PRF mechanism (a CKM_*_HMAC variant or CKM_AES_CMAC).
