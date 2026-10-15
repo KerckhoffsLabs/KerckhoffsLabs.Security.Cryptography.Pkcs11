@@ -42,20 +42,20 @@ jobs:
       # submodules: pkcs11-mock (vendor/pkcs11-mock) and SoftHSM2 (vendor/softhsmv2)
       # are built from source during `dotnet build` so both backends are exercised.
       # fetch-depth 0: Sonar needs full history for new-code detection and blame.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
           persist-credentials: false
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: '10.0.x'
 
       # The Sonar analysis engine is JVM-based; the .NET scanner shells out to it.
       - name: Setup Java
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
           java-version: '21'
@@ -66,7 +66,7 @@ jobs:
 
       # OpenSSL 3.5 for SoftHSM's ML-DSA and Kryoptic's "pqc" feature; see the action.
       - name: OpenSSL 3.5
-        uses: ./.github/actions/openssl35
+        uses: $/.github/actions/openssl35
 
       # Fourth real backend, so its coverage counts toward the Sonar/Codecov numbers too (a
       # KryopticBackendFixture-only line change previously showed as 0% covered new code and
@@ -79,7 +79,7 @@ jobs:
 
       - name: Cache Kryoptic build
         id: kryoptic-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: vendor/kryoptic/target
           key: kryoptic-${{ runner.arch }}-${{ steps.kryopticrev.outputs.sha }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
@@ -109,6 +109,12 @@ jobs:
       # -- the scanner logs a WARN and imports zero coverage, which still lets the analysis
       # "succeed" while every line reports uncovered and the new-code coverage gate fails. The
       # Codecov "files:" glob below needs the same treatment for coverage.cobertura.*.xml.
+      #
+      # githubactions:S7637 wants every third-party `uses:` pinned to a commit SHA inline. The
+      # workflows are pinned by .github/workflows/actions.lock instead, which Actions enforces at
+      # run time (transitive dependencies included); Sonar does not read the lockfile, so it
+      # flags every tag ref. Ignored for workflow and action files only: the organization's
+      # "Require lockfile" Actions policy blocks any workflow whose dependencies are not in the lockfile.
       - name: Begin analysis
         run: >
           dotnet sonarscanner begin
@@ -119,6 +125,9 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.*.xml"
           /d:sonar.coverage.exclusions="**/*.SecurityAnalyzers/**/*.cs,**/*.SourceGenerators/**/*.cs"
           /d:sonar.exclusions="vendor/**,docs/images/**"
+          /d:sonar.issue.ignore.multicriteria="actionslock"
+          /d:sonar.issue.ignore.multicriteria.actionslock.ruleKey="githubactions:S7637"
+          /d:sonar.issue.ignore.multicriteria.actionslock.resourceKey=".github/**/*.yml"
 
       # -p:UseMicrosoftTestingPlatformRunner=true: only this (Linux-only) job needs the full MTP
       # entry point, for coverlet.MTP's extension hook to register at all -- see the test csproj
@@ -151,7 +160,7 @@ jobs:
       # Runs before End analysis so a Codecov hiccup is independent of the Sonar import.
       - name: Upload coverage
         if: github.event_name == 'push'
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        uses: codecov/codecov-action@v7.1.1
         with:
           files: ./coverage/**/coverage.cobertura.*.xml
           fail_ci_if_error: true
