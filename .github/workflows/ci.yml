@@ -32,15 +32,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - run: dotnet restore src/KerckhoffsLabs.sln
+      - run: dotnet restore KerckhoffsLabs.sln
 
       # `dotnet format` loads source generators from the built analyzer assemblies, so the
       # solution must be built first — otherwise the generated `CK_*_Windows` types are absent
       # and format aborts with CS0246 before it can check formatting. The native vendor builds
       # are skipped (env above), so this compiles managed code only.
-      - run: dotnet build src/KerckhoffsLabs.sln --no-restore
+      - run: dotnet build KerckhoffsLabs.sln --no-restore
 
-      - run: dotnet format src/KerckhoffsLabs.sln --verify-no-changes --no-restore
+      - run: dotnet format KerckhoffsLabs.sln --verify-no-changes --no-restore
 
   build-and-test:
     name: ${{ matrix.os }}${{ matrix.arch == 'x86' && ' (x86)' || '' }}
@@ -149,7 +149,7 @@ jobs:
         id: native-cache
         uses: actions/cache@v6.1.0
         with:
-          path: src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
+          path: tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
           key: ${{ steps.rev.outputs.native }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1', 'build/lib/common.sh') }}-v1
 
       # Fourth independent real backend (ubuntu-latest only): Kryoptic, a Rust/OpenSSL PKCS#11 soft
@@ -167,7 +167,7 @@ jobs:
           key: kryoptic-${{ runner.arch }}-${{ steps.rev.outputs.kryoptic }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
 
       - name: Restore
-        run: dotnet restore src/KerckhoffsLabs.sln
+        run: dotnet restore KerckhoffsLabs.sln
 
       - name: Build
         env:
@@ -178,7 +178,7 @@ jobs:
           # Kryoptic's BeforeTarget places libkryoptic_pkcs11.so next to the test assembly, where
           # KryopticBackendFixture finds it, as code-quality.yml does.
           BuildKryoptic: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
-        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+        run: dotnet build KerckhoffsLabs.sln --no-restore -c Release
 
       # Persist the vcpkg OpenSSL build right after it's produced, even if the Test step later fails
       # (if: always()). Only saves on a cache miss — an existing key can't be overwritten anyway. The
@@ -261,7 +261,7 @@ jobs:
       # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
       - name: Test
         if: matrix.os != 'ubuntu-latest'
-        run: dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed
+        run: dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed
 
       # ubuntu-latest also exercises the opencryptoki, Kryoptic, and NSS backends. Run under the
       # pkcs11 group so the test host can read the opencryptoki token store. LD_LIBRARY_PATH must be
@@ -286,7 +286,7 @@ jobs:
         # NSS's libsoftokn3 carries an $ORIGIN runpath for its own siblings; its dir is also added to
         # LD_LIBRARY_PATH (belt-and-suspenders under sg's stripped environment). PKCS11_TEST_NSS_* come
         # from $GITHUB_ENV, set by the NSS step above.
-        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed"
+        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed"
 
   # Native-AOT smoke test: publishes tests/AotSmoke — a standalone app that references only the
   # main library (not the test project) — with PublishAot, then runs the native binary. A publish
@@ -482,14 +482,14 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Restore
-        run: dotnet restore src/KerckhoffsLabs.sln
+        run: dotnet restore KerckhoffsLabs.sln
 
       # The staged module is used directly, and the ABI oracle feeds the unit tests, which this job
       # filters out (one backend's suite only), so skip every native build.
       - name: Build
         env:
           SkipNativeBuilds: true
-        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+        run: dotnet build KerckhoffsLabs.sln --no-restore -c Release
 
       # Run the backend's suite against the staged module. The mechanism-list and capability gates
       # skip anything it predates (EdDSA on SoftHSM 2.5; the hashed RSA-PSS mechanisms, DSA-SHA224
@@ -497,4 +497,4 @@ jobs:
       - name: Test (${{ matrix.backend }})
         env:
           FILTER: ${{ matrix.filter }}
-        run: dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "$FILTER"
+        run: dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "$FILTER"

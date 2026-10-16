@@ -1,0 +1,138 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <!--
+      Deliberately NOT set unconditionally here. UseMicrosoftTestingPlatformRunner=true generates
+      the full Microsoft.Testing.Platform entry point (not the legacy standalone in-process console
+      runner). The only reason to want it is so registered extensions such as coverlet.MTP's
+      TestingPlatformBuilderHook can wire themselves in, and the only leg that collects coverage
+      is the Linux-only coverage job (code-quality.yml), which passes
+      -p:UseMicrosoftTestingPlatformRunner=true explicitly. Every other build/test leg, including
+      all Windows legs, has no use for it and gets the legacy runner instead.
+    -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <LangVersion>13.0</LangVersion>
+    <!--
+      GenerateDocumentationFile is on repo-wide (Directory.Build.props) only so IDE0005
+      (unused usings) runs at build. Individual test methods are not XML-documented, so the
+      missing-doc warning (CS1591) is suppressed; every other doc-comment diagnostic
+      (unresolved/malformed crefs, param mismatches, malformed XML) is fixed at the source.
+    -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
+    <!--
+      Run the shipped analyzer against the tests, exactly as a consumer's build would: the tests are
+      the closest thing we have to real consumer code, so the insecure-RSA-padding diagnostic
+      (KLPKCS11008) is proven to fire — and to be suppressible per-site — end to end.
+    -->
+    <ProjectReference
+      Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- coverlet.collector is the VSTest-collector shim; MTP-native runs (dotnet test's coverage
+         option) need coverlet's own MTP extension instead. -->
+    <PackageReference Include="coverlet.MTP" Version="10.1.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The official OASIS v3.2 header from the vendor/pkcs11 submodule (oasis-tcs/pkcs11): the
+         reference the constant parity tests read at run time. Conditional so a checkout without
+         submodules still builds; the parity tests then fail saying the header is missing. -->
+    <None Include="..\..\vendor\pkcs11\published\3-02\pkcs11t.h" Link="pkcs11-v3.2\pkcs11t.h" CopyToOutputDirectory="PreserveNewest" Visible="false"
+          Condition="Exists('..\..\vendor\pkcs11\published\3-02\pkcs11t.h')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy" />
+  </ItemGroup>
+
+  <!-- SkipNativeBuilds=true skips every native build below (pkcs11-mock, the ABI oracle, the gate
+       shims, SoftHSM and Kryoptic), for a managed-only build that needs neither the submodules nor a
+       C toolchain. Each target keeps its own Skip* switch; a value passed on the command line still
+       wins over this one. -->
+  <PropertyGroup Condition="'$(SkipNativeBuilds)' == 'true'">
+    <SkipPkcs11MockBuild>true</SkipPkcs11MockBuild>
+    <SkipAbiProbeBuild>true</SkipAbiProbeBuild>
+    <SkipPkcs11GateBuild>true</SkipPkcs11GateBuild>
+    <SkipSoftHsmV2Build>true</SkipSoftHsmV2Build>
+    <BuildKryoptic>false</BuildKryoptic>
+  </PropertyGroup>
+
+  <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
+    <PropertyGroup>
+      <_MockOutputDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_MockOutputDir>
+      <!-- The mock must match the architecture the tests run as (the testhost = the .NET SDK arch),
+           not the architecture of the (64-bit) pwsh that runs the build script. An explicit RID
+           build (-r) wins; otherwise use the SDK's RID. -->
+      <_MockRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_MockRid>
+      <_MockRid Condition="'$(_MockRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_MockRid>
+    </PropertyGroup>
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-pkcs11-mock.sh&quot; &quot;$(_MockOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot; -Rid &quot;$(_MockRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <!-- ABI oracle (AbiOracleTests): compile build/abi-probe.c against the OASIS headers in the
+       vendor/pkcs11 submodule with this leg's own C toolchain, for the architecture the tests run as,
+       and write the sizeof/offsetof of every PKCS#11 struct next to the test assembly. A few hundred milliseconds, so it always runs;
+       SkipAbiProbeBuild=true opts out (jobs that build without running the unit tests). -->
+  <Target Name="BuildAbiOracle" BeforeTargets="PrepareForBuild" Condition="'$(SkipAbiProbeBuild)' != 'true'">
+    <PropertyGroup>
+      <_AbiOutputDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_AbiOutputDir>
+      <_AbiRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_AbiRid>
+      <_AbiRid Condition="'$(_AbiRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_AbiRid>
+    </PropertyGroup>
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-abi-probe.sh&quot; &quot;$(_AbiOutputDir)&quot;" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-abi-probe.ps1&quot; -TestOutputDir &quot;$(_AbiOutputDir)&quot; -Rid &quot;$(_AbiRid)&quot;" />
+  </Target>
+
+  <!-- Spec-version gate shims (Linux/macOS only): tiny C wrappers that restrict which
+       PKCS#11 API version a consumer can negotiate against a real backend. Used by the
+       SoftHsmGate* fixtures to validate v2.40 / v3.0 compatibility end to end. -->
+  <Target Name="BuildPkcs11Gate" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11GateBuild)' != 'true' AND !$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup>
+      <_GateOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_GateOutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-pkcs11-gate.sh&quot; &quot;$(_GateOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <Target Name="BuildSoftHsmV2" BeforeTargets="PrepareForBuild" Condition="'$(SkipSoftHsmV2Build)' != 'true'">
+    <PropertyGroup>
+      <_SoftHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_SoftHsmOutputDir>
+      <!-- Build libsofthsm2 for the architecture the tests run as (the testhost = the .NET SDK arch),
+           not the (64-bit) pwsh running the script. An explicit RID build (-r) wins; else the SDK's RID. -->
+      <_SoftHsmRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_SoftHsmRid>
+      <_SoftHsmRid Condition="'$(_SoftHsmRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_SoftHsmRid>
+    </PropertyGroup>
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-softhsmv2.sh&quot; &quot;$(_SoftHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-softhsmv2.ps1&quot; -TestOutputDir &quot;$(_SoftHsmOutputDir)&quot; -Rid &quot;$(_SoftHsmRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <!-- Kryoptic: unlike pkcs11-mock/SoftHSM (built on every leg), this one is opt-in —
+       default OFF, flip it on with -p:BuildKryoptic=true (or the env var of the same name, which
+       MSBuild picks up as a property) — because it needs a Rust toolchain plus an OpenSSL 3.2+ it
+       links against, and is wired into CI on the ubuntu-latest leg only for now (see ci.yml).
+       build-kryoptic.sh itself no-ops on non-Linux; cargo's own target-dir caching plus the
+       script's own up-to-date check make repeat builds idempotent. -->
+  <Target Name="BuildKryoptic" BeforeTargets="PrepareForBuild" Condition="'$(BuildKryoptic)' == 'true' AND !$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup>
+      <_KryopticOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_KryopticOutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-kryoptic.sh&quot; &quot;$(_KryopticOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+</Project>

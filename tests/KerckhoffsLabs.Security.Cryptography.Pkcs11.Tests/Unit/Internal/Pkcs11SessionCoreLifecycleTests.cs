@@ -1,0 +1,368 @@
+using System.Text;
+using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
+// behaviour under test), so the compile-time warning is suppressed for this file only.
+#pragma warning disable KLPKCS11009
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
+
+/// <summary>
+/// Hermetic coverage for session lifecycle (login/PIN/operation-state/random) success and
+/// error-mapping paths, plus the security-critical <see cref="Pkcs11SessionCore.UsePolicy"/>
+/// gate. The fake captures the marshalled arguments so the tests assert both the CKR-&gt;exception
+/// mapping and that PIN/username/seed bytes are passed through correctly — neither of which the
+/// Integration suite can observe. The fake is a <see cref="FakeModule"/> behind the real loader, so the
+/// captured bytes are the ones that crossed the function table.
+/// </summary>
+[Collection(FakeModuleCollection.Name)]
+public sealed class Pkcs11SessionCoreLifecycleTests
+{
+    private const ulong SessionId = 11;
+
+    private sealed class LifecycleFake : SessionTestModule
+    {
+        public CKR LoginRv = CKR.CKR_OK, LoginUserRv = CKR.CKR_OK, InitPinRv = CKR.CKR_OK,
+            SetPinRv = CKR.CKR_OK, SeedRv = CKR.CKR_OK, GenRandomRv = CKR.CKR_OK,
+            GetOpStateRv = CKR.CKR_OK, SetOpStateRv = CKR.CKR_OK, GenerateKeyRv = CKR.CKR_OK,
+            FunctionStatusRv = CKR.CKR_FUNCTION_NOT_PARALLEL, CancelFunctionRv = CKR.CKR_FUNCTION_NOT_PARALLEL;
+
+        public CKU? CapturedUserType;
+        public byte[]? CapturedPin;
+        public byte[]? CapturedUsername;
+        public byte[]? CapturedSeed;
+        public byte[]? CapturedOpState;
+        public ulong CapturedEncKey, CapturedAuthKey;
+        public byte[] OperationState = [0x01, 0x02, 0x03, 0x04];
+        public ulong GeneratedKeyId = 0x42;
+
+        protected override CKR C_Logout(NativeCULong session) => CKR.CKR_OK;
+
+        protected override CKR C_Login(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin)
+        { CapturedUserType = (CKU)(ulong)userType; CapturedPin = pin.ToArray(); return LoginRv; }
+
+        protected override CKR C_LoginUser(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username)
+        { CapturedUserType = (CKU)(ulong)userType; CapturedPin = pin.ToArray(); CapturedUsername = username.ToArray(); return LoginUserRv; }
+
+        protected override CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin)
+        { CapturedPin = pin.ToArray(); return InitPinRv; }
+
+        protected override CKR C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
+            => SetPinRv;
+
+        protected override CKR C_SeedRandom(NativeCULong session, ReadOnlySpan<byte> seed)
+        { CapturedSeed = seed.ToArray(); return SeedRv; }
+
+        protected override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+        { for (int i = 0; i < randomData.Length; i++) randomData[i] = (byte)(i + 1); return GenRandomRv; }
+
+        protected override CKR C_GetOperationState(NativeCULong session, NativeBuffer<byte> operationState, ref NativeCULong operationStateLen)
+        {
+            if (operationState.IsNull) { operationStateLen = (NativeCULong)OperationState.Length; return GetOpStateRv; }
+            OperationState.AsSpan(0, OperationState.Length).CopyTo(operationState.Span);
+            operationStateLen = (NativeCULong)OperationState.Length;
+            return GetOpStateRv;
+        }
+
+        protected override CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey, NativeCULong authenticationKey)
+        { CapturedOpState = operationState.ToArray(); CapturedEncKey = (ulong)encryptionKey; CapturedAuthKey = (ulong)authenticationKey; return SetOpStateRv; }
+
+        protected override CKR C_GenerateKey(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, ref NativeCULong key)
+        { key = (NativeCULong)GeneratedKeyId; return GenerateKeyRv; }
+
+        protected override CKR C_GetFunctionStatus(NativeCULong session) => FunctionStatusRv;
+        protected override CKR C_CancelFunction(NativeCULong session) => CancelFunctionRv;
+    }
+
+    // === Login / LoginUser ==================================================
+
+    [Fact]
+    public void Login_Ok_PassesUserTypeAndPin()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        using var pin = new SecurePin("1234");
+
+        s.Login(CKU.CKU_USER, pin);
+
+        Assert.Equal(CKU.CKU_USER, fake.CapturedUserType);
+        Assert.Equal("1234"u8.ToArray(), fake.CapturedPin);
+    }
+
+    [Fact]
+    public void Login_Error_Throws()
+    {
+        using var fake = new LifecycleFake { LoginRv = CKR.CKR_PIN_INCORRECT };
+        using var s = fake.CreateSession(SessionId);
+        using var pin = new SecurePin("0000");
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.Login(CKU.CKU_USER, pin));
+    }
+
+    [Fact]
+    public void LoginUser_Ok_EncodesUsernameUtf8()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        using var pin = new SecurePin("1234");
+
+        s.LoginUser(CKU.CKU_USER, pin, "operator-1");
+
+        Assert.Equal(Encoding.UTF8.GetBytes("operator-1"), fake.CapturedUsername);
+        Assert.Equal("1234"u8.ToArray(), fake.CapturedPin);
+    }
+
+    [Fact]
+    public void LoginUser_EmptyUsername_Throws()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        using var pin = new SecurePin("1234");
+        Assert.Throws<ArgumentException>(() => s.LoginUser(CKU.CKU_USER, pin, ""));
+    }
+
+    [Fact]
+    public void LoginUser_Error_Throws()
+    {
+        using var fake = new LifecycleFake { LoginUserRv = CKR.CKR_FUNCTION_NOT_SUPPORTED };
+        using var s = fake.CreateSession(SessionId);
+        using var pin = new SecurePin("1234");
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.LoginUser(CKU.CKU_USER, pin, "alice"));
+    }
+
+    // === PIN management =====================================================
+
+    [Fact]
+    public void InitPin_Ok_PassesPin()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        using var pin = new SecurePin("9876");
+
+        s.InitPin(pin);
+
+        Assert.Equal("9876"u8.ToArray(), fake.CapturedPin);
+    }
+
+    [Fact]
+    public void InitPin_Error_Throws()
+    {
+        using var fake = new LifecycleFake { InitPinRv = CKR.CKR_USER_NOT_LOGGED_IN };
+        using var s = fake.CreateSession(SessionId);
+        using var pin = new SecurePin("9876");
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.InitPin(pin));
+    }
+
+    [Fact]
+    public void SetPin_Ok_DoesNotThrow()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        using var oldPin = new SecurePin("1111");
+        using var newPin = new SecurePin("2222");
+        Assert.Null(Record.Exception(() => s.SetPin(oldPin, newPin)));
+    }
+
+    [Fact]
+    public void SetPin_Error_Throws()
+    {
+        using var fake = new LifecycleFake { SetPinRv = CKR.CKR_PIN_INVALID };
+        using var s = fake.CreateSession(SessionId);
+        using var oldPin = new SecurePin("1111");
+        using var newPin = new SecurePin("2222");
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.SetPin(oldPin, newPin));
+    }
+
+    // === Operation state ====================================================
+
+    [Fact]
+    public void GetOperationState_Ok_ReturnsProbedBytes()
+    {
+        using var fake = new LifecycleFake { OperationState = [5, 6, 7] };
+        using var s = fake.CreateSession(SessionId);
+        Assert.Equal(new byte[] { 5, 6, 7 }, s.GetOperationState());
+    }
+
+    [Fact]
+    public void GetOperationState_Error_Throws()
+    {
+        using var fake = new LifecycleFake { GetOpStateRv = CKR.CKR_STATE_UNSAVEABLE };
+        using var s = fake.CreateSession(SessionId);
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.GetOperationState());
+    }
+
+    [Fact]
+    public void SetOperationState_Ok_PassesStateAndKeyHandles()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+
+        s.SetOperationState([1, 2, 3], new ObjectHandle(7), new ObjectHandle(9));
+
+        Assert.Equal(new byte[] { 1, 2, 3 }, fake.CapturedOpState);
+        Assert.Equal(7UL, fake.CapturedEncKey);
+        Assert.Equal(9UL, fake.CapturedAuthKey);
+    }
+
+    [Fact]
+    public void SetOperationState_Error_Throws()
+    {
+        using var fake = new LifecycleFake { SetOpStateRv = CKR.CKR_SAVED_STATE_INVALID };
+        using var s = fake.CreateSession(SessionId);
+        Assert.ThrowsAny<Pkcs11Exception>(() =>
+            s.SetOperationState([1, 2, 3], ObjectHandle.Invalid, ObjectHandle.Invalid));
+    }
+
+    // === Random =============================================================
+
+    [Fact]
+    public void GenerateRandom_Span_FillsBuffer()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        Span<byte> buffer = stackalloc byte[4];
+        int written = s.GenerateRandom(buffer);
+        Assert.Equal(4, written);
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, buffer.ToArray());
+    }
+
+    [Fact]
+    public void GenerateRandom_Span_Empty_ReturnsZero()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.Equal(0, s.GenerateRandom([]));
+    }
+
+    [Fact]
+    public void SeedRandom_Ok_PassesSeed()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        s.SeedRandom([0xDE, 0xAD]);
+        Assert.Equal([0xDE, 0xAD], fake.CapturedSeed);
+    }
+
+    [Fact]
+    public void SeedRandom_Error_Throws()
+    {
+        using var fake = new LifecycleFake { SeedRv = CKR.CKR_RANDOM_SEED_NOT_SUPPORTED };
+        using var s = fake.CreateSession(SessionId);
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.SeedRandom([1]));
+    }
+
+    // === Legacy parallel-function stubs (always map their CKR to an exception) ===
+
+    [Fact]
+    public void GetFunctionStatus_Throws()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.GetFunctionStatus());
+    }
+
+    [Fact]
+    public void CancelFunction_Throws()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.CancelFunction());
+    }
+
+    // === Policy / UsePolicy ==================================================
+
+    [Fact]
+    public void UsePolicy_RoundTrips()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        var insecure = s.UsePolicy(CryptoPolicy.AllowInsecure);
+        Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+        insecure.Dispose();
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+    }
+
+    [Fact]
+    public void UsePolicy_PermitsInsecureMechanism_ThenRestores()
+    {
+        using var fake = new LifecycleFake { GeneratedKeyId = 7 };
+        using var s = fake.CreateSession(SessionId);
+
+        // Gated by default.
+        var gated = new Mechanism(CKM.CKM_DES_KEY_GEN);
+        Assert.Throws<CryptoPolicyViolationException>(() => s.GenerateKey(gated, []));
+
+        // Permitted inside the scope.
+        using (s.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+            var mech = new Mechanism(CKM.CKM_DES_KEY_GEN);
+            Assert.Equal(7UL, s.GenerateKey(mech, []).ObjectId);
+        }
+
+        // Restored to gated after the scope.
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        var gatedAgain = new Mechanism(CKM.CKM_DES_KEY_GEN);
+        Assert.Throws<CryptoPolicyViolationException>(() => s.GenerateKey(gatedAgain, []));
+    }
+
+    [Fact]
+    public void UsePolicy_NestsLifo()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        using (s.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+            using (s.UsePolicy(CryptoPolicy.AllowInsecure))
+                Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+            // Inner lease restores to its captured "previous" (CryptoPolicy.AllowInsecure), not to
+            // CryptoPolicy.SecureOnly.
+            Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+        }
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+    }
+
+    [Fact]
+    public void PolicyAccess_AfterDispose_Throws()
+    {
+        using var fake = new LifecycleFake();
+        var s = fake.CreateSession(SessionId);
+        s.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => _ = s.Policy);
+        Assert.Throws<ObjectDisposedException>(() => s.UsePolicy(CryptoPolicy.AllowInsecure));
+    }
+
+    /// <summary>
+    /// The disposed check runs while the busy lock is held — before it, the check would race Dispose,
+    /// which sets the flag under that lock. So the throw has to release the lock on its way out, or
+    /// the first call on a disposed session would poison it: the second caller would be told it was a
+    /// concurrency violation, and any caller on another thread would be told that forever.
+    /// </summary>
+    [Fact]
+    public void OperationsOnADisposedSession_KeepThrowingObjectDisposed_NotConcurrencyViolations()
+    {
+        using var fake = new LifecycleFake();
+        var s = fake.CreateSession(SessionId);
+        s.Dispose();
+
+        for (int attempt = 0; attempt < 3; attempt++)
+            Assert.Throws<ObjectDisposedException>(() => s.GetSessionInfo());
+
+        // And the lock is genuinely free, not merely re-entered by this thread. The exception is
+        // carried back rather than asserted in the worker: an assertion failure there is an unhandled
+        // exception on a foreign thread, which takes the test host down instead of failing this test.
+        Exception? fromAnotherThread = null;
+        var worker = new Thread(() => fromAnotherThread = Record.Exception(() => s.GetSessionInfo()));
+        worker.Start();
+
+        Assert.True(worker.Join(TimeSpan.FromSeconds(10)), "A disposed session deadlocked another thread.");
+        Assert.IsType<ObjectDisposedException>(fromAnotherThread);
+    }
+}

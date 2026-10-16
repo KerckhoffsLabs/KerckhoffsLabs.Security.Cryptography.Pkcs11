@@ -1,0 +1,249 @@
+using System.Security.Cryptography;
+using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
+
+#pragma warning disable SYSLIB5006 // ML-DSA (and its external-mu / PKCS#8 export members) are evaluation-only BCL APIs.
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
+
+/// <summary>
+/// <see cref="MLDsaPkcs11"/> over the in-process <c>ManagedSoftToken</c>. SoftHSM is not built with
+/// ML-DSA, so the SoftHsm KAT skips; here the managed token generates the key pair, signs, and verifies
+/// entirely via the BCL <see cref="MLDsa"/> primitive (FIPS 204). This mirrors the SoftHsm behaviour set
+/// (round-trips, context binding, context-length validation, external-mu refusal, key-material export
+/// rules) and adds BCL cross-checks: the token's signature is verified with a BCL <c>MLDsa</c> rebuilt
+/// from the exported public key. The crypto cases are gated on <see cref="MLDsa.IsSupported"/> (needs OS
+/// PQC support — OpenSSL 3.5+ or a recent Windows); construction / argument-validation cases that throw
+/// before any native call stay <c>[Fact]</c>.
+/// </summary>
+[Collection(FakeModuleCollection.Name)]
+public sealed class MLDsaPkcs11Tests_Managed
+{
+    private static MLDsaAlgorithm MapAlgorithm(CkpMlDsa parameterSet) => parameterSet switch
+    {
+        CkpMlDsa.CKP_ML_DSA_44 => MLDsaAlgorithm.MLDsa44,
+        CkpMlDsa.CKP_ML_DSA_65 => MLDsaAlgorithm.MLDsa65,
+        CkpMlDsa.CKP_ML_DSA_87 => MLDsaAlgorithm.MLDsa87,
+        _ => throw new ArgumentOutOfRangeException(nameof(parameterSet)),
+    };
+
+    // Generates an ML-DSA key pair for the given parameter set on the managed token, wraps it as
+    // MLDsaPkcs11, runs the body, then destroys the handle. CKA_PARAMETER_SET goes on the public template.
+    private static void WithMlDsa(CkpMlDsa parameterSet, Action<MLDsaPkcs11> body)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+
+        string label = $"mldsa-{Guid.NewGuid():N}";
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_DSA)
+            .Label(label).Verify()
+            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)parameterSet).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
+            .Label(label).Sign().Build();
+
+        using var key = session.GenerateKeyPair(
+            new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+        try
+        {
+            using var mldsa = new MLDsaPkcs11(key);
+            body(mldsa);
+        }
+        finally
+        {
+            try { key.Destroy(); }
+            catch { /* best-effort cleanup */ }
+        }
+    }
+
+    // === Sign / verify — pure ML-DSA, cross-checked against the BCL ========
+
+    [Theory(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
+    public void SignVerifyData_RoundTrips(CkpMlDsa parameterSet) => WithMlDsa(parameterSet, mldsa =>
+    {
+        Assert.Equal(MapAlgorithm(parameterSet), mldsa.Algorithm);
+
+        byte[] data = Encoding.UTF8.GetBytes("ml-dsa round trip");
+        byte[] sig = mldsa.SignData(data);
+        Assert.Equal(mldsa.Algorithm.SignatureSizeInBytes, sig.Length);
+        Assert.True(mldsa.VerifyData(data, sig));
+
+        byte[] tamperedMessage = [.. data];
+        tamperedMessage[0] ^= 0xFF;
+        Assert.False(mldsa.VerifyData(tamperedMessage, sig));
+
+        byte[] tamperedSig = [.. sig];
+        tamperedSig[0] ^= 0xFF;
+        Assert.False(mldsa.VerifyData(data, tamperedSig));
+    });
+
+    // The token's signature must verify under a BCL MLDsa rebuilt from the exported public key.
+    [Theory(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
+    public void SignData_VerifiesWithBcl(CkpMlDsa parameterSet) => WithMlDsa(parameterSet, mldsa =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("token-signed, bcl-verified");
+        byte[] sig = mldsa.SignData(data);
+
+        byte[] pub = mldsa.ExportMLDsaPublicKey();
+        using var bcl = MLDsa.ImportMLDsaPublicKey(MapAlgorithm(parameterSet), pub);
+        Assert.True(bcl.VerifyData(data, sig));
+
+        byte[] tampered = [.. data];
+        tampered[0] ^= 0xFF;
+        Assert.False(bcl.VerifyData(tampered, sig));
+    });
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void SignVerifyData_WithContext_RoundTrips() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("context-bound message");
+        byte[] context = Encoding.UTF8.GetBytes("app-context");
+
+        byte[] sig = mldsa.SignData(data, context);
+        Assert.True(mldsa.VerifyData(data, sig, context));
+        // A signature made with a context must not verify without it.
+        Assert.False(mldsa.VerifyData(data, sig));
+        // ...nor under a different context.
+        Assert.False(mldsa.VerifyData(data, sig, Encoding.UTF8.GetBytes("other-context")));
+
+        // Cross-check: the BCL (rebuilt from the exported public key) agrees on context binding.
+        byte[] pub = mldsa.ExportMLDsaPublicKey();
+        using var bcl = MLDsa.ImportMLDsaPublicKey(MLDsaAlgorithm.MLDsa65, pub);
+        Assert.True(bcl.VerifyData(data, sig, context));
+        Assert.False(bcl.VerifyData(data, sig));
+    });
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void SignData_ContextTooLong_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
+        // The BCL validates the >255-byte context first (ArgumentOutOfRangeException) before our own
+        // ArgumentException would fire; both derive from ArgumentException.
+        Assert.ThrowsAny<ArgumentException>(() => mldsa.SignData(new byte[4], new byte[256])));
+
+    // === External-mu / pre-hash — unsupported on PKCS#11 v3.2 =============
+    //
+    // HashML-DSA pre-hash (SignPreHash/VerifyPreHash) is intentionally not tested: the BCL's
+    // evaluation-only pre-hash wrappers validate/short-circuit before reaching our *Core overrides, so a
+    // test would assert BCL behaviour, not ours. External-mu reaches our overrides and is asserted here.
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void SignMu_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
+        Assert.Throws<NotSupportedException>(() => mldsa.SignMu(new byte[64])));
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void VerifyMu_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
+        Assert.Throws<NotSupportedException>(() =>
+            mldsa.VerifyMu(new byte[64], new byte[mldsa.Algorithm.SignatureSizeInBytes])));
+
+    // === Key-material export ==============================================
+
+    [Theory(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
+    public void ExportMLDsaPublicKey_ReturnsStandardEncoding(CkpMlDsa parameterSet) =>
+        WithMlDsa(parameterSet, mldsa =>
+        {
+            byte[] pub = mldsa.ExportMLDsaPublicKey();
+            Assert.Equal(mldsa.Algorithm.PublicKeySizeInBytes, pub.Length);
+            // It is a valid FIPS 204 public-key encoding (the BCL accepts it).
+            using var bcl = MLDsa.ImportMLDsaPublicKey(MapAlgorithm(parameterSet), pub);
+            Assert.Equal(MapAlgorithm(parameterSet), bcl.Algorithm);
+        });
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void ExportMLDsaPrivateKey_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
+        Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportMLDsaPrivateKey()));
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void ExportMLDsaPrivateSeed_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
+        Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportMLDsaPrivateSeed()));
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void ExportPkcs8PrivateKey_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
+        Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportPkcs8PrivateKey()));
+
+    // === Construction / argument validation (run before any native call) ==
+
+    [Fact]
+    public void Ctor_NullKey_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => new MLDsaPkcs11(null!));
+
+    [Fact]
+    public void Ctor_NonMlDsaKey_Throws()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label("aes").ValueLen(32).Encrypt().Decrypt().Build();
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+
+        var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+    }
+
+    // === ResolveAlgorithm / attribute-read edge cases ======================
+    //
+    // A real token can't be coaxed into reporting CKA_PARAMETER_SET as sensitive, or into
+    // returning a value it never advertises, on a well-formed ML-DSA key object — these are
+    // fallback paths a fake library must drive.
+
+    private static byte[] UlongAttr(ulong value) =>
+        BitConverter.GetBytes(value).AsSpan(0, UnmanagedMemory.NativeULongSize).ToArray();
+
+    [Fact]
+    public void Ctor_ParameterSetAttributeSensitive_ThrowsArgumentException()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+
+        var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+        Assert.Contains("not readable", ex.Message);
+    }
+
+    [Fact]
+    public void Ctor_UnrecognizedParameterSet_ThrowsArgumentException()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_OK, UlongAttr(0xFFFF)));
+
+        var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+        Assert.Contains("Unrecognized ML-DSA parameter set", ex.Message);
+    }
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void ExportMLDsaPublicKey_ValueAttributeSensitive_ThrowsPkcs11Exception()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, ca => ca == CKA.CKA_PARAMETER_SET
+            ? (CKR.CKR_OK, UlongAttr((ulong)CkpMlDsa.CKP_ML_DSA_44))
+            : (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+        using var mldsa = new MLDsaPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
+        Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+    }
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void ExportMLDsaPublicKey_TokenReturnsWrongLength_ThrowsPkcs11Exception()
+    {
+        // MLDsa44's public key is 1312 bytes; a well-formed token could never return a different
+        // length for its own advertised parameter set, so this drives CopyExact's mismatch guard.
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, ca => ca == CKA.CKA_PARAMETER_SET
+            ? (CKR.CKR_OK, UlongAttr((ulong)CkpMlDsa.CKP_ML_DSA_44))
+            : (CKR.CKR_OK, new byte[1]));
+        using var mldsa = new MLDsaPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
+        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+    }
+}

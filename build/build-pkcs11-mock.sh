@@ -3,7 +3,7 @@
 # Pkcs11.Tests output directory under the appropriate runtime identifier.
 #
 # Usage: build-pkcs11-mock.sh <test-output-dir>
-#   <test-output-dir> e.g. src/.../Pkcs11.Tests/bin/Debug/net9.0
+#   <test-output-dir> e.g. tests/.../Pkcs11.Tests/bin/Debug/net9.0
 #
 # Idempotent: the target binary is reused when it was built from this submodule
 # commit by this script (see is_built_from).

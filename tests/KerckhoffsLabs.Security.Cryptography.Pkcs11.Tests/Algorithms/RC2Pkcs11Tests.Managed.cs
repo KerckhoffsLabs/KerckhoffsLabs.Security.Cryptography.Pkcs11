@@ -1,0 +1,280 @@
+using System.Security.Cryptography;
+using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
+
+// RC2Pkcs11 is [Obsolete] (weak legacy 64-bit cipher with a reduced effective key length); the
+// secure-defaults gate is the whole point of the type, so KLPKCS11005 is suppressed deliberately at the
+// use sites.
+#pragma warning disable KLPKCS11005
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
+
+/// <summary>
+/// RC2Pkcs11 over the in-process <c>ManagedSoftToken</c> (a BCL-backed PKCS#11 fake). Unlike SoftHSM —
+/// which implements no RC2 at all, forcing its KATs to skip — the managed token genuinely implements
+/// <c>CKM_RC2_CBC/CBC_PAD/ECB</c> on top of the BCL <see cref="RC2"/> (honouring the RFC 2268
+/// effective-key-bits mechanism parameter), so every known-answer round-trip runs here and is
+/// cross-checked against the BCL primitive for the same key, IV and effective key size.
+/// <para>
+/// RC2 is gated on two fronts. The secure-defaults policy means each cipher op must run inside
+/// <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> and throws <see cref="CryptoPolicyViolationException"/> without it. The BCL
+/// <see cref="RC2"/> implementation is cross-platform today (confirmed on Linux and Windows) but is
+/// still probed via <see cref="Rc2Supported"/> rather than assumed, matching how this suite probes
+/// other host-BCL-dependent capabilities (ML-DSA/ML-KEM/SLH-DSA); the construction and
+/// argument-validation cases that throw before any token call stay <c>[Fact]</c>.
+/// </para>
+/// </summary>
+[Collection(FakeModuleCollection.Name)]
+public sealed class RC2Pkcs11Tests_Managed
+{
+    // RC2.Create() throws PlatformNotSupportedException on a host without an RC2 implementation;
+    // probe rather than assume a specific OS. Confirmed working (construction, EffectiveKeySize,
+    // and full CBC/ECB encrypt/decrypt cross-checked against real NSS token crypto) on Linux, not
+    // just Windows as an earlier version of this suite assumed.
+    public static bool Rc2Supported
+    {
+        get
+        {
+            try { using var rc2 = RC2.Create(); return true; }
+            catch (PlatformNotSupportedException) { return false; }
+        }
+    }
+
+    // Shared with RC2Pkcs11TestCases (the backend-agnostic suite), so the Managed and real-backend
+    // suites validate against the same key/IV/effective-bits vectors.
+    private static readonly byte[] Key128 = RC2Pkcs11TestCases.Key128;
+    private static readonly byte[] Iv8 = RC2Pkcs11TestCases.Iv8;
+    private const int EffectiveBits = RC2Pkcs11TestCases.EffectiveBits;
+
+    // Imports Key128 as a token RC2 key and hands a wrapping RC2Pkcs11 (and its session) to the body.
+    private static void WithImportedRc2(Action<Pkcs11Session, RC2Pkcs11> body)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_RC2)
+            .Label($"rc2-{Guid.NewGuid():N}").Value(Key128).Encrypt().Decrypt().Build();
+        using var key = session.ImportKey(tpl);
+        using var rc2 = new RC2Pkcs11(key) { EffectiveKeySize = EffectiveBits };
+        body(session, rc2);
+    }
+
+    private static RC2 BclRc2() => RC2Pkcs11TestCases.BclRc2();
+
+    // === Construction / argument surface (throws before any token call) =============================
+
+    [Fact]
+    public void Ctor_NullKey_Throws()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() => new RC2Pkcs11(null!));
+        Assert.Equal("key", ex.ParamName);
+    }
+
+    [Fact]
+    public void Ctor_NonRc2Key_Throws()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label("gen").ValueLen(32).Sign().Build();
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+
+        var ex = Assert.Throws<ArgumentException>(() => new RC2Pkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+    }
+
+    // The ctor reflects the token key's CKA_VALUE_LEN into KeySize (and thus the EffectiveKeySize
+    // default) when it is a legal RC2 size; a 16-byte key → 128 bits.
+    [Fact]
+    public void Ctor_ReflectsTokenKeySize()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_RC2)
+            .Label($"rc2-{Guid.NewGuid():N}").Value(Key128).Encrypt().Decrypt().Build();
+        using var key = session.ImportKey(tpl);
+        using var rc2 = new RC2Pkcs11(key);
+        Assert.Equal(128, rc2.KeySize);
+    }
+
+    // === Secure-defaults gate (fires before any token call — no RC2-capable host needed) ============
+
+    [Fact]
+    public void EncryptCbc_Pkcs7_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptCbc(new byte[8], Iv8)));
+
+    [Fact]
+    public void EncryptCbc_NonePadding_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptCbc(new byte[8], Iv8, PaddingMode.None)));
+
+    [Fact]
+    public void DecryptCbc_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.DecryptCbc(new byte[8], Iv8)));
+
+    [Fact]
+    public void EncryptEcb_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptEcb(new byte[8], PaddingMode.None)));
+
+    // === Known-answer round-trips vs the BCL (the managed token implements RC2 wherever the host does) ==
+
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
+    public void EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl() => WithImportedRc2((session, rc2) =>
+    {
+        byte[] plaintext = Encoding.UTF8.GetBytes("RC2-CBC PKCS7 over a token key — variable length.");
+
+        using var bcl = BclRc2();
+        byte[] expected = bcl.EncryptCbc(plaintext, Iv8); // default PaddingMode.PKCS7
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            byte[] ct = rc2.EncryptCbc(plaintext, Iv8);
+            Assert.Equal(expected, ct);
+            Assert.Equal(plaintext, rc2.DecryptCbc(ct, Iv8));
+        }
+    });
+
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
+    public void EncryptCbc_NonePadding_AllowInsecure_MatchesBcl() => WithImportedRc2((session, rc2) =>
+    {
+        byte[] plaintext = new byte[16]; // exactly two 8-byte blocks
+        RandomNumberGenerator.Fill(plaintext);
+
+        using var bcl = BclRc2();
+        byte[] expected = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            byte[] ct = rc2.EncryptCbc(plaintext, Iv8, PaddingMode.None);
+            Assert.Equal(expected, ct);
+            Assert.Equal(plaintext, rc2.DecryptCbc(ct, Iv8, PaddingMode.None));
+        }
+    });
+
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
+    public void EncryptEcb_AllowInsecure_MatchesBcl() => WithImportedRc2((session, rc2) =>
+    {
+        byte[] plaintext = new byte[8];
+        RandomNumberGenerator.Fill(plaintext);
+
+        using var bcl = BclRc2();
+        byte[] expected = bcl.EncryptEcb(plaintext, PaddingMode.None);
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            byte[] ct = rc2.EncryptEcb(plaintext, PaddingMode.None);
+            Assert.Equal(expected, ct);
+            Assert.Equal(plaintext, rc2.DecryptEcb(ct, PaddingMode.None));
+        }
+    });
+
+    // No KAT for a reduced RFC 2268 effective-key-bits (< the key's own size): every OS's
+    // System.Security.Cryptography.RC2Implementation — confirmed directly on Linux, and by CI on
+    // Windows — throws CryptographicUnexpectedOperationException("EffectiveKeySize must be the same
+    // as KeySize in this implementation.") the moment EffectiveKeySize is set to anything other than
+    // KeySize. This is not a Windows-only restriction; it is the one cross-platform managed RC2
+    // implementation .NET ships. The ManagedSoftToken fake's own RC2 crypto
+    // (ManagedSoftToken.Symmetric.cs) goes through the same RC2.Create() internally, so it hits the
+    // identical restriction — there is no way to drive a reduced effective-key-bits round-trip
+    // through the BCL at all, on any platform. See RC2Pkcs11Tests.Nss.cs
+    // (EncryptCbc_ReducedEffectiveKeySize_MatchesKnownAnswer) for real coverage of this case: NSS
+    // softoken implements genuine CKM_RC2_CBC with a configurable effective-bits parameter,
+    // cross-checked against a fixed vector computed independently with PyCryptodome's ARC2.
+
+    // No test for "effective > KeySize" / "effective < 1": the base RC2.EffectiveKeySize and
+    // RC2.KeySize setters already enforce EffectiveKeySize <= KeySize symmetrically (each throws
+    // CryptographicException if the other would end up smaller), and the BCL's legal RC2 key sizes
+    // start at 40 bits, so RC2Pkcs11 has no reachable path to an inconsistent value in the first
+    // place — confirmed empirically; setting either property to violate the invariant throws from
+    // the BCL setter itself, before any RC2Pkcs11 code runs.
+
+    // Reverse direction: ciphertext produced by the BCL must decrypt on the token.
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
+    public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedRc2((session, rc2) =>
+    {
+        byte[] plaintext = Encoding.UTF8.GetBytes("token decrypts BCL RC2 ciphertext");
+        using var bcl = BclRc2();
+        byte[] ct = bcl.EncryptCbc(plaintext, Iv8);
+
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            Assert.Equal(plaintext, rc2.DecryptCbc(ct, Iv8));
+    });
+
+    // A wrong IV corrupts the leading block under CBC (no integrity, so it does not throw).
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
+    public void DecryptCbc_WrongIv_ProducesDifferentPlaintext() => WithImportedRc2((session, rc2) =>
+    {
+        byte[] plaintext = new byte[16];
+        RandomNumberGenerator.Fill(plaintext);
+        using var bcl = BclRc2();
+        byte[] ct = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
+
+        byte[] wrongIv = [.. Iv8];
+        wrongIv[0] ^= 0xFF;
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            byte[] dec = rc2.DecryptCbc(ct, wrongIv, PaddingMode.None);
+            Assert.NotEqual(plaintext, dec);
+        }
+    });
+
+    // === Empty-input handling (gate first, then no-op fast path) ====================================
+
+    [Fact]
+    public void Cbc_EmptyInput_Gated_Throws() => WithImportedRc2((ws, rc2) =>
+        // Even the empty-input fast path honours the secure-defaults gate: without the AllowInsecure policy the
+        // gated mechanism throws before the (empty) buffer reaches the token.
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
+
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
+    public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedRc2((session, rc2) =>
+    {
+        // Under the AllowInsecure policy, empty decrypt is a no-op returned without touching the token.
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            Assert.Empty(rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+    });
+
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
+    public void EncryptCbc_Pkcs7_EmptyInput_AllowInsecure_EmitsPaddingBlock() => WithImportedRc2((session, rc2) =>
+    {
+        // Empty plaintext with PKCS7 must still emit a full 8-byte padding block; that path goes to the
+        // token rather than the empty-input fast path. Cross-check against the BCL.
+        using var bcl = BclRc2();
+        byte[] expected = bcl.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            byte[] ct = rc2.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
+            Assert.Equal(8, ct.Length);
+            Assert.Equal(expected, ct);
+            Assert.Empty(rc2.DecryptCbc(ct, Iv8));
+        }
+    });
+
+
+    // === NotSupported / argument surface (no token call) ===========================================
+
+    [Fact]
+    public void EncryptCbc_UnsupportedPadding_Throws() => WithImportedRc2((ws, rc2) =>
+        Assert.Throws<NotSupportedException>(() => rc2.EncryptCbc(new byte[8], Iv8, PaddingMode.Zeros)));
+
+    [Fact]
+    public void EncryptEcb_UnsupportedPadding_Throws() => WithImportedRc2((ws, rc2) =>
+        Assert.Throws<NotSupportedException>(() => rc2.EncryptEcb(new byte[8], PaddingMode.PKCS7)));
+
+    [Fact]
+    public void GenerateIV_ProducesBlockSizedIv() => WithImportedRc2((ws, rc2) =>
+    {
+        rc2.GenerateIV();
+        Assert.Equal(8, rc2.IV.Length);
+    });
+
+    [Fact]
+    public void ManagedKeyAndStreamingSurface_NotSupported() => WithImportedRc2((ws, rc2) =>
+    {
+        Assert.Throws<NotSupportedException>(() => rc2.CreateEncryptor(new byte[16], new byte[8]));
+        Assert.Throws<NotSupportedException>(() => rc2.CreateDecryptor(new byte[16], new byte[8]));
+        Assert.Throws<NotSupportedException>(() => rc2.GenerateKey());
+        Assert.Throws<NotSupportedException>(() => { _ = rc2.Key; });
+        Assert.Throws<NotSupportedException>(() => rc2.Key = new byte[16]);
+    });
+}
