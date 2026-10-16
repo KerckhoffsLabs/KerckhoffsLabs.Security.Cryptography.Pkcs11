@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// A certificate object on a PKCS#11 token, returned by <see cref="Pkcs11Session.FindCertificates"/>.
+/// A certificate object on a PKCS#11 token, returned by <see cref="Pkcs11Session.FindCertificates()"/>.
 /// Exposes the parsed <see cref="X509Certificate2"/> (identity + public key), retains the token
 /// handle for <see cref="Destroy"/>, and bridges to the associated on-token private key — located by
 /// the certificate's <c>CKA_ID</c> — as a <see cref="Pkcs11Key"/>.

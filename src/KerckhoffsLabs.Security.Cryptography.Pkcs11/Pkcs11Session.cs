@@ -328,10 +328,10 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Finds all certificate objects on the token (<c>CKA_CLASS = CKO_CERTIFICATE</c>) — a typed
-    /// counterpart to <see cref="FindKeys"/>. Each <see cref="Pkcs11Certificate"/> exposes the
-    /// parsed <see cref="X509Certificate2"/> and bridges to its on-token private key by
-    /// <c>CKA_ID</c>.
+    /// Finds all X.509 certificate objects on the token (<c>CKA_CLASS = CKO_CERTIFICATE</c>,
+    /// <c>CKA_CERTIFICATE_TYPE = CKC_X_509</c>) — a typed counterpart to <see cref="FindKeys"/>. Each
+    /// <see cref="Pkcs11Certificate"/> exposes the parsed <see cref="X509Certificate2"/> and bridges to
+    /// its on-token private key by <c>CKA_ID</c>.
     /// </summary>
     /// <returns>A list of <see cref="Pkcs11Certificate"/>. May be empty. The list owns the certificates:
     /// dispose it (a <see langword="using"/> will do) to release them all.</returns>
@@ -340,17 +340,207 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <c>CKA_VALUE</c> cannot be read; also propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public ReadOnlyDisposableList<Pkcs11Certificate> FindCertificates()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using var filter = ObjectTemplate.Empty().Build();
+        return FindCertificates(filter);
+    }
 
-        using var filter = ObjectTemplate.Empty()
-            .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_CERTIFICATE)
-            .Build();
+    /// <summary>
+    /// Finds the X.509 certificate objects that match <paramref name="filter"/>, which is applied on the
+    /// token: only the matching certificates are read and parsed.
+    /// </summary>
+    /// <remarks>
+    /// <c>CKA_CLASS = CKO_CERTIFICATE</c> and <c>CKA_CERTIFICATE_TYPE = CKC_X_509</c> are added unless the
+    /// filter already names them, with those values.
+    /// </remarks>
+    /// <param name="filter">The attributes to match. Use an <see cref="ObjectTemplate.Empty"/>-based builder.</param>
+    /// <returns>A list of <see cref="Pkcs11Certificate"/>. May be empty. The list owns the certificates:
+    /// dispose it (a <see langword="using"/> will do) to release them all.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="filter"/> names another class or certificate type.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if a certificate's
+    /// <c>CKA_VALUE</c> cannot be read; also propagated from the underlying <c>C_FindObjects</c> call.</exception>
+    public ReadOnlyDisposableList<Pkcs11Certificate> FindCertificates(ObjectTemplate filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
 
-        var handles = _core.FindAllObjects([.. filter.Attributes]);
-        var result = new List<Pkcs11Certificate>(handles.Count);
-        foreach (var handle in handles)
-            result.Add(HydrateCertificateFromHandle(handle));
+        var result = new List<Pkcs11Certificate>();
+        try
+        {
+            foreach ((ObjectHandle handle, _) in SearchFamily(filter, Certificates))
+                result.Add(HydrateCertificateFromHandle(handle));
+        }
+        catch
+        {
+            // A certificate that failed to read must not leave the ones already built undisposed.
+            foreach (Pkcs11Certificate certificate in result)
+                certificate.Dispose();
+            throw;
+        }
         return new ReadOnlyDisposableList<Pkcs11Certificate>(result);
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate whose <c>CKA_LABEL</c> is <paramref name="label"/>.
+    /// </summary>
+    /// <remarks>
+    /// Only X.509 certificate objects match — keys and data objects that share the label are ignored.
+    /// The lookup must identify exactly one certificate; several are refused with
+    /// <see cref="Pkcs11AmbiguousObjectException"/> rather than resolved by picking one. Narrow an
+    /// ambiguous lookup with <see cref="OpenCertificate(ObjectTemplate)"/> or by <c>CKA_ID</c>.
+    /// </remarks>
+    /// <param name="label">The <c>CKA_LABEL</c> to match.</param>
+    /// <returns>A new <see cref="Pkcs11Certificate"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is null.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no certificate matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public Pkcs11Certificate OpenCertificate(string label)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        using var filter = ObjectTemplate.Empty().Label(label).Build();
+        return OpenCertificateCore(filter, $"with label '{label}'");
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate whose <c>CKA_ID</c> is <paramref name="id"/>: the certificate of the
+    /// key with that id. See <see cref="OpenCertificate(string)"/> for which objects match.
+    /// </summary>
+    /// <param name="id">The <c>CKA_ID</c> bytes to match. Must not be empty.</param>
+    /// <returns>A new <see cref="Pkcs11Certificate"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="id"/> is empty.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no certificate matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public Pkcs11Certificate OpenCertificate(ReadOnlySpan<byte> id)
+    {
+        if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
+        using var filter = ObjectTemplate.Empty().Id(id).Build();
+        return OpenCertificateCore(filter, $"with CKA_ID ({id.Length} bytes)");
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate that matches <paramref name="filter"/>. See
+    /// <see cref="OpenCertificate(string)"/> for which objects match, and
+    /// <see cref="FindCertificates(ObjectTemplate)"/> for what the filter may name.
+    /// </summary>
+    /// <param name="filter">The attributes to match. Use an <see cref="ObjectTemplate.Empty"/>-based builder.</param>
+    /// <returns>A new <see cref="Pkcs11Certificate"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="filter"/> names another class or certificate type.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no certificate matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public Pkcs11Certificate OpenCertificate(ObjectTemplate filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return OpenCertificateCore(filter, "matching the filter");
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate whose <c>CKA_LABEL</c> is <paramref name="label"/>, or reports that
+    /// there is none. Matches exactly as <see cref="OpenCertificate(string)"/> does.
+    /// </summary>
+    /// <remarks>
+    /// Only "no match" returns <see langword="false"/>. Several matches still throw
+    /// <see cref="Pkcs11AmbiguousObjectException"/>.
+    /// </remarks>
+    /// <param name="label">The <c>CKA_LABEL</c> to match.</param>
+    /// <param name="certificate">The certificate, when one matched; the caller must <c>Dispose</c> it.</param>
+    /// <returns><see langword="true"/> if exactly one certificate matched.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is null.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public bool TryOpenCertificate(string label, [NotNullWhen(true)] out Pkcs11Certificate? certificate)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        using var filter = ObjectTemplate.Empty().Label(label).Build();
+        certificate = FindUniqueCertificate(filter);
+        return certificate is not null;
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate whose <c>CKA_ID</c> is <paramref name="id"/>, or reports that there
+    /// is none. Matches exactly as <see cref="OpenCertificate(ReadOnlySpan{byte})"/> does; see
+    /// <see cref="TryOpenCertificate(string, out Pkcs11Certificate?)"/> for what returns <see langword="false"/>.
+    /// </summary>
+    /// <param name="id">The <c>CKA_ID</c> bytes to match. Must not be empty.</param>
+    /// <param name="certificate">The certificate, when one matched; the caller must <c>Dispose</c> it.</param>
+    /// <returns><see langword="true"/> if exactly one certificate matched.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="id"/> is empty.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public bool TryOpenCertificate(ReadOnlySpan<byte> id, [NotNullWhen(true)] out Pkcs11Certificate? certificate)
+    {
+        if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
+        using var filter = ObjectTemplate.Empty().Id(id).Build();
+        certificate = FindUniqueCertificate(filter);
+        return certificate is not null;
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate that matches <paramref name="filter"/>, or reports that there is
+    /// none. Matches exactly as <see cref="OpenCertificate(ObjectTemplate)"/> does; see
+    /// <see cref="TryOpenCertificate(string, out Pkcs11Certificate?)"/> for what returns <see langword="false"/>.
+    /// </summary>
+    /// <param name="filter">The attributes to match. Use an <see cref="ObjectTemplate.Empty"/>-based builder.</param>
+    /// <param name="certificate">The certificate, when one matched; the caller must <c>Dispose</c> it.</param>
+    /// <returns><see langword="true"/> if exactly one certificate matched.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="filter"/> names another class or certificate type.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public bool TryOpenCertificate(ObjectTemplate filter, [NotNullWhen(true)] out Pkcs11Certificate? certificate)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        certificate = FindUniqueCertificate(filter);
+        return certificate is not null;
+    }
+
+    /// <summary>
+    /// Stores <paramref name="certificate"/> on the token as an X.509 certificate object and returns it.
+    /// </summary>
+    /// <remarks>
+    /// Writes <c>CKA_VALUE</c> (the DER certificate), <c>CKA_SUBJECT</c> and <c>CKA_ISSUER</c>, with
+    /// <paramref name="label"/> and <paramref name="id"/>. Give it the <c>CKA_ID</c> of its key:
+    /// that is how <see cref="Pkcs11Certificate.GetPrivateKey"/> and <see cref="Pkcs11Key.GetCertificate"/>
+    /// find each other. Only the public certificate is stored, never a private key it may carry.
+    /// </remarks>
+    /// <param name="certificate">The certificate to store.</param>
+    /// <param name="label">The <c>CKA_LABEL</c> to give it.</param>
+    /// <param name="id">The <c>CKA_ID</c> to give it, normally its key's. Must not be empty.</param>
+    /// <param name="persistOnToken">
+    /// <see langword="true"/> to store it on the token (<c>CKA_TOKEN = true</c>); the default creates a
+    /// session object, gone when the session closes.
+    /// </param>
+    /// <returns>The stored certificate. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="certificate"/> or <paramref name="label"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="id"/> is empty.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CreateObject</c> call.</exception>
+    public Pkcs11Certificate ImportCertificate(X509Certificate2 certificate, string label, ReadOnlySpan<byte> id, bool persistOnToken = false)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(certificate);
+        ArgumentNullException.ThrowIfNull(label);
+        if (id.IsEmpty) throw new ArgumentException("Id must not be empty: it links the certificate to its key.", nameof(id));
+
+        using var template = ObjectTemplate.ForCertificate(CKC.CKC_X_509)
+            .Label(label)
+            .Id(id)
+            .OnToken(persistOnToken)
+            .Subject(certificate.SubjectName.RawData)
+            .Issuer(certificate.IssuerName.RawData)
+            .Value(certificate.RawData)
+            .Build();
+        ObjectHandle handle = _core.CreateObject([.. template.Attributes]);
+        return HydrateCertificateFromHandle(handle);
     }
 
     private Pkcs11Certificate HydrateCertificateFromHandle(ObjectHandle handle)
@@ -358,7 +548,7 @@ public sealed partial class Pkcs11Session : IDisposable
         using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID]);
         if (attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "FindCertificates (CKA_VALUE unreadable)");
+                "Pkcs11Certificate (CKA_VALUE unreadable)");
 
         var certificate = X509CertificateLoader.LoadCertificate(attrs[0].GetValueAsByteArray());
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
@@ -377,6 +567,19 @@ public sealed partial class Pkcs11Session : IDisposable
         if (id.Length == 0) return null;
         using var filter = ObjectTemplate.Empty().Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PRIVATE_KEY).Id(id).Build();
         return FindUniqueKey(filter);
+    }
+
+    /// <summary>
+    /// Opens the X.509 certificate with the given <c>CKA_ID</c>, or returns <see langword="null"/> when
+    /// <paramref name="id"/> is empty or no such certificate exists. Used by <see cref="Pkcs11Key"/>,
+    /// whose key objects share the id: the certificate family keeps them out of the match.
+    /// </summary>
+    /// <exception cref="Pkcs11AmbiguousObjectException">More than one certificate has this id.</exception>
+    internal Pkcs11Certificate? OpenCertificateById(byte[] id)
+    {
+        if (id.Length == 0) return null;
+        using var filter = ObjectTemplate.Empty().Id(id).Build();
+        return FindUniqueCertificate(filter);
     }
 
     private Pkcs11Object HydrateObjectFromHandle(ObjectHandle handle)
@@ -756,47 +959,51 @@ public sealed partial class Pkcs11Session : IDisposable
         return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
     }
 
-    private static readonly CKO[] KeyClasses = [CKO.CKO_PRIVATE_KEY, CKO.CKO_PUBLIC_KEY, CKO.CKO_SECRET_KEY];
+    /// <summary>
+    /// A family of objects a lookup returns as one wrapper type: the classes it spans, and an attribute
+    /// every member has (certificates: <c>CKA_CERTIFICATE_TYPE = CKC_X_509</c>, since
+    /// <see cref="Pkcs11Certificate"/> holds an <see cref="X509Certificate2"/>).
+    /// </summary>
+    private sealed record ObjectFamily(string Name, CKO[] Classes, CKA? FixedAttribute = null, ulong FixedValue = 0);
+
+    private static readonly ObjectFamily Keys =
+        new("key", [CKO.CKO_PRIVATE_KEY, CKO.CKO_PUBLIC_KEY, CKO.CKO_SECRET_KEY]);
+
+    private static readonly ObjectFamily Certificates =
+        new("certificate", [CKO.CKO_CERTIFICATE], CKA.CKA_CERTIFICATE_TYPE, (ulong)CKC.CKC_X_509);
 
     private Pkcs11Key OpenKeyCore(ObjectTemplate filter, string criteria)
         => FindUniqueKey(filter)
             ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No key {criteria} was found on the token.");
 
     private Pkcs11Key? FindUniqueKey(ObjectTemplate filter)
-        => FindUnique(filter, KeyClasses, "key", GroupKeyHalves, HydrateKeyGroup);
+        => FindUnique(filter, Keys, GroupKeyHalves, HydrateKeyGroup);
+
+    private Pkcs11Certificate OpenCertificateCore(ObjectTemplate filter, string criteria)
+        => FindUniqueCertificate(filter)
+            ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No certificate {criteria} was found on the token.");
+
+    private Pkcs11Certificate? FindUniqueCertificate(ObjectTemplate filter)
+        => FindUnique(filter, Certificates, EachOnItsOwn, matched => HydrateCertificateFromHandle(matched[0].Handle));
 
     /// <summary>An object a lookup matched, with the attributes that decide which result it belongs to.</summary>
     private sealed record ObjectCandidate(ObjectHandle Handle, CKO Class, CKK? KeyType, byte[] Id, string? Label);
 
     /// <summary>
-    /// Runs a lookup that must identify one object of a family (keys, certificates, …): searches each
-    /// class the family allows with the rest of <paramref name="filter"/>, groups the matches into
-    /// results with <paramref name="group"/> and builds the one result with <paramref name="hydrate"/>,
-    /// or returns <see langword="null"/> when nothing matched.
+    /// Runs a lookup that must identify one object of <paramref name="family"/>: searches with
+    /// <see cref="SearchFamily"/>, groups the matches into results with <paramref name="group"/> and
+    /// builds the one result with <paramref name="hydrate"/>, or returns <see langword="null"/> when
+    /// nothing matched.
     /// </summary>
-    /// <remarks>
-    /// PKCS#11 has no "class is one of" filter, so a lookup across a family is one search per class,
-    /// which is also what keeps objects of other families out of the match. A <c>CKA_CLASS</c> in
-    /// <paramref name="filter"/> narrows the search to that class, and must belong to the family.
-    /// </remarks>
-    /// <exception cref="ArgumentException"><paramref name="filter"/> names a class outside the family.</exception>
+    /// <exception cref="ArgumentException"><paramref name="filter"/> contradicts the family.</exception>
     /// <exception cref="Pkcs11AmbiguousObjectException">The matches form more than one result.</exception>
     private T? FindUnique<T>(
-        ObjectTemplate filter, CKO[] familyClasses, string family,
+        ObjectTemplate filter, ObjectFamily family,
         Func<List<ObjectCandidate>, List<List<ObjectCandidate>>> group, Func<List<ObjectCandidate>, T> hydrate)
         where T : class
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        CKO[] classes = ClassesToSearch(filter, familyClasses, family);
-        List<ObjectAttribute> criteria = [.. filter.Attributes.Where(a => a.Type != CKA.CKA_CLASS)];
-        List<ObjectCandidate> candidates = [];
-        foreach (CKO objectClass in classes)
-        {
-            using var classAttribute = new ObjectAttribute(CKA.CKA_CLASS, objectClass);
-            foreach (ObjectHandle handle in _core.FindAllObjects([.. criteria, classAttribute]))
-                candidates.Add(ReadCandidate(handle, objectClass));
-        }
+        List<ObjectCandidate> candidates =
+            [.. SearchFamily(filter, family).Select(match => ReadCandidate(match.Handle, match.Class))];
 
         List<List<ObjectCandidate>> results = group(candidates);
         return results.Count switch
@@ -804,23 +1011,65 @@ public sealed partial class Pkcs11Session : IDisposable
             0 => null,
             1 => hydrate(results[0]),
             _ => throw new Pkcs11AmbiguousObjectException("C_FindObjects",
-                $"The lookup matched {results.Count} distinct {family}s; refusing to pick one. Narrow it with a " +
+                $"The lookup matched {results.Count} distinct {family.Name}s; refusing to pick one. Narrow it with a " +
                 "filter (class, type, CKA_ID, …), or enumerate the candidates with a Find method."),
         };
     }
 
+    // Single-member groups, for the families that have no pairs.
+    private static List<List<ObjectCandidate>> EachOnItsOwn(List<ObjectCandidate> candidates)
+        => [.. candidates.Select(c => new List<ObjectCandidate> { c })];
+
+    /// <summary>
+    /// Every object of <paramref name="family"/> that matches <paramref name="filter"/>, with its class.
+    /// </summary>
+    /// <remarks>
+    /// PKCS#11 has no "class is one of" filter, so a search across a family is one search per class,
+    /// which is also what keeps objects of other families out. A <c>CKA_CLASS</c> in
+    /// <paramref name="filter"/> narrows the search to that class and must belong to the family; the
+    /// family's fixed attribute is added unless the filter already names it, with the same value.
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="filter"/> names a class outside the family, or another value for its fixed attribute.</exception>
+    private List<(ObjectHandle Handle, CKO Class)> SearchFamily(ObjectTemplate filter, ObjectFamily family)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        CKO[] classes = ClassesToSearch(filter, family);
+        List<ObjectAttribute> criteria = [.. filter.Attributes.Where(a => a.Type != CKA.CKA_CLASS)];
+
+        using ObjectAttribute? fixedAttribute = family.FixedAttribute is { } type ? new ObjectAttribute(type, family.FixedValue) : null;
+        if (fixedAttribute is not null)
+        {
+            ObjectAttribute? given = criteria.Find(a => a.Type == fixedAttribute.Type);
+            if (given is null)
+                criteria.Add(fixedAttribute);
+            else if (given.GetValueAsUlong() != family.FixedValue)
+                throw new ArgumentException(
+                    $"A {family.Name} has {fixedAttribute.Type} = 0x{family.FixedValue:X}; the filter asks for 0x{given.GetValueAsUlong():X}.", nameof(filter));
+        }
+
+        List<(ObjectHandle, CKO)> matches = [];
+        foreach (CKO objectClass in classes)
+        {
+            using var classAttribute = new ObjectAttribute(CKA.CKA_CLASS, objectClass);
+            foreach (ObjectHandle handle in _core.FindAllObjects([.. criteria, classAttribute]))
+                matches.Add((handle, objectClass));
+        }
+        return matches;
+    }
+
     // The family's classes, or the class the filter names, which must be among them. A template holds
     // each attribute once (its builder replaces a repeated one), so there is at most one CKA_CLASS.
-    private static CKO[] ClassesToSearch(ObjectTemplate filter, CKO[] familyClasses, string family)
+    private static CKO[] ClassesToSearch(ObjectTemplate filter, ObjectFamily family)
     {
         ObjectAttribute? named = filter.Attributes.FirstOrDefault(a => a.Type == CKA.CKA_CLASS);
         if (named is null)
-            return familyClasses;
+            return family.Classes;
 
         var objectClass = (CKO)named.GetValueAsUlong();
-        return Array.IndexOf(familyClasses, objectClass) >= 0
+        return Array.IndexOf(family.Classes, objectClass) >= 0
             ? [objectClass]
-            : throw new ArgumentException($"The filter's CKA_CLASS {objectClass} is not a {family} class.", nameof(filter));
+            : throw new ArgumentException($"The filter's CKA_CLASS {objectClass} is not a {family.Name} class.", nameof(filter));
     }
 
     private ObjectCandidate ReadCandidate(ObjectHandle handle, CKO objectClass)

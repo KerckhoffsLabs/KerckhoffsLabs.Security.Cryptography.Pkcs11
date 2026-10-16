@@ -214,6 +214,24 @@ public sealed partial class Pkcs11Key : IDisposable
         return _session.Core.GetAttributeValue(handle, types);
     }
 
+    /// <summary>
+    /// Opens this key's X.509 certificate: the certificate object with the same <c>CKA_ID</c>. Returns
+    /// <see langword="null"/> when the key has no <c>CKA_ID</c> or no certificate has it. The caller owns
+    /// the returned certificate.
+    /// </summary>
+    /// <remarks>
+    /// The counterpart of <see cref="Pkcs11Certificate.GetPrivateKey"/>; certificates are stored with
+    /// their key's id by <see cref="Pkcs11Session.ImportCertificate"/>.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">More than one certificate on the token has this key's <c>CKA_ID</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public Pkcs11Certificate? GetCertificate()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _session.OpenCertificateById(_id);
+    }
+
     /// <summary>Internal accessor for the session this key belongs to.</summary>
     internal Pkcs11Session Session => _session;
 
