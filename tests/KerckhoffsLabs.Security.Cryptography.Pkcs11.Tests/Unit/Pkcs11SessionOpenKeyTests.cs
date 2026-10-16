@@ -8,7 +8,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
-/// <see cref="Pkcs11Session.OpenKey(string, CKO?)"/> and its siblings must identify exactly one key:
+/// <see cref="Pkcs11Session.OpenKey(string)"/> and its siblings must identify exactly one key:
 /// only key objects match, a pair counts as one key, and several keys are refused rather than resolved
 /// by picking one. Runs on the in-process token, where duplicate labels are easy to set up.
 /// </summary>
@@ -49,6 +49,14 @@ public sealed class Pkcs11SessionOpenKeyTests : IDisposable
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
         using var _ = _session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTemplate, privTemplate);
+    }
+
+    private static ObjectTemplate Filter(string label, CKO? objectClass = null, CKK? keyType = null)
+    {
+        var builder = ObjectTemplate.Empty().Label(label);
+        if (objectClass is { } c) builder = builder.Attribute(CKA.CKA_CLASS, (ulong)c);
+        if (keyType is { } t) builder = builder.Attribute(CKA.CKA_KEY_TYPE, (ulong)t);
+        return builder.Build();
     }
 
     private void AddDataObject(string label)
@@ -96,11 +104,12 @@ public sealed class Pkcs11SessionOpenKeyTests : IDisposable
     }
 
     [Fact]
-    public void KeyClassFilter_MatchingOneHalf_StillAttachesTheOther()
+    public void ClassFilter_MatchingOneHalf_StillAttachesTheOther()
     {
         AddEcPair(Label, PairId);
 
-        using Pkcs11Key key = _session.OpenKey(Label, CKO.CKO_PUBLIC_KEY);
+        using ObjectTemplate filter = Filter(Label, CKO.CKO_PUBLIC_KEY);
+        using Pkcs11Key key = _session.OpenKey(filter);
 
         Assert.NotEqual(ObjectHandle.Invalid, key.PrivateHandle);
         Assert.NotEqual(ObjectHandle.Invalid, key.PublicHandle);
@@ -147,23 +156,47 @@ public sealed class Pkcs11SessionOpenKeyTests : IDisposable
         AddEcPair(Label, PairId);
         AddEcPair(Label, PairId);
 
-        Assert.Throws<Pkcs11AmbiguousObjectException>(() => _session.OpenKey(PairId, CKO.CKO_PRIVATE_KEY));
+        using ObjectTemplate filter = ObjectTemplate.Empty().Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PRIVATE_KEY).Id(PairId).Build();
+        Assert.Throws<Pkcs11AmbiguousObjectException>(() => _session.OpenKey(filter));
     }
 
     [Fact]
-    public void KeyClassFilter_ResolvesAnAmbiguousLabel()
+    public void ClassFilter_ResolvesAnAmbiguousLabel()
     {
         AddEcPair(Label, PairId);
         AddAesKey(Label);
 
         Assert.Throws<Pkcs11AmbiguousObjectException>(() => _session.OpenKey(Label));
 
-        using Pkcs11Key secret = _session.OpenKey(Label, CKO.CKO_SECRET_KEY);
+        using ObjectTemplate secretFilter = Filter(Label, CKO.CKO_SECRET_KEY);
+        using Pkcs11Key secret = _session.OpenKey(secretFilter);
         Assert.Equal(CKK.CKK_AES, secret.KeyType);
 
-        using Pkcs11Key pair = _session.OpenKey(Label, CKO.CKO_PRIVATE_KEY);
+        using ObjectTemplate privateFilter = Filter(Label, CKO.CKO_PRIVATE_KEY);
+        using Pkcs11Key pair = _session.OpenKey(privateFilter);
         Assert.Equal(CKK.CKK_EC, pair.KeyType);
         Assert.NotEqual(ObjectHandle.Invalid, pair.PublicHandle);
+    }
+
+    // A key class can't tell two pairs apart; a key type can.
+    [Fact]
+    public void KeyTypeFilter_ResolvesTwoPairsSharingTheLabel()
+    {
+        AddEcPair(Label, PairId);
+        using (_session.GenerateRsaSigningKeyPair(3072, Label)) { }
+
+        Assert.Throws<Pkcs11AmbiguousObjectException>(() => _session.OpenKey(Label));
+        using ObjectTemplate privateOnly = Filter(Label, CKO.CKO_PRIVATE_KEY);
+        Assert.Throws<Pkcs11AmbiguousObjectException>(() => _session.OpenKey(privateOnly));
+
+        using ObjectTemplate ecFilter = Filter(Label, keyType: CKK.CKK_EC);
+        using Pkcs11Key ec = _session.OpenKey(ecFilter);
+        Assert.Equal(CKK.CKK_EC, ec.KeyType);
+
+        using ObjectTemplate rsaFilter = Filter(Label, keyType: CKK.CKK_RSA);
+        Assert.True(_session.TryOpenKey(rsaFilter, out Pkcs11Key? rsa));
+        using (rsa)
+            Assert.Equal(CKK.CKK_RSA, rsa.KeyType);
     }
 
     [Fact]
@@ -178,12 +211,17 @@ public sealed class Pkcs11SessionOpenKeyTests : IDisposable
     // === No key ==============================================================
 
     [Fact]
-    public void NoMatch_OpenKeyThrowsKeyNotFound_AndTryOpenKeyReturnsFalse()
+    public void NoMatch_OpenKeyThrowsNotFound_AndTryOpenKeyReturnsFalse()
     {
         AddDataObject(Label);
 
-        Assert.Throws<KeyNotFoundException>(() => _session.OpenKey(Label));
-        Assert.Throws<KeyNotFoundException>(() => _session.OpenKey(PairId));
+        var ex = Assert.Throws<Pkcs11ObjectNotFoundException>(() => _session.OpenKey(Label));
+        Assert.Equal(CKR.CKR_OK, ex.ReturnValue);
+        Assert.Contains(Label, ex.Message);
+        Assert.IsAssignableFrom<Pkcs11ObjectException>(ex);
+        Assert.Throws<Pkcs11ObjectNotFoundException>(() => _session.OpenKey(PairId));
+        using ObjectTemplate filter = Filter(Label);
+        Assert.Throws<Pkcs11ObjectNotFoundException>(() => _session.OpenKey(filter));
         Assert.False(_session.TryOpenKey(Label, out Pkcs11Key? byLabel));
         Assert.Null(byLabel);
         Assert.False(_session.TryOpenKey(PairId, out Pkcs11Key? byId));
@@ -191,11 +229,12 @@ public sealed class Pkcs11SessionOpenKeyTests : IDisposable
     }
 
     [Fact]
-    public void KeyClassFilter_ExcludingTheOnlyMatch_IsNotFound()
+    public void ClassFilter_ExcludingTheOnlyMatch_IsNotFound()
     {
         AddAesKey(Label);
 
-        Assert.False(_session.TryOpenKey(Label, out _, CKO.CKO_PRIVATE_KEY));
+        using ObjectTemplate filter = Filter(Label, CKO.CKO_PRIVATE_KEY);
+        Assert.False(_session.TryOpenKey(filter, out _));
     }
 
     // === Arguments ===========================================================
@@ -203,16 +242,21 @@ public sealed class Pkcs11SessionOpenKeyTests : IDisposable
     [Theory]
     [InlineData(CKO.CKO_CERTIFICATE)]
     [InlineData(CKO.CKO_DATA)]
-    public void NonKeyClass_IsRejected(CKO keyClass)
+    public void FilterNamingANonKeyClass_IsRejected(CKO objectClass)
     {
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => _session.OpenKey(Label, keyClass));
-        Assert.Equal("keyClass", ex.ParamName);
+        using ObjectTemplate filter = Filter(Label, objectClass);
+
+        var ex = Assert.Throws<ArgumentException>(() => _session.OpenKey(filter));
+        Assert.Equal("filter", ex.ParamName);
     }
+
 
     [Fact]
     public void InvalidArguments_AreRejected()
     {
         Assert.Throws<ArgumentNullException>(() => _session.OpenKey((string)null!));
+        Assert.Throws<ArgumentNullException>(() => _session.OpenKey((ObjectTemplate)null!));
+        Assert.Throws<ArgumentNullException>(() => _session.TryOpenKey((ObjectTemplate)null!, out _));
         Assert.Throws<ArgumentException>(() => _session.OpenKey(ReadOnlySpan<byte>.Empty));
         Assert.Throws<ArgumentException>(() => _session.TryOpenKey(ReadOnlySpan<byte>.Empty, out _));
     }
