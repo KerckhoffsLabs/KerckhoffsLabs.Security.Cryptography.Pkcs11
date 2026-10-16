@@ -80,12 +80,46 @@ internal static class EcPointEncoding
         return new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } };
     }
 
-    private static ReadOnlySpan<byte> StripDerOctetString(byte[] der)
+    /// <summary>
+    /// The byte length of one coordinate of the point in a <c>CKA_EC_POINT</c> value — ⌈field bits / 8⌉,
+    /// read off the token's own key rather than a curve table. Accepts the conformant DER OCTET STRING
+    /// form and, for tokens that omit the wrapper, the bare point; uncompressed (<c>0x04 ‖ X ‖ Y</c>) or
+    /// compressed (<c>0x02/0x03 ‖ X</c>). Returns <see langword="false"/> when neither form parses.
+    /// </summary>
+    /// <remarks>
+    /// The DER form wins whenever it parses exactly (no trailing bytes). A bare point misread as DER
+    /// needs its first coordinate bytes to forge both a matching length and a point header, and even then
+    /// the result is a wrong size, which the ECDH coordinate-length check turns into a refusal.
+    /// </remarks>
+    internal static bool TryGetCoordinateLength(byte[] ecPoint, out int coordinateLength)
     {
-        if (der.Length < 2 || der[0] != 0x04) return [];
+        ArgumentNullException.ThrowIfNull(ecPoint);
 
-        int offset = 2;
-        int len = der[1];
+        coordinateLength = TryReadDerOctetString(ecPoint, out int offset, out int length) && offset + length == ecPoint.Length
+            ? PointCoordinateLength(ecPoint.AsSpan(offset, length))
+            : 0;
+        if (coordinateLength == 0)
+            coordinateLength = PointCoordinateLength(ecPoint);
+        return coordinateLength > 0;
+    }
+
+    private static int PointCoordinateLength(ReadOnlySpan<byte> point) => point switch
+    {
+        [0x04, ..] when point.Length >= 3 && point.Length % 2 == 1 => (point.Length - 1) / 2,
+        [0x02 or 0x03, ..] when point.Length >= 2 => point.Length - 1,
+        _ => 0,
+    };
+
+    private static ReadOnlySpan<byte> StripDerOctetString(byte[] der)
+        => TryReadDerOctetString(der, out int offset, out int length) ? der.AsSpan(offset, length) : [];
+
+    private static bool TryReadDerOctetString(byte[] der, out int offset, out int len)
+    {
+        offset = len = 0;
+        if (der.Length < 2 || der[0] != 0x04) return false;
+
+        offset = 2;
+        len = der[1];
         if (len == 0x81 && der.Length >= 3)
         {
             len = der[2];
@@ -98,11 +132,10 @@ internal static class EcPointEncoding
         }
         else if (len > 0x7F)
         {
-            return [];
+            return false;
         }
 
-        if (offset + len > der.Length) return [];
-        return der.AsSpan(offset, len);
+        return offset + len <= der.Length;
     }
 
     // CKA_EC_PARAMS for a named curve is the DER-encoded curve OID; bridge it to a BCL named curve

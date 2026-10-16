@@ -77,4 +77,43 @@ public sealed class EcPointEncodingTests
     [Fact]
     public void TryDecode_NotAnOctetString_ReturnsFalse()
         => Assert.False(EcPointEncoding.TryDecode([0x03, 0x01, 0x04], out _, out _));
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(32)]
+    [InlineData(66)] // long-form DER length
+    public void TryGetCoordinateLength_DerUncompressed(int coordLen)
+    {
+        Assert.True(EcPointEncoding.TryGetCoordinateLength(EcPoint(coordLen), out int length));
+        Assert.Equal(coordLen, length);
+    }
+
+    // Some tokens return the bare point without the DER OCTET STRING wrapper.
+    [Theory]
+    [InlineData(32)]
+    [InlineData(66)]
+    public void TryGetCoordinateLength_BareUncompressed(int coordLen)
+    {
+        byte[] bare = EcPoint(coordLen)[(coordLen * 2 + 1 <= 0x7F ? 2 : 3)..];
+        Assert.True(EcPointEncoding.TryGetCoordinateLength(bare, out int length));
+        Assert.Equal(coordLen, length);
+    }
+
+    [Theory]
+    [InlineData(0x02)]
+    [InlineData(0x03)]
+    public void TryGetCoordinateLength_DerCompressed(byte prefix)
+    {
+        byte[] compressed = [prefix, .. new byte[32]];
+        Assert.True(EcPointEncoding.TryGetCoordinateLength(DerOctetString(compressed), out int length));
+        Assert.Equal(32, length);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { })]
+    [InlineData(new byte[] { 0x04 })]
+    [InlineData(new byte[] { 0x04, 0x02, 0x04, 0x00 })] // even-length point, wrapped or bare
+    [InlineData(new byte[] { 0x05, 0x01, 0x02, 0x03 })] // neither an OCTET STRING nor a point header
+    public void TryGetCoordinateLength_Malformed_ReturnsFalse(byte[] ecPoint)
+        => Assert.False(EcPointEncoding.TryGetCoordinateLength(ecPoint, out _));
 }

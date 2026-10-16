@@ -216,12 +216,10 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
         ValidatedEcdhPeer peer = EcdhPeerValidator.Validate(
             _key, otherPartyPublicKey.ExportParameters(), nameof(otherPartyPublicKey), "ECDiffieHellmanPkcs11.DeriveRawSecret");
-        // Field size from the local key, not the peer's coordinate encoding — a subclassed
-        // ECDiffieHellmanPublicKey could otherwise report a short X and silently truncate the
-        // shared secret the token derives. Falls back to the peer's (now curve-matched) length only
-        // for a curve outside the library's curve catalog (Pkcs11LibraryOptions.CurveCatalog).
-        // Rounded up: P-521's 521-bit field takes 66 bytes, not 65.
-        int fieldSize = peer.LocalCurve.FieldSizeBits is int bits ? (bits + 7) / 8 : peer.X.Length;
+        // Field size from the local key (curve catalog, else its CKA_EC_POINT), not the peer's
+        // coordinate encoding — a subclassed ECDiffieHellmanPublicKey could otherwise report a short X
+        // and silently truncate the shared secret the token derives. See EcdhPeerValidator.
+        int fieldSize = peer.FieldSizeBytes;
 
         var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.EncodedPoint);
         var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);

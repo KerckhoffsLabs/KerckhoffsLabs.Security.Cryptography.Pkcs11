@@ -8,11 +8,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// A peer's ECDH public key that passed <see cref="EcdhPeerValidator.Validate"/>, with
 /// <see cref="EncodedPoint"/> ready for the <c>CKM_ECDH1_DERIVE</c> public-data parameter.
 /// </summary>
-/// <param name="LocalCurve">The local key's curve, resolved through the library's curve catalog.</param>
+/// <param name="FieldSizeBytes">
+/// The local key's field size in bytes (⌈bits / 8⌉): the length of each peer coordinate and of the raw
+/// shared secret. Never taken from the peer while the local key or the curve catalog can supply it.
+/// </param>
 /// <param name="X">The peer's X coordinate.</param>
 /// <param name="Y">The peer's Y coordinate.</param>
 /// <param name="EncodedPoint">The peer's point as a DER OCTET STRING (see <see cref="EcPointEncoding.Encode"/>).</param>
-internal readonly record struct ValidatedEcdhPeer(Pkcs11ECCurve LocalCurve, byte[] X, byte[] Y, byte[] EncodedPoint);
+internal readonly record struct ValidatedEcdhPeer(int FieldSizeBytes, byte[] X, byte[] Y, byte[] EncodedPoint);
 
 /// <summary>
 /// Validates a peer's ECDH public key against the local key before it reaches
@@ -46,10 +49,11 @@ internal static class EcdhPeerValidator
 
         Pkcs11ECCurve localCurve = ReadLocalCurve(localKey, operationName);
         CheckCurve(localCurve, peer, operationName);
-        CheckCoordinateLength(localCurve, x, y, operationName);
+        int fieldSizeBytes = ResolveFieldSizeBytes(localKey, localCurve, x);
+        CheckCoordinateLength(fieldSizeBytes, x, y, operationName);
         CheckPointOnCurve(peer, operationName);
 
-        return new ValidatedEcdhPeer(localCurve, x, y, EcPointEncoding.Encode(x, y));
+        return new ValidatedEcdhPeer(fieldSizeBytes, x, y, EcPointEncoding.Encode(x, y));
     }
 
     // Reads CKA_EC_PARAMS off the local key, resolved through the library's curve catalog so it carries
@@ -71,13 +75,28 @@ internal static class EcdhPeerValidator
                 $"{operationName} (peer public key is on curve {peer.Curve.Oid.FriendlyName ?? peerOid ?? "unknown"}, expected {localCurve.FriendlyName ?? localCurve.Oid})");
     }
 
-    // Skipped when the local curve isn't one the library's curve catalog knows the field size for —
-    // CheckCurve already pins the peer to that exact (uncommon) curve, and CheckPointOnCurve still runs.
-    private static void CheckCoordinateLength(Pkcs11ECCurve localCurve, byte[] x, byte[] y, string operationName)
+    // The field size in bytes, from the most trusted source available:
+    //   1. the library's curve catalog (exact bits, rounded up: P-521's 521-bit field takes 66 bytes);
+    //   2. the local key's own CKA_EC_POINT, whose coordinates the token encodes at the field's byte
+    //      length — covers a curve outside the catalog without the caller having to register it;
+    //   3. the peer's X, only when the token exposes no readable CKA_EC_POINT on either handle. CheckCurve
+    //      has pinned the peer to the local curve and CheckPointOnCurve still runs, but a peer that strips
+    //      a leading zero from X can then shorten the derived secret.
+    private static int ResolveFieldSizeBytes(Pkcs11Key key, Pkcs11ECCurve localCurve, byte[] x)
     {
-        if (localCurve.FieldSizeBits is not int bits) return;
+        if (localCurve.FieldSizeBits is int bits)
+            return (bits + 7) / 8;
 
-        int fieldSizeBytes = (bits + 7) / 8;
+        using var attrs = key.GetAttributeValue(CKA.CKA_EC_POINT);
+        if (attrs.Count > 0 && !attrs[0].CannotBeRead
+            && EcPointEncoding.TryGetCoordinateLength(attrs[0].GetValueAsByteArray(), out int coordinateLength))
+            return coordinateLength;
+
+        return x.Length;
+    }
+
+    private static void CheckCoordinateLength(int fieldSizeBytes, byte[] x, byte[] y, string operationName)
+    {
         if (x.Length != fieldSizeBytes || y.Length != fieldSizeBytes)
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
                 $"{operationName} (peer coordinate length {x.Length}/{y.Length} bytes does not match the curve's {fieldSizeBytes}-byte field size)");
