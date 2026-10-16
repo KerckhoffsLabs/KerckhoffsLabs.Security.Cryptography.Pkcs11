@@ -102,6 +102,11 @@ jobs:
       # which raises the same project-level encoding warning even when every real source file is
       # clean. They carry no analyzable content, so indexing them buys nothing.
       #
+      # tests/ is excluded under both keys because the scanner sorts it two ways: the Tests project
+      # is detected as a test project, so its files are test sources filtered by
+      # sonar.test.exclusions, while AotSmoke is an ordinary executable whose files are main
+      # sources filtered by sonar.exclusions. Excluding only one key leaves the other half analyzed.
+      #
       # reportsPaths has a wildcard segment in the filename itself (coverage.opencover.*.xml, not a
       # literal coverage.opencover.xml): coverlet.MTP (the xUnit v3/MTP-native coverage extension,
       # unlike the old VSTest-collector coverlet.collector) names its own output
@@ -124,7 +129,8 @@ jobs:
           /d:sonar.sourceEncoding="UTF-8"
           /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.*.xml"
           /d:sonar.coverage.exclusions="**/*.SecurityAnalyzers/**/*.cs,**/*.SourceGenerators/**/*.cs"
-          /d:sonar.exclusions="vendor/**,docs/images/**"
+          /d:sonar.exclusions="vendor/**,docs/images/**,tests/**"
+          /d:sonar.test.exclusions="tests/**"
           /d:sonar.issue.ignore.multicriteria="actionslock"
           /d:sonar.issue.ignore.multicriteria.actionslock.ruleKey="githubactions:S7637"
           /d:sonar.issue.ignore.multicriteria.actionslock.resourceKey=".github/**/*.yml"
