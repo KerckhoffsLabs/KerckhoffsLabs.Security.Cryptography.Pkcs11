@@ -232,17 +232,17 @@ public sealed partial class Pkcs11Key
 
     private ValidatedEcdhPeer ValidateEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string operationName)
         => EcdhPeerValidator.Validate(
-            this, DecodeEcPeer(peerSubjectPublicKeyInfo), nameof(peerSubjectPublicKeyInfo), operationName);
+            this, DecodeEcPeer(peerSubjectPublicKeyInfo, operationName), nameof(peerSubjectPublicKeyInfo), operationName);
 
     // A malformed encoding is the caller's argument error; a well-formed key of another algorithm is a
     // mismatch with this key, reported like a curve mismatch.
-    private static ECParameters DecodeEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
+    private static ECParameters DecodeEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string operationName)
     {
         string? algorithm = SubjectPublicKeyInfoEncoding.TryReadAlgorithm(peerSubjectPublicKeyInfo)
             ?? throw new ArgumentException("Peer public key is not a DER SubjectPublicKeyInfo.", nameof(peerSubjectPublicKeyInfo));
         if (algorithm != Oids.KeyAlgorithms.EcPublicKey)
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
-                $"Pkcs11Key.DeriveRawSecret (peer public key algorithm is {algorithm}, expected id-ecPublicKey)");
+                $"{operationName} (peer public key algorithm is {algorithm}, expected id-ecPublicKey)");
         if (!SubjectPublicKeyInfoEncoding.TryDecodeEc(peerSubjectPublicKeyInfo, out ECParameters ec))
             throw new ArgumentException(
                 "Peer EC public key must name its curve (namedCurve) and carry an uncompressed point.", nameof(peerSubjectPublicKeyInfo));
