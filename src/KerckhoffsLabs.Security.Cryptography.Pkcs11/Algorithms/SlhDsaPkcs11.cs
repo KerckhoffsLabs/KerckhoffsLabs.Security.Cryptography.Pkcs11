@@ -122,11 +122,9 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
     /// <remarks>Reads <c>CKA_VALUE</c> from the public-key handle (FIPS 205 standard public-key encoding).</remarks>
     /// <exception cref="Pkcs11Exception">No public-key object, <c>CKA_VALUE</c> is sensitive, or the token returned a length other than the parameter set's.</exception>
     protected override void ExportSlhDsaPublicKeyCore(Span<byte> destination)
-    {
         // Read from the public-key object only, and length-checked against the parameter set: see
         // Pkcs11Key.Export.
-        _key.Export(Pkcs11KeyBlobFormat.RawPublicKey).CopyTo(destination);
-    }
+        => _key.Export(Pkcs11KeyBlobFormat.RawPublicKey).CopyTo(destination);
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">Always thrown. PKCS#11 keys are non-extractable.</exception>
