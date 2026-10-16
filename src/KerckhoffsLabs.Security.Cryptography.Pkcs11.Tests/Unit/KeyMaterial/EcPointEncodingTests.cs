@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.KeyMaterial;
 
 // Covers EcPointEncoding: the CKA_EC_POINT encoder/decoder pair, and TryParsePublicKey building an ECParameters view from raw CKA_EC_POINT
 // + CKA_EC_PARAMS. Since the curve is resolved through Pkcs11ECCurve.FromEcParams, the whole named-curve

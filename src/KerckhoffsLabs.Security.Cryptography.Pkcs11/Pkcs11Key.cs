@@ -265,7 +265,7 @@ public sealed class Pkcs11Key : IDisposable
         if (!PublicHandle.IsInvalid) return null;
         if (PrivateHandle.IsInvalid) return null;
 
-        return Pkcs11PublicKeyView.TrySynthesizeRsa(_session.Core, PrivateHandle);
+        return PublicKeySynthesis.TrySynthesizeRsa(_session.Core, PrivateHandle);
     }
 
     /// <summary>
@@ -279,7 +279,7 @@ public sealed class Pkcs11Key : IDisposable
         if (_keyType != CKK.CKK_EC) return null;
         if (!PublicHandle.IsInvalid) return null;
         if (PrivateHandle.IsInvalid) return null;
-        return Pkcs11PublicKeyView.TrySynthesizeEc(_session.Core, PrivateHandle);
+        return PublicKeySynthesis.TrySynthesizeEc(_session.Core, PrivateHandle);
     }
 
     /// <summary>
