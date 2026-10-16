@@ -68,8 +68,8 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Information, Message = "C_Finalize on {LibraryPath} left to another load of the module that is still live")]
     public static partial void FinalizeHandedOff(ILogger logger, string? libraryPath);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Loading PKCS#11 library {LibraryPath} from a relative path, resolved against the current directory {CurrentDirectory}; pass a fully qualified path from trusted configuration")]
-    public static partial void LoadingModuleFromRelativePath(ILogger logger, string libraryPath, string currentDirectory);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Loading PKCS#11 library {LibraryPath} from a relative path, resolved against the current directory to {ResolvedPath}; pass a fully qualified path from trusted configuration")]
+    public static partial void LoadingModuleFromRelativePath(ILogger logger, string libraryPath, string resolvedPath);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): {PolicyName} policy refused {Request}")]
     public static partial void PolicyDenied(ILogger logger, ulong sessionId, string policyName, string request);

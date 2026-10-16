@@ -89,7 +89,11 @@ public sealed class ModulePathTests
         try
         {
             Environment.CurrentDirectory = dir;
-            Assert.Throws<DllNotFoundException>(() => Pkcs11Library.Load(name));
+            var e = Assert.Throws<DllNotFoundException>(() => Pkcs11Library.Load(name));
+
+            // The same explanation on every OS, not just the runtime's list of what it tried.
+            Assert.Contains(name, e.Message);
+            Assert.Contains("never searched for in the current directory", e.Message);
         }
         finally
         {
@@ -118,6 +122,8 @@ public sealed class ModulePathTests
             CapturingLogger.Entry warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
             Assert.Contains(relative, warning.Message);
             Assert.Contains("relative path", warning.Message);
+            // As the loader saw it: on macOS the temp directory is reached through the /var -> /private/var link.
+            Assert.Contains(Path.GetFullPath(relative), warning.Message);
         }
         finally
         {

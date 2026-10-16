@@ -91,17 +91,36 @@ internal static class ModulePath
         }
 
         if (!resolveBareNameItself)
-            return NativeLibrary.Load(path, typeof(ModulePath).Assembly, BareNameSearch);
+        {
+            try
+            {
+                return NativeLibrary.Load(path, typeof(ModulePath).Assembly, BareNameSearch);
+            }
+            catch (DllNotFoundException ex)
+            {
+                // The runtime's message lists what it tried, not what it deliberately skipped. Its text is kept
+                // as well: the module may have been found but failed to load (a missing dependency).
+                throw BareNameNotFound(path, OperatingSystem.IsWindows()
+                    ? "this library's directory or the system's library directories (PATH excluded)"
+                    : "this library's directory or the system's library search", ex);
+            }
+        }
 
         string? resolved = ResolveBareNameOnMacOS(
             path, NativeAssetDirectories(), AppContext.BaseDirectory, Environment.GetEnvironmentVariable);
         return resolved is not null
             ? NativeLibrary.Load(resolved)
-            : throw new DllNotFoundException(
-                $"PKCS#11 module '{path}' was not found in the application's native-asset directories, the application " +
-                "directory, DYLD_LIBRARY_PATH or dyld's fallback directories. A bare name is never searched for in the " +
-                "current directory; pass a fully qualified path to load a module from there.");
+            : throw BareNameNotFound(path,
+                "the application's native-asset directories, the application directory, DYLD_LIBRARY_PATH or dyld's fallback directories",
+                inner: null);
     }
+
+    private static DllNotFoundException BareNameNotFound(string name, string searched, Exception? inner)
+        => new(
+            $"PKCS#11 module '{name}' was not found in {searched}. A bare name is never searched for in the current " +
+            "directory; pass a fully qualified path to load a module from there." +
+            (inner is null ? "" : $" {inner.Message}"),
+            inner);
 
     /// <summary>
     /// Where bare <paramref name="name"/> would be found on macOS, without the current directory:
@@ -158,7 +177,7 @@ internal static class ModulePath
     }
 
     // The application's native-asset directories from its deps.json, as the host passes them to the runtime.
-    private static IEnumerable<string> NativeAssetDirectories()
+    private static string[] NativeAssetDirectories()
         => (AppContext.GetData("NATIVE_DLL_SEARCH_DIRECTORIES") as string ?? "")
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
 }

@@ -96,13 +96,25 @@ public sealed class Pkcs11Library : IDisposable
     /// configure their own <see cref="Pkcs11Library"/>.
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
+    /// <exception cref="ArgumentException"><paramref name="libraryPath"/> is <see langword="null"/> or empty.</exception>
+    /// <exception cref="DllNotFoundException">
+    /// The module was not found where <paramref name="libraryPath"/> says to look, or was found but could not be
+    /// loaded (a missing dependency, for example). For a bare name the message says the current directory was
+    /// not searched.
+    /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library Load(string libraryPath, Pkcs11LibraryOptions? options = null)
         => new(libraryPath, logger =>
         {
+            // Resolved once, here, so the warning names the file that is then loaded, even if another thread
+            // changes the current directory in between.
+            string path = libraryPath;
             if (!string.IsNullOrEmpty(libraryPath) && ModulePath.Classify(libraryPath) == ModulePathKind.Relative)
-                Log.LoadingModuleFromRelativePath(logger, libraryPath, Environment.CurrentDirectory);
-            return new LowLevelPkcs11Library(libraryPath);
+            {
+                path = Path.GetFullPath(libraryPath);
+                Log.LoadingModuleFromRelativePath(logger, libraryPath, path);
+            }
+            return new LowLevelPkcs11Library(path);
         }, options);
 
     /// <summary>
