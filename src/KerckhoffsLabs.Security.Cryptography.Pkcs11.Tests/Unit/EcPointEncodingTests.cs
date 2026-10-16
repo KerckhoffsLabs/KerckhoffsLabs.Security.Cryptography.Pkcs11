@@ -78,6 +78,47 @@ public sealed class EcPointEncodingTests
     public void TryDecode_NotAnOctetString_ReturnsFalse()
         => Assert.False(EcPointEncoding.TryDecode([0x03, 0x01, 0x04], out _, out _));
 
+    // 128-byte coordinates make a 257-byte point, past the old encoder's one-byte long-form length.
+    [Fact]
+    public void Encode_PointOver255Bytes_UsesTwoByteLength()
+    {
+        byte[] x = new byte[128], y = new byte[128];
+        x[0] = 1; y[^1] = 2;
+
+        byte[] encoded = EcPointEncoding.Encode(x, y);
+
+        Assert.Equal(new byte[] { 0x04, 0x82, 0x01, 0x01, 0x04 }, encoded[..5]);
+        Assert.True(EcPointEncoding.TryDecode(encoded, out byte[] decodedX, out byte[] decodedY));
+        Assert.Equal(x, decodedX);
+        Assert.Equal(y, decodedY);
+    }
+
+    // Read as BER: a token that pads the length (0x81 for a length under 128) is still understood.
+    [Fact]
+    public void TryDecode_NonMinimalLength_Accepted()
+    {
+        byte[] point = EcPoint(32)[2..];
+        Assert.True(EcPointEncoding.TryDecode([0x04, 0x81, (byte)point.Length, .. point], out byte[] x, out _));
+        Assert.Equal(point[1..33], x);
+    }
+
+    // BER also allows a constructed OCTET STRING (indefinite length, split into segments).
+    [Fact]
+    public void TryDecode_ConstructedOctetString_Accepted()
+    {
+        byte[] point = EcPoint(32)[2..];
+        byte[] ber = [0x24, 0x80, 0x04, 0x20, .. point[..32], 0x04, (byte)(point.Length - 32), .. point[32..], 0x00, 0x00];
+
+        Assert.True(EcPointEncoding.TryDecode(ber, out byte[] x, out byte[] y));
+        Assert.Equal(point[1..33], x);
+        Assert.Equal(point[33..], y);
+    }
+
+    // The old parser ignored anything after the OCTET STRING.
+    [Fact]
+    public void TryDecode_TrailingBytes_ReturnsFalse()
+        => Assert.False(EcPointEncoding.TryDecode([.. EcPoint(32), 0x00], out _, out _));
+
     [Theory]
     [InlineData(30)]
     [InlineData(32)]
