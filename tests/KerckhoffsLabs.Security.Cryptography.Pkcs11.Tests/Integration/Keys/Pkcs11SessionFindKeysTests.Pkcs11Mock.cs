@@ -12,12 +12,10 @@ public sealed class Pkcs11SessionFindKeysTests_Mock(MockBackendFixture backend)
         _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [Fact]
-    public void OpenKey_NotFound_Throws()
-    {
-        using var session = OpenSession();
-        SessionKeyTestCases.Assert_OpenKey_NotFound_Throws(session);
-    }
+    // No OpenKey_NotFound case here: pkcs11-mock's C_FindObjectsInit honours only CKA_CLASS and
+    // ignores the label, so OpenKey's per-key-class search always "finds" the mock's canned key, which
+    // exposes no CKA_KEY_TYPE. The not-found path runs on the real backends and in
+    // Pkcs11SessionOpenKeyTests.
 
     [Fact]
     public void FindKeys_NoMatch_ReturnsEmpty()

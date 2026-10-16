@@ -1,5 +1,4 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -18,7 +17,7 @@ internal static class SessionKeyTestCases
         Assert.Equal(label, key.Label);
     }
 
-    public static void Assert_OpenKey_NotFound_Throws(Pkcs11Session session) => Assert.Throws<Pkcs11ObjectException>(() => session.OpenKey("does-not-exist-zzzz"));
+    public static void Assert_OpenKey_NotFound_Throws(Pkcs11Session session) => Assert.Throws<KeyNotFoundException>(() => session.OpenKey("does-not-exist-zzzz"));
 
     public static void Assert_FindKeys_NoMatch_ReturnsEmpty(Pkcs11Session session)
     {
