@@ -273,7 +273,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
     {
         using var key = FakeKeys.Create(CKK.CKK_SLH_DSA, ca => ca == CKA.CKA_PARAMETER_SET
             ? (CKR.CKR_OK, UlongAttr((ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128S))
-            : (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+            : (CKR.CKR_ATTRIBUTE_SENSITIVE, null), publicOnly: true);
         using var slhdsa = new SlhDsaPkcs11(key);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => slhdsa.ExportSlhDsaPublicKey());
@@ -284,10 +284,10 @@ public sealed class SlhDsaPkcs11Tests_Managed
     public void ExportSlhDsaPublicKey_TokenReturnsWrongLength_ThrowsPkcs11Exception()
     {
         // A well-formed token could never return a length other than the one it advertised via
-        // its own CKA_PARAMETER_SET, so this drives CopyExact's mismatch guard.
+        // its own CKA_PARAMETER_SET, so this drives Pkcs11Key.Export's length check.
         using var key = FakeKeys.Create(CKK.CKK_SLH_DSA, ca => ca == CKA.CKA_PARAMETER_SET
             ? (CKR.CKR_OK, UlongAttr((ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128S))
-            : (CKR.CKR_OK, new byte[1]));
+            : (CKR.CKR_OK, new byte[1]), publicOnly: true);
         using var slhdsa = new SlhDsaPkcs11(key);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => slhdsa.ExportSlhDsaPublicKey());

@@ -21,10 +21,11 @@ public sealed partial class Pkcs11Key
     /// <item><term><see cref="CKK.CKK_EC"/> (named curve)</term><description>The uncompressed point <c>0x04 ‖ X ‖ Y</c>.</description></item>
     /// <item><term><see cref="CKK.CKK_RSA"/></term><description>PKCS#1 <c>RSAPublicKey</c>, as <see cref="RSA.ExportRSAPublicKey"/> writes it.</description></item>
     /// <item><term><see cref="CKK.CKK_DSA"/></term><description>The public value as <c>INTEGER y</c> (RFC 3279); the domain parameters are only in the <c>SubjectPublicKeyInfo</c>.</description></item>
+    /// <item><term><see cref="CKK.CKK_ML_DSA"/>, <see cref="CKK.CKK_SLH_DSA"/>, <see cref="CKK.CKK_ML_KEM"/></term><description>The FIPS 204 / 205 / 203 public-key encoding; the <c>SubjectPublicKeyInfo</c> names the parameter set by OID.</description></item>
     /// </list>
     /// <para>
-    /// Where <c>CKA_VALUE</c> is the public key (DSA) it is read from the public-key handle only: on the
-    /// private-key object the same attribute is the private value.
+    /// Where <c>CKA_VALUE</c> is the public key (DSA and the FIPS 203/204/205 types) it is read from the
+    /// public-key handle only: on the private-key object the same attribute is the private value.
     /// </para>
     /// </remarks>
     /// <param name="format">The encoding to write.</param>
@@ -77,8 +78,26 @@ public sealed partial class Pkcs11Key
                             domain[0].GetValueAsByteArray(), domain[1].GetValueAsByteArray(), domain[2].GetValueAsByteArray(), y)
                         : SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey(y);
                 }
+            case CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA or CKK.CKK_ML_KEM:
+                {
+                    using var parameterSet = GetAttributeValue(CKA.CKA_PARAMETER_SET);
+                    if (parameterSet[0].CannotBeRead)
+                        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                            "Pkcs11Key.Export (CKA_PARAMETER_SET not readable)");
+                    ulong set = parameterSet[0].GetValueAsUlong();
+                    (string oid, int length) = PostQuantumParameterSets.Describe(_keyType, set)
+                        ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
+                            $"Pkcs11Key.Export (unrecognized {_keyType} parameter set 0x{set:X})");
+
+                    byte[] publicKey = ReadPublicValue();
+                    if (publicKey.Length != length)
+                        throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+                            $"Pkcs11Key.Export (token returned a {publicKey.Length}-byte public key; parameter set 0x{set:X} has {length})");
+                    return spki ? SubjectPublicKeyInfoEncoding.EncodeWithoutParameters(oid, publicKey) : publicKey;
+                }
             default:
-                throw new NotSupportedException($"Pkcs11Key.Export supports CKK_EC, CKK_RSA and CKK_DSA keys; this key is {_keyType}.");
+                throw new NotSupportedException(
+                    $"Pkcs11Key.Export supports CKK_EC, CKK_RSA, CKK_DSA, CKK_ML_DSA, CKK_SLH_DSA and CKK_ML_KEM keys; this key is {_keyType}.");
         }
     }
 

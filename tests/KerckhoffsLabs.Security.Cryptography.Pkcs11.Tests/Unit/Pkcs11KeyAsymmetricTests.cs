@@ -8,6 +8,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
+// SLH-DSA and the ML-DSA / ML-KEM SubjectPublicKeyInfo exports are evaluation-only BCL APIs.
+#pragma warning disable SYSLIB5006
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
@@ -151,6 +154,103 @@ public sealed class Pkcs11KeyAsymmetricTests
             Assert.Equal(2048, key.KeySize);
             Assert.Equal(bcl.ExportSubjectPublicKeyInfo(), key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
         });
+    }
+
+    // === Export: ML-DSA, SLH-DSA, ML-KEM (over a fake token: no platform PQC support needed) =====
+
+    private static byte[] UlongAttr(ulong value) =>
+        BitConverter.GetBytes(value).AsSpan(0, KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.UnmanagedMemory.NativeULongSize).ToArray();
+
+    private static FakeKey PostQuantumKey(CKK keyType, ulong parameterSet, byte[] value, bool publicOnly = true)
+        => FakeKeys.Create(keyType, ca => ca switch
+        {
+            CKA.CKA_PARAMETER_SET => (CKR.CKR_OK, UlongAttr(parameterSet)),
+            CKA.CKA_VALUE => (CKR.CKR_OK, value),
+            _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+        }, publicOnly: publicOnly);
+
+    // The OIDs and lengths written out here rather than read from the library's table, so a mistyped
+    // entry fails: NIST CSOR / RFC 9881 / RFC 9909, FIPS 203/204/205.
+    [Theory]
+    [InlineData(CKK.CKK_ML_DSA, (ulong)CkpMlDsa.CKP_ML_DSA_44, "2.16.840.1.101.3.4.3.17", 1312)]
+    [InlineData(CKK.CKK_ML_DSA, (ulong)CkpMlDsa.CKP_ML_DSA_65, "2.16.840.1.101.3.4.3.18", 1952)]
+    [InlineData(CKK.CKK_ML_DSA, (ulong)CkpMlDsa.CKP_ML_DSA_87, "2.16.840.1.101.3.4.3.19", 2592)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128S, "2.16.840.1.101.3.4.3.20", 32)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, "2.16.840.1.101.3.4.3.21", 32)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_192S, "2.16.840.1.101.3.4.3.22", 48)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_192F, "2.16.840.1.101.3.4.3.23", 48)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_256S, "2.16.840.1.101.3.4.3.24", 64)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_256F, "2.16.840.1.101.3.4.3.25", 64)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S, "2.16.840.1.101.3.4.3.26", 32)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F, "2.16.840.1.101.3.4.3.27", 32)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S, "2.16.840.1.101.3.4.3.28", 48)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F, "2.16.840.1.101.3.4.3.29", 48)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S, "2.16.840.1.101.3.4.3.30", 64)]
+    [InlineData(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F, "2.16.840.1.101.3.4.3.31", 64)]
+    [InlineData(CKK.CKK_ML_KEM, (ulong)CkpMlKem.CKP_ML_KEM_512, "2.16.840.1.101.3.4.4.1", 800)]
+    [InlineData(CKK.CKK_ML_KEM, (ulong)CkpMlKem.CKP_ML_KEM_768, "2.16.840.1.101.3.4.4.2", 1184)]
+    [InlineData(CKK.CKK_ML_KEM, (ulong)CkpMlKem.CKP_ML_KEM_1024, "2.16.840.1.101.3.4.4.3", 1568)]
+    public void Export_PostQuantum_NamesTheParameterSet(CKK keyType, ulong parameterSet, string oid, int length)
+    {
+        byte[] value = RandomNumberGenerator.GetBytes(length);
+        using var key = PostQuantumKey(keyType, parameterSet, value);
+
+        Assert.Equal(value, key.Key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+
+        var outer = new AsnReader(key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo), AsnEncodingRules.DER);
+        AsnReader info = outer.ReadSequence();
+        outer.ThrowIfNotEmpty();
+        AsnReader algorithm = info.ReadSequence();
+        Assert.Equal(oid, algorithm.ReadObjectIdentifier());
+        Assert.False(algorithm.HasData); // parameters absent
+        Assert.Equal(value, info.ReadBitString(out int unusedBits));
+        Assert.Equal(0, unusedBits);
+        info.ThrowIfNotEmpty();
+    }
+
+    // On the private-key object CKA_VALUE is the private key. A private-only key must not have it
+    // exported as the public key, however readable the token leaves it.
+    [Fact]
+    public void Export_PostQuantum_PrivateOnlyKey_NeverReadsThePrivateValue()
+    {
+        using var key = PostQuantumKey(CKK.CKK_ML_DSA, (ulong)CkpMlDsa.CKP_ML_DSA_44, new byte[1312], publicOnly: false);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+    }
+
+    [Fact]
+    public void Export_PostQuantum_UnrecognizedParameterSet_Throws()
+    {
+        using var key = PostQuantumKey(CKK.CKK_ML_KEM, 0xFFFF, new byte[800]);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+        Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, ex.ReturnValue);
+    }
+
+    // Where the platform implements the algorithm, the SPKI is byte for byte what the BCL writes.
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void Export_MlDsa_SubjectPublicKeyInfo_IsWhatTheBclWrites()
+    {
+        using var bcl = MLDsa.GenerateKey(MLDsaAlgorithm.MLDsa65);
+        using var key = PostQuantumKey(CKK.CKK_ML_DSA, (ulong)CkpMlDsa.CKP_ML_DSA_65, bcl.ExportMLDsaPublicKey());
+        Assert.Equal(bcl.ExportSubjectPublicKeyInfo(), key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+    }
+
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
+    public void Export_SlhDsa_SubjectPublicKeyInfo_IsWhatTheBclWrites()
+    {
+        using var bcl = SlhDsa.GenerateKey(SlhDsaAlgorithm.SlhDsaShake128f);
+        using var key = PostQuantumKey(CKK.CKK_SLH_DSA, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F, bcl.ExportSlhDsaPublicKey());
+        Assert.Equal(bcl.ExportSubjectPublicKeyInfo(), key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+    }
+
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void Export_MlKem_SubjectPublicKeyInfo_IsWhatTheBclWrites()
+    {
+        using var bcl = MLKem.GenerateKey(MLKemAlgorithm.MLKem768);
+        using var key = PostQuantumKey(CKK.CKK_ML_KEM, (ulong)CkpMlKem.CKP_ML_KEM_768, bcl.ExportEncapsulationKey());
+        Assert.Equal(bcl.ExportSubjectPublicKeyInfo(), key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
     }
 
     [Fact]
