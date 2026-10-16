@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using BclECCurve = System.Security.Cryptography.ECCurve;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Curves;
 
 // Covers the Pkcs11ECCurve value type: CKA_EC_PARAMS (DER OID) encoding/round-trip, the BCL bridge, the
 // named-curve catalog, and equality. No token needed — this only manipulates curve metadata.

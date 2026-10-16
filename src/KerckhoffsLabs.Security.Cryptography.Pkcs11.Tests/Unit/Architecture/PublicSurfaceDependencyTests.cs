@@ -1,7 +1,7 @@
 using System.Reflection;
 using KerckhoffsLabs.Runtime.InteropServices;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 // NativeCULong is a marshalling type whose width differs per RID (32-bit on Windows, pointer-sized
 // elsewhere) and which ships from a separate package. On the public surface it would make consumers

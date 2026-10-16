@@ -1,4 +1,4 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Info;
 
 public sealed class SessionIdTests
 {

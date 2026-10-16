@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using static KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.LayerDependencies;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
 /// <c>Algorithms</c> adapts the façade to the BCL's algorithm types (<c>RSA</c>, <c>Aes</c>,

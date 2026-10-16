@@ -11,7 +11,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 #pragma warning disable KLPKCS11006 // DSA
 #pragma warning disable KLPKCS11007 // weak EC curves
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
 /// The obsoletion diagnostic ids are a public contract: consumers write them into

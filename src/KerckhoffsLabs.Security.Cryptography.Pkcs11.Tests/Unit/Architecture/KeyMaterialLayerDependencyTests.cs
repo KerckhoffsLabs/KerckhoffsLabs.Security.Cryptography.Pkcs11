@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using static KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.LayerDependencies;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.KeyMaterial;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
 /// <c>KeyMaterial</c> holds the internal helpers both the façade and <c>Algorithms</c> use to read, encode

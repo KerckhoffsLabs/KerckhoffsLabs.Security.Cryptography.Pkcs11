@@ -1,4 +1,4 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Info;
 
 /// <summary>
 /// Shared contract for the CKF-backed flag records (<c>SlotFlags</c>, <c>TokenFlags</c>,

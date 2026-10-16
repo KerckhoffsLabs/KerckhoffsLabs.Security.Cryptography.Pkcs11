@@ -1,7 +1,7 @@
 using System.Reflection;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
 /// Guards the assembly's test-parallelization contract (see <c>Support/TestParallelization.cs</c>).

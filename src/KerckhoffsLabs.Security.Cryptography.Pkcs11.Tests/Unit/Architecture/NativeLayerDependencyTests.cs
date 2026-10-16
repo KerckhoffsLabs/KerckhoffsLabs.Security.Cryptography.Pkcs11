@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using static KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.LayerDependencies;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
 /// The Native layer sits just above <c>Common</c>: it mirrors the C ABI and owns the module, and the rest

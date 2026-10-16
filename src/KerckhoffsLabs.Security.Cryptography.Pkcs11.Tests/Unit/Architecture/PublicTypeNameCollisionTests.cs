@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 // A consumer of a cryptography library nearly always has `using System.Security.Cryptography;` in
 // scope. A public type here whose simple name matches one in that namespace makes every bare use of

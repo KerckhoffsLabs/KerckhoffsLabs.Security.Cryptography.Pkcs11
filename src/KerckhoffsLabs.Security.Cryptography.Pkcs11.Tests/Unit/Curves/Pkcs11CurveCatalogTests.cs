@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Curves;
 
 // Covers Pkcs11CurveCatalog / Pkcs11CurveInfo: the built-in catalog, extension with With, lookups,
 // resolving a bare curve read off a token, and how a library picks its catalog up from the options.

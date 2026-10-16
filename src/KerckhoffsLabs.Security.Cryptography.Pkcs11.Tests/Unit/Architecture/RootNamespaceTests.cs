@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using static KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.LayerDependencies;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
 /// The root namespace is the public façade. An internal helper there would be reachable from every layer

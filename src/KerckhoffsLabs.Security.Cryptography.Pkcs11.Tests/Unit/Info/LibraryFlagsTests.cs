@@ -1,4 +1,4 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Info;
 
 // CK_INFO.flags defines no bits today (the PKCS#11 spec reserves it, always zero), so unlike its
 // sibling flag records this one has nothing to decode — All is empty and the shared contract only
