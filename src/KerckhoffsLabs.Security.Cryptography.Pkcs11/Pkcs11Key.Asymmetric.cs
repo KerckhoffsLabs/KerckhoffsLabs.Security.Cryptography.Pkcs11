@@ -20,7 +20,12 @@ public sealed partial class Pkcs11Key
     /// <listheader><term>Key type</term><description><see cref="Pkcs11KeyBlobFormat.RawPublicKey"/></description></listheader>
     /// <item><term><see cref="CKK.CKK_EC"/> (named curve)</term><description>The uncompressed point <c>0x04 ‖ X ‖ Y</c>.</description></item>
     /// <item><term><see cref="CKK.CKK_RSA"/></term><description>PKCS#1 <c>RSAPublicKey</c>, as <see cref="RSA.ExportRSAPublicKey"/> writes it.</description></item>
+    /// <item><term><see cref="CKK.CKK_DSA"/></term><description>The public value as <c>INTEGER y</c> (RFC 3279); the domain parameters are only in the <c>SubjectPublicKeyInfo</c>.</description></item>
     /// </list>
+    /// <para>
+    /// Where <c>CKA_VALUE</c> is the public key (DSA) it is read from the public-key handle only: on the
+    /// private-key object the same attribute is the private value.
+    /// </para>
     /// </remarks>
     /// <param name="format">The encoding to write.</param>
     /// <returns>The encoded public key.</returns>
@@ -59,9 +64,38 @@ public sealed partial class Pkcs11Key
                         ? SubjectPublicKeyInfoEncoding.EncodeRsa(modulus, exponent)
                         : SubjectPublicKeyInfoEncoding.EncodeRsaPublicKey(modulus, exponent);
                 }
+            case CKK.CKK_DSA:
+                {
+                    // Domain parameters are public on either half.
+                    using var domain = GetAttributeValue(CKA.CKA_PRIME, CKA.CKA_SUBPRIME, CKA.CKA_BASE);
+                    if (domain[0].CannotBeRead || domain[1].CannotBeRead || domain[2].CannotBeRead)
+                        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                            "Pkcs11Key.Export (CKA_PRIME / CKA_SUBPRIME / CKA_BASE not readable from any available handle)");
+                    byte[] y = ReadPublicValue();
+                    return spki
+                        ? SubjectPublicKeyInfoEncoding.EncodeDsa(
+                            domain[0].GetValueAsByteArray(), domain[1].GetValueAsByteArray(), domain[2].GetValueAsByteArray(), y)
+                        : SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey(y);
+                }
             default:
-                throw new NotSupportedException($"Pkcs11Key.Export supports CKK_EC and CKK_RSA keys; this key is {_keyType}.");
+                throw new NotSupportedException($"Pkcs11Key.Export supports CKK_EC, CKK_RSA and CKK_DSA keys; this key is {_keyType}.");
         }
+    }
+
+    // CKA_VALUE of the public-key object. Never GetAttributeValue's fallback to the private-key handle:
+    // there the same attribute is the private value, and a token that leaves it readable would hand it
+    // back as the public key.
+    private byte[] ReadPublicValue()
+    {
+        if (PublicHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.Export (no public-key object; the private key's CKA_VALUE is the private value)");
+
+        using var attrs = _session.Core.GetAttributeValue(PublicHandle, [CKA.CKA_VALUE]);
+        if (attrs[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "Pkcs11Key.Export (public-key CKA_VALUE not readable)");
+        return attrs[0].GetValueAsByteArray();
     }
 
     /// <summary>
