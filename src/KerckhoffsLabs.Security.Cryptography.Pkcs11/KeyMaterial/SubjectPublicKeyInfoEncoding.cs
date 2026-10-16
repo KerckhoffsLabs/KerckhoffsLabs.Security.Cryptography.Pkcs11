@@ -1,5 +1,6 @@
 using System.Formats.Asn1;
 using System.Security.Cryptography;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
@@ -21,22 +22,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 /// </remarks>
 internal static class SubjectPublicKeyInfoEncoding
 {
-    /// <summary><c>id-ecPublicKey</c> (RFC 5480 §2.1.1).</summary>
-    internal const string EcPublicKeyOid = "1.2.840.10045.2.1";
-
-    /// <summary><c>rsaEncryption</c> (RFC 8017 §A.1).</summary>
-    internal const string RsaEncryptionOid = "1.2.840.113549.1.1.1";
-
-    /// <summary><c>id-dsa</c> (RFC 3279 §2.3.2).</summary>
-    internal const string DsaOid = "1.2.840.10040.4.1";
-
     /// <summary>Encodes a named-curve EC public key.</summary>
     internal static byte[] EncodeEc(ECParameters ec)
-        => Encode(EcPublicKeyOid, w => w.WriteObjectIdentifier(ec.Curve.Oid.Value!), [0x04, .. ec.Q.X!, .. ec.Q.Y!]);
+        => Encode(Oids.KeyAlgorithms.EcPublicKey, w => w.WriteObjectIdentifier(ec.Curve.Oid.Value!), [0x04, .. ec.Q.X!, .. ec.Q.Y!]);
 
     /// <summary>Encodes an RSA public key from its unsigned big-endian modulus and public exponent.</summary>
     internal static byte[] EncodeRsa(ReadOnlySpan<byte> modulus, ReadOnlySpan<byte> exponent)
-        => Encode(RsaEncryptionOid, w => w.WriteNull(), EncodeRsaPublicKey(modulus, exponent));
+        => Encode(Oids.KeyAlgorithms.RsaEncryption, w => w.WriteNull(), EncodeRsaPublicKey(modulus, exponent));
 
     /// <summary>
     /// The PKCS#1 <c>RSAPublicKey ::= SEQUENCE { modulus INTEGER, publicExponent INTEGER }</c>, what
@@ -59,7 +51,7 @@ internal static class SubjectPublicKeyInfoEncoding
     internal static byte[] EncodeDsa(ReadOnlySpan<byte> p, ReadOnlySpan<byte> q, ReadOnlySpan<byte> g, ReadOnlySpan<byte> y)
     {
         byte[] pBytes = p.ToArray(), qBytes = q.ToArray(), gBytes = g.ToArray();
-        return Encode(DsaOid, w =>
+        return Encode(Oids.KeyAlgorithms.Dsa, w =>
         {
             using (w.PushSequence())
             {
@@ -115,7 +107,7 @@ internal static class SubjectPublicKeyInfoEncoding
     {
         ec = default;
         if (!TryRead(spki, out string? algorithm, out ReadOnlyMemory<byte>? parameters, out byte[]? key)
-            || algorithm != EcPublicKeyOid || parameters is not { } p)
+            || algorithm != Oids.KeyAlgorithms.EcPublicKey || parameters is not { } p)
             return false;
 
         string curveOid;

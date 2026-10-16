@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
@@ -9,10 +10,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </summary>
 public static class Pkcs11CertificateExtensions
 {
-    private const string RsaOid = "1.2.840.113549.1.1.1";       // rsaEncryption
-    private const string RsaPssOid = "1.2.840.113549.1.1.10";  // id-RSASSA-PSS
-    private const string EcOid = "1.2.840.10045.2.1";
-
     /// <summary>
     /// Returns the certificate's on-token RSA private key (located by <see cref="Pkcs11Certificate.Id"/>)
     /// as a token-backed <see cref="RSA"/>. Returns <see langword="null"/> when the certificate is not RSA, or
@@ -25,7 +22,7 @@ public static class Pkcs11CertificateExtensions
     public static RSA? GetRSAPrivateKey(this Pkcs11Certificate certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate);
-        if (certificate.Certificate.GetKeyAlgorithm() is not (RsaOid or RsaPssOid)) return null;
+        if (certificate.Certificate.GetKeyAlgorithm() is not (Oids.KeyAlgorithms.RsaEncryption or Oids.KeyAlgorithms.RsaSsaPss)) return null;
         var key = certificate.TryOpenPrivateKey();
         return key is null ? null : new RSAPkcs11(key);
     }
@@ -41,7 +38,7 @@ public static class Pkcs11CertificateExtensions
     public static ECDsa? GetECDsaPrivateKey(this Pkcs11Certificate certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate);
-        if (certificate.Certificate.GetKeyAlgorithm() != EcOid) return null;
+        if (certificate.Certificate.GetKeyAlgorithm() != Oids.KeyAlgorithms.EcPublicKey) return null;
         var key = certificate.TryOpenPrivateKey();
         return key is null ? null : new ECDsaPkcs11(key);
     }
