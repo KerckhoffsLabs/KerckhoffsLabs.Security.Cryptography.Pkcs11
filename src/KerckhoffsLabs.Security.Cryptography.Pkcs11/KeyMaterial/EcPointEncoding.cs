@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Formats.Asn1;
 using System.Security.Cryptography;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
 /// <summary>
 /// The PKCS#11 encoding of an EC public key, both directions: <c>CKA_EC_POINT</c> is a DER OCTET STRING

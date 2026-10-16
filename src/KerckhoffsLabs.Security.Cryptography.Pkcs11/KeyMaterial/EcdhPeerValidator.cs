@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
 /// <summary>
 /// A peer's ECDH public key that passed <see cref="EcdhPeerValidator.Validate"/>, with
