@@ -149,7 +149,7 @@ jobs:
         id: native-cache
         uses: actions/cache@v6.1.0
         with:
-          path: src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
+          path: tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
           key: ${{ steps.rev.outputs.native }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1', 'build/lib/common.sh') }}-v1
 
       # Fourth independent real backend (ubuntu-latest only): Kryoptic, a Rust/OpenSSL PKCS#11 soft

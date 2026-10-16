@@ -5,7 +5,7 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11", "KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj", "{08043EBE-C091-3C47-DDAE-0562E6A5EB50}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests", "KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests\KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj", "{1BF65904-C5E3-473C-8D0E-60086E5499D8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests", "..\tests\KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests\KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj", "{1BF65904-C5E3-473C-8D0E-60086E5499D8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers", "KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj", "{DBD8E7D0-E284-41AD-9C7C-1296D012967E}"
 EndProject
