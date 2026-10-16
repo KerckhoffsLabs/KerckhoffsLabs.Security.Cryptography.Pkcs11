@@ -26,8 +26,13 @@ internal readonly record struct ValidatedEcdhPeer(int FieldSizeBytes, byte[] X, 
 /// PKCS#11 does not require the token to check either the curve or the point, so skipping this lets a
 /// peer on a different (weaker) curve — or an off-curve point on the right curve — reach the token
 /// unchecked; the invalid-curve / small-subgroup attack then recovers a token-resident private key one
-/// residue at a time (Antipa et al., PKC 2003; NIST SP 800-56A Rev. 3 §5.6.2.3.2). The only way to the
-/// encoded point a derivation needs is through <see cref="Validate"/>, so no caller can skip the checks.
+/// residue at a time (Antipa et al., PKC 2003; NIST SP 800-56A Rev. 3 §5.6.2.3.2). Every path that
+/// takes the peer as <see cref="ECParameters"/> (<see cref="Pkcs11Key.DeriveRawSecretEcdh"/>,
+/// <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>) reaches the
+/// encoded point only through <see cref="Validate"/>. The paths that take an already-encoded point
+/// (the <see cref="ReadOnlySpan{T}"/> overload of <c>DeriveSharedSecretEcdh</c>, or
+/// <see cref="MechanismParams.CkmEcdh1DeriveParams"/> with <see cref="Pkcs11Key.Derive"/>) cannot be
+/// checked, since an octet string carries no curve, and are documented as caller-validated.
 /// </remarks>
 internal static class EcdhPeerValidator
 {

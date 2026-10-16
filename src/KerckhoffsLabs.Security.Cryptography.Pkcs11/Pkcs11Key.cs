@@ -39,7 +39,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// explicit.
 /// </para>
 /// </remarks>
-public sealed class Pkcs11Key : IDisposable
+public sealed partial class Pkcs11Key : IDisposable
 {
     private readonly Pkcs11Session _session;
     // The halves known so far. Read them only through PrivateHandle and PublicHandle, which look up

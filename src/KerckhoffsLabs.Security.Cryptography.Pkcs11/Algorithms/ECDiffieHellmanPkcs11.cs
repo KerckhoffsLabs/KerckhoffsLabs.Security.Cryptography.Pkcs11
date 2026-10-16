@@ -1,9 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
@@ -73,20 +70,13 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     {
         try
         {
-            using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return key.Session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
+            return key.GetCurve().FieldSizeBits;
         }
         catch (Pkcs11Exception)
         {
-            // Token doesn't expose CKA_EC_PARAMS — leave KeySize at the ECDiffieHellman base-class default.
+            // CKA_EC_PARAMS unreadable or not a named-curve OID — leave KeySize at the ECDiffieHellman base-class default.
+            return null;
         }
-        catch (ArgumentException)
-        {
-            // CKA_EC_PARAMS wasn't a DER-encoded named-curve OID.
-        }
-
-        return null;
     }
 
     /// <inheritdoc/>
@@ -211,75 +201,12 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             "ECDiffieHellmanPkcs11 does not support DeriveKeyTls (no public TLS-PRF primitive). " +
             "Use DeriveKeyFromHash / DeriveKeyFromHmac, or DeriveRawSecretAgreement plus your own PRF.");
 
+    // Peer validation, the export policy check and the read-back all happen in the façade: see
+    // Pkcs11Key.DeriveRawSecretEcdh. The field size comes from the local key, not the peer's
+    // coordinate encoding, so a subclassed ECDiffieHellmanPublicKey reporting a short X cannot
+    // truncate the secret.
     private byte[] DeriveRawSecret(ECDiffieHellmanPublicKey otherPartyPublicKey)
-    {
-        _key.Session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret));
-
-        ValidatedEcdhPeer peer = EcdhPeerValidator.Validate(
-            _key, otherPartyPublicKey.ExportParameters(), nameof(otherPartyPublicKey), "ECDiffieHellmanPkcs11.DeriveRawSecret");
-        // Field size from the local key (curve catalog, else its CKA_EC_POINT), not the peer's
-        // coordinate encoding — a subclassed ECDiffieHellmanPublicKey could otherwise report a short X
-        // and silently truncate the shared secret the token derives. See EcdhPeerValidator.
-        int fieldSize = peer.FieldSizeBytes;
-
-        var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.EncodedPoint);
-        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
-        // Raw secret read-back: derive an extractable, non-sensitive session generic secret of the
-        // field size. The private key itself remains non-extractable.
-        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .ValueLen(fieldSize)
-            .Extractable()
-            .Sensitive(false)
-            .Build();
-
-        // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so Pkcs11SessionCore.BuildSecureKeyDefaults refuses unless the
-        // session has opted in. That single check is the whole policy; there is no adapter-local
-        // guard to keep in step with it.
-        Pkcs11Key derived = _key.Derive(mech, template);
-        bool operationFailed = true;
-        try
-        {
-            // ObjectAttribute owns an unmanaged buffer holding the shared secret Z; disposing the
-            // list is what frees and zeroizes it.
-            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "ECDiffieHellmanPkcs11.DeriveRawSecret (derived CKA_VALUE not readable)");
-            byte[] secret = attrs[0].GetValueAsByteArray();
-            operationFailed = false;
-            return secret;
-        }
-        finally
-        {
-            DestroyEphemeral(derived, operationFailed);
-        }
-    }
-
-    /// <summary>
-    /// Destroys an ephemeral derived key without letting a cleanup failure hide a real one.
-    /// </summary>
-    /// <remarks>
-    /// A throw from <see langword="finally"/> <i>replaces</i> an exception already in flight, so a failed
-    /// <c>C_DestroyObject</c> would reach the caller in place of whatever actually went wrong. This
-    /// suppresses the destroy failure only on that path: when the operation succeeded, the destroy
-    /// failure is the only news and is allowed to surface. The key is a session object either way, so
-    /// the token collects it at <c>C_CloseSession</c> even when the eager destroy fails.
-    /// </remarks>
-    private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
-    {
-        using (derived)
-        {
-            try
-            {
-                derived.Destroy();
-            }
-            catch (Pkcs11Exception) when (operationFailed)
-            {
-                // Deliberately swallowed: see the remarks. The primary exception is the useful one.
-            }
-        }
-    }
+        => _key.DeriveRawSecretEcdh(otherPartyPublicKey.ExportParameters());
 
     // -----------------------------------------------------------------------
     // Key material
@@ -297,7 +224,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        return Pkcs11PublicKeyView.ReadEcPublicKey(_key, "ECDiffieHellmanPkcs11.ExportParameters");
+        return _key.ExportEcPublicKey();
     }
 
     /// <inheritdoc/>

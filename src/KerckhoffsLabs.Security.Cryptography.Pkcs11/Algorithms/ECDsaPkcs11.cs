@@ -1,7 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
@@ -66,20 +65,13 @@ public sealed class ECDsaPkcs11 : ECDsa
     {
         try
         {
-            using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return key.Session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
+            return key.GetCurve().FieldSizeBits;
         }
         catch (Pkcs11Exception)
         {
-            // Token doesn't expose CKA_EC_PARAMS — leave KeySize at the ECDsa base-class default.
+            // CKA_EC_PARAMS unreadable or not a named-curve OID — leave KeySize at the ECDsa base-class default.
+            return null;
         }
-        catch (ArgumentException)
-        {
-            // CKA_EC_PARAMS wasn't a DER-encoded named-curve OID.
-        }
-
-        return null;
     }
 
     // -----------------------------------------------------------------------
@@ -309,7 +301,7 @@ public sealed class ECDsaPkcs11 : ECDsa
             throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        return Pkcs11PublicKeyView.ReadEcPublicKey(_key, "ECDsaPkcs11.ExportParameters");
+        return _key.ExportEcPublicKey();
     }
 
     /// <inheritdoc/>
