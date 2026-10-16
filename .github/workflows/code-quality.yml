@@ -97,10 +97,10 @@ jobs:
       # construction — .editorconfig sets charset = utf-8 and the dotnet format gate enforces it — so
       # this only tells the scanner what the files already are.
       #
-      # docs/images is excluded because the scanner indexes those binary assets and tries to decode
-      # them as text; icon.png in particular reports "Invalid character encountered ... at line 1",
-      # which raises the same project-level encoding warning even when every real source file is
-      # clean. They carry no analyzable content, so indexing them buys nothing.
+      # docs/ is excluded: it is the DocFX site (Markdown, the generated policy pages, templates and
+      # binary images), none of it library code. The images in particular would otherwise be indexed
+      # and decoded as text; icon.png reports "Invalid character encountered ... at line 1", which
+      # raises the project-level encoding warning even when every real source file is clean.
       #
       # build/ holds the CI toolchain, not the library: shell/PowerShell scripts that build and
       # provision the PKCS#11 backends, the C ABI probe and pkcs11-gate shims, and a Python generator.
@@ -133,7 +133,7 @@ jobs:
           /d:sonar.sourceEncoding="UTF-8"
           /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.*.xml"
           /d:sonar.coverage.exclusions="**/*.SecurityAnalyzers/**/*.cs,**/*.SourceGenerators/**/*.cs"
-          /d:sonar.exclusions="vendor/**,docs/images/**,tests/**,build/**"
+          /d:sonar.exclusions="vendor/**,docs/**,tests/**,build/**"
           /d:sonar.test.exclusions="tests/**"
           /d:sonar.issue.ignore.multicriteria="actionslock"
           /d:sonar.issue.ignore.multicriteria.actionslock.ruleKey="githubactions:S7637"
