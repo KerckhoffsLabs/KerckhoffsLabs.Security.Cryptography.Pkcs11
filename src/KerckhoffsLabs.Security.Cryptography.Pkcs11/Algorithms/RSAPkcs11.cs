@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -60,31 +61,13 @@ public sealed class RSAPkcs11 : RSA
     {
         try
         {
-            // CKA_MODULUS_BITS is exact and required on every RSA public key object.
-            using var attrs = key.GetAttributeValue(CKA.CKA_MODULUS_BITS);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return checked((int)attrs[0].GetValueAsUlong());
+            return key.KeySize;
         }
         catch (Pkcs11Exception)
         {
-            // Fall through to the modulus-length fallback below.
+            // C_GetAttributeValue failed — leave KeySize at the RSA base-class default.
+            return null;
         }
-
-        try
-        {
-            // Fallback for a token that omits CKA_MODULUS_BITS: derive from CKA_MODULUS's byte
-            // length. Approximate in principle (the top byte could theoretically use fewer than 8
-            // bits), but exact in practice for any RSA modulus generated to a specific key size.
-            using var attrs = key.GetAttributeValue(CKA.CKA_MODULUS);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return attrs[0].GetValueAsByteArray().Length * 8;
-        }
-        catch (Pkcs11Exception)
-        {
-            // Token exposes neither — leave KeySize at the RSA base-class default.
-        }
-
-        return null;
     }
 
     // -----------------------------------------------------------------------
@@ -246,20 +229,32 @@ public sealed class RSAPkcs11 : RSA
                 "Refusing to export RSA private parameters. PKCS#11 keys are non-extractable " +
                 "by design; export only public material via ExportParameters(false).");
 
-        // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one
-        // exists, falling back to the private-key handle otherwise — covering both real key-pair
-        // companions and private-only objects whose CKA_MODULUS / CKA_PUBLIC_EXPONENT are readable.
-        using var attrs = _key.GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
-        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "RSAPkcs11.ExportParameters (CKA_MODULUS / CKA_PUBLIC_EXPONENT)");
-
-        return new RSAParameters
-        {
-            Modulus = attrs[0].GetValueAsByteArray(),
-            Exponent = attrs[1].GetValueAsByteArray(),
-        };
+        return ToRSAParameters(_key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
     }
+
+    // Parses the PKCS#1 RSAPublicKey Pkcs11Key.Export writes. Not through RSA.ImportRSAPublicKey: that
+    // creates a platform key for a read that needs none. A DER INTEGER is two's complement, so a modulus
+    // whose top bit is set carries one leading 0x00 byte, which RSAParameters does not want.
+    private static RSAParameters ToRSAParameters(byte[] rsaPublicKey)
+    {
+        try
+        {
+            AsnReader sequence = new AsnReader(rsaPublicKey, AsnEncodingRules.DER).ReadSequence();
+            return new RSAParameters
+            {
+                Modulus = Unsigned(sequence.ReadIntegerBytes()),
+                Exponent = Unsigned(sequence.ReadIntegerBytes()),
+            };
+        }
+        catch (AsnContentException ex)
+        {
+            // Pkcs11Key.Export writes this encoding itself, so reaching here is a library bug.
+            throw new CryptographicException("Pkcs11Key.Export returned a malformed RSAPublicKey.", ex);
+        }
+    }
+
+    private static byte[] Unsigned(ReadOnlyMemory<byte> integer)
+        => (integer.Span is [0x00, _, ..] ? integer[1..] : integer).ToArray();
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Always thrown.</exception>

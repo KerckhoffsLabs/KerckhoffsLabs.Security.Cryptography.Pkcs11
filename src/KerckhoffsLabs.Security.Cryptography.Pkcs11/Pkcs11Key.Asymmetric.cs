@@ -15,7 +15,13 @@ public sealed partial class Pkcs11Key
     /// Exports this key's public half in <paramref name="format"/>, read from the public-key handle when
     /// there is one and from the private-key handle otherwise. Nothing private is ever exported.
     /// </summary>
-    /// <remarks>Supports <see cref="CKK.CKK_EC"/> keys on a named curve.</remarks>
+    /// <remarks>
+    /// <list type="table">
+    /// <listheader><term>Key type</term><description><see cref="Pkcs11KeyBlobFormat.RawPublicKey"/></description></listheader>
+    /// <item><term><see cref="CKK.CKK_EC"/> (named curve)</term><description>The uncompressed point <c>0x04 ‖ X ‖ Y</c>.</description></item>
+    /// <item><term><see cref="CKK.CKK_RSA"/></term><description>PKCS#1 <c>RSAPublicKey</c>, as <see cref="RSA.ExportRSAPublicKey"/> writes it.</description></item>
+    /// </list>
+    /// </remarks>
     /// <param name="format">The encoding to write.</param>
     /// <returns>The encoded public key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
@@ -30,13 +36,32 @@ public sealed partial class Pkcs11Key
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (format is not (Pkcs11KeyBlobFormat.SubjectPublicKeyInfo or Pkcs11KeyBlobFormat.RawPublicKey))
             throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown key blob format.");
-        if (_keyType != CKK.CKK_EC)
-            throw new NotSupportedException($"Pkcs11Key.Export supports CKK_EC keys; this key is {_keyType}.");
 
-        ECParameters ec = Pkcs11PublicKeyView.ReadEcPublicKey(this, "Pkcs11Key.Export");
-        return format == Pkcs11KeyBlobFormat.SubjectPublicKeyInfo
-            ? SubjectPublicKeyInfoEncoding.EncodeEc(ec)
-            : [0x04, .. ec.Q.X!, .. ec.Q.Y!];
+        bool spki = format == Pkcs11KeyBlobFormat.SubjectPublicKeyInfo;
+        switch (_keyType)
+        {
+            case CKK.CKK_EC:
+                {
+                    ECParameters ec = Pkcs11PublicKeyView.ReadEcPublicKey(this, "Pkcs11Key.Export");
+                    return spki ? SubjectPublicKeyInfoEncoding.EncodeEc(ec) : [0x04, .. ec.Q.X!, .. ec.Q.Y!];
+                }
+            case CKK.CKK_RSA:
+                {
+                    // The modulus and public exponent are public on either half, so the private-key handle
+                    // is a valid source for a key without a public companion.
+                    using var attrs = GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
+                    if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+                        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                            "Pkcs11Key.Export (CKA_MODULUS / CKA_PUBLIC_EXPONENT not readable from any available handle)");
+                    byte[] modulus = attrs[0].GetValueAsByteArray();
+                    byte[] exponent = attrs[1].GetValueAsByteArray();
+                    return spki
+                        ? SubjectPublicKeyInfoEncoding.EncodeRsa(modulus, exponent)
+                        : SubjectPublicKeyInfoEncoding.EncodeRsaPublicKey(modulus, exponent);
+                }
+            default:
+                throw new NotSupportedException($"Pkcs11Key.Export supports CKK_EC and CKK_RSA keys; this key is {_keyType}.");
+        }
     }
 
     /// <summary>
