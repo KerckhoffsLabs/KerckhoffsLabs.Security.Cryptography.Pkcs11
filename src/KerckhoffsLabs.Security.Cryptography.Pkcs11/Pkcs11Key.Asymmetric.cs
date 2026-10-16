@@ -121,16 +121,16 @@ public sealed partial class Pkcs11Key
 
     // A malformed encoding is the caller's argument error; a well-formed key of another algorithm is a
     // mismatch with this key, reported like a curve mismatch.
-    private static ECParameters DecodeEcPeer(ReadOnlySpan<byte> spki)
+    private static ECParameters DecodeEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
-        string? algorithm = SubjectPublicKeyInfoEncoding.TryReadAlgorithm(spki)
-            ?? throw new ArgumentException("Peer public key is not a DER SubjectPublicKeyInfo.", "peerSubjectPublicKeyInfo");
+        string? algorithm = SubjectPublicKeyInfoEncoding.TryReadAlgorithm(peerSubjectPublicKeyInfo)
+            ?? throw new ArgumentException("Peer public key is not a DER SubjectPublicKeyInfo.", nameof(peerSubjectPublicKeyInfo));
         if (algorithm != SubjectPublicKeyInfoEncoding.EcPublicKeyOid)
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
                 $"Pkcs11Key.DeriveRawSecret (peer public key algorithm is {algorithm}, expected id-ecPublicKey)");
-        if (!SubjectPublicKeyInfoEncoding.TryDecodeEc(spki, out ECParameters ec))
+        if (!SubjectPublicKeyInfoEncoding.TryDecodeEc(peerSubjectPublicKeyInfo, out ECParameters ec))
             throw new ArgumentException(
-                "Peer EC public key must name its curve (namedCurve) and carry an uncompressed point.", "peerSubjectPublicKeyInfo");
+                "Peer EC public key must name its curve (namedCurve) and carry an uncompressed point.", nameof(peerSubjectPublicKeyInfo));
         return ec;
     }
 
