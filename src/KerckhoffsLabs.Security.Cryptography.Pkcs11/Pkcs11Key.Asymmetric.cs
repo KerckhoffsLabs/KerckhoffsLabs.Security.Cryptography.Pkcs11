@@ -142,9 +142,7 @@ public sealed partial class Pkcs11Key
             throw new NotSupportedException($"Pkcs11Key.DeriveRawSecret supports CKK_EC keys; this key is {_keyType}.");
         _session.Enforce(new Policy.KeyMaterialExportRequest(Policy.KeyMaterialExportKind.EcdhSharedSecret));
 
-        ECParameters peerKey = DecodeEcPeer(peerSubjectPublicKeyInfo);
-        ValidatedEcdhPeer peer = EcdhPeerValidator.Validate(
-            this, peerKey, nameof(peerSubjectPublicKeyInfo), "Pkcs11Key.DeriveRawSecret");
+        ValidatedEcdhPeer peer = ValidateEcPeer(peerSubjectPublicKeyInfo, "Pkcs11Key.DeriveRawSecret");
 
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.EncodedPoint));
         // Raw secret read-back: derive an extractable, non-sensitive session generic secret of the
@@ -177,6 +175,64 @@ public sealed partial class Pkcs11Key
             DestroyEphemeral(derived, operationFailed);
         }
     }
+
+    /// <summary>
+    /// Key agreement with a peer public key that keeps the shared secret on the token: the result is
+    /// a session <see cref="CKK.CKK_GENERIC_SECRET"/> key holding the raw secret Z, sensitive,
+    /// non-extractable and usable only as the base key of a further derivation. Turn it into working keys
+    /// with <see cref="Derive"/> and a KDF, e.g. <c>CKM_HKDF_DERIVE</c> (<see cref="MechanismParams.CkmHkdfParams"/>),
+    /// one derivation per key; no secret byte reaches the process.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The PKCS#11 counterpart of CNG's <c>NCryptSecretAgreement</c> secret handle. For a
+    /// <see cref="CKK.CKK_EC"/> key: <c>CKM_ECDH1_DERIVE</c> with <see cref="CKD.CKD_NULL"/>, Z the
+    /// x-coordinate of the shared point, as many bytes as this key's field.
+    /// </para>
+    /// <para>
+    /// The peer is validated exactly as for <see cref="DeriveRawSecret"/>.
+    /// </para>
+    /// <para>
+    /// Permitted by the default policies, which otherwise refuse <see cref="CKD.CKD_NULL"/>: the result
+    /// has <c>CKA_ENCRYPT</c>, <c>CKA_DECRYPT</c>, <c>CKA_SIGN</c>, <c>CKA_VERIFY</c>, <c>CKA_WRAP</c> and
+    /// <c>CKA_UNWRAP</c> false, so Z can never be used as a key itself (SP 800-56A), only through a KDF
+    /// the policy approves. For SP 800-56C two-step derivation, run the extraction step first
+    /// (<c>CKM_HKDF_DERIVE</c> with extract, or extract-and-expand); the policy judges the KDF mechanism
+    /// and its PRF, not which step the caller runs on Z.
+    /// </para>
+    /// </remarks>
+    /// <param name="peerSubjectPublicKeyInfo">The peer's public key as a DER <c>SubjectPublicKeyInfo</c>; for EC, RFC 5480 with a named curve and an uncompressed point.</param>
+    /// <returns>The on-token shared secret. Dispose releases the wrapper; <see cref="Destroy"/> removes it from the token before the session closes.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <see cref="KeyType"/> is not supported.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerSubjectPublicKeyInfo"/> is not a DER <c>SubjectPublicKeyInfo</c>, or is an EC key without a named curve and an uncompressed point.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate lengths don't match the field size, or its point does not satisfy the curve equation.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the session's <see cref="Pkcs11Session.Policy"/> refuses ECDH or this key's curve.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown if this key's <c>CKA_EC_PARAMS</c> cannot be read; otherwise propagated from <c>C_DeriveKey</c>.</exception>
+    public Pkcs11Key DeriveSecretAgreement(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_keyType != CKK.CKK_EC)
+            throw new NotSupportedException($"Pkcs11Key.DeriveSecretAgreement supports CKK_EC keys; this key is {_keyType}.");
+
+        ValidatedEcdhPeer peer = ValidateEcPeer(peerSubjectPublicKeyInfo, "Pkcs11Key.DeriveSecretAgreement");
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.EncodedPoint));
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(peer.FieldSizeBytes)
+            .Sensitive()
+            .NonExtractable()
+            .OnToken(false)
+            .Derive()
+            .Encrypt(false).Decrypt(false)
+            .Sign(false).Verify(false)
+            .Wrap(false).Unwrap(false)
+            .Build();
+        return Derive(mechanism, template);
+    }
+
+    private ValidatedEcdhPeer ValidateEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string operationName)
+        => EcdhPeerValidator.Validate(
+            this, DecodeEcPeer(peerSubjectPublicKeyInfo), nameof(peerSubjectPublicKeyInfo), operationName);
 
     // A malformed encoding is the caller's argument error; a well-formed key of another algorithm is a
     // mismatch with this key, reported like a curve mismatch.

@@ -38,6 +38,10 @@ internal static class CatalogueEvaluator
             RsaKeyGenerationRequest r => EvaluateRsaKeyGeneration(catalogue, policyName, extensionHint, r),
             EcKeyGenerationRequest r => EvaluateCurve(catalogue, policyName, r.Curve),
             KeyTemplateRequest r => catalogue.Rules.KeyTemplate(r),
+            // CKD_NULL keeps Z as is. Refused into a working key (SP 800-56A forbids using Z directly),
+            // allowed into a derivation-only secret: Z stays in the module and only an approved KDF
+            // (the catalogue's CKM_HKDF_DERIVE / CKM_SP800_108_*_KDF) can turn it into keys.
+            KeyAgreementKdfRequest { Kdf: CKD.CKD_NULL, ResultIsDerivationOnlySecret: true } => PolicyDecision.Allow,
             KeyAgreementKdfRequest r => EvaluateKdf(catalogue, policyName, r.Kdf),
             KeyAgreementKeyRequest r => EvaluateKeyAgreementKeyType(catalogue, policyName, r.KeyType),
             KeyMaterialExportRequest r => catalogue.Rules.KeyMaterialExport(r),
