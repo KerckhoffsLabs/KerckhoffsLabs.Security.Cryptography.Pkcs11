@@ -4,7 +4,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 // The Cryptoki functions a FakeModule can implement: a virtual per function, taking spans and
 // decoded structs, and the [UnmanagedCallersOnly] thunk the function table points at, which decodes

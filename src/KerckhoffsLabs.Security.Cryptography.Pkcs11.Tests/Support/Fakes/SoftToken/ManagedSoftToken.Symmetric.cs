@@ -3,9 +3,9 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // Symmetric family: single-part C_EncryptInit/C_Encrypt (+ Decrypt) over the BCL — block ciphers
 // (AES/DES/3DES/RC2, CBC/ECB) and AEAD (AES-GCM/CCM, ChaCha20-Poly1305). Because the token implements

@@ -4,7 +4,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;

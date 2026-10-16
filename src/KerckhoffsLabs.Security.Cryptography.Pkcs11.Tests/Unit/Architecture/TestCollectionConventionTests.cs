@@ -1,5 +1,5 @@
 using System.Reflection;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 

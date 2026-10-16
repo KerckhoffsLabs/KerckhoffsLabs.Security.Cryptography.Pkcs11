@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 /// <summary>
 /// A PKCS#11 module made of managed code, loaded through the library's real loader. A test derives

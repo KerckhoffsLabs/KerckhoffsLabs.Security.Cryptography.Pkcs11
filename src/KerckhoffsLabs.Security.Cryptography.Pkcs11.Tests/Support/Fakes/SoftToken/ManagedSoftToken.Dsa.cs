@@ -2,7 +2,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // DSA: the BCL can't generate a key inside a caller-provided (P,Q,G) domain, so DSA keys are
 // IMPORTED via C_CreateObject. We reconstruct a live BCL DSA from the imported attributes; the

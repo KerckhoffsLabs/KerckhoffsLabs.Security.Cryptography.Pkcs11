@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 /// <summary>
 /// Builds a <c>Pkcs11Key</c> directly over an <see cref="AttributeResponseModule"/>, using the

@@ -3,9 +3,9 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // Sign / verify dispatch: HMAC (generic-secret key), asymmetric RSA/ECDSA, and PQC ML-DSA/SLH-DSA.
 // PKCS#11 ECDSA signatures are raw r‖s — the BCL's default IEEE-P1363 format — so no conversion.

@@ -4,8 +4,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
 // secure-defaults policy check is the behaviour under test), so the compile-time warning is suppressed

@@ -3,8 +3,8 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.

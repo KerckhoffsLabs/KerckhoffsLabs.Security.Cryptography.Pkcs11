@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // Key derivation: C_DeriveKey for ECDH1 (CKD_NULL — raw shared secret Z), SP800-108 counter-mode
 // HMAC KDF and HKDF. Produces a new secret-key object whose CKA_VALUE is the derived material.

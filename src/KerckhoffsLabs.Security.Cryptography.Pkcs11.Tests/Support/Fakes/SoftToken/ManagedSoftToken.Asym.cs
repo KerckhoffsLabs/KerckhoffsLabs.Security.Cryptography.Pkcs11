@@ -3,7 +3,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // Asymmetric key generation: C_GenerateKeyPair for RSA and EC. Generates a live BCL key, indexes it
 // under BOTH handles (Sign uses the private handle, Verify the public), and synthesizes the public

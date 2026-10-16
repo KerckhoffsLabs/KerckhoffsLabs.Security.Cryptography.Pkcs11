@@ -1,6 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 /// <summary>
 /// Convenience entry points for opening a session over an in-process <see cref="ManagedSoftToken"/>.

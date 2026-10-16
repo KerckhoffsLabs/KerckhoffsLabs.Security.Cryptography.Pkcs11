@@ -12,7 +12,7 @@ where a new test goes:
 ## Where to put / find a test
 
 - **Does it touch a token (SoftHSM or pkcs11-mock)?**
-  - **No** → `Unit/`, mirroring the source path: `src/Native/UnmanagedMemory.cs` → `Unit/Native/UnmanagedMemoryTests.cs`. Root-namespace source types (the BCL adapters' *value* types, `SlotInfo`/`TokenInfo`/…/`*Flags`, `SecurePin`, `Pkcs11Slot`) live directly under `Unit/`.
+  - **No** → `Unit/`, mirroring the source path: `src/Native/UnmanagedMemory.cs` → `Unit/Native/UnmanagedMemoryTests.cs`. Root-namespace source types are grouped by area: `Unit/Info/` for `SlotInfo`/`TokenInfo`/…/`*Flags`/`SlotId`/`SessionId`, `Unit/Curves/` for the EC curve types; the rest (`SecurePin`, `Pkcs11Slot`, …) live directly under `Unit/`. Tests that enforce rules over the whole library (layer dependencies, public surface, naming and test conventions) live in `Unit/Architecture/`.
   - **Yes** → `Integration/<operation>`: `Sign/`, `Verify/`, `Encrypt/`, `Decrypt/`, `Digest/`, `Derive/`, `Keys/`, `Auth/`, `Discovery/`, `Lifecycle/`, `Objects/`, `Random/`, `Security/`, `ThreadSafety/`, `Smoke/`. The BCL adapter end-to-end tests (`RSAPkcs11Tests`, … and `KnownAnswerTests`) are in `Integration/Adapters/`.
 
 Namespaces follow folders (`…Tests.Unit.Native`, `…Tests.Integration.Sign`), which enables fast
@@ -29,7 +29,8 @@ dotnet test -- --filter-query "/*/*.Tests.Integration*/*/*"
 ## Conventions & exceptions
 
 - **`Support/`** holds `Fixtures/` (SoftHSM + mock backends, xUnit collection definitions),
-  `FakeModules/` (`FakeModule`, managed PKCS#11 modules loaded through the real loader), and the ambient helpers `TestKeys`, `Settings`, and
+  `Fakes/` (`Modules/`: `FakeModule`, managed PKCS#11 modules loaded through the real loader;
+  `SoftToken/`: `ManagedSoftToken`, an in-process token that performs real crypto), and the ambient helpers `TestKeys`, `Settings`, and
   `CapturingLogger`. The ambient helpers intentionally keep the **assembly-root namespace**
   (`…Tests`) so any test can use them without an extra `using`.
 - **`Integration/MemoryLeaks/`** is kept as one group even though some of its tests are hermetic:
@@ -55,7 +56,7 @@ So **every test class under `Integration/` must declare one of two things**:
 | `[Collection("Mock" \| "SoftHsm" \| "Nss" \| "OpenCryptoki" \| "MemoryLeaks")]` | It drives that backend — the collection serializes its tests and owns the module lifetime. |
 | `[NoBackendCollection("why")]` | It touches no process-global native state (in-process `ManagedSoftToken`, or a static `File.Exists` availability probe). |
 
-`Unit/TestCollectionConventionTests` enforces this, so a forgotten `[Collection]` fails
+`Unit/Architecture/TestCollectionConventionTests` enforces this, so a forgotten `[Collection]` fails
 deterministically at the moment the class is added instead of surfacing later as an intermittent
 native-state corruption. It also checks, across the whole assembly (`Algorithms/` included), that a
 class named `*_Mock` / `*_SoftHsm` / `*_Nss` / `*_OpenCryptoki` joins the matching collection, that

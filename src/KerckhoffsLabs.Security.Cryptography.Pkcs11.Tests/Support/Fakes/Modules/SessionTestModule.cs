@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 /// <summary>
 /// A <see cref="FakeModule"/> for tests that drive a <see cref="Pkcs11SessionCore"/> directly: it accepts

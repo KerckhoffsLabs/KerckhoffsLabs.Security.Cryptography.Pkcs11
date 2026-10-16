@@ -2,7 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 /// <summary>
 /// One call of one <see cref="LowLevelPkcs11Library"/> wrapper, for the per-family dispatch smoke tests:

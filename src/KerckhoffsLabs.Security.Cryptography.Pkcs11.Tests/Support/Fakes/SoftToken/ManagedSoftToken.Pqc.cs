@@ -2,11 +2,11 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 #pragma warning disable SYSLIB5006 // ML-DSA / SLH-DSA / ML-KEM are evaluation-only BCL APIs.
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // PQC family: C_GenerateKeyPair (ML-DSA / SLH-DSA / ML-KEM) + ML-KEM C_EncapsulateKey/C_DecapsulateKey.
 // ML-DSA/SLH-DSA sign/verify dispatch from ManagedSoftToken.Sign.cs.

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // HMAC primitives over a CKK_GENERIC_SECRET key. The C_SignInit/C_Sign/C_Verify entry points that
 // drive these live in ManagedSoftToken.Sign.cs, which dispatches HMAC vs asymmetric by mechanism.
