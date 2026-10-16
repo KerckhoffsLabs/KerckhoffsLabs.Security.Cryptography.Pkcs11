@@ -102,6 +102,14 @@ public static class Settings
     public static string BouncyHsmTokenLabel =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_TOKEN") ?? "kl-bouncyhsm";
 
+    /// <summary>
+    /// Optional path to a Craton HSM PKCS#11 library (craton-hsm-core) — a fifth, fully independent
+    /// real backend. Falls back to the path the BuildCratonHsm MSBuild target places next to the
+    /// test assembly. Tests that require it skip themselves when this resolves to null.
+    /// </summary>
+    public static string? CratonHsmLibraryPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_CRATON_HSM_LIBRARY");
+
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;

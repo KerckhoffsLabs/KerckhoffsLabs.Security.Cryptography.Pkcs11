@@ -64,7 +64,7 @@
   </ItemGroup>
 
   <!-- SkipNativeBuilds=true skips every native build below (pkcs11-mock, the ABI oracle, the gate
-       shims, SoftHSM, Kryoptic and BouncyHsm), for a managed-only build that needs neither the submodules nor a
+       shims, SoftHSM, Kryoptic, BouncyHsm and Craton HSM), for a managed-only build that needs neither the submodules nor a
        C toolchain. Each target keeps its own Skip* switch; a value passed on the command line still
        wins over this one. -->
   <PropertyGroup Condition="'$(SkipNativeBuilds)' == 'true'">
@@ -74,6 +74,7 @@
     <SkipSoftHsmV2Build>true</SkipSoftHsmV2Build>
     <BuildKryoptic>false</BuildKryoptic>
     <BuildBouncyHsm>false</BuildBouncyHsm>
+    <BuildCratonHsm>false</BuildCratonHsm>
   </PropertyGroup>
 
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
@@ -147,6 +148,17 @@
       <_BouncyHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_BouncyHsmOutputDir>
     </PropertyGroup>
     <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-bouncyhsm.sh&quot; &quot;$(_BouncyHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <!-- Craton HSM: opt-in like Kryoptic — default OFF, flip it on with -p:BuildCratonHsm=true (or the
+       env var of the same name). Needs a Rust toolchain only: its default RustCrypto backend has no
+       C or OpenSSL dependency. Wired into CI on the ubuntu-latest leg only for now (see ci.yml);
+       build-craton-hsm.sh no-ops on non-Linux and skips the rebuild when the submodule is unchanged. -->
+  <Target Name="BuildCratonHsm" BeforeTargets="PrepareForBuild" Condition="'$(BuildCratonHsm)' == 'true' AND !$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup>
+      <_CratonHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_CratonHsmOutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-craton-hsm.sh&quot; &quot;$(_CratonHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
 </Project>
