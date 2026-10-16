@@ -76,13 +76,16 @@ public sealed class Pkcs11Library : IDisposable
     ///   <item><description>
     ///     A bare name (<c>libsofthsm2.so</c>, <c>cryptoki.dll</c>) is searched for in this library's
     ///     directory and the system's library directories, never in the current directory, where a planted
-    ///     module could win. On Windows <c>PATH</c> is excluded too. On macOS, whose loader would search the
-    ///     current directory, the name is resolved here against the application directory,
-    ///     <c>DYLD_LIBRARY_PATH</c>, <c>LD_LIBRARY_PATH</c> and dyld's fallback directories instead.
+    ///     module could win. On Windows <c>PATH</c> is excluded too. On Linux an empty entry in
+    ///     <c>LD_LIBRARY_PATH</c> (a stray <c>:</c>) would still make <c>dlopen</c> look there. On macOS, whose
+    ///     loader would search the current directory, the name is resolved here against the application's
+    ///     native-asset directories, the application directory, <c>DYLD_LIBRARY_PATH</c> and dyld's fallback
+    ///     directories instead, trying the <c>lib</c> prefix and <c>.dylib</c> suffix as .NET does elsewhere.
     ///   </description></item>
     ///   <item><description>
     ///     A relative path with a directory part (<c>modules/libx.so</c>) is resolved against the current
-    ///     directory, so where the process starts decides what loads. It loads, and a warning is logged.
+    ///     directory only, on every OS (Windows' loader would also try it under each directory of its search),
+    ///     so where the process starts decides what loads. It loads, and a warning is logged.
     ///   </description></item>
     /// </list>
     /// </param>
@@ -95,7 +98,12 @@ public sealed class Pkcs11Library : IDisposable
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library Load(string libraryPath, Pkcs11LibraryOptions? options = null)
-        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), options, isModulePath: true);
+        => new(libraryPath, logger =>
+        {
+            if (!string.IsNullOrEmpty(libraryPath) && ModulePath.Classify(libraryPath) == ModulePathKind.Relative)
+                Log.LoadingModuleFromRelativePath(logger, libraryPath, Environment.CurrentDirectory);
+            return new LowLevelPkcs11Library(libraryPath);
+        }, options);
 
     /// <summary>
     /// Binds to a PKCS#11 implementation that is statically linked into the host
@@ -152,7 +160,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library LoadStaticallyLinked(Pkcs11LibraryOptions? options = null)
-        => new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), options);
+        => new(libraryPath: "<statically-linked>", _ => new LowLevelPkcs11Library(), options);
 
     /// <summary>
     /// Test seam: binds to a module whose exports come from <paramref name="resolveExport"/> (a fake
@@ -161,11 +169,11 @@ public sealed class Pkcs11Library : IDisposable
     /// pinning and struct packing.
     /// </summary>
     internal Pkcs11Library(Func<string, IntPtr> resolveExport, Pkcs11LibraryOptions? options = null)
-        : this(libraryPath: "<fake module>", () => new LowLevelPkcs11Library(resolveExport), options)
+        : this(libraryPath: "<fake module>", _ => new LowLevelPkcs11Library(resolveExport), options)
     {
     }
 
-    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, Pkcs11LibraryOptions? options, bool isModulePath = false)
+    private Pkcs11Library(string libraryPath, Func<ILogger, LowLevelPkcs11Library> load, Pkcs11LibraryOptions? options)
     {
         ILoggerFactory? loggerFactory = options?.LoggerFactory;
         _loggerFactory = loggerFactory;
@@ -173,16 +181,12 @@ public sealed class Pkcs11Library : IDisposable
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");
 
-        // Only Load passes a real path; the other constructors label the instance ("<fake module>", ...).
-        if (isModulePath && !string.IsNullOrEmpty(libraryPath) && ModulePath.Classify(libraryPath) == ModulePathKind.Relative)
-            Log.LoadingModuleFromRelativePath(_logger, libraryPath, Environment.CurrentDirectory);
-
         _libraryPath = libraryPath;
 
         try
         {
             Log.LoadingLibrary(_logger, _libraryPath);
-            _pkcs11Library = load();
+            _pkcs11Library = load(_logger);
             _pkcs11Library.Pbkdf2PasswordLengthByReference = options?.Pbkdf2ParametersLayout switch
             {
                 Pbkdf2ParametersLayout.PasswordLengthByReference => true,

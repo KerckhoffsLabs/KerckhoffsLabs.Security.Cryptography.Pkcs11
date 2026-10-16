@@ -127,6 +127,57 @@ public sealed class ModulePathTests
         }
     }
 
+    // Windows' loader would try a relative path under each directory of its search, the application
+    // directory first. Resolved here, the copy beside the application is not found from an empty current
+    // directory, on every OS.
+    [Fact]
+    public void RelativePath_IsResolvedAgainstTheCurrentDirectoryOnly()
+    {
+        string sub = $"modules-{Guid.NewGuid():N}";
+        string name = UniqueModuleName();
+        string besideApp = CopyMockTo(Path.Join(AppContext.BaseDirectory, sub), name);
+        string cwd = Directory.CreateTempSubdirectory("pkcs11-empty-").FullName;
+        string previous = Environment.CurrentDirectory;
+        try
+        {
+            Environment.CurrentDirectory = cwd;
+            Assert.Throws<DllNotFoundException>(() => ModulePath.Load(Path.Join(sub, name)));
+        }
+        finally
+        {
+            Environment.CurrentDirectory = previous;
+            TryDelete(Path.GetDirectoryName(besideApp)!);
+            TryDelete(cwd);
+        }
+    }
+
+    // The planted case for a relative path: a writable PATH directory holding modules\x.dll.
+    [Fact]
+    public void RelativePath_IsNotSearchedForInPath()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows' loader searches PATH for a relative path.");
+        string planted = Directory.CreateTempSubdirectory("pkcs11-path-").FullName;
+        string sub = $"modules-{Guid.NewGuid():N}";
+        string name = UniqueModuleName();
+        CopyMockTo(Path.Join(planted, sub), name);
+        string cwd = Directory.CreateTempSubdirectory("pkcs11-empty-").FullName;
+        string previousDirectory = Environment.CurrentDirectory;
+        string? previousPath = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            Environment.CurrentDirectory = cwd;
+            Environment.SetEnvironmentVariable("PATH", planted + Path.PathSeparator + previousPath);
+            Assert.Throws<DllNotFoundException>(() => ModulePath.Load(Path.Join(sub, name)));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", previousPath);
+            Environment.CurrentDirectory = previousDirectory;
+            TryDelete(planted);
+            TryDelete(cwd);
+        }
+    }
+
     [Fact]
     public void FullyQualifiedPath_LogsNoWarning()
     {
@@ -150,22 +201,32 @@ public sealed class ModulePathTests
     // Pure: takes the directories and environment as inputs, so these run on every OS.
 
     [Fact]
-    public void MacOSSearch_FollowsDyldOrder()
+    public void MacOSSearch_FollowsDotNetThenDyldOrder()
     {
         // dyld's search paths are ':'-separated, which a Windows drive path (C:\...) cannot be written in.
         Assert.SkipWhen(OperatingSystem.IsWindows(), "':'-separated search paths cannot hold a Windows drive path.");
         using var dirs = new TempDirs(5);
         string name = UniqueModuleName();
-        string[] env = [dirs[1], dirs[2], dirs[3], dirs[4]];   // DYLD_LIBRARY_PATH, LD_LIBRARY_PATH, fallback
-        Func<string, string?> getEnv = Env(("DYLD_LIBRARY_PATH", env[0]), ("LD_LIBRARY_PATH", env[1]),
-            ("DYLD_FALLBACK_LIBRARY_PATH", $"{env[2]}:{env[3]}"));
+        // native-asset directory, application directory, DYLD_LIBRARY_PATH, fallback (two entries)
+        Func<string, string?> getEnv = Env(("DYLD_LIBRARY_PATH", dirs[2]), ("DYLD_FALLBACK_LIBRARY_PATH", $"{dirs[3]}:{dirs[4]}"));
 
         // Each step only when every earlier one lacks the module.
         for (int i = 4; i >= 0; i--)
         {
             File.WriteAllBytes(Path.Join(dirs[i], name), []);
-            Assert.Equal(Path.Join(dirs[i], name), ModulePath.ResolveBareNameOnMacOS(name, dirs[0], getEnv));
+            Assert.Equal(Path.Join(dirs[i], name), ModulePath.ResolveBareNameOnMacOS(name, [dirs[0]], dirs[1], getEnv));
         }
+    }
+
+    // dyld never reads LD_LIBRARY_PATH, so neither does the search that stands in for it.
+    [Fact]
+    public void MacOSSearch_IgnoresLdLibraryPath()
+    {
+        using var dirs = new TempDirs(2);
+        string name = UniqueModuleName();
+        File.WriteAllBytes(Path.Join(dirs[1], name), []);
+
+        Assert.Null(ModulePath.ResolveBareNameOnMacOS(name, [], dirs[0], Env(("LD_LIBRARY_PATH", dirs[1]))));
     }
 
     [Fact]
@@ -180,8 +241,8 @@ public sealed class ModulePathTests
             Environment.CurrentDirectory = dirs[1];
 
             // Not searched as such, and not reachable through a relative or empty search-path entry either.
-            Assert.Null(ModulePath.ResolveBareNameOnMacOS(name, dirs[0],
-                Env(("DYLD_LIBRARY_PATH", ".:"), ("LD_LIBRARY_PATH", "./"), ("DYLD_FALLBACK_LIBRARY_PATH", "::."))));
+            Assert.Null(ModulePath.ResolveBareNameOnMacOS(name, [".", ""], dirs[0],
+                Env(("DYLD_LIBRARY_PATH", ".:"), ("DYLD_FALLBACK_LIBRARY_PATH", "::."))));
         }
         finally
         {
@@ -195,13 +256,38 @@ public sealed class ModulePathTests
         using var dirs = new TempDirs(1);
         var asked = new List<string>();
 
-        Assert.Null(ModulePath.ResolveBareNameOnMacOS(UniqueModuleName(), dirs[0], variable =>
+        Assert.Null(ModulePath.ResolveBareNameOnMacOS(UniqueModuleName(), [], dirs[0], variable =>
         {
             asked.Add(variable);
             return null;
         }));
-        Assert.Equal(["DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH"], asked);
+        Assert.Equal(["DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH"], asked);
         Assert.Equal("/usr/local/lib:/usr/lib", ModulePath.MacOSDefaultFallbackPath);
+    }
+
+    // A name without the lib prefix or .dylib suffix still finds the file, as it would on Linux and Windows.
+    [Theory]
+    [InlineData("softhsm2", "libsofthsm2.dylib")]
+    [InlineData("softhsm2", "softhsm2.dylib")]
+    [InlineData("libsofthsm2", "libsofthsm2.dylib")]
+    [InlineData("softhsm2.dylib", "libsofthsm2.dylib")]
+    public void MacOSSearch_TriesTheLibraryNameVariants(string name, string file)
+    {
+        using var dirs = new TempDirs(1);
+        File.WriteAllBytes(Path.Join(dirs[0], file), []);
+
+        Assert.Equal(Path.Join(dirs[0], file), ModulePath.ResolveBareNameOnMacOS(name, [], dirs[0], Env()));
+    }
+
+    // The exact name wins over a variant even in a later directory: variants are tried one at a time.
+    [Fact]
+    public void MacOSSearch_PrefersTheExactName()
+    {
+        using var dirs = new TempDirs(2);
+        File.WriteAllBytes(Path.Join(dirs[0], "libsofthsm2.dylib"), []);
+        File.WriteAllBytes(Path.Join(dirs[1], "softhsm2"), []);
+
+        Assert.Equal(Path.Join(dirs[1], "softhsm2"), ModulePath.ResolveBareNameOnMacOS("softhsm2", [dirs[0]], dirs[1], Env()));
     }
 
     // The macOS branch of Load, driven on whatever OS runs the tests: the name is resolved first, then loaded
