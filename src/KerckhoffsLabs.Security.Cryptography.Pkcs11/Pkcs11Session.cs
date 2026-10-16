@@ -354,7 +354,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(filter);
         ObjectFamily family = OtherObjects(filter);
         return FindUniqueObject(filter, family)
-            ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No {family.Name} matching the filter was found on the token.");
+            ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No {family.Name} matching the filter was found on the token.");
     }
 
     /// <summary>
@@ -1064,7 +1064,7 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private Pkcs11Key OpenKeyCore(ObjectTemplate filter, string criteria)
         => FindUniqueKey(filter)
-            ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No key {criteria} was found on the token.");
+            ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No key {criteria} was found on the token.");
 
     private Pkcs11Key? FindUniqueKey(ObjectTemplate filter)
         => FindUnique(filter, Keys, GroupKeyHalves, HydrateKeyGroup);
@@ -1091,7 +1091,7 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private Pkcs11Certificate OpenCertificateCore(ObjectTemplate filter, string criteria)
         => FindUniqueCertificate(filter)
-            ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No certificate {criteria} was found on the token.");
+            ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No certificate {criteria} was found on the token.");
 
     private Pkcs11Certificate? FindUniqueCertificate(ObjectTemplate filter)
         => FindUnique(filter, Certificates, EachOnItsOwn, matched => HydrateCertificateFromHandle(matched[0].Handle));
@@ -1120,7 +1120,7 @@ public sealed partial class Pkcs11Session : IDisposable
         {
             0 => null,
             1 => hydrate(results[0]),
-            _ => throw new Pkcs11AmbiguousObjectException("C_FindObjects",
+            _ => throw new Pkcs11AmbiguousObjectException(Pkcs11Operations.OpFindObjects,
                 $"The lookup matched {results.Count} distinct {family.Name}s; refusing to pick one. Narrow it with a " +
                 "filter (class, type, CKA_ID, …), or enumerate the candidates with a Find method."),
         };
