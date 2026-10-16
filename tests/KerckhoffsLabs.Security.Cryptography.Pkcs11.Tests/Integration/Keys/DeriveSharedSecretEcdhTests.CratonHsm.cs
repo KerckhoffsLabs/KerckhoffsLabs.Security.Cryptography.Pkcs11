@@ -1,0 +1,110 @@
+using System.Security.Cryptography;
+using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
+
+[Collection("CratonHsm")]
+[ResetCratonHsmLogin]
+public sealed class DeriveSharedSecretEcdhTests_CratonHsm(CratonHsmBackendFixture backend)
+{
+    private readonly CratonHsmBackendFixture _backend = backend;
+
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
+            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+
+    private static byte[] ReadEcPoint(Pkcs11Session session, ObjectHandle publicHandle)
+    {
+        using var attrs = session.Core.GetAttributeValue(publicHandle, [CKA.CKA_EC_POINT]);
+        Assert.False(attrs[0].CannotBeRead);
+        return attrs[0].GetValueAsByteArray();
+    }
+
+    // Two parties run ECDH1 (CKD_NULL) over P-256; the derived on-token AES keys must be identical,
+    // proven by a cross-party AES-GCM encrypt-with-Alice / decrypt-with-Bob round-trip.
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void TwoParties_DeriveMatchingAesKey()
+    {
+        using var session = OpenSession();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKD_NULL is gated by default — it's what's under test here
+        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+
+        byte[] alicePoint = ReadEcPoint(session, alice.PublicHandle);
+        byte[] bobPoint = ReadEcPoint(session, bob.PublicHandle);
+
+        // CKD_NULL: the raw shared secret Z (P-256 field size = 32 bytes) becomes the AES-256 key
+        // material directly.
+        using var aliceAes = session.DeriveSharedSecretEcdh(alice, bobPoint, kdf: CKD.CKD_NULL);
+        using var bobAes = session.DeriveSharedSecretEcdh(bob, alicePoint, kdf: CKD.CKD_NULL);
+
+        byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        byte[] plaintext = Encoding.UTF8.GetBytes("ECDH-derived AES key must match on both sides");
+
+        byte[] ciphertext = TestAesGcm.Encrypt(session.Core, aliceAes.PrivateHandle, iv, plaintext);
+        byte[] recovered = TestAesGcm.Decrypt(session.Core, bobAes.PrivateHandle, iv, ciphertext);
+
+        Assert.Equal(plaintext, recovered);
+    }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void RejectsWrongAesBitLength()
+    {
+        using var session = OpenSession();
+        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        byte[] point = ReadEcPoint(session, alice.PublicHandle);
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => session.DeriveSharedSecretEcdh(alice, point, aesBitLength: 100));
+    }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void NullKey_Throws()
+    {
+        using var session = OpenSession();
+        Assert.Throws<ArgumentNullException>(
+            () => session.DeriveSharedSecretEcdh(null!, new byte[1]));
+    }
+
+    // === ECParameters overload: validates the peer, then agrees exactly like the raw-span form ===
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void TwoParties_DeriveMatchingAesKey_ViaECParametersOverload()
+    {
+        using var session = OpenSession();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKD_NULL is gated by default — it's what's under test here
+        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+
+        using var aliceEcdh = new ECDiffieHellmanPkcs11(alice);
+        using var bobEcdh = new ECDiffieHellmanPkcs11(bob);
+        ECParameters alicePub = aliceEcdh.ExportParameters(includePrivateParameters: false);
+        ECParameters bobPub = bobEcdh.ExportParameters(includePrivateParameters: false);
+
+        using var aliceAes = session.DeriveSharedSecretEcdh(alice, bobPub, kdf: CKD.CKD_NULL);
+        using var bobAes = session.DeriveSharedSecretEcdh(bob, alicePub, kdf: CKD.CKD_NULL);
+
+        byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        byte[] plaintext = Encoding.UTF8.GetBytes("ECParameters overload must validate and still agree");
+        byte[] ciphertext = TestAesGcm.Encrypt(session.Core, aliceAes.PrivateHandle, iv, plaintext);
+        byte[] recovered = TestAesGcm.Decrypt(session.Core, bobAes.PrivateHandle, iv, ciphertext);
+        Assert.Equal(plaintext, recovered);
+    }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void ECParametersOverload_RejectsPeerOnDifferentCurve()
+    {
+        using var session = OpenSession();
+        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP384);
+        using var bobEcdh = new ECDiffieHellmanPkcs11(bob);
+        ECParameters bobPub = bobEcdh.ExportParameters(includePrivateParameters: false);
+
+        Assert.Throws<Pkcs11ArgumentException>(() => session.DeriveSharedSecretEcdh(alice, bobPub));
+    }
+}
