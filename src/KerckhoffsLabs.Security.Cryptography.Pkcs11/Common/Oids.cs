@@ -62,4 +62,35 @@ internal static class Oids
         // SM2 (GB/T 32918.5, GM/T 0006).
         internal const string Sm2 = "1.2.156.10197.1.301";
     }
+
+    /// <summary>
+    /// FIPS 203/204/205 parameter sets, the <c>SubjectPublicKeyInfo</c> algorithm OID with absent parameters
+    /// (NIST CSOR <c>sigAlgs</c> / <c>kems</c> arcs).
+    /// </summary>
+    internal static class PostQuantum
+    {
+        // ML-DSA (FIPS 204, RFC 9881).
+        internal const string MlDsa44 = "2.16.840.1.101.3.4.3.17";
+        internal const string MlDsa65 = "2.16.840.1.101.3.4.3.18";
+        internal const string MlDsa87 = "2.16.840.1.101.3.4.3.19";
+
+        // SLH-DSA (FIPS 205, RFC 9909).
+        internal const string SlhDsaSha2_128s = "2.16.840.1.101.3.4.3.20";
+        internal const string SlhDsaSha2_128f = "2.16.840.1.101.3.4.3.21";
+        internal const string SlhDsaSha2_192s = "2.16.840.1.101.3.4.3.22";
+        internal const string SlhDsaSha2_192f = "2.16.840.1.101.3.4.3.23";
+        internal const string SlhDsaSha2_256s = "2.16.840.1.101.3.4.3.24";
+        internal const string SlhDsaSha2_256f = "2.16.840.1.101.3.4.3.25";
+        internal const string SlhDsaShake128s = "2.16.840.1.101.3.4.3.26";
+        internal const string SlhDsaShake128f = "2.16.840.1.101.3.4.3.27";
+        internal const string SlhDsaShake192s = "2.16.840.1.101.3.4.3.28";
+        internal const string SlhDsaShake192f = "2.16.840.1.101.3.4.3.29";
+        internal const string SlhDsaShake256s = "2.16.840.1.101.3.4.3.30";
+        internal const string SlhDsaShake256f = "2.16.840.1.101.3.4.3.31";
+
+        // ML-KEM (FIPS 203).
+        internal const string MlKem512 = "2.16.840.1.101.3.4.4.1";
+        internal const string MlKem768 = "2.16.840.1.101.3.4.4.2";
+        internal const string MlKem1024 = "2.16.840.1.101.3.4.4.3";
+    }
 }

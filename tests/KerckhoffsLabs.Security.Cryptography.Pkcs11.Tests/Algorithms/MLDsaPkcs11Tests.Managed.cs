@@ -226,7 +226,7 @@ public sealed class MLDsaPkcs11Tests_Managed
     {
         using var key = FakeKeys.Create(CKK.CKK_ML_DSA, ca => ca == CKA.CKA_PARAMETER_SET
             ? (CKR.CKR_OK, UlongAttr((ulong)CkpMlDsa.CKP_ML_DSA_44))
-            : (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+            : (CKR.CKR_ATTRIBUTE_SENSITIVE, null), publicOnly: true);
         using var mldsa = new MLDsaPkcs11(key);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
@@ -237,10 +237,10 @@ public sealed class MLDsaPkcs11Tests_Managed
     public void ExportMLDsaPublicKey_TokenReturnsWrongLength_ThrowsPkcs11Exception()
     {
         // MLDsa44's public key is 1312 bytes; a well-formed token could never return a different
-        // length for its own advertised parameter set, so this drives CopyExact's mismatch guard.
+        // length for its own advertised parameter set, so this drives Pkcs11Key.Export's length check.
         using var key = FakeKeys.Create(CKK.CKK_ML_DSA, ca => ca == CKA.CKA_PARAMETER_SET
             ? (CKR.CKR_OK, UlongAttr((ulong)CkpMlDsa.CKP_ML_DSA_44))
-            : (CKR.CKR_OK, new byte[1]));
+            : (CKR.CKR_OK, new byte[1]), publicOnly: true);
         using var mldsa = new MLDsaPkcs11(key);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
