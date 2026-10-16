@@ -44,61 +44,68 @@ public sealed partial class Pkcs11Key
             throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown key blob format.");
 
         bool spki = format == Pkcs11KeyBlobFormat.SubjectPublicKeyInfo;
-        switch (_keyType)
+        return _keyType switch
         {
-            case CKK.CKK_EC:
-                {
-                    ECParameters ec = Pkcs11PublicKeyView.ReadEcPublicKey(this, "Pkcs11Key.Export");
-                    return spki ? SubjectPublicKeyInfoEncoding.EncodeEc(ec) : [0x04, .. ec.Q.X!, .. ec.Q.Y!];
-                }
-            case CKK.CKK_RSA:
-                {
-                    // The modulus and public exponent are public on either half, so the private-key handle
-                    // is a valid source for a key without a public companion.
-                    using var attrs = GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
-                    if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-                        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                            "Pkcs11Key.Export (CKA_MODULUS / CKA_PUBLIC_EXPONENT not readable from any available handle)");
-                    byte[] modulus = attrs[0].GetValueAsByteArray();
-                    byte[] exponent = attrs[1].GetValueAsByteArray();
-                    return spki
-                        ? SubjectPublicKeyInfoEncoding.EncodeRsa(modulus, exponent)
-                        : SubjectPublicKeyInfoEncoding.EncodeRsaPublicKey(modulus, exponent);
-                }
-            case CKK.CKK_DSA:
-                {
-                    // Domain parameters are public on either half.
-                    using var domain = GetAttributeValue(CKA.CKA_PRIME, CKA.CKA_SUBPRIME, CKA.CKA_BASE);
-                    if (domain[0].CannotBeRead || domain[1].CannotBeRead || domain[2].CannotBeRead)
-                        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                            "Pkcs11Key.Export (CKA_PRIME / CKA_SUBPRIME / CKA_BASE not readable from any available handle)");
-                    byte[] y = ReadPublicValue();
-                    return spki
-                        ? SubjectPublicKeyInfoEncoding.EncodeDsa(
-                            domain[0].GetValueAsByteArray(), domain[1].GetValueAsByteArray(), domain[2].GetValueAsByteArray(), y)
-                        : SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey(y);
-                }
-            case CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA or CKK.CKK_ML_KEM:
-                {
-                    using var parameterSet = GetAttributeValue(CKA.CKA_PARAMETER_SET);
-                    if (parameterSet[0].CannotBeRead)
-                        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                            "Pkcs11Key.Export (CKA_PARAMETER_SET not readable)");
-                    ulong set = parameterSet[0].GetValueAsUlong();
-                    (string oid, int length) = PostQuantumParameterSets.Describe(_keyType, set)
-                        ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
-                            $"Pkcs11Key.Export (unrecognized {_keyType} parameter set 0x{set:X})");
+            CKK.CKK_EC => ExportEc(spki),
+            CKK.CKK_RSA => ExportRsa(spki),
+            CKK.CKK_DSA => ExportDsa(spki),
+            CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA or CKK.CKK_ML_KEM => ExportPostQuantum(spki),
+            _ => throw new NotSupportedException(
+                $"Pkcs11Key.Export supports CKK_EC, CKK_RSA, CKK_DSA, CKK_ML_DSA, CKK_SLH_DSA and CKK_ML_KEM keys; this key is {_keyType}."),
+        };
+    }
 
-                    byte[] publicKey = ReadPublicValue();
-                    if (publicKey.Length != length)
-                        throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
-                            $"Pkcs11Key.Export (token returned a {publicKey.Length}-byte public key; parameter set 0x{set:X} has {length})");
-                    return spki ? SubjectPublicKeyInfoEncoding.EncodeWithoutParameters(oid, publicKey) : publicKey;
-                }
-            default:
-                throw new NotSupportedException(
-                    $"Pkcs11Key.Export supports CKK_EC, CKK_RSA, CKK_DSA, CKK_ML_DSA, CKK_SLH_DSA and CKK_ML_KEM keys; this key is {_keyType}.");
-        }
+    private byte[] ExportEc(bool spki)
+    {
+        ECParameters ec = Pkcs11PublicKeyView.ReadEcPublicKey(this, "Pkcs11Key.Export");
+        return spki ? SubjectPublicKeyInfoEncoding.EncodeEc(ec) : [0x04, .. ec.Q.X!, .. ec.Q.Y!];
+    }
+
+    private byte[] ExportRsa(bool spki)
+    {
+        // The modulus and public exponent are public on either half, so the private-key handle
+        // is a valid source for a key without a public companion.
+        using var attrs = GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "Pkcs11Key.Export (CKA_MODULUS / CKA_PUBLIC_EXPONENT not readable from any available handle)");
+        byte[] modulus = attrs[0].GetValueAsByteArray();
+        byte[] exponent = attrs[1].GetValueAsByteArray();
+        return spki
+            ? SubjectPublicKeyInfoEncoding.EncodeRsa(modulus, exponent)
+            : SubjectPublicKeyInfoEncoding.EncodeRsaPublicKey(modulus, exponent);
+    }
+
+    private byte[] ExportDsa(bool spki)
+    {
+        // Domain parameters are public on either half.
+        using var domain = GetAttributeValue(CKA.CKA_PRIME, CKA.CKA_SUBPRIME, CKA.CKA_BASE);
+        if (domain[0].CannotBeRead || domain[1].CannotBeRead || domain[2].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "Pkcs11Key.Export (CKA_PRIME / CKA_SUBPRIME / CKA_BASE not readable from any available handle)");
+        byte[] y = ReadPublicValue();
+        return spki
+            ? SubjectPublicKeyInfoEncoding.EncodeDsa(
+                domain[0].GetValueAsByteArray(), domain[1].GetValueAsByteArray(), domain[2].GetValueAsByteArray(), y)
+            : SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey(y);
+    }
+
+    private byte[] ExportPostQuantum(bool spki)
+    {
+        using var parameterSet = GetAttributeValue(CKA.CKA_PARAMETER_SET);
+        if (parameterSet[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "Pkcs11Key.Export (CKA_PARAMETER_SET not readable)");
+        ulong set = parameterSet[0].GetValueAsUlong();
+        (string oid, int length) = PostQuantumParameterSets.Describe(_keyType, set)
+            ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
+                $"Pkcs11Key.Export (unrecognized {_keyType} parameter set 0x{set:X})");
+
+        byte[] publicKey = ReadPublicValue();
+        if (publicKey.Length != length)
+            throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+                $"Pkcs11Key.Export (token returned a {publicKey.Length}-byte public key; parameter set 0x{set:X} has {length})");
+        return spki ? SubjectPublicKeyInfoEncoding.EncodeWithoutParameters(oid, publicKey) : publicKey;
     }
 
     // CKA_VALUE of the public-key object. Never GetAttributeValue's fallback to the private-key handle:
