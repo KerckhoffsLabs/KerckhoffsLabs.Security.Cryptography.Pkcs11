@@ -257,16 +257,8 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     {
         bool All(CKA type, bool required, Func<Objects.ObjectAttribute, bool> holds)
         {
-            bool seen = false;
-            foreach (Objects.ObjectAttribute a in template)
-            {
-                if (a.Type != type)
-                    continue;
-                if (!holds(a))
-                    return false;
-                seen = true;
-            }
-            return seen || !required;
+            Objects.ObjectAttribute[] occurrences = [.. template.Where(a => a.Type == type)];
+            return occurrences.Length == 0 ? !required : occurrences.All(holds);
         }
 
         return All(CKA.CKA_CLASS, required: true, a => a.GetValueAsUlong() == (ulong)CKO.CKO_SECRET_KEY)
