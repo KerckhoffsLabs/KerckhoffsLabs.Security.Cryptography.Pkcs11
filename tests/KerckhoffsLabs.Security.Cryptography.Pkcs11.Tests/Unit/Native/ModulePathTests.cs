@@ -93,6 +93,7 @@ public sealed class ModulePathTests
 
             // The same explanation on every OS, not just the runtime's list of what it tried.
             Assert.Contains(name, e.Message);
+            Assert.Contains("could not be loaded from", e.Message);
             Assert.Contains("never searched for in the current directory", e.Message);
         }
         finally
@@ -328,6 +329,7 @@ public sealed class ModulePathTests
 
             var e = Assert.Throws<DllNotFoundException>(() => ModulePath.Load(name, resolveBareNameItself: true));
             Assert.Contains(name, e.Message);
+            Assert.Contains("could not be loaded from", e.Message);
             Assert.Contains("never searched for in the current directory", e.Message);
         }
         finally

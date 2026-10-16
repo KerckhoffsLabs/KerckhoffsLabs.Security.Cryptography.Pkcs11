@@ -100,7 +100,7 @@ internal static class ModulePath
             {
                 // The runtime's message lists what it tried, not what it deliberately skipped. Its text is kept
                 // as well: the module may have been found but failed to load (a missing dependency).
-                throw BareNameNotFound(path, OperatingSystem.IsWindows()
+                throw BareNameNotLoaded(path, OperatingSystem.IsWindows()
                     ? "this library's directory or the system's library directories (PATH excluded)"
                     : "this library's directory or the system's library search", ex);
             }
@@ -110,14 +110,14 @@ internal static class ModulePath
             path, NativeAssetDirectories(), AppContext.BaseDirectory, Environment.GetEnvironmentVariable);
         return resolved is not null
             ? NativeLibrary.Load(resolved)
-            : throw BareNameNotFound(path,
+            : throw BareNameNotLoaded(path,
                 "the application's native-asset directories, the application directory, DYLD_LIBRARY_PATH or dyld's fallback directories",
                 inner: null);
     }
 
-    private static DllNotFoundException BareNameNotFound(string name, string searched, Exception? inner)
+    private static DllNotFoundException BareNameNotLoaded(string name, string searched, Exception? inner)
         => new(
-            $"PKCS#11 module '{name}' was not found in {searched}. A bare name is never searched for in the current " +
+            $"PKCS#11 module '{name}' could not be loaded from {searched}. A bare name is never searched for in the current " +
             "directory; pass a fully qualified path to load a module from there." +
             (inner is null ? "" : $" {inner.Message}"),
             inner);
