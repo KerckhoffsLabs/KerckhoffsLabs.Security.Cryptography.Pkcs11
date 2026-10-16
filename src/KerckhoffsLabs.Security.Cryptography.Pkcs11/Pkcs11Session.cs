@@ -183,7 +183,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
     public Pkcs11Key OpenKey(ReadOnlySpan<byte> id)
     {
-        if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
+        if (id.IsEmpty) throw new ArgumentException(EmptyIdMessage, nameof(id));
         using var filter = ObjectTemplate.Empty().Id(id).Build();
         return OpenKeyCore(filter, $"with CKA_ID ({id.Length} bytes)");
     }
@@ -249,7 +249,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
     public bool TryOpenKey(ReadOnlySpan<byte> id, [NotNullWhen(true)] out Pkcs11Key? key)
     {
-        if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
+        if (id.IsEmpty) throw new ArgumentException(EmptyIdMessage, nameof(id));
         using var filter = ObjectTemplate.Empty().Id(id).Build();
         key = FindUniqueKey(filter);
         return key is not null;
@@ -416,7 +416,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
     public Pkcs11Certificate OpenCertificate(ReadOnlySpan<byte> id)
     {
-        if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
+        if (id.IsEmpty) throw new ArgumentException(EmptyIdMessage, nameof(id));
         using var filter = ObjectTemplate.Empty().Id(id).Build();
         return OpenCertificateCore(filter, $"with CKA_ID ({id.Length} bytes)");
     }
@@ -477,7 +477,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
     public bool TryOpenCertificate(ReadOnlySpan<byte> id, [NotNullWhen(true)] out Pkcs11Certificate? certificate)
     {
-        if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
+        if (id.IsEmpty) throw new ArgumentException(EmptyIdMessage, nameof(id));
         using var filter = ObjectTemplate.Empty().Id(id).Build();
         certificate = FindUniqueCertificate(filter);
         return certificate is not null;
@@ -958,6 +958,9 @@ public sealed partial class Pkcs11Session : IDisposable
         var handles = _core.FindAllObjects([.. filter.Attributes]);
         return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
     }
+
+    // The lookups by CKA_ID refuse an empty id: it matches every object that has no CKA_ID.
+    private const string EmptyIdMessage = "Id must not be empty.";
 
     /// <summary>
     /// A family of objects a lookup returns as one wrapper type: the classes it spans, and an attribute
