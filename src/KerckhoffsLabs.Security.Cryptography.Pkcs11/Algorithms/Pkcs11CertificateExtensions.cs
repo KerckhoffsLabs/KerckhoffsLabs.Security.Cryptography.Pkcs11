@@ -23,7 +23,7 @@ public static class Pkcs11CertificateExtensions
     {
         ArgumentNullException.ThrowIfNull(certificate);
         if (certificate.Certificate.GetKeyAlgorithm() is not (Oids.KeyAlgorithms.RsaEncryption or Oids.KeyAlgorithms.RsaSsaPss)) return null;
-        var key = certificate.TryOpenPrivateKey();
+        var key = certificate.GetPrivateKey();
         return key is null ? null : new RSAPkcs11(key);
     }
 
@@ -39,7 +39,7 @@ public static class Pkcs11CertificateExtensions
     {
         ArgumentNullException.ThrowIfNull(certificate);
         if (certificate.Certificate.GetKeyAlgorithm() != Oids.KeyAlgorithms.EcPublicKey) return null;
-        var key = certificate.TryOpenPrivateKey();
+        var key = certificate.GetPrivateKey();
         return key is null ? null : new ECDsaPkcs11(key);
     }
 }

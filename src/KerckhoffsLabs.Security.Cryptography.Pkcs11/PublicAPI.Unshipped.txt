@@ -1,4 +1,9 @@
 #nullable enable
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11AmbiguousObjectException
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11AmbiguousObjectException.Pkcs11AmbiguousObjectException(string! method, string? message) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11ObjectNotFoundException
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11ObjectNotFoundException.Pkcs11ObjectNotFoundException(string! method, string? message) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.GetPrivateKey() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveRawSecret(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveSecretAgreement(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Export(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat format) -> byte[]!
@@ -6,6 +11,12 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.KeySize.get -> int?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat.RawPublicKey = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat.SubjectPublicKeyInfo = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.OpenKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! filter) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.OpenKey(System.ReadOnlySpan<byte> id) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.OpenKey(string! label) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! filter, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key? key) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(System.ReadOnlySpan<byte> id, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key? key) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(string! label, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key? key) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyAgreementKdfRequest.ResultIsDerivationOnlySecret.get -> bool
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.VendorMechanismParameters.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.Pkcs11ParameterWriter! writer) -> void
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest!
@@ -1441,7 +1452,6 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.Destroy() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.Dispose() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.Id.get -> System.ReadOnlySpan<byte>
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.Label.get -> string?
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.TryOpenPrivateKey() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.CurveType.get -> System.Security.Cryptography.ECCurve.ECCurveType
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve other) -> bool
@@ -1523,8 +1533,6 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.ImportKey(KerckhoffsLa
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.InitPinWithPin(KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! userPin) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.InitPinWithPinpad() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.Library.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.OpenKey(string! label) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.OpenKey(System.ReadOnlySpan<byte> id) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.Policy.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.SeedRandom(System.ReadOnlySpan<byte> seed) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.SetPinWithPin(KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! oldPin, KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! newPin) -> void

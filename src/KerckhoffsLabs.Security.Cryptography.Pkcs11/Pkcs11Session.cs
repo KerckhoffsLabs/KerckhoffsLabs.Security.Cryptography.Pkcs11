@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -136,54 +137,142 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Looks up a key by CKA_LABEL. If a matching private key is found, it is paired with its
-    /// public companion via CKA_ID when first needed; if the lookup hits a symmetric key
-    /// (or a private key with no companion), the returned <see cref="Pkcs11Key"/> carries
-    /// a single handle.
+    /// Opens the one key whose <c>CKA_LABEL</c> is <paramref name="label"/>.
     /// </summary>
     /// <remarks>
-    /// The other half of a key pair (same <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>) is looked up the first
-    /// time an operation on the key needs it, not here. If that lookup fails, the error comes from that
-    /// operation (<c>Verify</c>, <c>Encrypt</c>, <c>Sign</c>, <c>GetAttributeValue</c>, …), and the
-    /// next use looks again.
+    /// <para>
+    /// Only key objects match — certificates and data objects that share the label are ignored. The
+    /// lookup must identify exactly one key; anything more is refused with
+    /// <see cref="Pkcs11AmbiguousObjectException"/> rather than resolved by picking a match, which would
+    /// let whoever can create objects on the token decide which key an operation uses. Narrow an
+    /// ambiguous lookup with <see cref="OpenKey(ObjectTemplate)"/> (by key class, key type or any other
+    /// attribute), or by <c>CKA_ID</c>.
+    /// </para>
+    /// <para>
+    /// The private and public halves of a pair (same <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>) count as one
+    /// key. When only one half matched, the other is found by <c>CKA_ID</c> the first time an operation
+    /// on the key needs it, not here; if that lookup fails, the error comes from that operation
+    /// (<c>Verify</c>, <c>Encrypt</c>, <c>Sign</c>, <c>GetAttributeValue</c>, …), and the next use looks
+    /// again. Halves with an empty <c>CKA_ID</c> can only be paired when both matched the lookup.
+    /// </para>
     /// </remarks>
-    /// <param name="label">The CKA_LABEL string to match.</param>
+    /// <param name="label">The <c>CKA_LABEL</c> to match.</param>
     /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is null.</exception>
-    /// <exception cref="Pkcs11ObjectException">Thrown if no matching key is found.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no key matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
     public Pkcs11Key OpenKey(string label)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(label);
-
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        return OpenKeyByFilter(filter, $"label '{label}'");
+        return OpenKeyCore(filter, $"with label '{label}'");
     }
 
     /// <summary>
-    /// Looks up a key by CKA_ID.
+    /// Opens the one key whose <c>CKA_ID</c> is <paramref name="id"/>. See <see cref="OpenKey(string)"/>
+    /// for which objects match and when the lookup is ambiguous.
     /// </summary>
-    /// <remarks>
-    /// The other half of a key pair (same <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>) is looked up the first
-    /// time an operation on the key needs it, not here. If that lookup fails, the error comes from that
-    /// operation (<c>Verify</c>, <c>Encrypt</c>, <c>Sign</c>, <c>GetAttributeValue</c>, …), and the
-    /// next use looks again.
-    /// </remarks>
-    /// <param name="id">The CKA_ID bytes to match.</param>
+    /// <param name="id">The <c>CKA_ID</c> bytes to match. Must not be empty.</param>
     /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="id"/> is empty.</exception>
-    /// <exception cref="Pkcs11ObjectException">Thrown if no matching key is found.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no key matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
     public Pkcs11Key OpenKey(ReadOnlySpan<byte> id)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
-
         using var filter = ObjectTemplate.Empty().Id(id).Build();
-        return OpenKeyByFilter(filter, $"id (len={id.Length})");
+        return OpenKeyCore(filter, $"with CKA_ID ({id.Length} bytes)");
+    }
+
+    /// <summary>
+    /// Opens the one key that matches <paramref name="filter"/>: any attributes, such as a key class
+    /// (<c>CKA_CLASS = CKO_SECRET_KEY</c>) or a key type (<c>CKA_KEY_TYPE = CKK_EC</c>) next to a label.
+    /// See <see cref="OpenKey(string)"/> for which objects match and when the lookup is ambiguous.
+    /// </summary>
+    /// <remarks>
+    /// Without a <c>CKA_CLASS</c>, private, public and secret keys are all searched. A <c>CKA_CLASS</c>
+    /// in the filter must be one of those three.
+    /// </remarks>
+    /// <param name="filter">The attributes to match. Use an <see cref="ObjectTemplate.Empty"/>-based builder.</param>
+    /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="filter"/> names a <c>CKA_CLASS</c> that is not a key class.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no key matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public Pkcs11Key OpenKey(ObjectTemplate filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return OpenKeyCore(filter, "matching the filter");
+    }
+
+    /// <summary>
+    /// Opens the one key whose <c>CKA_LABEL</c> is <paramref name="label"/>, or reports that there is
+    /// none. Matches exactly as <see cref="OpenKey(string)"/> does.
+    /// </summary>
+    /// <remarks>
+    /// Only "no match" returns <see langword="false"/>. Several matches still throw
+    /// <see cref="Pkcs11AmbiguousObjectException"/>: that is a problem with the token's contents, not
+    /// an absent key.
+    /// </remarks>
+    /// <param name="label">The <c>CKA_LABEL</c> to match.</param>
+    /// <param name="key">The key, when one matched; the caller must <c>Dispose</c> it.</param>
+    /// <returns><see langword="true"/> if exactly one key matched.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is null.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public bool TryOpenKey(string label, [NotNullWhen(true)] out Pkcs11Key? key)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        using var filter = ObjectTemplate.Empty().Label(label).Build();
+        key = FindUniqueKey(filter);
+        return key is not null;
+    }
+
+    /// <summary>
+    /// Opens the one key whose <c>CKA_ID</c> is <paramref name="id"/>, or reports that there is none.
+    /// Matches exactly as <see cref="OpenKey(ReadOnlySpan{byte})"/> does; see
+    /// <see cref="TryOpenKey(string, out Pkcs11Key?)"/> for what returns <see langword="false"/>.
+    /// </summary>
+    /// <param name="id">The <c>CKA_ID</c> bytes to match. Must not be empty.</param>
+    /// <param name="key">The key, when one matched; the caller must <c>Dispose</c> it.</param>
+    /// <returns><see langword="true"/> if exactly one key matched.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="id"/> is empty.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public bool TryOpenKey(ReadOnlySpan<byte> id, [NotNullWhen(true)] out Pkcs11Key? key)
+    {
+        if (id.IsEmpty) throw new ArgumentException("Id must not be empty.", nameof(id));
+        using var filter = ObjectTemplate.Empty().Id(id).Build();
+        key = FindUniqueKey(filter);
+        return key is not null;
+    }
+
+    /// <summary>
+    /// Opens the one key that matches <paramref name="filter"/>, or reports that there is none. Matches
+    /// exactly as <see cref="OpenKey(ObjectTemplate)"/> does; see
+    /// <see cref="TryOpenKey(string, out Pkcs11Key?)"/> for what returns <see langword="false"/>.
+    /// </summary>
+    /// <param name="filter">The attributes to match. Use an <see cref="ObjectTemplate.Empty"/>-based builder.</param>
+    /// <param name="key">The key, when one matched; the caller must <c>Dispose</c> it.</param>
+    /// <returns><see langword="true"/> if exactly one key matched.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="filter"/> names a <c>CKA_CLASS</c> that is not a key class.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public bool TryOpenKey(ObjectTemplate filter, [NotNullWhen(true)] out Pkcs11Key? key)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        key = FindUniqueKey(filter);
+        return key is not null;
     }
 
     /// <summary>
@@ -278,22 +367,16 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Finds the private-key object with the given <c>CKA_ID</c> and hydrates it (pairing its
-    /// public companion). Returns <see langword="null"/> when <paramref name="id"/> is empty or no matching
-    /// private key exists. Filters on <c>CKA_CLASS = CKO_PRIVATE_KEY</c> so it never matches the
-    /// certificate (which shares the id). Used by <see cref="Pkcs11Certificate"/>.
+    /// Opens the private key with the given <c>CKA_ID</c>, or returns <see langword="null"/> when
+    /// <paramref name="id"/> is empty or no such key exists. Used by <see cref="Pkcs11Certificate"/>, whose
+    /// certificate shares the id: the key-class filter keeps the certificate out of the match.
     /// </summary>
-    internal Pkcs11Key? TryOpenPrivateKey(byte[] id)
+    /// <exception cref="Pkcs11AmbiguousObjectException">More than one private key has this id.</exception>
+    internal Pkcs11Key? OpenPrivateKeyById(byte[] id)
     {
         if (id.Length == 0) return null;
-
-        using var filter = ObjectTemplate.Empty()
-            .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PRIVATE_KEY)
-            .Id(id)
-            .Build();
-
-        var handles = _core.FindAllObjects([.. filter.Attributes]);
-        return handles.Count == 0 ? null : HydrateKeyFromHandle(handles[0]);
+        using var filter = ObjectTemplate.Empty().Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PRIVATE_KEY).Id(id).Build();
+        return FindUniqueKey(filter);
     }
 
     private Pkcs11Object HydrateObjectFromHandle(ObjectHandle handle)
@@ -673,14 +756,127 @@ public sealed partial class Pkcs11Session : IDisposable
         return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
     }
 
-    private Pkcs11Key OpenKeyByFilter(ObjectTemplate filter, string queryDescription)
-    {
-        var handles = _core.FindAllObjects([.. filter.Attributes]);
-        if (handles.Count == 0)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                $"OpenKey({queryDescription})");
+    private static readonly CKO[] KeyClasses = [CKO.CKO_PRIVATE_KEY, CKO.CKO_PUBLIC_KEY, CKO.CKO_SECRET_KEY];
 
-        return HydrateKeyFromHandle(handles[0]);
+    private Pkcs11Key OpenKeyCore(ObjectTemplate filter, string criteria)
+        => FindUniqueKey(filter)
+            ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No key {criteria} was found on the token.");
+
+    private Pkcs11Key? FindUniqueKey(ObjectTemplate filter)
+        => FindUnique(filter, KeyClasses, "key", GroupKeyHalves, HydrateKeyGroup);
+
+    /// <summary>An object a lookup matched, with the attributes that decide which result it belongs to.</summary>
+    private sealed record ObjectCandidate(ObjectHandle Handle, CKO Class, CKK? KeyType, byte[] Id, string? Label);
+
+    /// <summary>
+    /// Runs a lookup that must identify one object of a family (keys, certificates, …): searches each
+    /// class the family allows with the rest of <paramref name="filter"/>, groups the matches into
+    /// results with <paramref name="group"/> and builds the one result with <paramref name="hydrate"/>,
+    /// or returns <see langword="null"/> when nothing matched.
+    /// </summary>
+    /// <remarks>
+    /// PKCS#11 has no "class is one of" filter, so a lookup across a family is one search per class,
+    /// which is also what keeps objects of other families out of the match. A <c>CKA_CLASS</c> in
+    /// <paramref name="filter"/> narrows the search to that class, and must belong to the family.
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="filter"/> names a class outside the family.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">The matches form more than one result.</exception>
+    private T? FindUnique<T>(
+        ObjectTemplate filter, CKO[] familyClasses, string family,
+        Func<List<ObjectCandidate>, List<List<ObjectCandidate>>> group, Func<List<ObjectCandidate>, T> hydrate)
+        where T : class
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        CKO[] classes = ClassesToSearch(filter, familyClasses, family);
+        List<ObjectAttribute> criteria = [.. filter.Attributes.Where(a => a.Type != CKA.CKA_CLASS)];
+        List<ObjectCandidate> candidates = [];
+        foreach (CKO objectClass in classes)
+        {
+            using var classAttribute = new ObjectAttribute(CKA.CKA_CLASS, objectClass);
+            foreach (ObjectHandle handle in _core.FindAllObjects([.. criteria, classAttribute]))
+                candidates.Add(ReadCandidate(handle, objectClass));
+        }
+
+        List<List<ObjectCandidate>> results = group(candidates);
+        return results.Count switch
+        {
+            0 => null,
+            1 => hydrate(results[0]),
+            _ => throw new Pkcs11AmbiguousObjectException("C_FindObjects",
+                $"The lookup matched {results.Count} distinct {family}s; refusing to pick one. Narrow it with a " +
+                "filter (class, type, CKA_ID, …), or enumerate the candidates with a Find method."),
+        };
+    }
+
+    // The family's classes, or the class the filter names, which must be among them. A template holds
+    // each attribute once (its builder replaces a repeated one), so there is at most one CKA_CLASS.
+    private static CKO[] ClassesToSearch(ObjectTemplate filter, CKO[] familyClasses, string family)
+    {
+        ObjectAttribute? named = filter.Attributes.FirstOrDefault(a => a.Type == CKA.CKA_CLASS);
+        if (named is null)
+            return familyClasses;
+
+        var objectClass = (CKO)named.GetValueAsUlong();
+        return Array.IndexOf(familyClasses, objectClass) >= 0
+            ? [objectClass]
+            : throw new ArgumentException($"The filter's CKA_CLASS {objectClass} is not a {family} class.", nameof(filter));
+    }
+
+    private ObjectCandidate ReadCandidate(ObjectHandle handle, CKO objectClass)
+    {
+        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL]);
+        CKK? keyType = attrs[0].CannotBeRead ? null : (CKK)attrs[0].GetValueAsUlong();
+        byte[] id = attrs[1].CannotBeRead ? [] : attrs[1].GetValueAsByteArray();
+        string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
+        return new ObjectCandidate(handle, objectClass, keyType, id, label);
+    }
+
+    /// <summary>
+    /// Groups key matches into keys: a private and a public key with the same <c>CKA_ID</c> and
+    /// <c>CKA_KEY_TYPE</c> are the two halves of one key — an empty id included, since a pair generated
+    /// without an id still shares the label the lookup matched. Every other match — each secret key, and
+    /// a second private or public key with the same id and type — is a key of its own. Halves whose key
+    /// type the token does not report are not paired: nothing shows they belong together.
+    /// </summary>
+    private static List<List<ObjectCandidate>> GroupKeyHalves(List<ObjectCandidate> candidates)
+    {
+        List<List<ObjectCandidate>> keys = [];
+        foreach (ObjectCandidate candidate in candidates)
+        {
+            // A half joins an existing key only as that key's missing other half.
+            List<ObjectCandidate>? pair = candidate.Class == CKO.CKO_SECRET_KEY
+                ? null
+                : keys.Find(k => k.Count == 1
+                    && k[0].Class != CKO.CKO_SECRET_KEY
+                    && k[0].Class != candidate.Class
+                    && k[0].KeyType is not null
+                    && k[0].KeyType == candidate.KeyType
+                    && k[0].Id.AsSpan().SequenceEqual(candidate.Id));
+
+            if (pair is null)
+                keys.Add([candidate]);
+            else
+                pair.Add(candidate);
+        }
+        return keys;
+    }
+
+    private Pkcs11Key HydrateKeyGroup(List<ObjectCandidate> key)
+    {
+        // One half matched: the other is found by CKA_ID on first use, as for any opened key.
+        if (key.Count == 1)
+            return HydrateKeyFromHandle(key[0].Handle);
+
+        ObjectCandidate privateHalf = key.Find(c => c.Class == CKO.CKO_PRIVATE_KEY)!;
+        ObjectCandidate publicHalf = key.Find(c => c.Class == CKO.CKO_PUBLIC_KEY)!;
+        return new Pkcs11Key(
+            session: this,
+            privateHandle: privateHalf.Handle,
+            publicHandle: publicHalf.Handle,
+            keyType: privateHalf.KeyType!.Value,
+            label: privateHalf.Label ?? publicHalf.Label,
+            id: privateHalf.Id);
     }
 
     /// <summary>
