@@ -608,7 +608,7 @@ public sealed class Pkcs11Session : IDisposable
     /// Generates an EC key pair on a NIST prime curve. The private key is sensitive,
     /// non-extractable, and usable for signing and ECDH derivation.
     /// </summary>
-    /// <param name="curve">Named curve from <see cref="Pkcs11ECCurve.NamedCurves"/> (or <see cref="Pkcs11ECCurve.CreateFromValue(string, string?)"/>).
+    /// <param name="curve">Named curve from <see cref="Pkcs11ECCurve.NamedCurves"/> (or <see cref="Pkcs11ECCurve.CreateFromValue(string, string?, int?)"/>).
     /// Defaults to <see cref="Pkcs11ECCurve.NamedCurves.NistP256"/> when omitted. The token must support the curve.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>

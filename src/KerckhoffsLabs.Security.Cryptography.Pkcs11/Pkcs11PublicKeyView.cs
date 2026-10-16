@@ -85,7 +85,8 @@ internal static class Pkcs11PublicKeyView
 
     /// <summary>
     /// Reads <c>CKA_EC_PARAMS</c> off <paramref name="key"/> and parses it into a
-    /// <see cref="Pkcs11ECCurve"/>. Used to establish the curve a peer's public key must match
+    /// <see cref="Pkcs11ECCurve"/>, resolved through the library's curve catalog so it carries the
+    /// curve's name and field size when the catalog lists it. Used to establish the curve a peer's public key must match
     /// before an ECDH agreement reaches the token — see <see cref="ValidatePeerEcKey"/>.
     /// </summary>
     /// <param name="key">The token-resident EC key whose curve is being established.</param>
@@ -98,7 +99,7 @@ internal static class Pkcs11PublicKeyView
         if (attrs.Count == 0 || attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 $"{operationName} (local CKA_EC_PARAMS not readable — cannot validate the peer's curve)");
-        return Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray());
+        return key.Session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()));
     }
 
     /// <summary>
@@ -127,7 +128,7 @@ internal static class Pkcs11PublicKeyView
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
                 $"{operationName} (peer public key is on curve {peer.Curve.Oid.FriendlyName ?? peerOid ?? "unknown"}, expected {localCurve.FriendlyName ?? localCurve.Oid})");
 
-        // Skip when the local curve isn't one this library's catalog knows the field size for —
+        // Skip when the local curve isn't one the library's curve catalog knows the field size for —
         // the OID-equality check above already pins the peer to that exact (uncommon) curve, and
         // the point-on-curve check below still runs regardless.
         if (localCurve.FieldSizeBits is int bits)

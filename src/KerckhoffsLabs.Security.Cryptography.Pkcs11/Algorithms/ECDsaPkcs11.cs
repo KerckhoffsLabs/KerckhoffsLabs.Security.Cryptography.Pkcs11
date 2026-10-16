@@ -67,7 +67,7 @@ public sealed class ECDsaPkcs11 : ECDsa
         {
             using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
             if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()).FieldSizeBits;
+                return key.Session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
         }
         catch (Pkcs11Exception)
         {

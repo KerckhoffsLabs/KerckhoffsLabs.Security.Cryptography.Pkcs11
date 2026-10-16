@@ -74,7 +74,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         {
             using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
             if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()).FieldSizeBits;
+                return key.Session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
         }
         catch (Pkcs11Exception)
         {
@@ -224,7 +224,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         // Field size from the local key, not the peer's coordinate encoding — a subclassed
         // ECDiffieHellmanPublicKey could otherwise report a short X and silently truncate the
         // shared secret the token derives. Falls back to the peer's (now curve-matched) length only
-        // for a curve outside this library's field-size catalog.
+        // for a curve outside the library's curve catalog (Pkcs11LibraryOptions.CurveCatalog).
         // Rounded up: P-521's 521-bit field takes 66 bytes, not 65.
         int fieldSize = localCurve.FieldSizeBits is int bits ? (bits + 7) / 8 : x.Length;
 
