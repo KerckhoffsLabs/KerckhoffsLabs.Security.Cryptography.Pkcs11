@@ -228,7 +228,7 @@ public sealed class Pkcs11KeyAsymmetricTests
         {
             using (writer.PushSequence())
             {
-                writer.WriteObjectIdentifier(SubjectPublicKeyInfoEncoding.EcPublicKeyOid);
+                writer.WriteObjectIdentifier("1.2.840.10045.2.1"); // id-ecPublicKey
                 writer.WriteObjectIdentifier(P256);
             }
             writer.WriteBitString([(byte)(0x02 | (p.Q.Y![^1] & 1)), .. p.Q.X!]);

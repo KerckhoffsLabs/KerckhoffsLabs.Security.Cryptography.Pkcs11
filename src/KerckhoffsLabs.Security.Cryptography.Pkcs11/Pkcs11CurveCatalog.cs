@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -44,29 +45,29 @@ public sealed class Pkcs11CurveCatalog
     /// </summary>
     public static Pkcs11CurveCatalog Default { get; } = new(
     [
-        new(Pkcs11ECCurve.NistP192Oid,        "nistP192",        192),
-        new(Pkcs11ECCurve.NistP224Oid,        "nistP224",        224),
-        new(Pkcs11ECCurve.NistP256Oid,        "nistP256",        256),
-        new(Pkcs11ECCurve.NistP384Oid,        "nistP384",        384),
-        new(Pkcs11ECCurve.NistP521Oid,        "nistP521",        521),
-        new(Pkcs11ECCurve.Secp192k1Oid,       "secp192k1",       192),
-        new(Pkcs11ECCurve.Secp224k1Oid,       "secp224k1",       224),
-        new(Pkcs11ECCurve.Secp256k1Oid,       "secp256k1",       256),
-        new(Pkcs11ECCurve.BrainpoolP160r1Oid, "brainpoolP160r1", 160),
-        new(Pkcs11ECCurve.BrainpoolP160t1Oid, "brainpoolP160t1", 160),
-        new(Pkcs11ECCurve.BrainpoolP192r1Oid, "brainpoolP192r1", 192),
-        new(Pkcs11ECCurve.BrainpoolP192t1Oid, "brainpoolP192t1", 192),
-        new(Pkcs11ECCurve.BrainpoolP224r1Oid, "brainpoolP224r1", 224),
-        new(Pkcs11ECCurve.BrainpoolP224t1Oid, "brainpoolP224t1", 224),
-        new(Pkcs11ECCurve.BrainpoolP256r1Oid, "brainpoolP256r1", 256),
-        new(Pkcs11ECCurve.BrainpoolP256t1Oid, "brainpoolP256t1", 256),
-        new(Pkcs11ECCurve.BrainpoolP320r1Oid, "brainpoolP320r1", 320),
-        new(Pkcs11ECCurve.BrainpoolP320t1Oid, "brainpoolP320t1", 320),
-        new(Pkcs11ECCurve.BrainpoolP384r1Oid, "brainpoolP384r1", 384),
-        new(Pkcs11ECCurve.BrainpoolP384t1Oid, "brainpoolP384t1", 384),
-        new(Pkcs11ECCurve.BrainpoolP512r1Oid, "brainpoolP512r1", 512),
-        new(Pkcs11ECCurve.BrainpoolP512t1Oid, "brainpoolP512t1", 512),
-        new(Pkcs11ECCurve.Sm2Oid,             "sm2",             256),
+        new(Oids.Curves.NistP192,        "nistP192",        192),
+        new(Oids.Curves.NistP224,        "nistP224",        224),
+        new(Oids.Curves.NistP256,        "nistP256",        256),
+        new(Oids.Curves.NistP384,        "nistP384",        384),
+        new(Oids.Curves.NistP521,        "nistP521",        521),
+        new(Oids.Curves.Secp192k1,       "secp192k1",       192),
+        new(Oids.Curves.Secp224k1,       "secp224k1",       224),
+        new(Oids.Curves.Secp256k1,       "secp256k1",       256),
+        new(Oids.Curves.BrainpoolP160r1, "brainpoolP160r1", 160),
+        new(Oids.Curves.BrainpoolP160t1, "brainpoolP160t1", 160),
+        new(Oids.Curves.BrainpoolP192r1, "brainpoolP192r1", 192),
+        new(Oids.Curves.BrainpoolP192t1, "brainpoolP192t1", 192),
+        new(Oids.Curves.BrainpoolP224r1, "brainpoolP224r1", 224),
+        new(Oids.Curves.BrainpoolP224t1, "brainpoolP224t1", 224),
+        new(Oids.Curves.BrainpoolP256r1, "brainpoolP256r1", 256),
+        new(Oids.Curves.BrainpoolP256t1, "brainpoolP256t1", 256),
+        new(Oids.Curves.BrainpoolP320r1, "brainpoolP320r1", 320),
+        new(Oids.Curves.BrainpoolP320t1, "brainpoolP320t1", 320),
+        new(Oids.Curves.BrainpoolP384r1, "brainpoolP384r1", 384),
+        new(Oids.Curves.BrainpoolP384t1, "brainpoolP384t1", 384),
+        new(Oids.Curves.BrainpoolP512r1, "brainpoolP512r1", 512),
+        new(Oids.Curves.BrainpoolP512t1, "brainpoolP512t1", 512),
+        new(Oids.Curves.Sm2,             "sm2",             256),
     ]);
 
     /// <summary>The curves of this catalog, built-in ones first, then in the order they were added.</summary>

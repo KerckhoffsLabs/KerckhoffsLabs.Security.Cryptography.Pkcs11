@@ -35,7 +35,7 @@ public sealed class PolicyDocsAreCurrentTests
     [MemberData(nameof(Pages))]
     public void GeneratedDoc_MatchesTheCommittedFile(string policyName, string relativePath)
     {
-        string repoRoot = FindRepoRoot();
+        string repoRoot = RepositoryRoot.Find();
         string path = Path.Join(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
         string rendered = PolicyCatalogueMarkdown.Render(CatalogueFor(policyName), policyName);
         var utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
@@ -53,17 +53,5 @@ public sealed class PolicyDocsAreCurrentTests
         Assert.True(
             committed.AsSpan().SequenceEqual(expected),
             $"{relativePath} is stale (the {policyName} catalogue changed); run with {UpdateEnvironmentVariable}=1 to regenerate.");
-    }
-
-    /// <summary>Walks up from the test assembly's own directory to the directory containing <c>KerckhoffsLabs.sln</c>.</summary>
-    private static string FindRepoRoot()
-    {
-        for (DirectoryInfo? dir = new(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            if (File.Exists(Path.Join(dir.FullName, "KerckhoffsLabs.sln")))
-                return dir.FullName;
-        }
-        throw new InvalidOperationException(
-            $"Could not locate the repo root (looked for KerckhoffsLabs.sln walking up from {AppContext.BaseDirectory}).");
     }
 }

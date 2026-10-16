@@ -184,7 +184,7 @@ public sealed partial class Pkcs11Key
     {
         string? algorithm = SubjectPublicKeyInfoEncoding.TryReadAlgorithm(peerSubjectPublicKeyInfo)
             ?? throw new ArgumentException("Peer public key is not a DER SubjectPublicKeyInfo.", nameof(peerSubjectPublicKeyInfo));
-        if (algorithm != SubjectPublicKeyInfoEncoding.EcPublicKeyOid)
+        if (algorithm != Oids.KeyAlgorithms.EcPublicKey)
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
                 $"Pkcs11Key.DeriveRawSecret (peer public key algorithm is {algorithm}, expected id-ecPublicKey)");
         if (!SubjectPublicKeyInfoEncoding.TryDecodeEc(peerSubjectPublicKeyInfo, out ECParameters ec))
