@@ -55,15 +55,15 @@ public sealed class PolicyDocsAreCurrentTests
             $"{relativePath} is stale (the {policyName} catalogue changed); run with {UpdateEnvironmentVariable}=1 to regenerate.");
     }
 
-    /// <summary>Walks up from the test assembly's own directory to the directory containing <c>src/KerckhoffsLabs.sln</c>.</summary>
+    /// <summary>Walks up from the test assembly's own directory to the directory containing <c>KerckhoffsLabs.sln</c>.</summary>
     private static string FindRepoRoot()
     {
         for (DirectoryInfo? dir = new(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            if (File.Exists(Path.Join(dir.FullName, "src", "KerckhoffsLabs.sln")))
+            if (File.Exists(Path.Join(dir.FullName, "KerckhoffsLabs.sln")))
                 return dir.FullName;
         }
         throw new InvalidOperationException(
-            $"Could not locate the repo root (looked for src/KerckhoffsLabs.sln walking up from {AppContext.BaseDirectory}).");
+            $"Could not locate the repo root (looked for KerckhoffsLabs.sln walking up from {AppContext.BaseDirectory}).");
     }
 }

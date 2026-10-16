@@ -264,13 +264,13 @@ so clone recursively:
 ```bash
 git clone --recurse-submodules https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11.git
 cd KerckhoffsLabs.Security.Cryptography.Pkcs11
-dotnet build src/KerckhoffsLabs.sln
+dotnet build KerckhoffsLabs.sln
 ```
 
 If you already cloned without submodules, run `git submodule update --init --recursive` first.
 
 ```bash
-dotnet test --solution src/KerckhoffsLabs.sln
+dotnet test --solution KerckhoffsLabs.sln
 ```
 
 Tests build `pkcs11-mock` from the vendored submodule automatically via an MSBuild target — this
