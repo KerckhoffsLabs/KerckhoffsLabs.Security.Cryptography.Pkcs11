@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// <summary>
 /// The key-type-neutral members of <see cref="Pkcs11Key"/> over the in-process <c>ManagedSoftToken</c>:
 /// <see cref="Pkcs11Key.KeySize"/>, <see cref="Pkcs11Key.Export"/> and
-/// <see cref="Pkcs11Key.DeriveRawSecret"/>, cross-checked against the BCL. The EC adapters are built on
+/// <see cref="Pkcs11Key.DeriveRawSecret"/>, cross-checked against the BCL. The adapters are built on
 /// them, and their own tests cover the same behaviour through the BCL surface.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
@@ -94,6 +94,27 @@ public sealed class Pkcs11KeyAsymmetricTests
         ECParameters p = bcl.ExportParameters(includePrivateParameters: false);
 
         Assert.Equal([0x04, .. p.Q.X!, .. p.Q.Y!], raw);
+    });
+
+    [Fact]
+    public void Export_Rsa_SubjectPublicKeyInfo_IsWhatTheBclWrites() => WithKey(s => s.GenerateRsaSigningKeyPair(3072), key =>
+    {
+        byte[] spki = key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo);
+
+        using var bcl = RSA.Create();
+        bcl.ImportSubjectPublicKeyInfo(spki, out int read);
+        Assert.Equal(spki.Length, read);
+        Assert.Equal(3072, bcl.KeySize);
+        Assert.Equal(spki, bcl.ExportSubjectPublicKeyInfo());
+    });
+
+    [Fact]
+    public void Export_Rsa_RawPublicKey_IsPkcs1RsaPublicKey() => WithKey(s => s.GenerateRsaSigningKeyPair(3072), key =>
+    {
+        using var bcl = RSA.Create();
+        bcl.ImportSubjectPublicKeyInfo(key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo), out _);
+
+        Assert.Equal(bcl.ExportRSAPublicKey(), key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
     });
 
     [Fact]
