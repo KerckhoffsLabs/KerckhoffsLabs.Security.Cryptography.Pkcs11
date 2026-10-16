@@ -13,6 +13,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 /// uncompressed point <c>0x04 ‖ X ‖ Y</c> as the BIT STRING.</item>
 /// <item>RSA (RFC 8017 §A.1, RFC 3279 §2.3.1): algorithm <c>rsaEncryption</c> with NULL parameters, and the
 /// PKCS#1 <c>RSAPublicKey</c> as the BIT STRING.</item>
+/// <item>DSA (RFC 3279 §2.3.2): algorithm <c>id-dsa</c> with <c>Dss-Parms ::= SEQUENCE { p, q, g }</c>, and
+/// the public value <c>INTEGER y</c> as the BIT STRING.</item>
 /// </list>
 /// Writes and reads DER only: a peer key is caller input, so nothing outside the canonical encoding is
 /// accepted.
@@ -24,6 +26,9 @@ internal static class SubjectPublicKeyInfoEncoding
 
     /// <summary><c>rsaEncryption</c> (RFC 8017 §A.1).</summary>
     internal const string RsaEncryptionOid = "1.2.840.113549.1.1.1";
+
+    /// <summary><c>id-dsa</c> (RFC 3279 §2.3.2).</summary>
+    internal const string DsaOid = "1.2.840.10040.4.1";
 
     /// <summary>Encodes a named-curve EC public key.</summary>
     internal static byte[] EncodeEc(ECParameters ec)
@@ -47,6 +52,29 @@ internal static class SubjectPublicKeyInfoEncoding
             writer.WriteIntegerUnsigned(TrimLeadingZeros(modulus));
             writer.WriteIntegerUnsigned(TrimLeadingZeros(exponent));
         }
+        return writer.Encode();
+    }
+
+    /// <summary>Encodes a DSA public key from its unsigned big-endian domain parameters and public value.</summary>
+    internal static byte[] EncodeDsa(ReadOnlySpan<byte> p, ReadOnlySpan<byte> q, ReadOnlySpan<byte> g, ReadOnlySpan<byte> y)
+    {
+        byte[] pBytes = p.ToArray(), qBytes = q.ToArray(), gBytes = g.ToArray();
+        return Encode(DsaOid, w =>
+        {
+            using (w.PushSequence())
+            {
+                w.WriteIntegerUnsigned(TrimLeadingZeros(pBytes));
+                w.WriteIntegerUnsigned(TrimLeadingZeros(qBytes));
+                w.WriteIntegerUnsigned(TrimLeadingZeros(gBytes));
+            }
+        }, EncodeDsaPublicKey(y));
+    }
+
+    /// <summary>The DSA public value as RFC 3279's <c>DSAPublicKey ::= INTEGER</c>.</summary>
+    internal static byte[] EncodeDsaPublicKey(ReadOnlySpan<byte> y)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteIntegerUnsigned(TrimLeadingZeros(y));
         return writer.Encode();
     }
 

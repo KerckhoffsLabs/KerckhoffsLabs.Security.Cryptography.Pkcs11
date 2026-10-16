@@ -10,11 +10,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 /// Lets a test drive an exact, otherwise unreachable <c>C_GetAttributeValue</c> response — a real
 /// token's required key attributes (e.g. RSA's <c>CKA_MODULUS</c>, DSA's <c>CKA_PRIME</c>) can't be
 /// made unreadable or fatally erroring on a well-formed key object, which is what the adapters'
-/// key-size fallback paths need to see.
+/// key-size fallback paths need to see. The key carries a private handle only, unless
+/// <c>publicOnly</c> asks for a public handle only; the module answers the same either way.
 /// </summary>
 internal static class FakeKeys
 {
-    public static FakeKey Create(CKK keyType, Func<CKA, (CKR Rv, byte[]? Value)> respond, ICryptoPolicy? policy = null)
+    public static FakeKey Create(CKK keyType, Func<CKA, (CKR Rv, byte[]? Value)> respond, ICryptoPolicy? policy = null, bool publicOnly = false)
     {
         var library = new AttributeResponseModule(respond).Load();
         var lowLevel = library.LowLevelLibrary!;
@@ -23,8 +24,8 @@ internal static class FakeKeys
         var session = new Pkcs11Session(library, slot, core);
         var key = new Pkcs11Key(
             session,
-            privateHandle: new ObjectHandle(1),
-            publicHandle: ObjectHandle.Invalid,
+            privateHandle: publicOnly ? ObjectHandle.Invalid : new ObjectHandle(1),
+            publicHandle: publicOnly ? new ObjectHandle(2) : ObjectHandle.Invalid,
             keyType: keyType,
             label: null,
             id: []);

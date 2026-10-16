@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -68,19 +69,13 @@ public sealed class DSAPkcs11 : DSA
     {
         try
         {
-            // No CKA_PRIME_BITS attribute exists in PKCS#11 for DSA (unlike RSA's CKA_MODULUS_BITS),
-            // so CKA_PRIME's byte length is the only source — exact for the standard DSA primes,
-            // whose bit length is always a multiple of 8 (commonly 64).
-            using var attrs = key.GetAttributeValue(CKA.CKA_PRIME);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return attrs[0].GetValueAsByteArray().Length * 8;
+            return key.KeySize;
         }
         catch (Pkcs11Exception)
         {
-            // Token doesn't expose CKA_PRIME — leave KeySize at the DSA base-class default.
+            // C_GetAttributeValue failed — leave KeySize at the DSA base-class default.
+            return null;
         }
-
-        return null;
     }
 
     // -----------------------------------------------------------------------
@@ -185,7 +180,7 @@ public sealed class DSAPkcs11 : DSA
     /// Always thrown when <paramref name="includePrivateParameters"/> is <see langword="true"/>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
-    /// <exception cref="Pkcs11Exception">Thrown when the domain parameters or public value (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) are sensitive or cannot be read.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown when the domain parameters or public value (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) are sensitive or cannot be read, or the key has no public-key object to read <c>CKA_VALUE</c> from.</exception>
     public override DSAParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
@@ -193,31 +188,39 @@ public sealed class DSAPkcs11 : DSA
                 "Refusing to export DSA private key (X). PKCS#11 keys are non-extractable by design; " +
                 "export only public material via ExportParameters(false).");
 
-        // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one exists,
-        // so CKA_VALUE resolves to the public value Y (not the private value X).
-        using var attrs = _key.GetAttributeValue(CKA.CKA_PRIME, CKA.CKA_SUBPRIME, CKA.CKA_BASE, CKA.CKA_VALUE);
-        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead || attrs[2].CannotBeRead || attrs[3].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "DSAPkcs11.ExportParameters (CKA_PRIME / CKA_SUBPRIME / CKA_BASE / CKA_VALUE)");
-
-        byte[] p = TrimLeadingZeros(attrs[0].GetValueAsByteArray());
-        byte[] q = TrimLeadingZeros(attrs[1].GetValueAsByteArray());
-        return new DSAParameters
-        {
-            P = p,
-            Q = q,
-            // DSAParameters requires G and Y to share the prime length; left-pad to P.
-            G = LeftPad(attrs[2].GetValueAsByteArray(), p.Length),
-            Y = LeftPad(attrs[3].GetValueAsByteArray(), p.Length),
-        };
+        // Y is read from the public-key object only; see Pkcs11Key.Export.
+        return ToDSAParameters(_key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
     }
 
-    /// <inheritdoc/>
-    /// <exception cref="NotSupportedException">Always thrown.</exception>
-    public override void ImportParameters(DSAParameters parameters)
-        => throw new NotSupportedException(
-            "DSAPkcs11 wraps a PKCS#11 key handle; importing managed parameters is not supported. " +
-            "Use Pkcs11Session.ImportKey or GenerateKey instead.");
+    // Parses the RFC 3279 SubjectPublicKeyInfo Pkcs11Key.Export writes: Dss-Parms { p, q, g } and
+    // INTEGER y. Not through DSA.ImportSubjectPublicKeyInfo: macOS's BCL cannot hold every DSA key.
+    private static DSAParameters ToDSAParameters(byte[] spki)
+    {
+        try
+        {
+            AsnReader info = new AsnReader(spki, AsnEncodingRules.DER).ReadSequence();
+            AsnReader algorithm = info.ReadSequence();
+            algorithm.ReadObjectIdentifier();
+            AsnReader domain = algorithm.ReadSequence();
+            byte[] p = TrimLeadingZeros(domain.ReadIntegerBytes().ToArray());
+            byte[] q = TrimLeadingZeros(domain.ReadIntegerBytes().ToArray());
+            byte[] g = domain.ReadIntegerBytes().ToArray();
+            byte[] y = new AsnReader(info.ReadBitString(out _), AsnEncodingRules.DER).ReadIntegerBytes().ToArray();
+            return new DSAParameters
+            {
+                P = p,
+                Q = q,
+                // DSAParameters requires G and Y to share the prime length; left-pad to P.
+                G = LeftPad(g, p.Length),
+                Y = LeftPad(y, p.Length),
+            };
+        }
+        catch (AsnContentException ex)
+        {
+            // Pkcs11Key.Export writes this encoding itself, so reaching here is a library bug.
+            throw new CryptographicException("Pkcs11Key.Export returned a malformed DSA SubjectPublicKeyInfo.", ex);
+        }
+    }
 
     private static byte[] TrimLeadingZeros(byte[] value)
     {
@@ -235,4 +238,11 @@ public sealed class DSAPkcs11 : DSA
         value.CopyTo(result, length - value.Length);
         return result;
     }
+
+    /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">Always thrown.</exception>
+    public override void ImportParameters(DSAParameters parameters)
+        => throw new NotSupportedException(
+            "DSAPkcs11 wraps a PKCS#11 key handle; importing managed parameters is not supported. " +
+            "Use Pkcs11Session.ImportKey or GenerateKey instead.");
 }

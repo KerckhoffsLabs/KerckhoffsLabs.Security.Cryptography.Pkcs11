@@ -89,7 +89,8 @@ public sealed partial class Pkcs11Key : IDisposable
     /// (a coordinate's byte length is not a bit size: prime239v1 is 239 bits in 30 bytes).</item>
     /// <item><see cref="CKK.CKK_RSA"/>: <c>CKA_MODULUS_BITS</c>, else the bit length of <c>CKA_MODULUS</c>.</item>
     /// <item>Secret keys: <c>CKA_VALUE_LEN</c> × 8 when the token exposes it.</item>
-    /// <item>Other asymmetric types (DSA, DH, EdDSA, X25519/X448, ML-DSA, ML-KEM, SLH-DSA, ...): <see langword="null"/>.</item>
+    /// <item><see cref="CKK.CKK_DSA"/>: the bit length of <c>CKA_PRIME</c>.</item>
+    /// <item>Other asymmetric types (DH, EdDSA, X25519/X448, ML-DSA, ML-KEM, SLH-DSA, ...): <see langword="null"/>.</item>
     /// </list>
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
@@ -136,6 +137,12 @@ public sealed partial class Pkcs11Key : IDisposable
                     if (!attrs[0].CannotBeRead)
                         return checked((int)attrs[0].GetValueAsUlong());
                     return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
+                }
+            case CKK.CKK_DSA:
+                {
+                    // PKCS#11 has no CKA_PRIME_BITS (unlike RSA's CKA_MODULUS_BITS).
+                    using var attrs = GetAttributeValue(CKA.CKA_PRIME);
+                    return attrs[0].CannotBeRead ? null : BitLength(attrs[0].GetValueAsByteArray());
                 }
             case CKK.CKK_DH or CKK.CKK_X9_42_DH or CKK.CKK_EC_MONTGOMERY or CKK.CKK_KEA or CKK.CKK_GOSTR3410:
                 return null;

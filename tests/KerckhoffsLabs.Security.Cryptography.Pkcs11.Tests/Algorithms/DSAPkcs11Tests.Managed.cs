@@ -380,7 +380,7 @@ public sealed class DSAPkcs11Tests_Managed
             CKA.CKA_BASE => (CKR.CKR_OK, (byte[])[0x07]),
             CKA.CKA_VALUE => (CKR.CKR_OK, (byte[])[0x08]),
             _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
-        });
+        }, publicOnly: true);
         using var dsa = new DSAPkcs11(key);
 
         DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
@@ -398,11 +398,31 @@ public sealed class DSAPkcs11Tests_Managed
             CKA.CKA_BASE => (CKR.CKR_OK, (byte[])[0x01, 0x02, 0x03]),
             CKA.CKA_VALUE => (CKR.CKR_OK, (byte[])[0x04, 0x05, 0x06]),
             _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
-        });
+        }, publicOnly: true);
         using var dsa = new DSAPkcs11(key);
 
         DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
         Assert.Equal(new byte[] { 0x02, 0x03 }, pub.G);
         Assert.Equal(new byte[] { 0x05, 0x06 }, pub.Y);
+    }
+
+    // On the private-key object CKA_VALUE is X, not Y. A private-only key whose X the token leaves
+    // readable must not have it exported as the public value.
+    [Fact]
+    public void ExportParameters_PrivateOnlyKey_NeverReadsThePrivateValue()
+    {
+        byte[] privateValue = [0x0A, 0x0B];
+        using var key = FakeKeys.Create(CKK.CKK_DSA, ca => ca switch
+        {
+            CKA.CKA_PRIME => (CKR.CKR_OK, (byte[])[0x01, 0x02]),
+            CKA.CKA_SUBPRIME => (CKR.CKR_OK, (byte[])[0x05]),
+            CKA.CKA_BASE => (CKR.CKR_OK, (byte[])[0x01, 0x03]),
+            CKA.CKA_VALUE => (CKR.CKR_OK, privateValue),
+            _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+        });
+        using var dsa = new DSAPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.ExportParameters(includePrivateParameters: false));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
     }
 }

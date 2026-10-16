@@ -1,8 +1,10 @@
 using System.Formats.Asn1;
 using System.Security.Cryptography;
 using BclECCurve = System.Security.Cryptography.ECCurve;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
@@ -116,6 +118,40 @@ public sealed class Pkcs11KeyAsymmetricTests
 
         Assert.Equal(bcl.ExportRSAPublicKey(), key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
     });
+
+    // macOS's BCL can't generate a 2048-bit DSA key, so the key can't be made there.
+    public static bool DsaSupported { get; } = ProbeDsa();
+
+    private static bool ProbeDsa()
+    {
+        try
+        {
+            using (DSA.Create(2048)) { }
+            return true;
+        }
+        catch (PlatformNotSupportedException) { return false; }
+        catch (CryptographicException) { return false; }
+    }
+
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void Export_Dsa_SubjectPublicKeyInfo_IsWhatTheBclWrites()
+    {
+        using var bcl = DSA.Create(2048);
+        DSAParameters p = bcl.ExportParameters(includePrivateParameters: false);
+
+        WithKey(s =>
+        {
+            using var template = ObjectTemplate.ForPublicKey(CKK.CKK_DSA)
+                .Attribute(CKA.CKA_PRIME, p.P!).Attribute(CKA.CKA_SUBPRIME, p.Q!)
+                .Attribute(CKA.CKA_BASE, p.G!).Attribute(CKA.CKA_VALUE, p.Y!)
+                .Verify().Build();
+            return s.ImportKey(template);
+        }, key =>
+        {
+            Assert.Equal(2048, key.KeySize);
+            Assert.Equal(bcl.ExportSubjectPublicKeyInfo(), key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+        });
+    }
 
     [Fact]
     public void Export_SecretKey_IsNotSupported() => WithAesKey(key =>
