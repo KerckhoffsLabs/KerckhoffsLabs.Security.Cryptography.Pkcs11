@@ -24,3 +24,7 @@
 	url = https://github.com/oasis-tcs/pkcs11.git
 	shallow = true
 	ignore = untracked
+[submodule "vendor/craton-hsm-core"]
+	path = vendor/craton-hsm-core
+	url = https://github.com/craton-co/craton-hsm-core.git
+	ignore = untracked
