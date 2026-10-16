@@ -431,8 +431,9 @@ public sealed partial class SecureOnlyPolicy
 
         Refuse(
             "CKD_NULL applies no KDF to the ECDH shared secret: the derived AES key becomes the raw x-coordinate " +
-            "(or a token-chosen truncation of it), which NIST SP 800-56A Rev. 3 §5.8 forbids.",
-            Sha256Kdf, CKD.CKD_NULL);
+            "(or a token-chosen truncation of it), which NIST SP 800-56A Rev. 3 §5.8 forbids. Allowed only into a " +
+            "derivation-only generic secret (every usage but CKA_DERIVE false), which only an on-token KDF can turn into keys.",
+            Sha256Kdf + ", or Pkcs11Key.DeriveSecretAgreement followed by CKM_HKDF_DERIVE", CKD.CKD_NULL);
         Refuse("SHA-1 is collision-broken and deprecated.", Sha256Kdf,
             CKD.CKD_SHA1_KDF, CKD.CKD_SHA1_KDF_ASN1, CKD.CKD_SHA1_KDF_CONCATENATE, CKD.CKD_SHA1_KDF_SP800);
         Refuse("SHA-224 / SHA3-224 offer no practical benefit over SHA-256 on equal-cost hardware.", Sha256Kdf,

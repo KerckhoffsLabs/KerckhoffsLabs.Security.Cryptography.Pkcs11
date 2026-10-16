@@ -235,14 +235,44 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         return _effectivePolicy.Evaluate(request).IsAllowed;
     }
 
-    private void Enforce(Mechanism mechanism, CryptoOperation operation)
+    private void Enforce(Mechanism mechanism, CryptoOperation operation, IReadOnlyList<Objects.ObjectAttribute>? resultTemplate = null)
     {
         Enforce(new MechanismUseRequest(mechanism, operation));
 
         // The KDF an ECDH derivation or KEM applies to the shared secret is judged here, on every call
-        // carrying CK_ECDH1_DERIVE_PARAMS, whichever public entry point it came through.
+        // carrying CK_ECDH1_DERIVE_PARAMS, whichever public entry point it came through. Whether the
+        // result is derivation-only is read off the template the token will receive, so a caller cannot
+        // claim it.
         if (mechanism.Parameters is CkmEcdh1DeriveParams ecdh)
-            Enforce(new KeyAgreementKdfRequest(mechanism.Type, ecdh.Kdf));
+            Enforce(new KeyAgreementKdfRequest(mechanism.Type, ecdh.Kdf)
+            {
+                ResultIsDerivationOnlySecret = resultTemplate is not null && IsDerivationOnlySecret(resultTemplate),
+            });
+    }
+
+    // See KeyAgreementKdfRequest.ResultIsDerivationOnlySecret. Every usage attribute must be present and
+    // false: a token's default for an omitted one is its own choice. A template listing an attribute
+    // twice must agree with itself on every occurrence.
+    internal static bool IsDerivationOnlySecret(IReadOnlyList<Objects.ObjectAttribute> template)
+    {
+        bool All(CKA type, bool required, Func<Objects.ObjectAttribute, bool> holds)
+        {
+            Objects.ObjectAttribute[] occurrences = [.. template.Where(a => a.Type == type)];
+            return occurrences.Length == 0 ? !required : occurrences.All(holds);
+        }
+
+        return All(CKA.CKA_CLASS, required: true, a => a.GetValueAsUlong() == (ulong)CKO.CKO_SECRET_KEY)
+            && All(CKA.CKA_KEY_TYPE, required: true, a => a.GetValueAsUlong() == (ulong)CKK.CKK_GENERIC_SECRET)
+            && All(CKA.CKA_DERIVE, required: true, a => a.GetValueAsBool())
+            && All(CKA.CKA_ENCRYPT, required: true, a => !a.GetValueAsBool())
+            && All(CKA.CKA_DECRYPT, required: true, a => !a.GetValueAsBool())
+            && All(CKA.CKA_SIGN, required: true, a => !a.GetValueAsBool())
+            && All(CKA.CKA_VERIFY, required: true, a => !a.GetValueAsBool())
+            && All(CKA.CKA_WRAP, required: true, a => !a.GetValueAsBool())
+            && All(CKA.CKA_UNWRAP, required: true, a => !a.GetValueAsBool())
+            // Omitted is fine: BuildSecureKeyDefaults then sets CKA_SENSITIVE=true / CKA_EXTRACTABLE=false.
+            && All(CKA.CKA_SENSITIVE, required: false, a => a.GetValueAsBool())
+            && All(CKA.CKA_EXTRACTABLE, required: false, a => !a.GetValueAsBool());
     }
 
     /// <summary>

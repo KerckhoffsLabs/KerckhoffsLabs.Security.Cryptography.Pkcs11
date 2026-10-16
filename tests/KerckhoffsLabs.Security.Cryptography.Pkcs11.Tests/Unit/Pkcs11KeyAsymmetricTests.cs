@@ -4,6 +4,7 @@ using BclECCurve = System.Security.Cryptography.ECCurve;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
@@ -15,8 +16,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// The key-type-neutral members of <see cref="Pkcs11Key"/> over the in-process <c>ManagedSoftToken</c>:
-/// <see cref="Pkcs11Key.KeySize"/>, <see cref="Pkcs11Key.Export"/> and
-/// <see cref="Pkcs11Key.DeriveRawSecret"/>, cross-checked against the BCL. The adapters are built on
+/// <see cref="Pkcs11Key.KeySize"/>, <see cref="Pkcs11Key.Export"/>, <see cref="Pkcs11Key.DeriveRawSecret"/>
+/// and <see cref="Pkcs11Key.DeriveSecretAgreement"/>, cross-checked against the BCL. The adapters are built on
 /// them, and their own tests cover the same behaviour through the BCL surface.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
@@ -341,4 +342,82 @@ public sealed class Pkcs11KeyAsymmetricTests
     [Fact]
     public void DeriveRawSecret_SecretKey_IsNotSupported() => WithAesKey(key =>
         Assert.Throws<NotSupportedException>(() => key.DeriveRawSecret([])));
+
+    // === DeriveSecretAgreement ================================================
+
+    private static readonly byte[] HkdfSalt = "agreement salt"u8.ToArray();
+    private static readonly byte[] HkdfInfo = "mac key"u8.ToArray();
+    private static readonly byte[] ProbeMessage = "probe"u8.ToArray();
+
+    public static TheoryData<string> Policies => ["SecureOnly", "FipsOnly"];
+
+    // The whole key schedule on the token under a default policy: agree into Z, HKDF Z into an HMAC key,
+    // MAC a probe. No secret byte is read; the BCL peer computes the same MAC from its own Z.
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    [MemberData(nameof(Policies))]
+    public void DeriveSecretAgreement_ThenHkdfOnTheToken_MatchesBcl(string policy)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, policy == "FipsOnly" ? CryptoPolicy.FipsOnly : CryptoPolicy.SecureOnly);
+        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+
+        using Pkcs11Key z = alice.DeriveSecretAgreement(bob.ExportSubjectPublicKeyInfo());
+
+        using var macTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Sign().Build();
+        using Pkcs11Key macKey = z.Derive(
+            new Mechanism(CKM.CKM_HKDF_DERIVE,
+                CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, HkdfSalt, HkdfInfo)),
+            macTemplate);
+        byte[] tag = macKey.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), ProbeMessage);
+
+        using var alicePublic = ECDiffieHellman.Create();
+        alicePublic.ImportSubjectPublicKeyInfo(alice.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo), out _);
+        byte[] bobZ = bob.DeriveRawSecretAgreement(alicePublic.PublicKey);
+        byte[] expected = HMACSHA256.HashData(HKDF.DeriveKey(HashAlgorithmName.SHA256, bobZ, 32, HkdfSalt, HkdfInfo), ProbeMessage);
+
+        Assert.Equal(expected, tag);
+    }
+
+    // Z can only feed a derivation: the token refuses it as a MAC key.
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void DeriveSecretAgreement_ResultIsNotAWorkingKey() => WithEcKey(P256, alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+        using Pkcs11Key z = alice.DeriveSecretAgreement(bob.ExportSubjectPublicKeyInfo());
+
+        using var attrs = z.GetAttributeValue(CKA.CKA_DERIVE, CKA.CKA_SIGN, CKA.CKA_ENCRYPT, CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE);
+        Assert.True(attrs[0].GetValueAsBool());
+        Assert.False(attrs[1].GetValueAsBool());
+        Assert.False(attrs[2].GetValueAsBool());
+        Assert.True(attrs[3].GetValueAsBool());
+        Assert.False(attrs[4].GetValueAsBool());
+    });
+
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void DeriveSecretAgreement_PointOffTheCurve_Throws() => WithEcKey(P256, alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+        ECParameters peer = bob.ExportParameters(includePrivateParameters: false);
+        peer.Q.Y![^1] ^= 1;
+
+        Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveSecretAgreement(SubjectPublicKeyInfoEncoding.EncodeEc(peer)));
+    });
+
+    // The policy widening is for derivation-only results: CKD_NULL straight into a working key stays refused.
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void CkdNull_IntoAWorkingKey_IsStillRefused() => WithEcKey(P256, alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+        ECParameters peer = bob.ExportParameters(includePrivateParameters: false);
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE,
+            new CkmEcdh1DeriveParams(CKD.CKD_NULL, EcPointEncoding.Encode(peer.Q.X!, peer.Q.Y!)));
+        using var aes = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
+
+        Assert.Throws<CryptoPolicyViolationException>(() => alice.Derive(mechanism, aes));
+    });
+
+    [Fact]
+    public void DeriveSecretAgreement_SecretKey_IsNotSupported() => WithAesKey(key =>
+        Assert.Throws<NotSupportedException>(() => key.DeriveSecretAgreement([])));
 }

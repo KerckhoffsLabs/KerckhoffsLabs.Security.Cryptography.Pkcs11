@@ -474,7 +474,7 @@ Documentation only: every item below is refused because it is absent from the al
 | `CKD_BLAKE2B_384_KDF` | BLAKE2b-based key-agreement KDFs are not NIST SP 800-56C KDFs and have not been reviewed for this policy; BLAKE2b-160 is also below 128-bit collision resistance. | the default CKD_SHA256_KDF or stronger |
 | `CKD_BLAKE2B_512_KDF` | BLAKE2b-based key-agreement KDFs are not NIST SP 800-56C KDFs and have not been reviewed for this policy; BLAKE2b-160 is also below 128-bit collision resistance. | the default CKD_SHA256_KDF or stronger |
 | `CKD_CPDIVERSIFY_KDF` | CKD_CPDIVERSIFY_KDF is a CryptoPro (GOST) key-diversification function, not a general-purpose key-agreement KDF. | the default CKD_SHA256_KDF or stronger |
-| `CKD_NULL` | CKD_NULL applies no KDF to the ECDH shared secret: the derived AES key becomes the raw x-coordinate (or a token-chosen truncation of it), which NIST SP 800-56A Rev. 3 §5.8 forbids. | the default CKD_SHA256_KDF or stronger |
+| `CKD_NULL` | CKD_NULL applies no KDF to the ECDH shared secret: the derived AES key becomes the raw x-coordinate (or a token-chosen truncation of it), which NIST SP 800-56A Rev. 3 §5.8 forbids. Allowed only into a derivation-only generic secret (every usage but CKA_DERIVE false), which only an on-token KDF can turn into keys. | the default CKD_SHA256_KDF or stronger, or Pkcs11Key.DeriveSecretAgreement followed by CKM_HKDF_DERIVE |
 | `CKD_SHA1_KDF` | SHA-1 is collision-broken and deprecated. | the default CKD_SHA256_KDF or stronger |
 | `CKD_SHA1_KDF_ASN1` | SHA-1 is collision-broken and deprecated. | the default CKD_SHA256_KDF or stronger |
 | `CKD_SHA1_KDF_CONCATENATE` | SHA-1 is collision-broken and deprecated. | the default CKD_SHA256_KDF or stronger |

@@ -67,7 +67,22 @@ public sealed record KeyTemplateRequest(CKO? ObjectClass, IReadOnlyList<ObjectAt
 /// <param name="Kdf">The KDF.</param>
 public sealed record KeyAgreementKdfRequest(CKM Mechanism, CKD Kdf) : PolicyRequest
 {
-    internal override string Describe() => $"{Mechanism} with {Kdf}";
+    /// <summary>
+    /// Whether the derived object can only feed a further key derivation: a <c>CKK_GENERIC_SECRET</c>
+    /// with <c>CKA_DERIVE=true</c>, <c>CKA_ENCRYPT</c>, <c>CKA_DECRYPT</c>, <c>CKA_SIGN</c>,
+    /// <c>CKA_VERIFY</c>, <c>CKA_WRAP</c> and <c>CKA_UNWRAP</c> all explicitly <see langword="false"/>,
+    /// and neither non-sensitive nor extractable. Set by the session from the derive template, never by
+    /// the caller.
+    /// </summary>
+    /// <remarks>
+    /// With <see cref="CKD.CKD_NULL"/> that object holds the raw shared secret Z inside the module, for a
+    /// key-derivation step that follows (SP 800-56C Rev.2 two-step derivation, e.g.
+    /// <c>CKM_HKDF_DERIVE</c>); Z itself can never be a working key or leave the token.
+    /// </remarks>
+    public bool ResultIsDerivationOnlySecret { get; internal init; }
+
+    internal override string Describe()
+        => ResultIsDerivationOnlySecret ? $"{Mechanism} with {Kdf} into a derivation-only secret" : $"{Mechanism} with {Kdf}";
     internal override CKM? MechanismType => Mechanism;
 }
 

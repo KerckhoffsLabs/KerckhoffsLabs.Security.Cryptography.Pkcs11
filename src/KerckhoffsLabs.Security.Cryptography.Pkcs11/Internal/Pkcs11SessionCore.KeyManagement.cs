@@ -371,7 +371,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        Enforce(mechanism, CryptoOperation.Derive);
+        Enforce(mechanism, CryptoOperation.Derive, attributes);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
