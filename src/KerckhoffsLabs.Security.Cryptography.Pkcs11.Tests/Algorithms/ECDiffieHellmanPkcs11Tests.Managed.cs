@@ -165,8 +165,8 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobZ, aliceZ);
     });
 
-    // Outside the catalog the adapter has no field size, so it sizes the secret by the peer's coordinate,
-    // which the BCL pads to the field: 30 bytes for a 239-bit field.
+    // Outside the catalog the adapter sizes the secret from the local key's CKA_EC_POINT: 30-byte
+    // coordinates for a 239-bit field.
     [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
     public void DeriveRawSecretAgreement_CurveOutsideTheCatalog_MatchesBcl() => WithEcdh("prime239v1", alice =>
     {
@@ -178,6 +178,23 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
 
         Assert.Equal(FieldSize("prime239v1"), aliceZ.Length);
         Assert.Equal(bobZ, aliceZ);
+    });
+
+    // The field size comes from the token's own CKA_EC_POINT, so a peer whose coordinates don't match is
+    // refused even though no catalog lists the curve. Without that fallback this peer's 32-byte X would
+    // have set the size, and the mismatch would only surface (if at all) in the point-on-curve check.
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void DeriveRawSecretAgreement_CurveOutsideTheCatalog_PeerCoordinateLengthMismatch_Throws() => WithEcdh("prime239v1", alice =>
+    {
+        int wrongSize = FieldSize("prime239v1") + 2;
+        var badPeer = new FixedPublicKey(new ECParameters
+        {
+            Curve = Curves("prime239v1").bcl,
+            Q = new ECPoint { X = new byte[wrongSize], Y = new byte[wrongSize] },
+        });
+
+        var ex = Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecretAgreement(badPeer));
+        Assert.Contains("30-byte field size", ex.Message, StringComparison.Ordinal);
     });
 
     // === A curve outside the built-in set, described through Pkcs11LibraryOptions.CurveCatalog ===

@@ -214,22 +214,14 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     {
         _key.Session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret));
 
-        ECParameters peer = otherPartyPublicKey.ExportParameters();
-        byte[] x = peer.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(otherPartyPublicKey));
-        byte[] y = peer.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(otherPartyPublicKey));
+        ValidatedEcdhPeer peer = EcdhPeerValidator.Validate(
+            _key, otherPartyPublicKey.ExportParameters(), nameof(otherPartyPublicKey), "ECDiffieHellmanPkcs11.DeriveRawSecret");
+        // Field size from the local key (curve catalog, else its CKA_EC_POINT), not the peer's
+        // coordinate encoding — a subclassed ECDiffieHellmanPublicKey could otherwise report a short X
+        // and silently truncate the shared secret the token derives. See EcdhPeerValidator.
+        int fieldSize = peer.FieldSizeBytes;
 
-        const string op = "ECDiffieHellmanPkcs11.DeriveRawSecret";
-        Pkcs11ECCurve localCurve = Pkcs11PublicKeyView.GetCurve(_key, op);
-        Pkcs11PublicKeyView.ValidatePeerEcKey(localCurve, peer, x, y, op);
-        // Field size from the local key, not the peer's coordinate encoding — a subclassed
-        // ECDiffieHellmanPublicKey could otherwise report a short X and silently truncate the
-        // shared secret the token derives. Falls back to the peer's (now curve-matched) length only
-        // for a curve outside the library's curve catalog (Pkcs11LibraryOptions.CurveCatalog).
-        // Rounded up: P-521's 521-bit field takes 66 bytes, not 65.
-        int fieldSize = localCurve.FieldSizeBits is int bits ? (bits + 7) / 8 : x.Length;
-
-        byte[] peerPoint = EncodeEcPointAsDerOctetString(x, y);
-        var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peerPoint);
+        var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.EncodedPoint);
         var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
         // Raw secret read-back: derive an extractable, non-sensitive session generic secret of the
         // field size. The private key itself remains non-extractable.
@@ -288,40 +280,6 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         }
     }
 
-
-    /// <summary>
-    /// Encodes an uncompressed EC point (0x04 ‖ X ‖ Y) as a DER OCTET STRING, the form PKCS#11 expects
-    /// for the ECDH1 public-data parameter (the full <c>CKA_EC_POINT</c> value). Also used by
-    /// <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/> to
-    /// build the raw-span form after validating the peer.
-    /// </summary>
-    internal static byte[] EncodeEcPointAsDerOctetString(byte[] x, byte[] y)
-    {
-        byte[] raw = new byte[1 + x.Length + y.Length];
-        raw[0] = 0x04;
-        x.CopyTo(raw, 1);
-        y.CopyTo(raw, 1 + x.Length);
-
-        if (raw.Length < 0x80)
-        {
-            byte[] der = new byte[2 + raw.Length];
-            der[0] = 0x04;
-            der[1] = (byte)raw.Length;
-            raw.CopyTo(der, 2);
-            return der;
-        }
-        else
-        {
-            // Long-form length (one length byte covers all named curves up to 255-byte points).
-            byte[] der = new byte[3 + raw.Length];
-            der[0] = 0x04;
-            der[1] = 0x81;
-            der[2] = (byte)raw.Length;
-            raw.CopyTo(der, 3);
-            return der;
-        }
-    }
-
     // -----------------------------------------------------------------------
     // Key material
     // -----------------------------------------------------------------------
@@ -338,15 +296,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        using var attrs = _key.GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);
-        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "ECDiffieHellmanPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS not readable)");
-
-        var ec = Pkcs11PublicKeyView.TryParseEcPublicKey(
-            attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
-        return ec ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
-            "ECDiffieHellmanPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be parsed as a named-curve uncompressed point)");
+        return Pkcs11PublicKeyView.ReadEcPublicKey(_key, "ECDiffieHellmanPkcs11.ExportParameters");
     }
 
     /// <inheritdoc/>
