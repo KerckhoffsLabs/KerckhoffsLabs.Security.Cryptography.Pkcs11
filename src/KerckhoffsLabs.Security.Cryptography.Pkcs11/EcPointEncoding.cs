@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -7,6 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// wrapping the uncompressed point <c>0x04 ‖ X ‖ Y</c>, and <c>CKA_EC_PARAMS</c> is the DER-encoded
 /// named-curve OID.
 /// </summary>
+/// <remarks>
+/// Writes DER. Reads BER — a superset that also takes non-minimal lengths and constructed OCTET STRINGs,
+/// which some tokens return — but never trailing bytes after the OCTET STRING.
+/// </remarks>
 internal static class EcPointEncoding
 {
     /// <summary>
@@ -15,60 +21,35 @@ internal static class EcPointEncoding
     /// </summary>
     internal static byte[] Encode(byte[] x, byte[] y)
     {
-        byte[] raw = new byte[1 + x.Length + y.Length];
-        raw[0] = 0x04;
-        x.CopyTo(raw, 1);
-        y.CopyTo(raw, 1 + x.Length);
-
-        if (raw.Length < 0x80)
-        {
-            byte[] der = new byte[2 + raw.Length];
-            der[0] = 0x04;
-            der[1] = (byte)raw.Length;
-            raw.CopyTo(der, 2);
-            return der;
-        }
-        else
-        {
-            // Long-form length (one length byte covers all named curves up to 255-byte points).
-            byte[] der = new byte[3 + raw.Length];
-            der[0] = 0x04;
-            der[1] = 0x81;
-            der[2] = (byte)raw.Length;
-            raw.CopyTo(der, 3);
-            return der;
-        }
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteOctetString([0x04, .. x, .. y]);
+        return writer.Encode();
     }
 
     /// <summary>
     /// The inverse of <see cref="Encode"/>: splits a <c>CKA_EC_POINT</c> value into its coordinates.
-    /// Returns <see langword="false"/> when the bytes aren't a DER OCTET STRING wrapping an
-    /// uncompressed point.
+    /// Returns <see langword="false"/> when the bytes aren't an OCTET STRING wrapping an uncompressed point.
     /// </summary>
     internal static bool TryDecode(byte[] ecPoint, out byte[] x, out byte[] y)
     {
         x = y = [];
+        if (!TryReadOctetString(ecPoint, out byte[]? point) || point is not [0x04, ..]) return false;
 
-        ReadOnlySpan<byte> pointBytes = StripDerOctetString(ecPoint);
-        if (pointBytes.IsEmpty) return false;
+        int coordLen = PointCoordinateLength(point);
+        if (coordLen == 0) return false;
 
-        // Point format: 0x04 || X || Y for uncompressed.
-        if (pointBytes[0] != 0x04) return false;
-        int coordLen = (pointBytes.Length - 1) / 2;
-        if (coordLen <= 0 || pointBytes.Length != 1 + 2 * coordLen) return false;
-
-        x = pointBytes.Slice(1, coordLen).ToArray();
-        y = pointBytes.Slice(1 + coordLen, coordLen).ToArray();
+        x = point[1..(1 + coordLen)];
+        y = point[(1 + coordLen)..];
         return true;
     }
 
     /// <summary>
     /// Parses raw <c>CKA_EC_POINT</c> + <c>CKA_EC_PARAMS</c> bytes into an <see cref="ECParameters"/>
     /// for a named curve (any curve in <see cref="Pkcs11ECCurve.NamedCurves"/>, and any other named-curve
-    /// OID the host BCL recognises). Returns <see langword="null"/> when the inputs don't decode as a
-    /// DER-OCTET-wrapped uncompressed point or <c>CKA_EC_PARAMS</c> isn't a DER-encoded curve OID.
+    /// OID the host BCL recognises). Returns <see langword="null"/> when the inputs don't decode as an
+    /// OCTET-STRING-wrapped uncompressed point or <c>CKA_EC_PARAMS</c> isn't a DER-encoded curve OID.
     /// </summary>
-    /// <param name="ecPoint">Raw <c>CKA_EC_POINT</c> bytes (DER OCTET STRING containing the uncompressed point).</param>
+    /// <param name="ecPoint">Raw <c>CKA_EC_POINT</c> bytes (OCTET STRING containing the uncompressed point).</param>
     /// <param name="ecParams">Raw <c>CKA_EC_PARAMS</c> bytes (DER-encoded named-curve OID).</param>
     internal static ECParameters? TryParsePublicKey(byte[] ecPoint, byte[] ecParams)
     {
@@ -82,22 +63,20 @@ internal static class EcPointEncoding
 
     /// <summary>
     /// The byte length of one coordinate of the point in a <c>CKA_EC_POINT</c> value — ⌈field bits / 8⌉,
-    /// read off the token's own key rather than a curve table. Accepts the conformant DER OCTET STRING
+    /// read off the token's own key rather than a curve table. Accepts the conformant OCTET STRING
     /// form and, for tokens that omit the wrapper, the bare point; uncompressed (<c>0x04 ‖ X ‖ Y</c>) or
     /// compressed (<c>0x02/0x03 ‖ X</c>). Returns <see langword="false"/> when neither form parses.
     /// </summary>
     /// <remarks>
-    /// The DER form wins whenever it parses exactly (no trailing bytes). A bare point misread as DER
-    /// needs its first coordinate bytes to forge both a matching length and a point header, and even then
-    /// the result is a wrong size, which the ECDH coordinate-length check turns into a refusal.
+    /// The OCTET STRING form wins whenever it parses. A bare point misread as one needs its first
+    /// coordinate bytes to forge both a matching length and a point header, and even then the result is a
+    /// wrong size, which the ECDH coordinate-length check turns into a refusal.
     /// </remarks>
     internal static bool TryGetCoordinateLength(byte[] ecPoint, out int coordinateLength)
     {
         ArgumentNullException.ThrowIfNull(ecPoint);
 
-        coordinateLength = TryReadDerOctetString(ecPoint, out int offset, out int length) && offset + length == ecPoint.Length
-            ? PointCoordinateLength(ecPoint.AsSpan(offset, length))
-            : 0;
+        coordinateLength = TryReadOctetString(ecPoint, out byte[]? point) ? PointCoordinateLength(point) : 0;
         if (coordinateLength == 0)
             coordinateLength = PointCoordinateLength(ecPoint);
         return coordinateLength > 0;
@@ -110,32 +89,20 @@ internal static class EcPointEncoding
         _ => 0,
     };
 
-    private static ReadOnlySpan<byte> StripDerOctetString(byte[] der)
-        => TryReadDerOctetString(der, out int offset, out int length) ? der.AsSpan(offset, length) : [];
-
-    private static bool TryReadDerOctetString(byte[] der, out int offset, out int len)
+    private static bool TryReadOctetString(byte[] encoded, [NotNullWhen(true)] out byte[]? content)
     {
-        offset = len = 0;
-        if (der.Length < 2 || der[0] != 0x04) return false;
-
-        offset = 2;
-        len = der[1];
-        if (len == 0x81 && der.Length >= 3)
+        try
         {
-            len = der[2];
-            offset = 3;
+            var reader = new AsnReader(encoded, AsnEncodingRules.BER);
+            content = reader.ReadOctetString();
+            reader.ThrowIfNotEmpty();
+            return true;
         }
-        else if (len == 0x82 && der.Length >= 4)
+        catch (AsnContentException)
         {
-            len = (der[2] << 8) | der[3];
-            offset = 4;
-        }
-        else if (len > 0x7F)
-        {
+            content = null;
             return false;
         }
-
-        return offset + len <= der.Length;
     }
 
     // CKA_EC_PARAMS for a named curve is the DER-encoded curve OID; bridge it to a BCL named curve
