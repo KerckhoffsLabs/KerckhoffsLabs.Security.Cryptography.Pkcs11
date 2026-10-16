@@ -1,4 +1,10 @@
 #nullable enable
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveRawSecret(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> byte[]!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Export(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat format) -> byte[]!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.KeySize.get -> int?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat.RawPublicKey = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat.SubjectPublicKeyInfo = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.VendorMechanismParameters.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.Pkcs11ParameterWriter! writer) -> void
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest!
 const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CK.CK_CERTIFICATE_CATEGORY_AUTHORITY = 2 -> ulong
