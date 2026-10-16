@@ -193,7 +193,7 @@ public sealed partial class SecureOnlyPolicy : ICryptoPolicy
 
     /// <summary>
     /// The allow-sets the KDF PRF checks below decide the verdict from, and the single source
-    /// <c>SecureOnlyPolicy.Catalogue.cs</c>'s <c>BuildAllowedKdfPrfs</c> renders into
+    /// <c>SecureOnlyPolicy.Rules.cs</c>'s <c>BuildAllowedKdfPrfs</c> renders into
     /// <see cref="PolicyCatalogue.AllowedKdfPrfs"/> for the generated catalogue documentation — never a hand-duplicated copy that can drift from what is enforced.
     /// </summary>
     /// <remarks>
