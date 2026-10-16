@@ -102,6 +102,10 @@ jobs:
       # which raises the same project-level encoding warning even when every real source file is
       # clean. They carry no analyzable content, so indexing them buys nothing.
       #
+      # build/ holds the CI toolchain, not the library: shell/PowerShell scripts that build and
+      # provision the PKCS#11 backends, the C ABI probe and pkcs11-gate shims, and a Python generator.
+      # None of it ships, so its findings and its lines say nothing about the library's quality.
+      #
       # tests/ is excluded under both keys because the scanner sorts it two ways: the Tests project
       # is detected as a test project, so its files are test sources filtered by
       # sonar.test.exclusions, while AotSmoke is an ordinary executable whose files are main
@@ -129,7 +133,7 @@ jobs:
           /d:sonar.sourceEncoding="UTF-8"
           /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.*.xml"
           /d:sonar.coverage.exclusions="**/*.SecurityAnalyzers/**/*.cs,**/*.SourceGenerators/**/*.cs"
-          /d:sonar.exclusions="vendor/**,docs/images/**,tests/**"
+          /d:sonar.exclusions="vendor/**,docs/images/**,tests/**,build/**"
           /d:sonar.test.exclusions="tests/**"
           /d:sonar.issue.ignore.multicriteria="actionslock"
           /d:sonar.issue.ignore.multicriteria.actionslock.ruleKey="githubactions:S7637"
