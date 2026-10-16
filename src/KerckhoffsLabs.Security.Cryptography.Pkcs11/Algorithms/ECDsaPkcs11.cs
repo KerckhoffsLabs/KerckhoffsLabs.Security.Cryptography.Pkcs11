@@ -65,11 +65,11 @@ public sealed class ECDsaPkcs11 : ECDsa
     {
         try
         {
-            return key.GetCurve().FieldSizeBits;
+            return key.KeySize;
         }
         catch (Pkcs11Exception)
         {
-            // CKA_EC_PARAMS unreadable or not a named-curve OID — leave KeySize at the ECDsa base-class default.
+            // C_GetAttributeValue failed — leave KeySize at the ECDsa base-class default.
             return null;
         }
     }
@@ -301,7 +301,7 @@ public sealed class ECDsaPkcs11 : ECDsa
             throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        return _key.ExportEcPublicKey();
+        return EcSubjectPublicKeyInfo.ToECParameters(_key);
     }
 
     /// <inheritdoc/>

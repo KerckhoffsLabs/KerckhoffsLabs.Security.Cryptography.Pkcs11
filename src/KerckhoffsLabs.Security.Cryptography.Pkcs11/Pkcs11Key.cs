@@ -78,6 +78,86 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <summary>The PKCS#11 key type (e.g. <see cref="CKK.CKK_AES"/>, <see cref="CKK.CKK_RSA"/>).</summary>
     public CKK KeyType => _keyType;
 
+    /// <summary>
+    /// The key's size in bits, or <see langword="null"/> when the key type has no single size or the
+    /// token doesn't expose it. Read from the token on first access and cached: a key's size never changes.
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><see cref="CKK.CKK_EC"/>: the curve's field size from the library's
+    /// <see cref="Pkcs11LibraryOptions.CurveCatalog"/>; <see langword="null"/> for a curve it doesn't list
+    /// (a coordinate's byte length is not a bit size: prime239v1 is 239 bits in 30 bytes).</item>
+    /// <item><see cref="CKK.CKK_RSA"/>: <c>CKA_MODULUS_BITS</c>, else the bit length of <c>CKA_MODULUS</c>.</item>
+    /// <item>Secret keys: <c>CKA_VALUE_LEN</c> × 8 when the token exposes it.</item>
+    /// <item>Other asymmetric types (DSA, DH, EdDSA, X25519/X448, ML-DSA, ML-KEM, SLH-DSA, ...): <see langword="null"/>.</item>
+    /// </list>
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetAttributeValue</c> call; nothing is cached then.</exception>
+    public int? KeySize
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            // One int, so a racing reader sees either "not read" or the final answer; both readers
+            // compute the same value.
+            int bits = _keySizeBits;
+            if (bits == KeySizeNotRead)
+                _keySizeBits = bits = ReadKeySizeBits() ?? KeySizeUnknown;
+            return bits == KeySizeUnknown ? null : bits;
+        }
+    }
+
+    private const int KeySizeNotRead = -1;
+    private const int KeySizeUnknown = 0;
+    private int _keySizeBits = KeySizeNotRead;
+
+    private int? ReadKeySizeBits()
+    {
+        switch (_keyType)
+        {
+            case CKK.CKK_EC:
+                {
+                    using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
+                    if (attrs[0].CannotBeRead)
+                        return null;
+                    try
+                    {
+                        return _session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
+                    }
+                    catch (ArgumentException)
+                    {
+                        return null; // not a DER-encoded named-curve OID
+                    }
+                }
+            case CKK.CKK_RSA:
+                {
+                    using var attrs = GetAttributeValue(CKA.CKA_MODULUS_BITS, CKA.CKA_MODULUS);
+                    if (!attrs[0].CannotBeRead)
+                        return checked((int)attrs[0].GetValueAsUlong());
+                    return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
+                }
+            case CKK.CKK_DH or CKK.CKK_X9_42_DH or CKK.CKK_EC_MONTGOMERY or CKK.CKK_KEA or CKK.CKK_GOSTR3410:
+                return null;
+            case var t when IsAsymmetricKeyType(t):
+                return null;
+            default:
+                {
+                    using var attrs = GetAttributeValue(CKA.CKA_VALUE_LEN);
+                    return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
+                }
+        }
+    }
+
+    // Bit length of a big-endian unsigned integer, ignoring leading zero bytes.
+    private static int? BitLength(ReadOnlySpan<byte> value)
+    {
+        int i = value.IndexOfAnyExcept((byte)0);
+        if (i < 0)
+            return null;
+        return (value.Length - i - 1) * 8 + 32 - System.Numerics.BitOperations.LeadingZeroCount((uint)value[i]);
+    }
+
     /// <summary>The key's CKA_LABEL, or <see langword="null"/> if not set on the token.</summary>
     public string? Label { get; }
 

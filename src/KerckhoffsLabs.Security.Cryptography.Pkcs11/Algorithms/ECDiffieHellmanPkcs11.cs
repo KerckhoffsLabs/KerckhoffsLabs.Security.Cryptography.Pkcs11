@@ -70,11 +70,11 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     {
         try
         {
-            return key.GetCurve().FieldSizeBits;
+            return key.KeySize;
         }
         catch (Pkcs11Exception)
         {
-            // CKA_EC_PARAMS unreadable or not a named-curve OID — leave KeySize at the ECDiffieHellman base-class default.
+            // C_GetAttributeValue failed — leave KeySize at the ECDiffieHellman base-class default.
             return null;
         }
     }
@@ -202,11 +202,11 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             "Use DeriveKeyFromHash / DeriveKeyFromHmac, or DeriveRawSecretAgreement plus your own PRF.");
 
     // Peer validation, the export policy check and the read-back all happen in the façade: see
-    // Pkcs11Key.DeriveRawSecretEcdh. The field size comes from the local key, not the peer's
+    // Pkcs11Key.DeriveRawSecret. The field size comes from the local key, not the peer's
     // coordinate encoding, so a subclassed ECDiffieHellmanPublicKey reporting a short X cannot
     // truncate the secret.
     private byte[] DeriveRawSecret(ECDiffieHellmanPublicKey otherPartyPublicKey)
-        => _key.DeriveRawSecretEcdh(otherPartyPublicKey.ExportParameters());
+        => _key.DeriveRawSecret(otherPartyPublicKey.ExportSubjectPublicKeyInfo());
 
     // -----------------------------------------------------------------------
     // Key material
@@ -224,7 +224,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        return _key.ExportEcPublicKey();
+        return EcSubjectPublicKeyInfo.ToECParameters(_key);
     }
 
     /// <inheritdoc/>

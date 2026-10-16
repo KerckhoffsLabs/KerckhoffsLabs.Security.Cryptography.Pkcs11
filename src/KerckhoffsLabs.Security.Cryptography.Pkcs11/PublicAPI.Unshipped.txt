@@ -1,4 +1,10 @@
 #nullable enable
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveRawSecret(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> byte[]!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Export(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat format) -> byte[]!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.KeySize.get -> int?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat.RawPublicKey = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat.SubjectPublicKeyInfo = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.VendorMechanismParameters.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.Pkcs11ParameterWriter! writer) -> void
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest!
 const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CK.CK_CERTIFICATE_CATEGORY_AUTHORITY = 2 -> ulong
@@ -1450,14 +1456,11 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DecapsulateKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> ciphertext, KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! sharedSecretTemplate) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Decrypt(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> ciphertext) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Derive(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! template) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveRawSecretEcdh(System.Security.Cryptography.ECParameters peerPublicKey) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Destroy() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Dispose() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.EncapsulateKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! sharedSecretTemplate, int expectedCiphertextLen = 0) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.EncapsulationResult
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Encrypt(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> plaintext) -> byte[]!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.ExportEcPublicKey() -> System.Security.Cryptography.ECParameters
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.GetAttributeValue(params System.ReadOnlySpan<KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKA> types) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ReadOnlyDisposableList<KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectAttribute!>!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.GetCurve() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Id.get -> System.ReadOnlySpan<byte>
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.KeyType.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Label.get -> string?

@@ -27,7 +27,7 @@ internal readonly record struct ValidatedEcdhPeer(int FieldSizeBytes, byte[] X, 
 /// peer on a different (weaker) curve — or an off-curve point on the right curve — reach the token
 /// unchecked; the invalid-curve / small-subgroup attack then recovers a token-resident private key one
 /// residue at a time (Antipa et al., PKC 2003; NIST SP 800-56A Rev. 3 §5.6.2.3.2). Every path that
-/// takes the peer as <see cref="ECParameters"/> (<see cref="Pkcs11Key.DeriveRawSecretEcdh"/>,
+/// takes the peer with its curve (<see cref="Pkcs11Key.DeriveRawSecret"/>,
 /// <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>) reaches the
 /// encoded point only through <see cref="Validate"/>. The paths that take an already-encoded point
 /// (the <see cref="ReadOnlySpan{T}"/> overload of <c>DeriveSharedSecretEcdh</c>, or
