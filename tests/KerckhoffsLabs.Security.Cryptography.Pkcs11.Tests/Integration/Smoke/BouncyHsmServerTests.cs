@@ -71,9 +71,12 @@ public sealed partial class BouncyHsmServerTests
         var inherited = new System.Collections.Hashtable
         {
             ["BouncyHsm_PersistenceStorageType"] = "LiteDb",
+            ["BOUNCYHSM_PersistenceStorageType"] = "LiteDb", // .NET matches the prefix ignoring case; Linux keeps both
             ["BouncyHsm_BouncyHsmSetup__TcpEndpoint__Endpoint"] = "127.0.0.1:8765",
             ["BouncyHsm_BouncyHsmSetup__SomethingElse"] = "x",
             ["Kestrel__Endpoints__Https__Url"] = "https://0.0.0.0:8443",
+            ["ASPNETCORE_Kestrel__Endpoints__Https__Url"] = "https://0.0.0.0:8444",
+            ["DOTNET_Kestrel__Endpoints__Https__Url"] = "https://0.0.0.0:8445",
             ["ASPNETCORE_ENVIRONMENT"] = "Development",
             ["PATH"] = "/usr/bin",
         };
@@ -87,6 +90,11 @@ public sealed partial class BouncyHsmServerTests
         Assert.Equal("Information", environment["BouncyHsm_Serilog__MinimumLevel__Default"]);
         Assert.True(environment.TryGetValue("BouncyHsm_BouncyHsmSetup__SomethingElse", out string? other) && other is null);
         Assert.True(environment.TryGetValue("Kestrel__Endpoints__Https__Url", out string? https) && https is null);
+        Assert.True(environment.TryGetValue("ASPNETCORE_Kestrel__Endpoints__Https__Url", out string? aspnet) && aspnet is null);
+        Assert.True(environment.TryGetValue("DOTNET_Kestrel__Endpoints__Https__Url", out string? dotnet) && dotnet is null);
+        // Every spelling of the storage setting the child could see is removed or the fixture's own.
+        Assert.All(inherited.Keys.Cast<string>().Where(name => name.Equals("BouncyHsm_PersistenceStorageType", StringComparison.OrdinalIgnoreCase)),
+            name => Assert.True(environment.TryGetValue(name, out string? value) && value is null or "InMemory", $"{name} = {value}"));
         Assert.Equal("Production", environment["ASPNETCORE_ENVIRONMENT"]);
         Assert.False(environment.ContainsKey("PATH"));
     }
@@ -110,6 +118,14 @@ public sealed partial class BouncyHsmServerTests
 
         Assert.Contains("Bad token", message, StringComparison.Ordinal);
         Assert.DoesNotContain("so-pin-0815", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectionMessage_WithAnEmptyBody_SaysSo()
+    {
+        string message = BouncyHsmServer.RejectionMessage(500, "Internal Server Error", "", "user-pin-4711", "so-pin-0815");
+
+        Assert.EndsWith("500 Internal Server Error. (empty body)", message, StringComparison.Ordinal);
     }
 
     // A body that is not ProblemDetails (an HTML error page, say) may hold a PIN in an encoding no

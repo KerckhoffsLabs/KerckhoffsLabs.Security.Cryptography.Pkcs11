@@ -90,22 +90,28 @@ internal sealed class BouncyHsmServer : IDisposable
     // unprefixed ones and the command line.
     private const string ConfigPrefix = "BouncyHsm_";
 
+    // Inherited variables that could configure the server: its own prefixed settings, and Kestrel's,
+    // which ASP.NET Core also reads under its ASPNETCORE_ and DOTNET_ prefixes and with ':' for '__'.
+    private static readonly string[] InheritedPrefixesToRemove =
+        [ConfigPrefix, "Kestrel__", "Kestrel:", "ASPNETCORE_Kestrel__", "ASPNETCORE_Kestrel:", "DOTNET_Kestrel__", "DOTNET_Kestrel:"];
+
     /// <summary>
     /// The environment the server starts with, as changes to the test host's <paramref name="inherited"/>
     /// one (a <see langword="null"/> value removes the variable). The settings go under
-    /// <see cref="ConfigPrefix"/>, so nothing inherited outranks them. Inherited <c>BouncyHsm_*</c> and
-    /// <c>Kestrel__*</c> variables are removed, since a developer's own BouncyHsm settings could switch on a
-    /// persistent store or another endpoint, and the server runs as Production whatever the host's
+    /// <see cref="ConfigPrefix"/>, so nothing inherited outranks them. Inherited variables matching
+    /// <see cref="InheritedPrefixesToRemove"/> (ignoring case, as configuration does) are removed, every
+    /// spelling of them on a case-sensitive OS, since a developer's own BouncyHsm settings could switch on a
+    /// persistent store or another endpoint; and the server runs as Production whatever the host's
     /// environment name. <paramref name="extraEnvironment"/> holds configuration keys
     /// (<c>Serilog__MinimumLevel__Default</c>), applied under the same prefix.
     /// </summary>
     internal static Dictionary<string, string?> ServerEnvironment(int tcpPort, int httpPort,
         System.Collections.IDictionary inherited, IReadOnlyDictionary<string, string>? extraEnvironment)
     {
-        var environment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var environment = new Dictionary<string, string?>(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         foreach (string name in inherited.Keys.Cast<string>().Where(name =>
-                     name.StartsWith(ConfigPrefix, StringComparison.OrdinalIgnoreCase)
-                     || name.StartsWith("Kestrel__", StringComparison.OrdinalIgnoreCase)))
+                     InheritedPrefixesToRemove.Any(prefix => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))))
             environment[name] = null;
 
         var settings = new Dictionary<string, string>
@@ -168,6 +174,8 @@ internal sealed class BouncyHsmServer : IDisposable
     internal static string RejectionMessage(int status, string? reasonPhrase, string body, string userPin, string soPin)
     {
         string reason;
+        if (string.IsNullOrWhiteSpace(body))
+            return $"BouncyHsm POST /Slot failed: {status} {reasonPhrase}. (empty body)";
         try
         {
             using var json = JsonDocument.Parse(body);
