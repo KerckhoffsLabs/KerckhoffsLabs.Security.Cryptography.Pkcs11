@@ -114,8 +114,9 @@ internal sealed partial class Pkcs11SessionCore
     /// </param>
     /// <param name="restart">
     /// Starts the operation again, for a module that ends it on <c>CKR_BUFFER_TOO_SMALL</c> against PKCS#11
-    /// v3.2 §5.2 (NSS does): the retry then fails with <c>CKR_OPERATION_NOT_INITIALIZED</c>, and the output
-    /// is found with a length query on the restarted operation instead.
+    /// v3.2 §5.2 (NSS does): the retry, or the length query when the module reported no length, then fails
+    /// with <c>CKR_OPERATION_NOT_INITIALIZED</c>, and the output is found with a length query on the
+    /// restarted operation instead.
     /// </param>
     private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation,
         int? guess = null, Func<CKR>? restart = null)
@@ -154,6 +155,13 @@ internal sealed partial class Pkcs11SessionCore
         }
 
         CKR rv = call(first, second, default, lengthOnly: true, out NativeCULong reported);
+        // A module that left the length unset on CKR_BUFFER_TOO_SMALL may also have ended the operation
+        // (NSS softoken's classic C_Encrypt does both for RSA).
+        if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED && guess is not null && restart is not null)
+        {
+            Pkcs11Exception.ThrowIfError(restart(), operation);
+            rv = call(first, second, default, lengthOnly: true, out reported);
+        }
         Pkcs11Exception.ThrowIfError(rv, operation);
 
         byte[] buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
