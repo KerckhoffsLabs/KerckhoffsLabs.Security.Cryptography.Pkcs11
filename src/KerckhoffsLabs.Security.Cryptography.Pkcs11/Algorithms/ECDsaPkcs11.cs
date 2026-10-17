@@ -132,13 +132,6 @@ public sealed class ECDsaPkcs11 : ECDsa
         return HasSignatureLength(signature) && _key.Verify(raw, hash, signature);
     }
 
-    // An IEEE P1363 signature is r || s, each the field size: any other length is invalid, and the BCL's
-    // ECDsa returns false for it. Checked here because modules report it inconsistently: SoftHSM2 and
-    // Kryoptic with CKR_SIGNATURE_LEN_RANGE, NSS 3.51 with CKR_DATA_LEN_RANGE. With the curve unknown
-    // (KeySize 0) the module decides.
-    private bool HasSignatureLength(ReadOnlySpan<byte> signature)
-        => KeySizeValue == 0 || signature.Length == 2 * ((KeySizeValue + 7) / 8);
-
     // The BCL routes these verification overloads through the protected HashData overrides, which are
     // shared with SignData and cannot tell which direction called them. Overriding them here lets the
     // pre-hash report CryptoOperation.Verify, so a direction-sensitive policy (FipsOnly allows SHA-1
@@ -239,6 +232,13 @@ public sealed class ECDsaPkcs11 : ECDsa
         var mech = new Mechanism(CKM.CKM_ECDSA);
         return HasSignatureLength(signature) && _key.Verify(mech, hash, signature);
     }
+
+    // An IEEE P1363 signature is r || s, each the field size: any other length is invalid, and the BCL's
+    // ECDsa returns false for it. Checked here because modules report it inconsistently: SoftHSM2 and
+    // Kryoptic with CKR_SIGNATURE_LEN_RANGE, NSS 3.51 with CKR_DATA_LEN_RANGE. With the curve unknown
+    // (KeySize 0) the module decides.
+    private bool HasSignatureLength(ReadOnlySpan<byte> signature)
+        => KeySizeValue == 0 || signature.Length == 2 * ((KeySizeValue + 7) / 8);
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
