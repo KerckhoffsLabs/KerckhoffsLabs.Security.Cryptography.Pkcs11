@@ -18,7 +18,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// in feedback mode (K(0) = the IV), A(i) in double-pipeline mode. A(1) is the PRF of the segments with the
 /// iteration variable empty and the optional counter left out, then A(i) = PRF(A(i-1)), as NIST and NSS's
 /// kbkdf.c define it. The derived value is read back (extractable, non-sensitive), so the session runs
-/// under <see cref="CryptoPolicy.AllowInsecure"/>.
+/// under <see cref="CryptoPolicy.AllowInsecure"/>. The base key is extractable and non-sensitive too: NSS refuses to
+/// derive a key more accessible than its base (<c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>).
 /// </remarks>
 internal static class Sp800108ChainedKdfTestCases
 {
@@ -63,7 +64,7 @@ internal static class Sp800108ChainedKdfTestCases
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"kl-sp800108-{Guid.NewGuid():N}";
         using var baseTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).Value(BaseKey).Derive().OnToken(backend.SupportsTokenObjects).Build();
+            .Label(label).Value(BaseKey).Derive().Extractable().Sensitive(false).OnToken(backend.SupportsTokenObjects).Build();
         using var derivedTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .ValueLen(OutputLength).Extractable().Sensitive(false).Build();
         using var baseKey = session.ImportKey(baseTemplate);
