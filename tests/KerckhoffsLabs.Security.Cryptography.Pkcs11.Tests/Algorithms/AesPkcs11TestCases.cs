@@ -202,12 +202,16 @@ internal static class AesPkcs11TestCases
         {
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
-            // A block whose plaintext ends in 0x00 never carries valid PKCS#7 padding.
-            byte[] zeroBlock = aes.EncryptCbc(new byte[16], Iv16, PaddingMode.None);
+            // A block whose plaintext ends in 0xFF never carries valid PKCS#7 padding: the pad length exceeds the
+            // block. A 0x00 pad byte is no use here: openCryptoki (v3.27.0, strip_pkcs_padding) only refuses a pad
+            // length greater than the data, so it accepts 0x00 and never checks the pad bytes themselves.
+            byte[] badPadPlaintext = new byte[16];
+            badPadPlaintext[^1] = 0xFF;
+            byte[] badPadBlock = aes.EncryptCbc(badPadPlaintext, Iv16, PaddingMode.None);
             using (var bcl = BclAes())
-                Assert.ThrowsAny<CryptographicException>(() => bcl.DecryptCbc(zeroBlock, Iv16));
-            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(zeroBlock, Iv16));
-            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(zeroBlock.AsSpan(0, 15), Iv16));
+                Assert.ThrowsAny<CryptographicException>(() => bcl.DecryptCbc(badPadBlock, Iv16));
+            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(badPadBlock, Iv16));
+            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(badPadBlock.AsSpan(0, 15), Iv16));
 
             byte[] plaintext = Encoding.UTF8.GetBytes("after a padding error");
             Assert.Equal(plaintext, aes.DecryptCbc(aes.EncryptCbc(plaintext, Iv16), Iv16));
