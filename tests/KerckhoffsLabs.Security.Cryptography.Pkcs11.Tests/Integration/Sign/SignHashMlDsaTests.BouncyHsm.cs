@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -59,7 +60,7 @@ public sealed class SignHashMlDsaTests_BouncyHsm(BouncyHsmBackendFixture backend
         }
         finally
         {
-            try { key.Destroy(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
         }
     }
 }

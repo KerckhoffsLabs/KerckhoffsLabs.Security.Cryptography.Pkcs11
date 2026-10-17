@@ -28,7 +28,7 @@ public sealed class SignEdDsaContextTests_BouncyHsm(BouncyHsmBackendFixture back
     public void Ed25519ctx_WithContext_RoundTrips()
     {
         RequireEdDsa();
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
             var (pub, priv) = TestKeys.GenerateEd25519KeyPair(session);
@@ -61,7 +61,6 @@ public sealed class SignEdDsaContextTests_BouncyHsm(BouncyHsmBackendFixture back
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
         }
     }
 
@@ -69,7 +68,7 @@ public sealed class SignEdDsaContextTests_BouncyHsm(BouncyHsmBackendFixture back
     public void Ed25519ph_Prehash_RoundTrips()
     {
         RequireEdDsa();
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
             var (pub, priv) = TestKeys.GenerateEd25519KeyPair(session);
@@ -102,7 +101,6 @@ public sealed class SignEdDsaContextTests_BouncyHsm(BouncyHsmBackendFixture back
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
         }
     }
 }

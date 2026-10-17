@@ -65,7 +65,7 @@ public sealed class SignMlDsaDeterministicHedgeTests_BouncyHsm(BouncyHsmBackendF
         }
         finally
         {
-            try { key.Destroy(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
         }
     }
 }
