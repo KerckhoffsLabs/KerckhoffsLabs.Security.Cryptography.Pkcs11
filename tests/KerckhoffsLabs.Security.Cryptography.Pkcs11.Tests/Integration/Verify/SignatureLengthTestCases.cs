@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -16,7 +17,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Verify;
 /// (<c>fns/signing.rs</c>) answer CKR_SIGNATURE_LEN_RANGE, which the spec defines as "invalid purely on the
 /// basis of its length". NSS since 3.126 (68af90f46, Bug 2054695) compares only <c>min(macLen, sigLen)</c>
 /// bytes of a non-general HMAC and leaves the length check to the caller, so on its own it accepts a
-/// truncated or even empty MAC as valid. Each case therefore covers a truncated, an over-long and an empty
+/// truncated or even empty MAC as valid. NSS 3.51 answers an ECDSA signature of the wrong length with
+/// CKR_DATA_LEN_RANGE and a short HMAC with CKR_DEVICE_ERROR. Each case therefore covers a truncated, an over-long and an empty
 /// value, then a valid one on the same session.
 /// </remarks>
 internal static class SignatureLengthTestCases
@@ -68,13 +70,13 @@ internal static class SignatureLengthTestCases
         }
         finally
         {
-            try { key.Destroy(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
         }
     }
 
     internal static void Assert_Rsa_WrongLengthSignature_ReturnsFalse(IPkcs11Backend backend)
     {
-        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
         using var session = backend.OpenSession();
         string label = $"siglen-rsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -94,7 +96,7 @@ internal static class SignatureLengthTestCases
         }
         finally
         {
-            try { key.Destroy(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
         }
     }
 
