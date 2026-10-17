@@ -171,7 +171,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-                data: [1, 2, 3], signature: [9, 9], out _, out _));
+                data: [1, 2, 3], signature: new byte[32], out _, out _));
     }
 
     [Fact]

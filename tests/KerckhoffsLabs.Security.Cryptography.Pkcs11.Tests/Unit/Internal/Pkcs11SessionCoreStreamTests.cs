@@ -302,7 +302,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
-            s.Verify(mech, new ObjectHandle(1), input, [9, 9], out _));
+            s.Verify(mech, new ObjectHandle(1), input, new byte[32], out _));
     }
 
     [Fact]
