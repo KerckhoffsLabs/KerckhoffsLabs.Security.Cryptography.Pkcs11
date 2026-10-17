@@ -34,8 +34,9 @@ internal abstract partial class ServerProcess : IDisposable
 
     public abstract void Dispose();
 
+    /// <summary>Starts the process with the test host's environment changed by <paramref name="environment"/>: a <see langword="null"/> value removes a variable.</summary>
     public static ServerProcess Start(string fileName, IReadOnlyList<string> arguments, string workingDirectory,
-        IReadOnlyDictionary<string, string> environment, Action<string> onLine) =>
+        IReadOnlyDictionary<string, string?> environment, Action<string> onLine) =>
         OperatingSystem.IsWindows()
             ? WindowsServerProcess.Create(fileName, arguments, workingDirectory, environment, onLine)
             : new PortableServerProcess(fileName, arguments, workingDirectory, environment, onLine);
@@ -45,7 +46,7 @@ internal abstract partial class ServerProcess : IDisposable
         private readonly Process _process;
 
         public PortableServerProcess(string fileName, IReadOnlyList<string> arguments, string workingDirectory,
-            IReadOnlyDictionary<string, string> environment, Action<string> onLine)
+            IReadOnlyDictionary<string, string?> environment, Action<string> onLine)
         {
             var psi = new ProcessStartInfo(fileName)
             {
@@ -55,7 +56,11 @@ internal abstract partial class ServerProcess : IDisposable
                 UseShellExecute = false,
             };
             foreach (string argument in arguments) psi.ArgumentList.Add(argument);
-            foreach (var (name, value) in environment) psi.Environment[name] = value;
+            foreach (var (name, value) in environment)
+            {
+                if (value is null) psi.Environment.Remove(name);
+                else psi.Environment[name] = value;
+            }
 
             _process = new Process { StartInfo = psi };
             _process.OutputDataReceived += (_, e) => { if (e.Data is not null) onLine(e.Data); };
@@ -111,7 +116,7 @@ internal abstract partial class ServerProcess : IDisposable
         public override void Dispose() => _handle.Dispose();
 
         public static WindowsServerProcess Create(string fileName, IReadOnlyList<string> arguments, string workingDirectory,
-            IReadOnlyDictionary<string, string> environment, Action<string> onLine)
+            IReadOnlyDictionary<string, string?> environment, Action<string> onLine)
         {
             using var stdin = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.Inheritable);
             var stdout = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.Inheritable);
@@ -206,12 +211,16 @@ internal abstract partial class ServerProcess : IDisposable
             return sb.Append('\\', backslashes * 2).Append('"').ToString();
         }
 
-        private static string EnvironmentBlock(IReadOnlyDictionary<string, string> overrides)
+        private static string EnvironmentBlock(IReadOnlyDictionary<string, string?> overrides)
         {
             var variables = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables())
                 variables[(string)e.Key] = (string?)e.Value ?? "";
-            foreach (var (name, value) in overrides) variables[name] = value;
+            foreach (var (name, value) in overrides)
+            {
+                if (value is null) variables.Remove(name);
+                else variables[name] = value;
+            }
             var sb = new StringBuilder();
             foreach (var (name, value) in variables) sb.Append(name).Append('=').Append(value).Append('\0');
             return sb.Append('\0').ToString();

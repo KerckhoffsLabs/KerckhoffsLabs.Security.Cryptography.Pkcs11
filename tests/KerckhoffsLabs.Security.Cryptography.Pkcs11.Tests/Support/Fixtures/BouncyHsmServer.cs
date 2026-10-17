@@ -67,16 +67,7 @@ internal sealed class BouncyHsmServer : IDisposable
         int tcpPort = FreeLoopbackPort();
         int httpPort = FreeLoopbackPort();
 
-        var environment = new Dictionary<string, string>
-        {
-            ["PersistenceStorageType"] = "InMemory",
-            ["BouncyHsmSetup__TcpEndpoint__Endpoint"] = $"127.0.0.1:{tcpPort}",
-            ["Kestrel__Endpoints__Http__Url"] = $"http://127.0.0.1:{httpPort}",
-            ["BouncyHsmSetup__EnableSwagger"] = "false",
-            ["Serilog__MinimumLevel__Default"] = "Warning",
-        };
-        foreach (var (name, value) in extraEnvironment ?? new Dictionary<string, string>())
-            environment[name] = value;
+        var environment = ServerEnvironment(tcpPort, httpPort, Environment.GetEnvironmentVariables(), extraEnvironment);
         string workingDirectory = Path.GetDirectoryName(serverAssemblyPath) is { Length: > 0 } dir && Directory.Exists(dir)
             ? dir : AppContext.BaseDirectory;
 
@@ -93,6 +84,48 @@ internal sealed class BouncyHsmServer : IDisposable
             server.Dispose();
             throw;
         }
+    }
+
+    // BouncyHsm adds BouncyHsm_-prefixed variables as its last configuration source, above the
+    // unprefixed ones and the command line.
+    private const string ConfigPrefix = "BouncyHsm_";
+
+    /// <summary>
+    /// The environment the server starts with, as changes to the test host's <paramref name="inherited"/>
+    /// one (a <see langword="null"/> value removes the variable). The settings go under
+    /// <see cref="ConfigPrefix"/>, so nothing inherited outranks them. Inherited <c>BouncyHsm_*</c> and
+    /// <c>Kestrel__*</c> variables are removed, since a developer's own BouncyHsm settings could switch on a
+    /// persistent store or another endpoint, and the server runs as Production whatever the host's
+    /// environment name. <paramref name="extraEnvironment"/> holds configuration keys
+    /// (<c>Serilog__MinimumLevel__Default</c>), applied under the same prefix.
+    /// </summary>
+    internal static Dictionary<string, string?> ServerEnvironment(int tcpPort, int httpPort,
+        System.Collections.IDictionary inherited, IReadOnlyDictionary<string, string>? extraEnvironment)
+    {
+        var environment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (string name in inherited.Keys.Cast<string>())
+        {
+            if (name.StartsWith(ConfigPrefix, StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("Kestrel__", StringComparison.OrdinalIgnoreCase))
+                environment[name] = null;
+        }
+
+        var settings = new Dictionary<string, string>
+        {
+            ["PersistenceStorageType"] = "InMemory",
+            ["BouncyHsmSetup__TcpEndpoint__Endpoint"] = $"127.0.0.1:{tcpPort}",
+            ["Kestrel__Endpoints__Http__Url"] = $"http://127.0.0.1:{httpPort}",
+            ["BouncyHsmSetup__EnableSwagger"] = "false",
+            ["Serilog__MinimumLevel__Default"] = "Warning",
+        };
+        foreach (var (name, value) in extraEnvironment ?? new Dictionary<string, string>())
+            settings[name] = value;
+        foreach (var (name, value) in settings)
+            environment[ConfigPrefix + name] = value;
+
+        environment["ASPNETCORE_ENVIRONMENT"] = "Production";
+        environment["DOTNET_ENVIRONMENT"] = "Production";
+        return environment;
     }
 
     /// <summary>

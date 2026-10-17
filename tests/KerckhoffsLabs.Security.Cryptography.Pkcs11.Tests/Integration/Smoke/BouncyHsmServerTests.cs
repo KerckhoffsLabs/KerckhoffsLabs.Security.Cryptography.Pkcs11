@@ -62,6 +62,35 @@ public sealed partial class BouncyHsmServerTests
         Assert.DoesNotContain(JsonSerializer.Serialize(soPin).Trim('"'), message, StringComparison.Ordinal);
     }
 
+    // BouncyHsm reads BouncyHsm_-prefixed variables after every other configuration source, so one a
+    // developer exported for their own BouncyHsm (a LiteDb store, a fixed endpoint) would override the
+    // fixture's settings: the run would share a token store, or bind a port its client never dials.
+    [Fact]
+    public void ServerEnvironment_OverridesWhatTheHostEnvironmentCouldSet()
+    {
+        var inherited = new System.Collections.Hashtable
+        {
+            ["BouncyHsm_PersistenceStorageType"] = "LiteDb",
+            ["BouncyHsm_BouncyHsmSetup__TcpEndpoint__Endpoint"] = "127.0.0.1:8765",
+            ["BouncyHsm_BouncyHsmSetup__SomethingElse"] = "x",
+            ["Kestrel__Endpoints__Https__Url"] = "https://0.0.0.0:8443",
+            ["ASPNETCORE_ENVIRONMENT"] = "Development",
+            ["PATH"] = "/usr/bin",
+        };
+
+        var environment = BouncyHsmServer.ServerEnvironment(4001, 4002, inherited,
+            new Dictionary<string, string> { ["Serilog__MinimumLevel__Default"] = "Information" });
+
+        Assert.Equal("InMemory", environment["BouncyHsm_PersistenceStorageType"]);
+        Assert.Equal("127.0.0.1:4001", environment["BouncyHsm_BouncyHsmSetup__TcpEndpoint__Endpoint"]);
+        Assert.Equal("http://127.0.0.1:4002", environment["BouncyHsm_Kestrel__Endpoints__Http__Url"]);
+        Assert.Equal("Information", environment["BouncyHsm_Serilog__MinimumLevel__Default"]);
+        Assert.True(environment.TryGetValue("BouncyHsm_BouncyHsmSetup__SomethingElse", out string? other) && other is null);
+        Assert.True(environment.TryGetValue("Kestrel__Endpoints__Https__Url", out string? https) && https is null);
+        Assert.Equal("Production", environment["ASPNETCORE_ENVIRONMENT"]);
+        Assert.False(environment.ContainsKey("PATH"));
+    }
+
     [Fact]
     public void RejectionMessage_RedactsAPinThatContainsTheOtherWhole()
     {
