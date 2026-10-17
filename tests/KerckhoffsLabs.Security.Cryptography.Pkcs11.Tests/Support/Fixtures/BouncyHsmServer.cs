@@ -103,12 +103,10 @@ internal sealed class BouncyHsmServer : IDisposable
         System.Collections.IDictionary inherited, IReadOnlyDictionary<string, string>? extraEnvironment)
     {
         var environment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        foreach (string name in inherited.Keys.Cast<string>())
-        {
-            if (name.StartsWith(ConfigPrefix, StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("Kestrel__", StringComparison.OrdinalIgnoreCase))
-                environment[name] = null;
-        }
+        foreach (string name in inherited.Keys.Cast<string>().Where(name =>
+                     name.StartsWith(ConfigPrefix, StringComparison.OrdinalIgnoreCase)
+                     || name.StartsWith("Kestrel__", StringComparison.OrdinalIgnoreCase)))
+            environment[name] = null;
 
         var settings = new Dictionary<string, string>
         {
