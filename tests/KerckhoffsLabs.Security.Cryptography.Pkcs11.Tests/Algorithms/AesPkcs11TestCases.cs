@@ -195,23 +195,31 @@ internal static class AesPkcs11TestCases
     // A ciphertext whose padding is wrong, or that is not a whole number of blocks, is refused with a
     // CryptographicException as in the BCL, and the session still decrypts afterwards. NSS hardened exactly this
     // check (Bug 2029448, Bug 1591315); SoftHSM2 ends the operation on it since a8d6c5f.
-    internal static void Assert_DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable(IPkcs11Backend backend)
+    internal static void Assert_DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable(IPkcs11Backend backend) =>
+        AssertDecryptCbcInvalidPaddingOrPartialBlock(backend, tokenRefusesBadPadding: true);
+
+    // openCryptoki (v3.27.0) never refuses bad CBC_PAD padding: aes_cbc_pad_decrypt ignores the result of
+    // strip_pkcs_padding and answers CKR_OK (usr/lib/common/mech_aes.c:370; the DES and 3DES copies do the same).
+    // Pinned rather than skipped, so an upstream fix fails here and the strict assertion can take over.
+    internal static void Assert_DecryptCbc_InvalidPaddingAccepted_PartialBlockThrows_SessionReusable(IPkcs11Backend backend) =>
+        AssertDecryptCbcInvalidPaddingOrPartialBlock(backend, tokenRefusesBadPadding: false);
+
+    private static void AssertDecryptCbcInvalidPaddingOrPartialBlock(IPkcs11Backend backend, bool tokenRefusesBadPadding)
     {
         backend.RequireMechanisms(CKM.CKM_AES_CBC, CKM.CKM_AES_CBC_PAD);
         WithImportedAes(backend, (session, aes) =>
         {
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
-            // A block whose plaintext ends in 0xFF never carries valid PKCS#7 padding: the pad length exceeds the
-            // block. A 0x00 pad byte is no use here: openCryptoki (v3.27.0, strip_pkcs_padding) only refuses a pad
-            // length greater than the data, so it accepts 0x00 and never checks the pad bytes themselves.
-            byte[] badPadPlaintext = new byte[16];
-            badPadPlaintext[^1] = 0xFF;
-            byte[] badPadBlock = aes.EncryptCbc(badPadPlaintext, Iv16, PaddingMode.None);
+            // A block whose plaintext ends in 0x00 never carries valid PKCS#7 padding.
+            byte[] zeroBlock = aes.EncryptCbc(new byte[16], Iv16, PaddingMode.None);
             using (var bcl = BclAes())
-                Assert.ThrowsAny<CryptographicException>(() => bcl.DecryptCbc(badPadBlock, Iv16));
-            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(badPadBlock, Iv16));
-            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(badPadBlock.AsSpan(0, 15), Iv16));
+                Assert.ThrowsAny<CryptographicException>(() => bcl.DecryptCbc(zeroBlock, Iv16));
+            if (tokenRefusesBadPadding)
+                Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(zeroBlock, Iv16));
+            else
+                Assert.Equal(new byte[16], aes.DecryptCbc(zeroBlock, Iv16)); // a pad length of 0 strips nothing
+            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(zeroBlock.AsSpan(0, 15), Iv16));
 
             byte[] plaintext = Encoding.UTF8.GetBytes("after a padding error");
             Assert.Equal(plaintext, aes.DecryptCbc(aes.EncryptCbc(plaintext, Iv16), Iv16));
