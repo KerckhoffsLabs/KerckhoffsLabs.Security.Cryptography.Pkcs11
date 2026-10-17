@@ -328,6 +328,93 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
+    /// Opens the one object that matches <paramref name="filter"/>: a data object, a profile, or any other
+    /// class that is neither a key nor a certificate. The filter must name the class, e.g.
+    /// <c>ObjectTemplate.ForData().Label("config")</c>.
+    /// </summary>
+    /// <remarks>
+    /// The lookup rules are those of <see cref="OpenKey(string)"/>: exactly one object must match, and
+    /// several are refused with <see cref="Pkcs11AmbiguousObjectException"/> rather than resolved by
+    /// picking one. Keys and certificates have their own typed lookups and are refused here, so a filter
+    /// mistake can't return a key as a generic object.
+    /// </remarks>
+    /// <param name="filter">The attributes to match, including <c>CKA_CLASS</c>.</param>
+    /// <returns>A new <see cref="Pkcs11Object"/>. Disposing it never destroys the token object.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown if <paramref name="filter"/> names no <c>CKA_CLASS</c>, or a key or certificate class: open those
+    /// with <see cref="OpenKey(ObjectTemplate)"/> or <see cref="OpenCertificate(ObjectTemplate)"/>.
+    /// </exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no object matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one object matches.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public Pkcs11Object OpenObject(ObjectTemplate filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ObjectFamily family = OtherObjects(filter);
+        return FindUniqueObject(filter, family)
+            ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No {family.Name} matching the filter was found on the token.");
+    }
+
+    /// <summary>
+    /// Opens the one object that matches <paramref name="filter"/>, or reports that there is none. Matches
+    /// exactly as <see cref="OpenObject(ObjectTemplate)"/> does.
+    /// </summary>
+    /// <remarks>
+    /// Only "no match" returns <see langword="false"/>. Several matches still throw
+    /// <see cref="Pkcs11AmbiguousObjectException"/>.
+    /// </remarks>
+    /// <param name="filter">The attributes to match, including <c>CKA_CLASS</c>.</param>
+    /// <param name="obj">The object, when one matched.</param>
+    /// <returns><see langword="true"/> if exactly one object matched.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown if <paramref name="filter"/> names no <c>CKA_CLASS</c>, or a key or certificate class: open those
+    /// with <see cref="OpenKey(ObjectTemplate)"/> or <see cref="OpenCertificate(ObjectTemplate)"/>.
+    /// </exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one object matches.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
+    public bool TryOpenObject(ObjectTemplate filter, [NotNullWhen(true)] out Pkcs11Object? obj)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        obj = FindUniqueObject(filter, OtherObjects(filter));
+        return obj is not null;
+    }
+
+    /// <summary>
+    /// Creates an object on the token from <paramref name="template"/> — a data object
+    /// (<see cref="ObjectTemplate.ForData"/>), a certificate of any type
+    /// (<see cref="ObjectTemplate.ForCertificate"/>), or another non-key class — and returns it.
+    /// </summary>
+    /// <remarks>
+    /// Keys are refused: import them with <see cref="ImportKey"/>, which applies the secure key defaults
+    /// and returns a usable <see cref="Pkcs11Key"/>. For an X.509 certificate,
+    /// <see cref="ImportCertificate"/> returns a typed <see cref="Pkcs11Certificate"/> instead.
+    /// </remarks>
+    /// <param name="template">A fully built template naming the object's <c>CKA_CLASS</c>.</param>
+    /// <returns>The created object. Disposing it never destroys the token object.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="template"/> names no <c>CKA_CLASS</c>, or a key class.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CreateObject</c> call.</exception>
+    public Pkcs11Object CreateObject(ObjectTemplate template)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(template);
+
+        ObjectAttribute named = template.Attributes.FirstOrDefault(a => a.Type == CKA.CKA_CLASS)
+            ?? throw new ArgumentException("The template must name the object's CKA_CLASS.", nameof(template));
+        var objectClass = (CKO)named.GetValueAsUlong();
+        if (Array.IndexOf(Keys.Classes, objectClass) >= 0)
+            throw new ArgumentException($"{objectClass} is a key class: import keys with ImportKey.", nameof(template));
+
+        ObjectHandle handle = _core.CreateObject([.. template.Attributes]);
+        return HydrateObjectFromHandle(handle);
+    }
+
+    /// <summary>
     /// Finds all X.509 certificate objects on the token (<c>CKA_CLASS = CKO_CERTIFICATE</c>,
     /// <c>CKA_CERTIFICATE_TYPE = CKC_X_509</c>) — a typed counterpart to <see cref="FindKeys"/>. Each
     /// <see cref="Pkcs11Certificate"/> exposes the parsed <see cref="X509Certificate2"/> and bridges to
@@ -977,14 +1064,34 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private Pkcs11Key OpenKeyCore(ObjectTemplate filter, string criteria)
         => FindUniqueKey(filter)
-            ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No key {criteria} was found on the token.");
+            ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No key {criteria} was found on the token.");
 
     private Pkcs11Key? FindUniqueKey(ObjectTemplate filter)
         => FindUnique(filter, Keys, GroupKeyHalves, HydrateKeyGroup);
 
+    private Pkcs11Object? FindUniqueObject(ObjectTemplate filter, ObjectFamily family)
+        => FindUnique(filter, family, EachOnItsOwn, matched => HydrateObjectFromHandle(matched[0].Handle));
+
+    /// <summary>
+    /// The family of the class <paramref name="filter"/> names, for the generic object lookups: any class
+    /// but the key and certificate ones, which have typed lookups of their own.
+    /// </summary>
+    private static ObjectFamily OtherObjects(ObjectTemplate filter)
+    {
+        ObjectAttribute named = filter.Attributes.FirstOrDefault(a => a.Type == CKA.CKA_CLASS)
+            ?? throw new ArgumentException("The filter must name a CKA_CLASS, e.g. ObjectTemplate.ForData().", nameof(filter));
+
+        var objectClass = (CKO)named.GetValueAsUlong();
+        if (Array.IndexOf(Keys.Classes, objectClass) >= 0)
+            throw new ArgumentException($"{objectClass} is a key class: open keys with OpenKey.", nameof(filter));
+        if (Array.IndexOf(Certificates.Classes, objectClass) >= 0)
+            throw new ArgumentException($"{objectClass} is the certificate class: open certificates with OpenCertificate.", nameof(filter));
+        return new ObjectFamily($"{objectClass} object", [objectClass]);
+    }
+
     private Pkcs11Certificate OpenCertificateCore(ObjectTemplate filter, string criteria)
         => FindUniqueCertificate(filter)
-            ?? throw new Pkcs11ObjectNotFoundException("C_FindObjects", $"No certificate {criteria} was found on the token.");
+            ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No certificate {criteria} was found on the token.");
 
     private Pkcs11Certificate? FindUniqueCertificate(ObjectTemplate filter)
         => FindUnique(filter, Certificates, EachOnItsOwn, matched => HydrateCertificateFromHandle(matched[0].Handle));
@@ -1013,7 +1120,7 @@ public sealed partial class Pkcs11Session : IDisposable
         {
             0 => null,
             1 => hydrate(results[0]),
-            _ => throw new Pkcs11AmbiguousObjectException("C_FindObjects",
+            _ => throw new Pkcs11AmbiguousObjectException(Pkcs11Operations.OpFindObjects,
                 $"The lookup matched {results.Count} distinct {family.Name}s; refusing to pick one. Narrow it with a " +
                 "filter (class, type, CKA_ID, …), or enumerate the candidates with a Find method."),
         };
