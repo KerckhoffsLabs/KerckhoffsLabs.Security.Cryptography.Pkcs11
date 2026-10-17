@@ -1845,6 +1845,36 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No (added `CkmEcdh1DeriveParams.ForEncapsulation`, purely additive)
 - **Raised by:** Cross-referencing kryoptic#432 against this wrapper's own test coverage
 
+### [BL-161] Lift the BouncyHsm empty-input gate once harrison314/BouncyHsm#115 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsEmptyInput`)
+- **Problem:** BouncyHsm v2.3.3 refuses zero-length data in `C_Digest`/`C_DigestUpdate`/`C_Verify` (`CKR_ARGUMENTS_BAD`) and `C_Sign` (`CKR_GENERAL_ERROR`), so the EmptyInput SHA-256 and HMAC cases skip on it.
+- **Proposed action:** After a `vendor/bouncyhsm` bump that includes the fix, `BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent`/`EmptyHmac_QuirkStillPresent` fail. Then set the flag to true and delete both tests.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-162] Lift the BouncyHsm out-of-range-signature gate once harrison314/BouncyHsm#116 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmRejectsOutOfRangeSignatures`)
+- **Problem:** An RSA-PSS signature at or above the modulus gives `CKR_GENERAL_ERROR` instead of `CKR_SIGNATURE_INVALID`, so `SignVerifyData_Pss_RoundTrips` skips on BouncyHsm.
+- **Proposed action:** After the bump, `BouncyHsmQuirkTests.OutOfRangePssSignature_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-163] Recheck BouncyHsm against harrison314/BouncyHsm#114 after the fix ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11SessionCore.Encryption.cs` (the length-query fallback for a `CKR_BUFFER_TOO_SMALL` that reports no length)
+- **Problem:** BouncyHsm returns `CKR_BUFFER_TOO_SMALL` without the required length. Once the library tolerates this, nothing is gated, but the fallback is the only path BouncyHsm exercises.
+- **Proposed action:** Once a bump includes the upstream fix, confirm the RSA encrypt wrappers still pass, then confirm the fallback stays covered by its fake-module unit test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Session` expose no `Stream` overload at all. See BL-087 and BL-099.

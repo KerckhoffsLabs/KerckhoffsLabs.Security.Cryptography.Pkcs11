@@ -258,7 +258,7 @@ opened the session, and refusing at build time would be wrong for SO sessions.
 
 ## Building from source
 
-The repository vendors its test backends (`pkcs11-mock`, SoftHSMv2, opencryptoki) as git submodules,
+The repository vendors its test backends (`pkcs11-mock`, SoftHSMv2, opencryptoki, NSS, Kryoptic, BouncyHsm) as git submodules,
 so clone recursively:
 
 ```bash
