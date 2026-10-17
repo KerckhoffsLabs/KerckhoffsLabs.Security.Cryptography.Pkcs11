@@ -81,5 +81,7 @@ random loopback ports, creates its token, and kills the server when the run ends
 killed hard can leave that server behind. It holds nothing on disk and doesn't affect the next run,
 but you may want to end it (`pkill -f BouncyHsm.dll`, or Task Manager on Windows).
 
-Linux and Windows arm64 have no BouncyHsm client upstream, so the BouncyHsm tests skip there.
+CI runs BouncyHsm on ubuntu-latest only, like the other extra backends. Locally the build also works on
+macOS and on Windows x64 and x86; Linux and Windows arm64 have no BouncyHsm client upstream, so the
+BouncyHsm tests skip there.
 Known BouncyHsm bugs are gated on `BouncyHsmBackendFixture` (see `BouncyHsmQuirkTests`).

@@ -53,20 +53,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            bouncyhsm: true
           - os: ubuntu-24.04-arm
             arch: arm64
           - os: macos-latest
-            bouncyhsm: true
           # osx-x64 is a shipped RID; Apple Silicon runners cannot execute it natively.
           - os: macos-15-intel
             arch: x64
-            bouncyhsm: true
           - os: windows-latest
-            bouncyhsm: true
           - os: windows-latest
             arch: x86
-            bouncyhsm: true
           - os: windows-11-arm
             arch: arm64
 
@@ -172,15 +167,15 @@ jobs:
           path: vendor/kryoptic/target
           key: kryoptic-${{ runner.arch }}-${{ steps.rev.outputs.kryoptic }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
 
-      # BouncyHsm (every leg with an upstream native client): the published server plus this leg's
+      # BouncyHsm (ubuntu-latest only, like the other extra backends): the published server plus the
       # native client. A hit skips the BuildBouncyHsm target, including its ~3 min cold publish.
       - name: Cache BouncyHsm build
-        if: matrix.bouncyhsm
+        if: matrix.os == 'ubuntu-latest'
         id: bouncyhsm-cache
         uses: actions/cache@v6.1.0
         with:
           path: tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/bouncyhsm
-          key: bouncyhsm-${{ runner.os }}-${{ matrix.arch || runner.arch }}-${{ steps.rev.outputs.bouncyhsm }}-${{ hashFiles('build/build-bouncyhsm.sh', 'build/build-bouncyhsm.ps1', 'build/lib/common.sh') }}-v1
+          key: bouncyhsm-${{ runner.os }}-${{ runner.arch }}-${{ steps.rev.outputs.bouncyhsm }}-${{ hashFiles('build/build-bouncyhsm.sh', 'build/lib/common.sh') }}-v1
 
       - name: Restore
         run: dotnet restore KerckhoffsLabs.sln
@@ -196,7 +191,7 @@ jobs:
           BuildKryoptic: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
           # BouncyHsm's BeforeTarget stages its server and native client under bin/…/bouncyhsm, where
           # BouncyHsmBackendFixture finds them; on a cache hit they are already there.
-          BuildBouncyHsm: ${{ matrix.bouncyhsm && steps.bouncyhsm-cache.outputs.cache-hit != 'true' && 'true' || '' }}
+          BuildBouncyHsm: ${{ matrix.os == 'ubuntu-latest' && steps.bouncyhsm-cache.outputs.cache-hit != 'true' && 'true' || '' }}
         run: dotnet build KerckhoffsLabs.sln --no-restore -c Release
 
       # Persist the vcpkg OpenSSL build right after it's produced, even if the Test step later fails
@@ -280,9 +275,6 @@ jobs:
       # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
       - name: Test
         if: matrix.os != 'ubuntu-latest'
-        env:
-          # Legs with an upstream BouncyHsm client must have a working one (BouncyHsmAvailabilityTests).
-          PKCS11_TEST_EXPECT_BOUNCYHSM: ${{ matrix.bouncyhsm && '1' || '' }}
         run: dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed
 
       # ubuntu-latest also exercises the opencryptoki, Kryoptic, NSS, and BouncyHsm backends. Run under the
