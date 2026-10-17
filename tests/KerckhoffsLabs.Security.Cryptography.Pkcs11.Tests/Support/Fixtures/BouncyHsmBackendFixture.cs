@@ -39,6 +39,28 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when a BouncyHsm server and a native client for this RID are staged. Never starts a process.</summary>
     public static bool BouncyHsmAvailable => ServerAssemblyPath() is not null && NativeLibraryPath() is not null;
 
+    /// <summary>
+    /// False while harrison314/BouncyHsm#115 is open: the client refuses <c>ulDataLen == 0</c> in
+    /// <c>C_Digest</c>/<c>C_DigestUpdate</c>/<c>C_Verify</c> (<c>CKR_ARGUMENTS_BAD</c>) and the server refuses to
+    /// sign or verify empty data (<c>CKR_GENERAL_ERROR</c>). BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent
+    /// and EmptyHmac_QuirkStillPresent fail once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmAcceptsEmptyInput = false;
+
+    /// <summary>
+    /// False while harrison314/BouncyHsm#116 is open: an RSA-PSS signature whose value is at least the
+    /// modulus gives <c>CKR_GENERAL_ERROR</c> instead of <c>CKR_SIGNATURE_INVALID</c>, so a tamper check
+    /// fails for about half of all random tamperings.
+    /// BouncyHsmQuirkTests.OutOfRangePssSignature_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRejectsOutOfRangeSignatures = false;
+
+    /// <summary>Gate for empty-input digest and MAC cases: see <see cref="BouncyHsmAcceptsEmptyInput"/>.</summary>
+    public static bool EmptyDigestAndMacAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyInput;
+
+    /// <summary>Gate for cases that verify a tampered RSA-PSS signature: see <see cref="BouncyHsmRejectsOutOfRangeSignatures"/>.</summary>
+    public static bool OutOfRangeSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmRejectsOutOfRangeSignatures;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;
