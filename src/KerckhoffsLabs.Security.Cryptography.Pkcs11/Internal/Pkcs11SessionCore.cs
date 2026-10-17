@@ -30,6 +30,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     // The slot this session was opened on: what CKM_PKCS5_PBKD2 asks about to pick its parameter layout.
     private readonly NativeCULong _slotId;
 
+    // Whether this session counts as a holder of its slot's login (see SlotLogins).
+    private bool _holdsLogin;
+
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
@@ -638,11 +641,25 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
 
     // The logout itself, shared by Logout and LogoutForDispose, which differ only in how they take the
     // session lease. The caller holds it.
+    // A session holding its slot's login logs out only when no other session of this binding still holds
+    // it: C_Logout would log those out too (see SlotLogins).
     private void LogoutHeld()
     {
+        if (_holdsLogin)
+        {
+            _holdsLogin = false;
+            if (!_pkcs11Library.Logins.Release((ulong)_slotId))
+            {
+                Log.SessionTrace(_logger, (ulong)_sessionId, "Logout skipped: the slot's other sessions still hold the login");
+                return;
+            }
+        }
+
         Log.LoggingOutSession(_logger, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Logout(_sessionId);
+        if (rv == CKR.CKR_OK)
+            _pkcs11Library.Logins.Clear((ulong)_slotId);
         Pkcs11Exception.ThrowIfError(rv, OpLogout);
     }
 
@@ -743,6 +760,19 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             // Managed cleanup — release the session handle (SafeHandle releases via C_CloseSession).
             if (disposing)
             {
+                // Closed while still holding its slot's login, without a Logout: the last holder still logs
+                // out, best-effort, as LogoutHeld would. A library already disposed has closed the session and
+                // ended the login with it.
+                if (_holdsLogin)
+                {
+                    _holdsLogin = false;
+                    if (_pkcs11Library.Logins.Release((ulong)_slotId))
+                    {
+                        try { _ = _pkcs11Library.C_Logout(_sessionId); }
+                        catch (ObjectDisposedException) { /* nothing left to log out of */ }
+                    }
+                }
+
                 _sessionHandle?.Dispose();
                 _sessionHandle = null!;
             }

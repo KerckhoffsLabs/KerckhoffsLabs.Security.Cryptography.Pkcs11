@@ -155,8 +155,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Log.LoggingIn(_logger, userType, (ulong)_sessionId);
 
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
-        Pkcs11Exception.ThrowIfError(rv, OpLogin);
+        LoginOnce(userType, () => _pkcs11Library.C_Login(_sessionId, userType, pin.Pin), OpLogin);
     }
 
     /// <summary>
@@ -174,8 +173,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
 
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, default);
-        Pkcs11Exception.ThrowIfError(rv, OpLogin);
+        LoginOnce(userType, () => _pkcs11Library.C_Login(_sessionId, userType, default), OpLogin);
     }
 
     /// <summary>
@@ -206,12 +204,27 @@ internal sealed partial class Pkcs11SessionCore
         byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try
         {
-            CKR rv = _pkcs11Library.C_LoginUser(_sessionId, userType, pin.Pin, usernameBytes);
-            Pkcs11Exception.ThrowIfError(rv, OpLoginUser);
+            LoginOnce(userType, () => _pkcs11Library.C_LoginUser(_sessionId, userType, pin.Pin, usernameBytes), OpLoginUser);
         }
         finally
         {
             CryptographicOperations.ZeroMemory(usernameBytes);
         }
+    }
+
+    /// <summary>
+    /// Logs in through <paramref name="login"/>, counting this session as a holder of its slot's login (see
+    /// <see cref="SlotLogins"/>) the first time it succeeds. A session that already holds one calls the
+    /// module as before, so it gets the module's own answer.
+    /// </summary>
+    private void LoginOnce(CKU userType, Func<CKR> login, string operation)
+    {
+        if (_holdsLogin)
+        {
+            Pkcs11Exception.ThrowIfError(login(), operation);
+            return;
+        }
+        Pkcs11Exception.ThrowIfError(_pkcs11Library.Logins.Acquire((ulong)_slotId, userType, login), operation);
+        _holdsLogin = true;
     }
 }
