@@ -22,8 +22,8 @@ internal sealed class BouncyHsmServer : IDisposable
     // field arrives unset and it fails with a 500, not a validation 400.
     private static readonly JsonSerializerOptions PascalCase = new() { PropertyNamingPolicy = null };
 
-    private readonly Process _process;
-    private readonly ConcurrentQueue<string> _tail = new();
+    private readonly ServerProcess _process;
+    private readonly ConcurrentQueue<string> _tail;
     private readonly HttpClient _http;
     private readonly EventHandler _onProcessExit;
     private bool _disposed;
@@ -33,9 +33,10 @@ internal sealed class BouncyHsmServer : IDisposable
     public int ProcessId => _process.Id;
     public IReadOnlyList<string> OutputTail => [.. _tail];
 
-    private BouncyHsmServer(Process process, int tcpPort, int httpPort)
+    private BouncyHsmServer(ServerProcess process, ConcurrentQueue<string> tail, int tcpPort, int httpPort)
     {
         _process = process;
+        _tail = tail;
         TcpPort = tcpPort;
         HttpPort = httpPort;
         _http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{httpPort}/"), Timeout = TimeSpan.FromSeconds(30) };
@@ -66,32 +67,24 @@ internal sealed class BouncyHsmServer : IDisposable
         int tcpPort = FreeLoopbackPort();
         int httpPort = FreeLoopbackPort();
 
-        var psi = new ProcessStartInfo(DotnetHost())
+        var environment = new Dictionary<string, string>
         {
-            ArgumentList = { serverAssemblyPath },
-            WorkingDirectory = Path.GetDirectoryName(serverAssemblyPath) is { Length: > 0 } dir && Directory.Exists(dir)
-                ? dir : AppContext.BaseDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
+            ["PersistenceStorageType"] = "InMemory",
+            ["BouncyHsmSetup__TcpEndpoint__Endpoint"] = $"127.0.0.1:{tcpPort}",
+            ["Kestrel__Endpoints__Http__Url"] = $"http://127.0.0.1:{httpPort}",
+            ["BouncyHsmSetup__EnableSwagger"] = "false",
+            ["Serilog__MinimumLevel__Default"] = "Warning",
         };
-        psi.Environment["PersistenceStorageType"] = "InMemory";
-        psi.Environment["BouncyHsmSetup__TcpEndpoint__Endpoint"] = $"127.0.0.1:{tcpPort}";
-        psi.Environment["Kestrel__Endpoints__Http__Url"] = $"http://127.0.0.1:{httpPort}";
-        psi.Environment["BouncyHsmSetup__EnableSwagger"] = "false";
-        psi.Environment["Serilog__MinimumLevel__Default"] = "Warning";
         foreach (var (name, value) in extraEnvironment ?? new Dictionary<string, string>())
-            psi.Environment[name] = value;
+            environment[name] = value;
+        string workingDirectory = Path.GetDirectoryName(serverAssemblyPath) is { Length: > 0 } dir && Directory.Exists(dir)
+            ? dir : AppContext.BaseDirectory;
 
-        var process = new Process { StartInfo = psi };
-        var server = new BouncyHsmServer(process, tcpPort, httpPort);
-        process.OutputDataReceived += (_, e) => server.Record(e.Data);
-        process.ErrorDataReceived += (_, e) => server.Record(e.Data);
+        var tail = new ConcurrentQueue<string>();
+        var process = ServerProcess.Start(DotnetHost(), [serverAssemblyPath], workingDirectory, environment, line => Record(tail, line));
+        var server = new BouncyHsmServer(process, tail, tcpPort, httpPort);
         try
         {
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
             server.WaitUntilReady(readyTimeout);
             return server;
         }
@@ -148,24 +141,12 @@ internal sealed class BouncyHsmServer : IDisposable
         _process.Dispose();
     }
 
-    private void Kill()
-    {
-        try
-        {
-            if (!_process.HasExited)
-            {
-                _process.Kill(entireProcessTree: true);
-                _process.WaitForExit(TimeSpan.FromSeconds(10));
-            }
-        }
-        catch (InvalidOperationException) { /* never started */ }
-    }
+    private void Kill() => _process.Kill(TimeSpan.FromSeconds(10));
 
-    private void Record(string? line)
+    private static void Record(ConcurrentQueue<string> tail, string line)
     {
-        if (line is null) return;
-        _tail.Enqueue(line);
-        while (_tail.Count > TailLines && _tail.TryDequeue(out _)) { }
+        tail.Enqueue(line);
+        while (tail.Count > TailLines && tail.TryDequeue(out _)) { }
     }
 
     private void WaitUntilReady(TimeSpan timeout)
@@ -175,7 +156,7 @@ internal sealed class BouncyHsmServer : IDisposable
         {
             if (_process.HasExited)
             {
-                _process.WaitForExit(); // flush the asynchronous output readers
+                _process.WaitForOutput();
                 throw new InvalidOperationException(
                     $"BouncyHsm server exited with code {_process.ExitCode} before it was ready.{Tail()}");
             }

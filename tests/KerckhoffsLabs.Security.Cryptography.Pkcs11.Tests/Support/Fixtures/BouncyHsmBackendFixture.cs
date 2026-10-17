@@ -70,7 +70,7 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
         {
             _server.CreateSlot(TokenLabel, Settings.UserPin, Settings.SoPin);
 
-            string config = $"Server=127.0.0.1; Port={_server.TcpPort}; LogTarget=ErrorConsole; LogLevel=Error;";
+            string config = $"Server=127.0.0.1; Port={_server.TcpPort}; LogTarget=ErrorConsole; LogLevel=ERROR;";
             Environment.SetEnvironmentVariable("BOUNCY_HSM_CFG_STRING", config);
             SoftHsmBackendFixture.SetNativeEnv("BOUNCY_HSM_CFG_STRING", config);
 
