@@ -25,7 +25,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <see cref="Pkcs11Library"/>. On <see cref="Dispose"/> it logs the user out (<c>C_Logout</c>,
 /// best-effort — a token-wide state change, since PKCS#11 login state is per-application/slot) and
 /// then closes the session (<c>C_CloseSession</c>), so the HSM audit log records an explicit logout,
-/// not just a session close. A logout that fails because no user was logged in is ignored.
+/// not just a session close. A logout that fails because no user was logged in is ignored. Several
+/// sessions opened with a login on the same token share it: only the last of them to be disposed
+/// logs out, so disposing one leaves the others logged in.
 /// </para>
 /// <para>
 /// Keys obtained via the session's factory methods hold a non-owning reference to the
@@ -116,7 +118,9 @@ public sealed partial class Pkcs11Session : IDisposable
         // Explicitly log out before closing the session so the token's audit log records a logout, not
         // just a session close. Both happen under one hold of the session's lock, so no call on another
         // thread can reach the session once logged out but not yet closed; the logout is best-effort, the
-        // close always happens. See Pkcs11SessionCore.LogoutAndDispose.
+        // close always happens. C_Logout affects the whole application's login state on the slot, so it
+        // is sent only by the last session holding the login (see SlotLogins). See
+        // Pkcs11SessionCore.LogoutAndDispose.
         _core.LogoutAndDispose();
         _disposed = true;
         GC.SuppressFinalize(this);
