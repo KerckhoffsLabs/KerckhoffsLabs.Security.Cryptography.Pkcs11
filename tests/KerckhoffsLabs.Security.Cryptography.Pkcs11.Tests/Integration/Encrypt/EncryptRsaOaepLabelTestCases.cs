@@ -48,7 +48,7 @@ internal static class EncryptRsaOaepLabelTestCases
     private static void WithRsaKeyPair(IPkcs11Backend backend, Action<Pkcs11SessionCore, ObjectHandle, ObjectHandle> body)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP);
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
@@ -62,7 +62,6 @@ internal static class EncryptRsaOaepLabelTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
         }
     }
 
