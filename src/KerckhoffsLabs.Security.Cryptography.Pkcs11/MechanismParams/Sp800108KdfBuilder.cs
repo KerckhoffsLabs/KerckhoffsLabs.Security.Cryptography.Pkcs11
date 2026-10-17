@@ -67,9 +67,15 @@ public sealed class Sp800108KdfBuilder
     internal IReadOnlyList<IReadOnlyList<ObjectAttribute>> DerivedKeys => _derivedKeys;
     internal ReadOnlySpan<byte> Iv => _iv;
 
-    /// <summary>Appends the mandatory iteration counter (<c>CK_SP800_108_ITERATION_VARIABLE</c>).</summary>
-    /// <param name="widthInBits">Counter width in bits (NIST default 32).</param>
-    /// <param name="littleEndian"><see langword="false"/> for big-endian (the NIST/BCL default).</param>
+    /// <summary>Appends the mandatory iteration variable (<c>CK_SP800_108_ITERATION_VARIABLE</c>).</summary>
+    /// <remarks>
+    /// In counter mode it is the counter, formatted by <paramref name="widthInBits"/> and <paramref name="littleEndian"/>.
+    /// In feedback and double-pipeline mode it is the chaining value (K(i-1) or A(i)), whose size the PRF fixes,
+    /// so it is sent with no format (<c>pValue = NULL_PTR</c>, as PKCS#11 v3.0 requires) and both arguments are
+    /// ignored; use <see cref="OptionalCounter"/> for a counter in those modes.
+    /// </remarks>
+    /// <param name="widthInBits">Counter width in bits (NIST default 32). Counter mode only.</param>
+    /// <param name="littleEndian"><see langword="false"/> for big-endian (the NIST/BCL default). Counter mode only.</param>
     public Sp800108KdfBuilder IterationCounter(uint widthInBits = 32, bool littleEndian = false)
     {
         _segments.Add(new Sp800108Segment { Kind = Sp800108SegmentKind.IterationCounter, WidthInBits = widthInBits, LittleEndian = littleEndian });
