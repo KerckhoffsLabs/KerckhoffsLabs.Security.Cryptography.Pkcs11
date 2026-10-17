@@ -295,6 +295,50 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         Assert.Empty(Assert.IsType<byte[]>(module.Password));
     }
 
+    /// <summary>
+    /// Where both layouts share their size, NSS 3.114+ tells them apart by the length alone: anything above
+    /// 8192 bytes is read as the v2.40 pointer and dereferenced. A longer password is refused before the module
+    /// sees it; at the boundary it still goes out by value.
+    /// </summary>
+    [Theory]
+    [InlineData(8192, false)]
+    [InlineData(8193, true)]
+    public void ByValue_PasswordPastNssBoundary_IsRefusedBeforeTheModuleSeesIt(int length, bool refused)
+    {
+        using var module = new Pbkd2Module(Mozilla);
+        module.Slots[1] = (Mozilla, 3, 131);
+        using var session = module.OpenSession(slot: 1);
+        byte[] password = new byte[length];
+        Array.Fill(password, (byte)'p');
+
+        if (refused && CkmPkcs5Pbkd2Params.LayoutsShareTheirSize)
+        {
+            Assert.Throws<NotSupportedException>(() => GenerateKey(session, password));
+            Assert.Null(module.SentByReference);
+            return;
+        }
+
+        GenerateKey(session, password);
+        Assert.False(module.SentByReference);
+        Assert.Equal(password, module.Password);
+    }
+
+    /// <summary>The v2.40 structure carries the length through a pointer, so its length is never ambiguous.</summary>
+    [Fact]
+    public void ByReference_PasswordPastNssBoundary_IsSent()
+    {
+        using var module = new Pbkd2Module(Mozilla);
+        module.Slots[1] = (Mozilla, 3, 98);
+        using var session = module.OpenSession(slot: 1);
+        byte[] password = new byte[8193];
+        Array.Fill(password, (byte)'p');
+
+        GenerateKey(session, password);
+
+        Assert.True(module.SentByReference);
+        Assert.Equal(password, module.Password);
+    }
+
     [Theory]
     [InlineData(Pbkdf2ParametersLayout.Detect, null)]
     [InlineData(Pbkdf2ParametersLayout.PasswordLengthByValue, false)]

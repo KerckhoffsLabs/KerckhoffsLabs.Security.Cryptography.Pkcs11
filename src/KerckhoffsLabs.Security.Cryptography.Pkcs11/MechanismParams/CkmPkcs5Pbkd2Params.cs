@@ -130,8 +130,20 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
 
     private static bool IsNssBefore3_114(Version version) => version is { Major: 3, Minor: < 114 };
 
+    /// <summary>
+    /// The longest <c>ulPasswordLen</c> NSS softoken reads as a value when the two layouts share their size
+    /// (<c>CK_PKCS5_PBKD2_PARAMS_PTR_BOUNDARY</c> in its <c>pkcs11n.h</c>); anything longer it takes for a pointer.
+    /// </summary>
+    internal const int AmbiguousPasswordLengthBoundary = 8192;
+
+    /// <summary>Whether <see cref="CK_PKCS5_PBKD2_PARAMS"/> and <see cref="CK_PKCS5_PBKD2_PARAMS2"/> have the same size here.</summary>
+    internal static bool LayoutsShareTheirSize
+        => Pkcs11Marshal.SizeOf<CK_PKCS5_PBKD2_PARAMS>() == Pkcs11Marshal.SizeOf<CK_PKCS5_PBKD2_PARAMS2>();
+
     /// <inheritdoc/>
     /// <exception cref="ObjectDisposedException">The borrowed <see cref="SecurePassword"/> has been disposed.</exception>
+    /// <exception cref="NotSupportedException">The password is longer than 8192 bytes and would go out as
+    /// <see cref="CK_PKCS5_PBKD2_PARAMS2"/> where both layouts have the same size.</exception>
     internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
         // Read straight from the caller's password into the scope, whose memory is zeroed when the call returns.
@@ -153,6 +165,16 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
                 PasswordLen = scope.WriteStruct((NativeCULong)password.Length),
             });
         }
+
+        // Where both structures have the same size (64-bit Unix), a module accepting either cannot tell them
+        // apart by ulParameterLen. NSS 3.114+ then reads a ulPasswordLen above 8192 as the v2.40 pointer and
+        // dereferences it, which takes the process down; refuse such a password rather than send it.
+        if (password.Length > AmbiguousPasswordLengthBoundary && LayoutsShareTheirSize)
+            throw new NotSupportedException(
+                $"A PBKDF2 password longer than {AmbiguousPasswordLengthBoundary} bytes cannot be sent as " +
+                "CK_PKCS5_PBKD2_PARAMS2 on this platform: modules that accept both PBKDF2 parameter layouts, " +
+                "NSS softoken from 3.114 among them, read such a length as a pointer and crash the process. " +
+                "Hash a longer password down first.");
 
         return scope.WriteParameter(new CK_PKCS5_PBKD2_PARAMS2
         {
