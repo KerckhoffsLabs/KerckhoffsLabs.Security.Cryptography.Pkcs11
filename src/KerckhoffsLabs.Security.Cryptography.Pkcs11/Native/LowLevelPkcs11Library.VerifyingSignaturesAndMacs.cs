@@ -17,7 +17,7 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        fixed (byte* sigPtr = signature)
+        fixed (byte* sigPtr = &NonNullPinnable(signature))
             return verifySignatureInit(session, m, key, sigPtr, (NativeCULong)signature.Length).ToCKR();
     }
 
@@ -32,7 +32,7 @@ internal sealed partial class LowLevelPkcs11Library
         if (verifySignature is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        fixed (byte* dataPtr = data)
+        fixed (byte* dataPtr = &NonNullPinnable(data))
             return verifySignature(session, dataPtr, (NativeCULong)data.Length).ToCKR();
     }
 
@@ -47,7 +47,7 @@ internal sealed partial class LowLevelPkcs11Library
         if (verifySignatureUpdate is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        fixed (byte* partPtr = part)
+        fixed (byte* partPtr = &NonNullPinnable(part))
             return verifySignatureUpdate(session, partPtr, (NativeCULong)part.Length).ToCKR();
     }
 
@@ -98,8 +98,8 @@ internal sealed partial class LowLevelPkcs11Library
         if (verify is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        fixed (byte* dataPtr = data)
-        fixed (byte* sigPtr = signature)
+        fixed (byte* dataPtr = &NonNullPinnable(data))
+        fixed (byte* sigPtr = &NonNullPinnable(signature))
             return verify(session, dataPtr, (NativeCULong)data.Length, sigPtr, (NativeCULong)signature.Length).ToCKR();
     }
 
@@ -116,7 +116,7 @@ internal sealed partial class LowLevelPkcs11Library
         if (verifyUpdate is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        fixed (byte* partPtr = part)
+        fixed (byte* partPtr = &NonNullPinnable(part))
             return verifyUpdate(session, partPtr, (NativeCULong)part.Length).ToCKR();
     }
 
@@ -133,7 +133,7 @@ internal sealed partial class LowLevelPkcs11Library
         if (verifyFinal is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        fixed (byte* signaturePtr = signature)
+        fixed (byte* signaturePtr = &NonNullPinnable(signature))
             return verifyFinal(session, signaturePtr, (NativeCULong)signature.Length).ToCKR();
     }
 
@@ -174,7 +174,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* sigPtr = signature)
+        fixed (byte* sigPtr = &NonNullPinnable(signature))
         fixed (byte* dataPtr = &NonNullPinnable(data))
         fixed (NativeCULong* lenPtr = &dataLen)
             rv = verifyRecover(session, sigPtr, (NativeCULong)signature.Length, lengthOnly ? null : dataPtr, lenPtr).ToCKR();

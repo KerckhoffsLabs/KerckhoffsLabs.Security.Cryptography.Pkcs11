@@ -21,8 +21,10 @@ internal sealed partial class LowLevelPkcs11Library
         => ref output.IsEmpty ? ref s_emptyOutput : ref MemoryMarshal.GetReference(output);
 
     /// <summary>
-    /// The same for an input, where an empty span is still real (empty) data. Only the message-mode
-    /// one-shot calls use it, which have always passed their associated data and payload this way.
+    /// The same for an input, where an empty span is still real (empty) data. Every data, part and
+    /// signature input is pinned this way: SoftHSM2, Kryoptic and opencryptoki reject <c>pData == NULL</c>
+    /// with CKR_ARGUMENTS_BAD even when the length is zero, and SoftHSM2 does so from C_Digest, C_Sign
+    /// and C_Verify without ending the operation.
     /// </summary>
     private static ref byte NonNullPinnable(ReadOnlySpan<byte> input)
         => ref input.IsEmpty ? ref s_emptyOutput : ref MemoryMarshal.GetReference(input);

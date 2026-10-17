@@ -40,7 +40,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* inPtr = data)
+        fixed (byte* inPtr = &NonNullPinnable(data))
         fixed (byte* outPtr = &NonNullPinnable(digest))
         fixed (NativeCULong* lenPtr = &digestLen)
             rv = digestFunction(session, inPtr, (NativeCULong)data.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();
@@ -60,7 +60,7 @@ internal sealed partial class LowLevelPkcs11Library
         if (digestUpdate is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        fixed (byte* partPtr = part)
+        fixed (byte* partPtr = &NonNullPinnable(part))
             return digestUpdate(session, partPtr, (NativeCULong)part.Length).ToCKR();
     }
 
