@@ -147,9 +147,10 @@ jobs:
       - name: Build
         env:
           BuildKryoptic: 'true'
+          BuildBouncyHsm: 'true'
         run: dotnet build KerckhoffsLabs.sln --no-restore -c Release -p:UseMicrosoftTestingPlatformRunner=true
 
-      # Three backends present on Linux → coverage spans the mock, SoftHSM2, and Kryoptic paths. A
+      # Four backends present on Linux → coverage spans the mock, SoftHSM2, Kryoptic, and BouncyHsm paths. A
       # single pass emits BOTH coverage formats — OpenCover (Sonar's first-class .NET format,
       # imported by the begin-step glob) and Cobertura (uploaded to Codecov below) — so the suite
       # is built and run once instead of duplicated across a separate workflow. Only the wide
@@ -160,6 +161,7 @@ jobs:
       - name: Test with coverage
         env:
           PKCS11_TEST_EXPECT_KRYOPTIC: '1'
+          PKCS11_TEST_EXPECT_BOUNCYHSM: '1'
         run: >
           dotnet test --solution KerckhoffsLabs.sln --no-build -c Release
           --results-directory ./coverage --output Detailed
