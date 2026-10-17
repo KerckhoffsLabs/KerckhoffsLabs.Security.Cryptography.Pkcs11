@@ -83,16 +83,17 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
         }
         catch
         {
-            try { Library?.Dispose(); } catch { /* best-effort */ }
-            _server.Dispose();
+            // Library.Dispose logs a failed C_Finalize rather than throwing; the finally still stops the server.
+            try { Library?.Dispose(); }
+            finally { _server.Dispose(); }
             throw;
         }
     }
 
     public void Dispose()
     {
-        try { Library?.Dispose(); } catch { /* best-effort */ }
-        _server?.Dispose();
+        try { Library?.Dispose(); }
+        finally { _server?.Dispose(); }
     }
 
     internal static string? ServerAssemblyPath()
