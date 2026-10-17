@@ -22,7 +22,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* inPtr = part)
+        fixed (byte* inPtr = &NonNullPinnable(part))
         fixed (byte* outPtr = &NonNullPinnable(encryptedPart))
         fixed (NativeCULong* lenPtr = &encryptedPartLen)
             rv = digestEncryptUpdate(session, inPtr, (NativeCULong)part.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();
@@ -47,7 +47,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* inPtr = encryptedPart)
+        fixed (byte* inPtr = &NonNullPinnable(encryptedPart))
         fixed (byte* outPtr = &NonNullPinnable(part))
         fixed (NativeCULong* lenPtr = &partLen)
             rv = decryptDigestUpdate(session, inPtr, (NativeCULong)encryptedPart.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();
@@ -72,7 +72,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* inPtr = part)
+        fixed (byte* inPtr = &NonNullPinnable(part))
         fixed (byte* outPtr = &NonNullPinnable(encryptedPart))
         fixed (NativeCULong* lenPtr = &encryptedPartLen)
             rv = signEncryptUpdate(session, inPtr, (NativeCULong)part.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();
@@ -97,7 +97,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* inPtr = encryptedPart)
+        fixed (byte* inPtr = &NonNullPinnable(encryptedPart))
         fixed (byte* outPtr = &NonNullPinnable(part))
         fixed (NativeCULong* lenPtr = &partLen)
             rv = decryptVerifyUpdate(session, inPtr, (NativeCULong)encryptedPart.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();

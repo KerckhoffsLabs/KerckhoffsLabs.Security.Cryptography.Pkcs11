@@ -74,7 +74,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* ptPtr = plaintextPart)
+        fixed (byte* ptPtr = &NonNullPinnable(plaintextPart))
         fixed (byte* ctPtr = &NonNullPinnable(ciphertextPart))
         fixed (NativeCULong* lenPtr = &ciphertextPartLen)
         {

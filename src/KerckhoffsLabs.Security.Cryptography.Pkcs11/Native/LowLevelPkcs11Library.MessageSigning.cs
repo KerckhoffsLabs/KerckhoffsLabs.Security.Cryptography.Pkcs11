@@ -34,7 +34,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* dataPtr = data)
+        fixed (byte* dataPtr = &NonNullPinnable(data))
         fixed (byte* sigPtr = &NonNullPinnable(signature))
         fixed (NativeCULong* lenPtr = &signatureLen)
             rv = signMessage(session, parameter, parameterLen, dataPtr, (NativeCULong)data.Length, lengthOnly ? null : sigPtr, lenPtr).ToCKR();
@@ -69,7 +69,7 @@ internal sealed partial class LowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         CKR rv;
-        fixed (byte* dataPtr = data)
+        fixed (byte* dataPtr = &NonNullPinnable(data))
         fixed (byte* sigPtr = &NonNullPinnable(signature))
         fixed (NativeCULong* lenPtr = &signatureLen)
             rv = signMessageNext(session, parameter, parameterLen, dataPtr, (NativeCULong)data.Length, lengthOnly ? null : sigPtr, lenPtr).ToCKR();
