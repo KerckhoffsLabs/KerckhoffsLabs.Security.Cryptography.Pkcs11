@@ -84,6 +84,19 @@ jobs:
           path: vendor/kryoptic/target
           key: kryoptic-${{ runner.arch }}-${{ steps.kryopticrev.outputs.sha }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
 
+      # The same cache as ci.yml's ubuntu-latest leg (same key): the published BouncyHsm server plus its
+      # native client. A hit skips the BuildBouncyHsm target and its ~3 min cold publish.
+      - name: BouncyHsm submodule revision
+        id: bouncyhsmrev
+        run: echo "sha=$(git -C vendor/bouncyhsm rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache BouncyHsm build
+        id: bouncyhsm-cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/bouncyhsm
+          key: bouncyhsm-${{ runner.os }}-${{ runner.arch }}-${{ steps.bouncyhsmrev.outputs.sha }}-${{ hashFiles('build/build-bouncyhsm.sh', 'build/lib/common.sh') }}-v1
+
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
 
@@ -147,7 +160,7 @@ jobs:
       - name: Build
         env:
           BuildKryoptic: 'true'
-          BuildBouncyHsm: 'true'
+          BuildBouncyHsm: ${{ steps.bouncyhsm-cache.outputs.cache-hit != 'true' && 'true' || '' }}
         run: dotnet build KerckhoffsLabs.sln --no-restore -c Release -p:UseMicrosoftTestingPlatformRunner=true
 
       # Four backends present on Linux → coverage spans the mock, SoftHSM2, Kryoptic, and BouncyHsm paths. A

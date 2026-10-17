@@ -79,7 +79,8 @@ dotnet test --project tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests -c
 You don't start anything yourself. `BouncyHsmBackendFixture` starts a private, in-memory server on
 random loopback ports, creates its token, and kills the server when the run ends. A test host that is
 killed hard can leave that server behind. It holds nothing on disk and doesn't affect the next run,
-but you may want to end it (`pkill -f BouncyHsm.dll`, or Task Manager on Windows).
+but you may want to end it (`pkill -f 'bouncyhsm/server/BouncyHsm.dll'`, which matches only the copy the
+build staged next to the test assembly, or Task Manager on Windows).
 
 CI runs BouncyHsm on ubuntu-latest only, like the other extra backends. Locally the build also works on
 macOS and on Windows x64 and x86; Linux and Windows arm64 have no BouncyHsm client upstream, so the

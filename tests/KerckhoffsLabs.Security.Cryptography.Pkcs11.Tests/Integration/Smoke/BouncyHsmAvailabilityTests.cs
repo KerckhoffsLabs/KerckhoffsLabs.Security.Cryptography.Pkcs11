@@ -4,9 +4,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 
 /// <summary>
 /// CI-health guard: makes a missing BouncyHsm build fail loudly instead of silently skipping the
-/// whole <c>[Fact(SkipUnless = nameof(BouncyHsmAvailable))]</c> suite while CI stays green. BouncyHsm
-/// is built only on the legs that declare it with <c>PKCS11_TEST_EXPECT_BOUNCYHSM=1</c> (no arm64
-/// client ships upstream), so the guard is keyed on that marker.
+/// whole <c>[Fact(SkipUnless = nameof(BouncyHsmAvailable))]</c> suite while CI stays green. CI builds
+/// BouncyHsm only on ubuntu-latest (ci.yml) and in code-quality.yml, which declare it with
+/// <c>PKCS11_TEST_EXPECT_BOUNCYHSM=1</c>, so the guard is keyed on that marker.
 /// </summary>
 [NoBackendCollection("Reads the fixture's static File.Exists probe only — it never starts the server " +
                      "or loads the module, so serializing it against the BouncyHsm collection would buy nothing.")]
