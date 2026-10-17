@@ -108,8 +108,7 @@ internal sealed class BouncyHsmServer : IDisposable
     internal static Dictionary<string, string?> ServerEnvironment(int tcpPort, int httpPort,
         System.Collections.IDictionary inherited, IReadOnlyDictionary<string, string>? extraEnvironment)
     {
-        var environment = new Dictionary<string, string?>(
-            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        var environment = new Dictionary<string, string?>(StringComparer.Ordinal); // Linux: names are case-sensitive
         foreach (string name in inherited.Keys.Cast<string>().Where(name =>
                      InheritedPrefixesToRemove.Any(prefix => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))))
             environment[name] = null;
@@ -252,7 +251,7 @@ internal sealed class BouncyHsmServer : IDisposable
     {
         if (Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } host && File.Exists(host))
             return host;
-        string exe = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
+        const string exe = "dotnet";
         if (Environment.GetEnvironmentVariable("DOTNET_ROOT") is { Length: > 0 } root && File.Exists(Path.Join(root, exe)))
             return Path.Join(root, exe);
         return exe;

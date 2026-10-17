@@ -80,9 +80,8 @@ You don't start anything yourself. `BouncyHsmBackendFixture` starts a private, i
 random loopback ports, creates its token, and kills the server when the run ends. A test host that is
 killed hard can leave that server behind. It holds nothing on disk and doesn't affect the next run,
 but you may want to end it (`pkill -f 'bouncyhsm/server/BouncyHsm.dll'`, which matches only the copy the
-build staged next to the test assembly, or Task Manager on Windows).
+build staged next to the test assembly).
 
-CI runs BouncyHsm on ubuntu-latest only, like the other extra backends. Locally the build also works on
-macOS and on Windows x64 and x86; Linux and Windows arm64 have no BouncyHsm client upstream, so the
-BouncyHsm tests skip there.
+The BouncyHsm backend is supported on Linux x64 only, and CI runs it on ubuntu-latest, like the other
+extra backends. On any other platform the build target does nothing and the BouncyHsm tests skip.
 Known BouncyHsm bugs are gated on `BouncyHsmBackendFixture` (see `BouncyHsmQuirkTests`).

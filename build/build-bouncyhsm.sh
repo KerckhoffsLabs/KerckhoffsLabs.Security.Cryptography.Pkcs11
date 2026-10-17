@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Builds BouncyHsm from the vendor/bouncyhsm submodule: the server (portable net10.0, the same on
-# every OS) and the native PKCS#11 client for this machine, staged where BouncyHsmBackendFixture
-# looks for them.
+# Builds BouncyHsm from the vendor/bouncyhsm submodule: the server (portable net10.0) and the native
+# PKCS#11 client, staged where BouncyHsmBackendFixture looks for them. Linux x64 only: the BouncyHsm
+# backend is supported there and nowhere else.
 #
 # Usage: build-bouncyhsm.sh <test-output-dir>
 #
 # Outputs (relative to <test-output-dir>):
 #   bouncyhsm/server/BouncyHsm.dll                     (+ the rest of the publish output)
-#   bouncyhsm/runtimes/<rid>/native/BouncyHsm.Pkcs11Lib.so | libBouncyHsm.Pkcs11Lib.dylib
+#   bouncyhsm/runtimes/linux-x64/native/BouncyHsm.Pkcs11Lib.so
 #
 # Idempotent: skips the rebuild when the staged outputs were built from this submodule commit by
-# this script (see is_built_from). Upstream ships no Linux arm64 client, so on linux-arm64 this prints
-# "skipped" and exits 0; the fixture then reports the backend unavailable and its tests skip.
+# this script (see is_built_from). On any other platform it prints "skipped" and exits 0; the fixture
+# then reports the backend unavailable and its tests skip.
 
 set -euo pipefail
 
@@ -27,9 +27,7 @@ require_submodule "${SRC_DIR}/src/Src/BouncyHsm/BouncyHsm.csproj" bouncyhsm
 RID="$(host_rid)"
 case "${RID}" in
   linux-x64) MAKE_DIR="build_linux"; MAKE_TARGET="build64";                            BUILT="BouncyHsm.Pkcs11Lib-x64.so";         STAGED="BouncyHsm.Pkcs11Lib.so" ;;
-  osx-x64)   MAKE_DIR="build_macos"; MAKE_TARGET="libBouncyHsm.Pkcs11Lib-x64.dylib";   BUILT="libBouncyHsm.Pkcs11Lib-x64.dylib";   STAGED="libBouncyHsm.Pkcs11Lib.dylib" ;;
-  osx-arm64) MAKE_DIR="build_macos"; MAKE_TARGET="libBouncyHsm.Pkcs11Lib-arm64.dylib"; BUILT="libBouncyHsm.Pkcs11Lib-arm64.dylib"; STAGED="libBouncyHsm.Pkcs11Lib.dylib" ;;
-  *) echo "build-bouncyhsm.sh: upstream ships no native client for ${RID}; skipped." >&2; exit 0 ;;
+  *) echo "build-bouncyhsm.sh: the BouncyHsm backend is supported on linux-x64 only, not ${RID}; skipped." >&2; exit 0 ;;
 esac
 
 BH_OUT="${OUT_BASE}/bouncyhsm"
@@ -56,8 +54,8 @@ echo "Publishing BouncyHsm server..."
 ) 2>&1
 
 echo "Building BouncyHsm native client for ${RID}..."
-# Upstream's Makefiles default to clang; `cc` is whatever the runner's toolchain provides
-# (gcc on ubuntu-latest's build-essential, Apple clang on macOS).
+# Upstream's Makefile defaults to clang; `cc` is whatever the runner's toolchain provides
+# (gcc on ubuntu-latest's build-essential).
 make -C "${SRC_DIR}/${MAKE_DIR}" CC=cc "${MAKE_TARGET}" 2>&1
 
 SRC_LIB="${SRC_DIR}/${MAKE_DIR}/${BUILT}"

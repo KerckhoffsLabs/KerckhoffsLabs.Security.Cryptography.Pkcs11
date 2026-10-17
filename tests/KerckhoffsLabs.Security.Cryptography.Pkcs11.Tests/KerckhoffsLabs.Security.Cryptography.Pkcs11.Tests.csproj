@@ -138,15 +138,13 @@
 
   <!-- Opt-in (-p:BuildBouncyHsm=true), like Kryoptic: a cold build publishes the vendored server
        (about 3 min, mostly restore), which a plain local build should not pay. Stages the server and
-       the native client under bin/<cfg>/<tfm>/bouncyhsm, where BouncyHsmBackendFixture looks. -->
-  <Target Name="BuildBouncyHsm" BeforeTargets="PrepareForBuild" Condition="'$(BuildBouncyHsm)' == 'true' AND '$(SkipBouncyHsmBuild)' != 'true'">
+       the native client under bin/<cfg>/<tfm>/bouncyhsm, where BouncyHsmBackendFixture looks. The
+       BouncyHsm backend is Linux-only; elsewhere the target does nothing and its tests skip. -->
+  <Target Name="BuildBouncyHsm" BeforeTargets="PrepareForBuild" Condition="'$(BuildBouncyHsm)' == 'true' AND '$(SkipBouncyHsmBuild)' != 'true' AND $([MSBuild]::IsOSPlatform('Linux'))">
     <PropertyGroup>
       <_BouncyHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_BouncyHsmOutputDir>
-      <_BouncyHsmRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_BouncyHsmRid>
-      <_BouncyHsmRid Condition="'$(_BouncyHsmRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_BouncyHsmRid>
     </PropertyGroup>
-    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-bouncyhsm.sh&quot; &quot;$(_BouncyHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
-    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-bouncyhsm.ps1&quot; -TestOutputDir &quot;$(_BouncyHsmOutputDir)&quot; -Rid &quot;$(_BouncyHsmRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-bouncyhsm.sh&quot; &quot;$(_BouncyHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
 </Project>

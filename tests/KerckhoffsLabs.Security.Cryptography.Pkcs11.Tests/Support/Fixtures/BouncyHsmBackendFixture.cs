@@ -7,8 +7,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// <summary>
 /// xUnit collection fixture for BouncyHsm (harrison314/BouncyHsm): a PKCS#11 v3.x soft HSM whose
 /// native client forwards every call over TCP to a .NET server built on BouncyCastle. It is a sixth,
-/// independent implementation alongside the mock, SoftHSM2, NSS, Kryoptic and opencryptoki, and the
-/// only real backend besides SoftHSM2 that runs on Windows and macOS.
+/// independent implementation alongside the mock, SoftHSM2, NSS, Kryoptic and opencryptoki. Supported on
+/// Linux x64 only; elsewhere <see cref="BouncyHsmAvailable"/> is false and its tests skip.
 ///
 /// Built from the vendor/bouncyhsm submodule by the opt-in BuildBouncyHsm MSBuild target
 /// (<see cref="Settings.BouncyHsmDirectory"/>). The fixture starts a private, in-memory server
@@ -36,8 +36,9 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when the token's mechanism list includes <paramref name="mechanism"/>.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
-    /// <summary>True when a BouncyHsm server and a native client for this RID are staged. Never starts a process.</summary>
-    public static bool BouncyHsmAvailable => ServerAssemblyPath() is not null && NativeLibraryPath() is not null;
+    /// <summary>True on Linux when a BouncyHsm server and a native client for this RID are staged. Never starts a process.</summary>
+    public static bool BouncyHsmAvailable =>
+        OperatingSystem.IsLinux() && ServerAssemblyPath() is not null && NativeLibraryPath() is not null;
 
     /// <summary>
     /// False while harrison314/BouncyHsm#115 is open: the client refuses <c>ulDataLen == 0</c> in
@@ -124,10 +125,7 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     internal static string? NativeLibraryPath()
     {
-        string fileName = OperatingSystem.IsWindows() ? "BouncyHsm.Pkcs11Lib.dll"
-            : OperatingSystem.IsMacOS() ? "libBouncyHsm.Pkcs11Lib.dylib"
-            : "BouncyHsm.Pkcs11Lib.so";
-        string path = Path.Join(Settings.BouncyHsmDirectory, "runtimes", SoftHsmBackendFixture.GetRid(), "native", fileName);
+        string path = Path.Join(Settings.BouncyHsmDirectory, "runtimes", SoftHsmBackendFixture.GetRid(), "native", "BouncyHsm.Pkcs11Lib.so");
         return File.Exists(path) ? path : null;
     }
 }

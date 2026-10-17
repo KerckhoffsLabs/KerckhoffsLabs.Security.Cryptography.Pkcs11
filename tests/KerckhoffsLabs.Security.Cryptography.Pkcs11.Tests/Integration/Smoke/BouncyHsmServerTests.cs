@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -12,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// </summary>
 [NoBackendCollection("Starts private BouncyHsm server processes on their own random ports and never " +
                      "loads the PKCS#11 client, so it shares no native state with the BouncyHsm collection.")]
-public sealed partial class BouncyHsmServerTests
+public sealed class BouncyHsmServerTests
 {
     private static string ServerDll => BouncyHsmBackendFixture.ServerAssemblyPath()!;
 
@@ -170,39 +169,6 @@ public sealed partial class BouncyHsmServerTests
         int slotB = b.CreateSlot("kl-b", "11111111", "11111111");
         Assert.True(slotA > 0 && slotB > 0);
     }
-
-    /// <summary>
-    /// On Windows a child created with handle inheritance gets every inheritable handle the test host
-    /// has open at that moment, such as SoftHSM's token files (opened with <c>_open</c>, no
-    /// <c>_O_NOINHERIT</c>). The server then holds them for its whole life and SoftHSM's
-    /// <c>C_DestroyObject</c> fails with <c>CKR_FUNCTION_FAILED</c>, because Windows will not delete a file
-    /// another process has open. The server must inherit only its own stdio.
-    /// </summary>
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void Start_DoesNotInheritTheTestHostsOpenHandles()
-    {
-        Assert.SkipUnless(OperatingSystem.IsWindows(), "Handle inheritance into a child process is a Windows behaviour.");
-        string path = Path.Join(Path.GetTempPath(), $"bh-inherit-{Guid.NewGuid():N}.tmp");
-        BouncyHsmServer server;
-        using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite))
-        {
-            Assert.True(SetHandleInformation(file.SafeFileHandle, HandleFlagInherit, HandleFlagInherit),
-                $"SetHandleInformation failed: {Marshal.GetLastPInvokeError()}");
-            server = BouncyHsmServer.Start(ServerDll);
-        }
-        using (server)
-        {
-            // Our handle is closed; the delete fails with a sharing violation only if the server holds one.
-            var ex = Record.Exception(() => File.Delete(path));
-            Assert.True(ex is null, $"The server inherited the test host's handle to {path}: {ex?.Message}");
-        }
-    }
-
-    private const uint HandleFlagInherit = 0x1;
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetHandleInformation(Microsoft.Win32.SafeHandles.SafeFileHandle handle, uint mask, uint flags);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void VerboseServer_KeepsRespondingAndOutputTailStaysBounded()
