@@ -63,10 +63,9 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmAcceptsNonZeroChaCha20Counter = false;
 
     /// <summary>
-    /// False while BouncyHsm runs the expand stage of a <c>CKM_HKDF_DERIVE</c> with <c>bExpand</c> false: an
-    /// extract-only derivation gives HKDF-Expand(PRK, empty info) instead of the PRK, against PKCS#11 v3.0
-    /// §2.43 (<c>HkdfDeriveKeyGenerator</c> in v2.3.3). BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent
-    /// fails once it is fixed.
+    /// False while harrison314/BouncyHsm#119 is open: a <c>CKM_HKDF_DERIVE</c> with <c>bExpand</c> false still
+    /// runs the expand stage, so an extract-only derivation gives HKDF-Expand(PRK, empty info) instead of the
+    /// PRK, against PKCS#11 v3.0 §2.43. BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmHonoursHkdfExtractOnly = false;
 

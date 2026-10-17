@@ -14,7 +14,7 @@ public sealed class HkdfTests_BouncyHsm(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ExpandOnly_MatchesBcl() => HkdfTestCases.Assert_ExpandOnly_MatchesBcl(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfExtractOnlyAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm also expands an extract-only HKDF")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfExtractOnlyAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "harrison314/BouncyHsm#119: an extract-only HKDF is also expanded")]
     public void ExtractOnly_MatchesBcl() => HkdfTestCases.Assert_ExtractOnly_MatchesBcl(_backend);
 
     // Sign-probe variants: same derivations, verified without reading CKA_VALUE — see
@@ -26,6 +26,6 @@ public sealed class HkdfTests_BouncyHsm(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ExpandOnly_MatchesBclViaSignProbe() => HkdfTestCases.Assert_ExpandOnly_MatchesBclViaSignProbe(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfExtractOnlyAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm also expands an extract-only HKDF")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfExtractOnlyAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "harrison314/BouncyHsm#119: an extract-only HKDF is also expanded")]
     public void ExtractOnly_MatchesBclViaSignProbe() => HkdfTestCases.Assert_ExtractOnly_MatchesBclViaSignProbe(_backend);
 }

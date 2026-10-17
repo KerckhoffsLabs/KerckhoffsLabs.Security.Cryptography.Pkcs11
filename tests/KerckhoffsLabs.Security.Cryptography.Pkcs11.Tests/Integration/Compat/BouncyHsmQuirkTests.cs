@@ -122,9 +122,9 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
 
             byte[] prk = HKDF.Extract(HashAlgorithmName.SHA256, ikm, salt);
             Assert.True(value.AsSpan().SequenceEqual(HKDF.Expand(HashAlgorithmName.SHA256, prk, 32)),
-                "BouncyHsm's extract-only HKDF no longer expands the PRK" +
+                "harrison314/BouncyHsm#119 looks fixed (an extract-only HKDF no longer expands the PRK" +
                 (value.AsSpan().SequenceEqual(prk) ? " and returns the PRK" : "") +
-                ": set BouncyHsmBackendFixture.BouncyHsmHonoursHkdfExtractOnly to true and delete this test.");
+                "): set BouncyHsmBackendFixture.BouncyHsmHonoursHkdfExtractOnly to true and delete this test.");
         }
         finally { ikmKey.Destroy(); }
     }

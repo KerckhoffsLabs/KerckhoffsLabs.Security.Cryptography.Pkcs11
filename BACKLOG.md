@@ -1885,13 +1885,13 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-165] Lift the BouncyHsm extract-only HKDF gate once BouncyHsm returns the PRK
+### [BL-165] Lift the BouncyHsm extract-only HKDF gate once harrison314/BouncyHsm#119 ships
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
 - **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmHonoursHkdfExtractOnly`)
-- **Problem:** BouncyHsm v2.3.3's `HkdfDeriveKeyGenerator` runs the expand stage even when `bExpand` is false, so an extract-only `CKM_HKDF_DERIVE` gives HKDF-Expand(PRK, empty info) instead of the PRK (PKCS#11 v3.0 §2.43). The four extract-only HKDF cases skip. No upstream issue has been filed yet.
-- **Proposed action:** File the issue upstream. After a bump with the fix, `BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Problem:** BouncyHsm v2.3.3's `HkdfDeriveKeyGenerator` runs the expand stage even when `bExpand` is false, so an extract-only `CKM_HKDF_DERIVE` gives HKDF-Expand(PRK, empty info) instead of the PRK (PKCS#11 v3.0 §2.43). The four extract-only HKDF cases skip.
+- **Proposed action:** After a bump with the fix, `BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
