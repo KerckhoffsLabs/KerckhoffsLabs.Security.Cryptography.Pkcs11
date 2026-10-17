@@ -31,6 +31,7 @@ public sealed class TestCollectionConventionTests
         ("_Nss", "Nss"),
         ("_OpenCryptoki", "OpenCryptoki"),
         ("_Kryoptic", "Kryoptic"),
+        ("_BouncyHsm", "BouncyHsm"),
     ];
 
     // -----------------------------------------------------------------------------------------
