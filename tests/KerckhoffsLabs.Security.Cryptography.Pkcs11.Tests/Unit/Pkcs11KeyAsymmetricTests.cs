@@ -367,7 +367,7 @@ public sealed class Pkcs11KeyAsymmetricTests
         using var macTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Sign().Build();
         using Pkcs11Key macKey = z.Derive(
             new Mechanism(CKM.CKM_HKDF_DERIVE,
-                CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, HkdfSalt, HkdfInfo)),
+                CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, HkdfSalt, HkdfInfo)),
             macTemplate);
         byte[] tag = macKey.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), ProbeMessage);
 
