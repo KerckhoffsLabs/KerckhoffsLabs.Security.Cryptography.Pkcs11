@@ -124,7 +124,8 @@ internal sealed partial class ManagedSoftToken
 
     // CKM_HKDF_DERIVE (RFC 5869) over the BCL HKDF. Extract-only yields the PRK (one hash length, as
     // PKCS#11 specifies); expand-only treats the base key's value as the PRK. SALT_NULL is the RFC
-    // default salt, SALT_KEY reads the salt from another key object.
+    // default salt, SALT_KEY reads the salt from another key object. prfHashMechanism is the "base hash
+    // used for the HMAC" (PKCS#11 v3.0 §2.43): an _HMAC mechanism is refused, as BouncyHsm refuses it.
     private bool TryDeriveHkdf(byte[] baseKey, ref CK_MECHANISM mech, int valueLen, out byte[] derived)
     {
         derived = [];
@@ -132,12 +133,12 @@ internal sealed partial class ManagedSoftToken
         HashAlgorithmName hash;
         switch ((CKM)(ulong)p.PrfHashMechanism)
         {
-            case CKM.CKM_SHA256_HMAC or CKM.CKM_SHA256: hash = HashAlgorithmName.SHA256; break;
-            case CKM.CKM_SHA384_HMAC or CKM.CKM_SHA384: hash = HashAlgorithmName.SHA384; break;
-            case CKM.CKM_SHA512_HMAC or CKM.CKM_SHA512: hash = HashAlgorithmName.SHA512; break;
-            case CKM.CKM_SHA3_256_HMAC or CKM.CKM_SHA3_256: hash = HashAlgorithmName.SHA3_256; break;
-            case CKM.CKM_SHA3_384_HMAC or CKM.CKM_SHA3_384: hash = HashAlgorithmName.SHA3_384; break;
-            case CKM.CKM_SHA3_512_HMAC or CKM.CKM_SHA3_512: hash = HashAlgorithmName.SHA3_512; break;
+            case CKM.CKM_SHA256: hash = HashAlgorithmName.SHA256; break;
+            case CKM.CKM_SHA384: hash = HashAlgorithmName.SHA384; break;
+            case CKM.CKM_SHA512: hash = HashAlgorithmName.SHA512; break;
+            case CKM.CKM_SHA3_256: hash = HashAlgorithmName.SHA3_256; break;
+            case CKM.CKM_SHA3_384: hash = HashAlgorithmName.SHA3_384; break;
+            case CKM.CKM_SHA3_512: hash = HashAlgorithmName.SHA3_512; break;
             default: return false;
         }
 

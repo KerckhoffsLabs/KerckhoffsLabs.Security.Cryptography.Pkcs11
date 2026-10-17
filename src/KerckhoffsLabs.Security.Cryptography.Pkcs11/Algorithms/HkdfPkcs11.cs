@@ -38,7 +38,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </remarks>
 public static class HkdfPkcs11
 {
-    /// <summary>A supported HKDF hash: its PRF mechanism and output length.</summary>
+    /// <summary>
+    /// A supported HKDF hash: the mechanism for <c>CK_HKDF_PARAMS.prfHashMechanism</c> and the hash's output
+    /// length. PKCS#11 v3.0 §2.43 has that field name the "base hash used for the HMAC", so it is the bare hash
+    /// (<c>CKM_SHA256</c>), not its <c>_HMAC</c> mechanism, which a token following the spec refuses.
+    /// </summary>
     private readonly record struct Prf(CKM Mechanism, int HashLength)
     {
         /// <summary>RFC 5869 §2.3: the output keying material is at most 255 · HashLen bytes.</summary>
@@ -296,12 +300,12 @@ public static class HkdfPkcs11
     // which HKDF accepts, are refused: the library's KDF adapters do not offer broken hashes as a PRF.
     private static Prf PrfFor(HashAlgorithmName hashAlgorithmName) => hashAlgorithmName.Name switch
     {
-        "SHA256" => new Prf(CKM.CKM_SHA256_HMAC, 32),
-        "SHA384" => new Prf(CKM.CKM_SHA384_HMAC, 48),
-        "SHA512" => new Prf(CKM.CKM_SHA512_HMAC, 64),
-        "SHA3-256" => new Prf(CKM.CKM_SHA3_256_HMAC, 32),
-        "SHA3-384" => new Prf(CKM.CKM_SHA3_384_HMAC, 48),
-        "SHA3-512" => new Prf(CKM.CKM_SHA3_512_HMAC, 64),
+        "SHA256" => new Prf(CKM.CKM_SHA256, 32),
+        "SHA384" => new Prf(CKM.CKM_SHA384, 48),
+        "SHA512" => new Prf(CKM.CKM_SHA512, 64),
+        "SHA3-256" => new Prf(CKM.CKM_SHA3_256, 32),
+        "SHA3-384" => new Prf(CKM.CKM_SHA3_384, 48),
+        "SHA3-512" => new Prf(CKM.CKM_SHA3_512, 64),
         "SHA1" or "MD5" => throw new NotSupportedException(
             $"{hashAlgorithmName.Name} is broken and not offered as an HKDF PRF; use SHA256, SHA384, SHA512 or SHA3."),
         _ => throw new ArgumentOutOfRangeException(nameof(hashAlgorithmName), hashAlgorithmName.Name,

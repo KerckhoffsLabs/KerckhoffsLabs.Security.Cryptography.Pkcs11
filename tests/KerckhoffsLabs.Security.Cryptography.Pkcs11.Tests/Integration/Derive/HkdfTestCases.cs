@@ -100,7 +100,7 @@ internal static class HkdfTestCases
             byte[] expected = HKDF.DeriveKey(HashAlgorithmName.SHA256, Ikm, length, Salt, Info);
 
             var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
-                CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, Salt, Info));
+                CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, Salt, Info));
 
             byte[] actual = DeriveAndReadValue(ikmKey, mechanism, length);
 
@@ -118,7 +118,7 @@ internal static class HkdfTestCases
             HKDF.Expand(HashAlgorithmName.SHA256, Ikm, expected, Info);
 
             var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
-                CkmHkdfParams.WithoutSalt(HkdfOperation.ExpandOnly, CKM.CKM_SHA256_HMAC, Info));
+                CkmHkdfParams.WithoutSalt(HkdfOperation.ExpandOnly, CKM.CKM_SHA256, Info));
 
             byte[] actual = DeriveAndReadValue(ikmKey, mechanism, length);
 
@@ -133,7 +133,7 @@ internal static class HkdfTestCases
             byte[] expected = HKDF.Extract(HashAlgorithmName.SHA256, Ikm, Salt);
 
             var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
-                CkmHkdfParams.WithSalt(HkdfOperation.ExtractOnly, CKM.CKM_SHA256_HMAC, Salt));
+                CkmHkdfParams.WithSalt(HkdfOperation.ExtractOnly, CKM.CKM_SHA256, Salt));
 
             byte[] actual = DeriveAndReadValue(ikmKey, mechanism, expected.Length);
 
@@ -152,7 +152,7 @@ internal static class HkdfTestCases
             byte[] expectedMac = ExpectedProbeMac(expectedDerived);
 
             var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
-                CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, Salt, Info));
+                CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, Salt, Info));
 
             byte[] actualMac = DeriveAndProbe(ikmKey, mechanism, length);
 
@@ -171,7 +171,7 @@ internal static class HkdfTestCases
             byte[] expectedMac = ExpectedProbeMac(expectedDerived);
 
             var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
-                CkmHkdfParams.WithoutSalt(HkdfOperation.ExpandOnly, CKM.CKM_SHA256_HMAC, Info));
+                CkmHkdfParams.WithoutSalt(HkdfOperation.ExpandOnly, CKM.CKM_SHA256, Info));
 
             byte[] actualMac = DeriveAndProbe(ikmKey, mechanism, length);
 
@@ -188,7 +188,7 @@ internal static class HkdfTestCases
             byte[] expectedMac = ExpectedProbeMac(expectedDerived);
 
             var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
-                CkmHkdfParams.WithSalt(HkdfOperation.ExtractOnly, CKM.CKM_SHA256_HMAC, Salt));
+                CkmHkdfParams.WithSalt(HkdfOperation.ExtractOnly, CKM.CKM_SHA256, Salt));
 
             byte[] actualMac = DeriveAndProbe(ikmKey, mechanism, expectedDerived.Length);
 

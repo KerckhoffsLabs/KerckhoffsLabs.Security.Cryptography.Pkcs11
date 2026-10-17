@@ -44,7 +44,7 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// HashLen zero bytes.
     /// </summary>
     /// <param name="operation">Which HKDF step(s) to perform.</param>
-    /// <param name="prfHashMechanism">PRF mechanism (typically a CKM_*_HMAC variant).</param>
+    /// <param name="prfHashMechanism">The base hash of the HMAC PRF, such as <c>CKM_SHA256</c> (PKCS#11 v3.0 §2.43). Some tokens also take the <c>CKM_*_HMAC</c> mechanism, but one following the spec refuses it.</param>
     /// <param name="info">Application-specific context bytes.</param>
     /// <returns>The parameters.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="operation"/> is not a defined <see cref="HkdfOperation"/> member.</exception>
@@ -55,7 +55,7 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// HKDF parameters salted with <paramref name="salt"/> (<c>CKF_HKDF_SALT_DATA</c>).
     /// </summary>
     /// <param name="operation">Which HKDF step(s) to perform.</param>
-    /// <param name="prfHashMechanism">PRF mechanism (typically a CKM_*_HMAC variant).</param>
+    /// <param name="prfHashMechanism">The base hash of the HMAC PRF, such as <c>CKM_SHA256</c> (PKCS#11 v3.0 §2.43). Some tokens also take the <c>CKM_*_HMAC</c> mechanism, but one following the spec refuses it.</param>
     /// <param name="salt">Salt bytes. Must not be empty.</param>
     /// <param name="info">Application-specific context bytes.</param>
     /// <returns>The parameters.</returns>
@@ -78,7 +78,7 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// is refused there.
     /// </remarks>
     /// <param name="operation">Which HKDF step(s) to perform.</param>
-    /// <param name="prfHashMechanism">PRF mechanism (typically a CKM_*_HMAC variant).</param>
+    /// <param name="prfHashMechanism">The base hash of the HMAC PRF, such as <c>CKM_SHA256</c> (PKCS#11 v3.0 §2.43). Some tokens also take the <c>CKM_*_HMAC</c> mechanism, but one following the spec refuses it.</param>
     /// <param name="saltKey">The key whose value is the salt.</param>
     /// <param name="info">Application-specific context bytes.</param>
     /// <returns>The parameters.</returns>
@@ -92,7 +92,7 @@ public sealed class CkmHkdfParams : MechanismParameters
         return new(operation, prfHashMechanism, HkdfSaltType.Key, default, saltKey, info);
     }
 
-    /// <summary>The PRF hash mechanism (typically a <c>CKM_*_HMAC</c> variant, or the bare hash), for policy evaluation.</summary>
+    /// <summary>The PRF hash mechanism (the bare hash, or the <c>CKM_*_HMAC</c> form some tokens accept), for policy evaluation.</summary>
     internal CKM PrfHashMechanism => _prfHashMechanism;
 
     /// <inheritdoc/>
