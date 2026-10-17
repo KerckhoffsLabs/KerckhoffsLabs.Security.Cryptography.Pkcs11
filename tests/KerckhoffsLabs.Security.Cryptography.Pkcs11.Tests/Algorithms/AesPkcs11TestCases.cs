@@ -176,17 +176,43 @@ internal static class AesPkcs11TestCases
         finally { DestroyByLabel(session, label); }
     }
 
-    internal static void Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(IPkcs11Backend backend) =>
+    // Empty CBC input follows the BCL: unpadded it is a no-op, and padded decryption is refused, since a padded
+    // ciphertext holds at least one block (returning empty would accept a ciphertext with no padding at all).
+    internal static void Assert_Cbc_EmptyInput_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedAes(backend, (session, aes) =>
         {
             // The empty-input fast path still honors the gate: without the AllowInsecure policy the gated mechanism
             // throws before the (empty) buffer reaches the token.
             Assert.Throws<CryptoPolicyViolationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
 
-            // Under the AllowInsecure policy, empty input is a no-op returned without touching the token.
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-            Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+            using var bcl = BclAes();
+            Assert.ThrowsAny<CryptographicException>(() => bcl.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+            Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16, PaddingMode.None));
         });
+
+    // A ciphertext whose padding is wrong, or that is not a whole number of blocks, is refused with a
+    // CryptographicException as in the BCL, and the session still decrypts afterwards. NSS hardened exactly this
+    // check (Bug 2029448, Bug 1591315); SoftHSM2 ends the operation on it since a8d6c5f.
+    internal static void Assert_DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_AES_CBC, CKM.CKM_AES_CBC_PAD);
+        WithImportedAes(backend, (session, aes) =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+            // A block whose plaintext ends in 0x00 never carries valid PKCS#7 padding.
+            byte[] zeroBlock = aes.EncryptCbc(new byte[16], Iv16, PaddingMode.None);
+            using (var bcl = BclAes())
+                Assert.ThrowsAny<CryptographicException>(() => bcl.DecryptCbc(zeroBlock, Iv16));
+            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(zeroBlock, Iv16));
+            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(zeroBlock.AsSpan(0, 15), Iv16));
+
+            byte[] plaintext = Encoding.UTF8.GetBytes("after a padding error");
+            Assert.Equal(plaintext, aes.DecryptCbc(aes.EncryptCbc(plaintext, Iv16), Iv16));
+        });
+    }
 
     internal static void Assert_ManagedKeyAndStreamingSurface_NotSupported(IPkcs11Backend backend) =>
         WithImportedAes(backend, (_, aes) =>
