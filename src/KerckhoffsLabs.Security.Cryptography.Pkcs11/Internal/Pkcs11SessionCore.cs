@@ -587,14 +587,21 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         public void Completed() => _session._operationsInProgress = _outer;
 
         /// <summary>
-        /// Records that the verify call that finishes the operation returned <paramref name="rv"/>. Every
-        /// code ends the operation (PKCS#11 v3.2 §5.2), but a module may leave it active after
-        /// <c>CKR_SIGNATURE_LEN_RANGE</c> (Kryoptic does): that one is left to the cancel on disposal, which
-        /// finds nothing to cancel on a module that ended it.
+        /// Records the end of a verify when <paramref name="rv"/> is a verdict (<see cref="CKR.CKR_OK"/> or
+        /// <see cref="CKR.CKR_SIGNATURE_INVALID"/>); any other result leaves it in progress, for
+        /// <see cref="Dispose"/> to cancel.
         /// </summary>
-        public void CompletedVerify(CKR rv)
+        /// <remarks>
+        /// The spec has <c>C_Verify</c>, <c>C_VerifyFinal</c> and <c>C_VerifySignature*</c> end the operation
+        /// whatever they return, but modules do not all agree: Kryoptic answers a signature of the wrong
+        /// length with CKR_SIGNATURE_LEN_RANGE before it finalizes, and SoftHSM2 returns CKR_ARGUMENTS_BAD
+        /// from C_Verify without ending it, either of which leaves the next C_VerifyInit with
+        /// CKR_OPERATION_ACTIVE. Cancelling an operation the module did end costs one
+        /// <c>C_SessionCancel</c>, answered with CKR_OPERATION_NOT_INITIALIZED, which is ignored.
+        /// </remarks>
+        public void CompletedIfVerdict(CKR rv)
         {
-            if (rv != CKR.CKR_SIGNATURE_LEN_RANGE)
+            if (rv is CKR.CKR_OK or CKR.CKR_SIGNATURE_INVALID)
                 Completed();
         }
 

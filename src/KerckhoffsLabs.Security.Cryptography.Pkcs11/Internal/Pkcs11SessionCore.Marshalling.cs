@@ -61,7 +61,8 @@ internal sealed partial class Pkcs11SessionCore
 
     /// <summary>
     /// Interprets a verify return value: <see langword="true"/> on <see cref="CKR.CKR_OK"/>, <see langword="false"/> on
-    /// <see cref="CKR.CKR_SIGNATURE_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_LEN_RANGE"/>, and throws
+    /// <see cref="CKR.CKR_SIGNATURE_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_LEN_RANGE"/> (a signature that is
+    /// invalid on its length alone, as SoftHSM2 and Kryoptic report a truncated one), and throws
     /// <see cref="Pkcs11Exception"/> for any other code (tagged with <paramref name="operation"/>).
     /// </summary>
     /// <remarks>
@@ -75,6 +76,20 @@ internal sealed partial class Pkcs11SessionCore
         if (rv is CKR.CKR_SIGNATURE_INVALID or CKR.CKR_SIGNATURE_LEN_RANGE) return false;
         throw Pkcs11Exception.Create(rv, operation);
     }
+
+    /// <summary>
+    /// <see cref="IsVerified(CKR, string)"/>, and, for a MAC whose length the mechanism fixes, a
+    /// <paramref name="signatureLength"/> of exactly that length.
+    /// </summary>
+    /// <remarks>
+    /// The module's answer is not enough on its own: NSS since 3.126 compares only the first
+    /// <c>min(macLen, sigLen)</c> bytes of a non-general HMAC and leaves the length to the caller, so it
+    /// answers <see cref="CKR.CKR_OK"/> for a truncated or empty MAC. The module is still called, so a
+    /// key or mechanism error surfaces as it would for a MAC of the right length.
+    /// </remarks>
+    private static bool IsVerified(CKR rv, string operation, CKM mechanism, int signatureLength)
+        => IsVerified(rv, operation)
+           && signatureLength == (KnownOutputLength.Of(mechanism) ?? signatureLength);
 
     /// <summary>One step of a Cryptoki two-call length probe: invoke with <paramref name="lengthOnly"/> to
     /// learn the size, then again with the allocated buffer. Capacity comes from the buffer itself, so
