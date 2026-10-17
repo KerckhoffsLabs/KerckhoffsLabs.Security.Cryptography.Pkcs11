@@ -89,6 +89,19 @@ public static class Settings
     public static string? KryopticLibraryPath =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_KRYOPTIC_LIBRARY");
 
+    /// <summary>
+    /// Directory holding a BouncyHsm build (<c>server/BouncyHsm.dll</c> plus
+    /// <c>runtimes/&lt;rid&gt;/native/</c>). Falls back to the <c>bouncyhsm</c> directory the
+    /// BuildBouncyHsm MSBuild target stages next to the test assembly.
+    /// </summary>
+    public static string BouncyHsmDirectory =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_DIR")
+        ?? Path.Join(AppContext.BaseDirectory, "bouncyhsm");
+
+    /// <summary>Label of the token the BouncyHsm fixture creates on its private server.</summary>
+    public static string BouncyHsmTokenLabel =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_TOKEN") ?? "kl-bouncyhsm";
+
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;

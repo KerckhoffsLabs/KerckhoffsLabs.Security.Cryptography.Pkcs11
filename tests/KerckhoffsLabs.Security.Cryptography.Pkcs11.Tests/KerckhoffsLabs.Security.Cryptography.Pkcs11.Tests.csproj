@@ -62,7 +62,7 @@
   </ItemGroup>
 
   <!-- SkipNativeBuilds=true skips every native build below (pkcs11-mock, the ABI oracle, the gate
-       shims, SoftHSM and Kryoptic), for a managed-only build that needs neither the submodules nor a
+       shims, SoftHSM, Kryoptic and BouncyHsm), for a managed-only build that needs neither the submodules nor a
        C toolchain. Each target keeps its own Skip* switch; a value passed on the command line still
        wins over this one. -->
   <PropertyGroup Condition="'$(SkipNativeBuilds)' == 'true'">
@@ -71,6 +71,7 @@
     <SkipPkcs11GateBuild>true</SkipPkcs11GateBuild>
     <SkipSoftHsmV2Build>true</SkipSoftHsmV2Build>
     <BuildKryoptic>false</BuildKryoptic>
+    <BuildBouncyHsm>false</BuildBouncyHsm>
   </PropertyGroup>
 
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
@@ -133,6 +134,17 @@
       <_KryopticOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_KryopticOutputDir>
     </PropertyGroup>
     <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-kryoptic.sh&quot; &quot;$(_KryopticOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <!-- Opt-in (-p:BuildBouncyHsm=true), like Kryoptic: a cold build publishes the vendored server
+       (about 3 min, mostly restore), which a plain local build should not pay. Stages the server and
+       the native client under bin/<cfg>/<tfm>/bouncyhsm, where BouncyHsmBackendFixture looks. The
+       BouncyHsm backend is Linux-only; elsewhere the target does nothing and its tests skip. -->
+  <Target Name="BuildBouncyHsm" BeforeTargets="PrepareForBuild" Condition="'$(BuildBouncyHsm)' == 'true' AND '$(SkipBouncyHsmBuild)' != 'true' AND $([MSBuild]::IsOSPlatform('Linux'))">
+    <PropertyGroup>
+      <_BouncyHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_BouncyHsmOutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-bouncyhsm.sh&quot; &quot;$(_BouncyHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
 </Project>

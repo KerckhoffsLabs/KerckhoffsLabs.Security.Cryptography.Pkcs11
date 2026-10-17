@@ -53,15 +53,35 @@ So **every test class under `Integration/` must declare one of two things**:
 
 | Declaration | When |
 |-------------|------|
-| `[Collection("Mock" \| "SoftHsm" \| "Nss" \| "OpenCryptoki" \| "MemoryLeaks")]` | It drives that backend — the collection serializes its tests and owns the module lifetime. |
+| `[Collection("Mock" \| "SoftHsm" \| "Nss" \| "OpenCryptoki" \| "Kryoptic" \| "BouncyHsm" \| "MemoryLeaks")]` | It drives that backend — the collection serializes its tests and owns the module lifetime. |
 | `[NoBackendCollection("why")]` | It touches no process-global native state (in-process `ManagedSoftToken`, or a static `File.Exists` availability probe). |
 
 `Unit/Architecture/TestCollectionConventionTests` enforces this, so a forgotten `[Collection]` fails
 deterministically at the moment the class is added instead of surfacing later as an intermittent
 native-state corruption. It also checks, across the whole assembly (`Algorithms/` included), that a
-class named `*_Mock` / `*_SoftHsm` / `*_Nss` / `*_OpenCryptoki` joins the matching collection, that
+class named `*_Mock` / `*_SoftHsm` / `*_Nss` / `*_OpenCryptoki` / `*_Kryoptic` / `*_BouncyHsm` joins the matching collection, that
 an injected collection fixture is actually supplied by the declared collection, and that no
 `[Collection]` names a definition that doesn't exist.
 
 Note that a collection **serializes its members**, so don't park unrelated classes in one to satisfy
 the rule — `[NoBackendCollection]` exists precisely so parallel-safe classes stay parallel.
+
+## Running against BouncyHsm locally
+
+BouncyHsm is built from `vendor/bouncyhsm` by an opt-in target (a cold build publishes the server,
+about 3 minutes):
+
+```bash
+git submodule update --init vendor/bouncyhsm
+dotnet test --project tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests -c Release -p:BuildBouncyHsm=true
+```
+
+You don't start anything yourself. `BouncyHsmBackendFixture` starts a private, in-memory server on
+random loopback ports, creates its token, and kills the server when the run ends. A test host that is
+killed hard can leave that server behind. It holds nothing on disk and doesn't affect the next run,
+but you may want to end it (`pkill -f 'bouncyhsm/server/BouncyHsm.dll'`, which matches only the copy the
+build staged next to the test assembly).
+
+The BouncyHsm backend is supported on Linux x64 only, and CI runs it on ubuntu-latest, like the other
+extra backends. On any other platform the build target does nothing and the BouncyHsm tests skip.
+Known BouncyHsm bugs are gated on `BouncyHsmBackendFixture` (see `BouncyHsmQuirkTests`).

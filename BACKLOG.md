@@ -4,8 +4,8 @@ _Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist d
 
 ## Summary
 
-- Total items: 160 (59 resolved, 101 open)
-- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (60 open, 27 resolved) | Low: 41 (28 open, 13 resolved)
+- Total items: 166 (59 resolved, 107 open)
+- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (60 open, 27 resolved) | Low: 47 (34 open, 13 resolved)
 - Headline risks:
   - **The advertised streaming surface does not exist, and the previous coverage matrix said it did.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer — `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099). Two matrix rows have been corrected below.
   - **Nine public-API decisions are cheap now and SemVer-major later — seven of them now settled.** Exceptions did not derive from `CryptographicException`, so `catch (CryptographicException)` around the BCL-shaped façades silently failed; they now do (BL-063, resolved); `ECCurve` collided with `System.Security.Cryptography.ECCurve` and is now `Pkcs11ECCurve`, with a reflection guard against the next such clash (BL-066, resolved); 96 `CKF`/`CK`/`CKZ` constants published the platform-width-dependent third-party `NativeCULong` and are now `ulong`, with that package gone from the public surface entirely (BL-067, resolved); every `CK_VERSION` reached the API as a lossy string in which a v3.1 module rendered as `"3.01"` and is now a comparable `System.Version` (BL-068, resolved); `LoadStaticallyLinked()` could not work on any shipped RID because `__Internal` is Mono-only, and now resolves against the entry-point module instead (BL-064, resolved); the secure-defaults key generators granted conflicting roles on one key and are now split into role-specific helpers (BL-070, resolved); and `CloseAllSessions()`'s bookkeeping gap was closed by removing the method from the public surface, its only legitimate use being narrow enough that disposing tracked sessions/sessions is the supported path (BL-071, resolved). `AdditionalDerivedKeys` now returns hydrated `Pkcs11Key` instances instead of raw `ulong` handles (BL-069, resolved). Only BL-065 (`Verify` throwing instead of returning `false`) remains open. The set is BL-063 – BL-071.
@@ -1844,6 +1844,66 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Resolution:** `EncapsulateKeyTests.Kryoptic.cs` and `EncapsulateKeyTests.SoftHsm2.cs` now both have `RsaOaep_EncapsulateDecapsulate_RoundTrips` and `Ecdh1_EncapsulateDecapsulate_RoundTrips` running for real — three backends exercise this now, not one. Revisit again only if the remaining gap (NSS) changes.
 - **Breaks public API?** No (added `CkmEcdh1DeriveParams.ForEncapsulation`, purely additive)
 - **Raised by:** Cross-referencing kryoptic#432 against this wrapper's own test coverage
+
+### [BL-161] Lift the BouncyHsm empty-input gate once harrison314/BouncyHsm#115 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsEmptyInput`)
+- **Problem:** BouncyHsm v2.3.3 refuses zero-length data in `C_Digest`/`C_DigestUpdate`/`C_Verify` (`CKR_ARGUMENTS_BAD`) and `C_Sign` (`CKR_GENERAL_ERROR`), so the EmptyInput SHA-256 and HMAC cases skip on it.
+- **Proposed action:** After a `vendor/bouncyhsm` bump that includes the fix, `BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent`/`EmptyHmac_QuirkStillPresent` fail. Then set the flag to true and delete both tests.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-162] Lift the BouncyHsm out-of-range-signature gate once harrison314/BouncyHsm#116 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmRejectsOutOfRangeSignatures`)
+- **Problem:** An RSA-PSS signature at or above the modulus gives `CKR_GENERAL_ERROR` instead of `CKR_SIGNATURE_INVALID`, so `SignVerifyData_Pss_RoundTrips` skips on BouncyHsm.
+- **Proposed action:** After the bump, `BouncyHsmQuirkTests.OutOfRangePssSignature_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-163] Recheck BouncyHsm against harrison314/BouncyHsm#114 after the fix ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11SessionCore.Encryption.cs` (the length-query fallback for a `CKR_BUFFER_TOO_SMALL` that reports no length)
+- **Problem:** BouncyHsm returns `CKR_BUFFER_TOO_SMALL` without the required length. Once the library tolerates this, nothing is gated, but the fallback is the only path BouncyHsm exercises.
+- **Proposed action:** Once a bump includes the upstream fix, confirm the RSA encrypt wrappers still pass, then confirm the fallback stays covered by its fake-module unit test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-164] Lift the BouncyHsm ChaCha20 block-counter gate once harrison314/BouncyHsm#118 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsNonZeroChaCha20Counter`)
+- **Problem:** BouncyHsm v2.3.3 refuses any initial block counter but 0 for raw `CKM_CHACHA20` (`CKR_GENERAL_ERROR`), so `RawChaCha20Tests_BouncyHsm.Encrypt_MatchesBclChaCha20Poly1305Keystream` and `Decrypt_WrongCounter_ProducesGarbageNotException` skip.
+- **Proposed action:** After the bump, `BouncyHsmQuirkTests.NonZeroChaCha20Counter_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-165] Lift the BouncyHsm extract-only HKDF gate once harrison314/BouncyHsm#119 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmHonoursHkdfExtractOnly`)
+- **Problem:** BouncyHsm v2.3.3's `HkdfDeriveKeyGenerator` runs the expand stage even when `bExpand` is false, so an extract-only `CKM_HKDF_DERIVE` gives HKDF-Expand(PRK, empty info) instead of the PRK (PKCS#11 v3.0 §2.43). The four extract-only HKDF cases skip.
+- **Proposed action:** After a bump with the fix, `BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-166] Ed25519 CKA_EC_POINT encoding and RFC 5958 v2 PKCS#8 in the shared test cases
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/TestKeys.cs` (`CreateEd25519PublicKey`); `Integration/Keys/WrapUnwrapCurve25519TestCases.cs`
+- **Problem:** Two shared cases are left out on BouncyHsm because of how the test cases encode, not because of the library. `TestKeys.CreateEd25519PublicKey` writes `CKA_EC_POINT` as a DER OCTET STRING (`04 20 <point>`), as SoftHSM expects; BouncyHsm takes only the raw 32-byte point that PKCS#11 v3.0 describes, so `Ed25519_Kat` cannot run on it. And BouncyHsm wraps Curve25519 private keys as an RFC 5958 OneAsymmetricKey v2 (public key included), which the Curve25519 wrap cases reject because they compare with the exact v1 bytes.
+- **Proposed action:** Decide which `CKA_EC_POINT` form the library and its helpers should send for Edwards keys (raw per the spec, or per-token), and let the Curve25519 cases accept a v2 encoding, then enable both on BouncyHsm.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
 
 ## PKCS#11 v3.2 Coverage Matrix
 

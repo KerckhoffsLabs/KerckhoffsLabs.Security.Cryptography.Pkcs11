@@ -2,6 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -19,6 +20,8 @@ public sealed class Pkcs11SessionCoreTokenQuirkTests
     private const ulong SessionId = 21;
     private static readonly ObjectHandle Key = new(2);
     private static readonly ObjectHandle WrappingKey = new(3);
+    private static readonly Mechanism Oaep =
+        new(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
 
     // NSS softoken's classic C_Encrypt ends the operation on CKR_BUFFER_TOO_SMALL, where the spec (§5.2)
     // keeps it active for the retry. Encrypt re-initializes, queries the length and encrypts once.
@@ -29,6 +32,21 @@ public sealed class Pkcs11SessionCoreTokenQuirkTests
         using var session = fake.CreateSession(SessionId);
 
         byte[] ciphertext = session.Encrypt(new Mechanism(CKM.CKM_AES_GCM), Key, [1, 2, 3]);
+
+        Assert.Equal(EndsOnBufferTooSmallFake.Ciphertext, ciphertext);
+        Assert.Equal(2, fake.Inits);
+    }
+
+    // For RSA, NSS softoken's classic C_Encrypt both leaves the length unset on CKR_BUFFER_TOO_SMALL and
+    // ends the operation, so the length query that follows fails with CKR_OPERATION_NOT_INITIALIZED.
+    // Encrypt re-initializes and queries again.
+    [Fact]
+    public void Encrypt_WhenTheTokenEndsTheOperationAndLeavesTheLengthUnset_ReinitializesAndEncrypts()
+    {
+        using var fake = new EndsOnBufferTooSmallFake(reportsLength: false);
+        using var session = fake.CreateSession(SessionId);
+
+        byte[] ciphertext = session.Encrypt(Oaep, Key, [1, 2, 3]);
 
         Assert.Equal(EndsOnBufferTooSmallFake.Ciphertext, ciphertext);
         Assert.Equal(2, fake.Inits);
@@ -129,9 +147,10 @@ public sealed class Pkcs11SessionCoreTokenQuirkTests
 
     /// <summary>
     /// Produces more ciphertext than the session's first buffer holds and, like NSS, ends the operation when
-    /// it reports <c>CKR_BUFFER_TOO_SMALL</c>.
+    /// it reports <c>CKR_BUFFER_TOO_SMALL</c>, setting the length it needs then only when
+    /// <paramref name="reportsLength"/> (NSS does for AES, not for RSA).
     /// </summary>
-    private sealed class EndsOnBufferTooSmallFake : SessionTestModule
+    private sealed class EndsOnBufferTooSmallFake(bool reportsLength = true) : SessionTestModule
     {
         public static readonly byte[] Ciphertext = [.. Enumerable.Range(0, 64).Select(i => (byte)i)];
 
@@ -148,18 +167,23 @@ public sealed class Pkcs11SessionCoreTokenQuirkTests
 
         protected override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> encryptedData, ref NativeCULong encryptedDataLen)
         {
-            encryptedDataLen = (NativeCULong)Ciphertext.Length;
             if (!_active)
                 return CKR.CKR_OPERATION_NOT_INITIALIZED;
             if (encryptedData.IsNull)
+            {
+                encryptedDataLen = (NativeCULong)Ciphertext.Length;
                 return CKR.CKR_OK;
+            }
             if (encryptedData.Span.Length < Ciphertext.Length)
             {
+                if (reportsLength)
+                    encryptedDataLen = (NativeCULong)Ciphertext.Length;
                 _active = false;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
 
             Ciphertext.CopyTo(encryptedData.Span);
+            encryptedDataLen = (NativeCULong)Ciphertext.Length;
             _active = false;
             return CKR.CKR_OK;
         }
