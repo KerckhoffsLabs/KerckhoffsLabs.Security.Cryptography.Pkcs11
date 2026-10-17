@@ -42,6 +42,9 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
     // member (advertised mechanism list), same as SoftHsmBackendFixture.
     public CKR? AeadAuthFailureCode(CKM mechanism) => CKR.CKR_ENCRYPTED_DATA_INVALID;
 
+    // Same SoftHSM underneath, so the same DER Edwards point as SoftHsmBackendFixture.
+    public bool EcxPointIsDerEncoded => true;
+
     private readonly string _gateDir;
     private readonly string _configPath;
     private readonly string _utilPath;

@@ -79,4 +79,11 @@ public interface IPkcs11Backend
     /// means the code is not pinned, so those tests only assert an <c>AuthenticationTagMismatchException</c>
     /// wrapping one of the mapped codes.</summary>
     CKR? AeadAuthFailureCode(CKM mechanism) => null;
+
+    /// <summary>True when the token reads and writes an Edwards or Montgomery key's <c>CKA_EC_POINT</c> as a
+    /// DER OCTET STRING (<c>04 20 ‖ point</c>), as PKCS#11 v3.0 described it, instead of the raw RFC 8032 /
+    /// RFC 7748 bytes v3.1 and later specify. Default <see langword="false"/>, the raw form BouncyHsm,
+    /// NSS and opencryptoki require and Kryoptic also accepts; SoftHSM, which takes only the DER form,
+    /// overrides it.</summary>
+    bool EcxPointIsDerEncoded => false;
 }

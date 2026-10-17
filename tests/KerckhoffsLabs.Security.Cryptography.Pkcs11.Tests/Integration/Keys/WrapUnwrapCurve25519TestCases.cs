@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -15,15 +16,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// <summary>
 /// Backend-agnostic tests for wrapping and unwrapping Ed25519 (<see cref="CKK.CKK_EC_EDWARDS"/>) and
 /// X25519 (<see cref="CKK.CKK_EC_MONTGOMERY"/>) private keys. A wrapped private key is a PKCS#8
-/// <c>PrivateKeyInfo</c>, and RFC 8410 fixes its form for these curves: version 0, the curve's
+/// <c>OneAsymmetricKey</c> (RFC 5958), and RFC 8410 fixes its form for these curves: the curve's
 /// AlgorithmIdentifier with no parameters, and the key as a <c>CurvePrivateKey</c> OCTET STRING inside
-/// the <c>privateKey</c> OCTET STRING. A token that encodes it any other way cannot exchange keys with
-/// OpenSSL or another token, which is what these cases check.
+/// the <c>privateKey</c> OCTET STRING. Version 0 carries nothing else; version 1 may add the public key
+/// (BouncyHsm writes it). A token that encodes the key any other way cannot exchange keys with OpenSSL
+/// or another token, which is what these cases check.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Every case wraps under an AES key whose value the test holds, so it can decrypt what the token
-/// wrapped and compare PKCS#8 bytes. The known-answer cases unwrap the RFC test keys, encoded and
+/// wrapped and read the PKCS#8 back. The known-answer cases unwrap the RFC test keys, encoded and
 /// encrypted here as a key exported by OpenSSL arrives; the round-trip cases start from a
 /// token-generated key.
 /// </para>
@@ -48,6 +50,8 @@ internal static class WrapUnwrapCurve25519TestCases
     // RFC 8032 §7.1, TEST 2: the secret key, a one-byte message, and its signature.
     private static readonly byte[] Rfc8032Test2Secret =
         Convert.FromHexString("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb");
+    private static readonly byte[] Rfc8032Test2Public =
+        Convert.FromHexString("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c");
     private static readonly byte[] Rfc8032Test2Message = [0x72];
     private static readonly byte[] Rfc8032Test2Signature = Convert.FromHexString(
         "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da" +
@@ -56,6 +60,8 @@ internal static class WrapUnwrapCurve25519TestCases
     // RFC 7748 §6.1: Alice's private key, Bob's public key, and the secret they share.
     private static readonly byte[] Rfc7748AlicePrivate =
         Convert.FromHexString("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a");
+    private static readonly byte[] Rfc7748AlicePublic =
+        Convert.FromHexString("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a");
     private static readonly byte[] Rfc7748BobPublic =
         Convert.FromHexString("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f");
     private static readonly byte[] Rfc7748SharedSecret =
@@ -74,7 +80,7 @@ internal static class WrapUnwrapCurve25519TestCases
             ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_EDWARDS, CKA.CKA_SIGN);
 
             AssertUsage(session, key, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
-            Assert.Equal(pkcs8, kek.Wrap(key));
+            AssertWrapsTheKey(kek.Wrap(key), Ed25519Oid, Rfc8032Test2Secret, Rfc8032Test2Public);
             Assert.Equal(Rfc8032Test2Signature, session.Sign(new Mechanism(CKM.CKM_EDDSA), key, Rfc8032Test2Message));
         });
     }
@@ -90,7 +96,7 @@ internal static class WrapUnwrapCurve25519TestCases
             ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
 
             AssertUsage(session, key, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
-            Assert.Equal(pkcs8, kek.Wrap(key));
+            AssertWrapsTheKey(kek.Wrap(key), X25519Oid, Rfc7748AlicePrivate, Rfc7748AlicePublic);
             // NSS derives only non-extractable keys, so the secret is compared through an HMAC under it.
             Assert.Equal(HMACSHA256.HashData(Rfc7748SharedSecret, Message),
                          HmacUnderSharedSecret(session, key, Rfc7748BobPublic));
@@ -106,11 +112,11 @@ internal static class WrapUnwrapCurve25519TestCases
             ObjectHandle original = GenerateWrappablePrivateKey(session, CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKK.CKK_EC_EDWARDS, Ed25519Params, CKA.CKA_SIGN);
 
             byte[] pkcs8 = kek.Wrap(original);
-            AssertRfc8410(pkcs8, Ed25519Oid);
+            var (privateKey, publicKey) = ReadCurvePrivateKey(pkcs8, Ed25519Oid);
             ObjectHandle copy = kek.Unwrap(pkcs8, CKK.CKK_EC_EDWARDS, CKA.CKA_SIGN);
 
             AssertUsage(session, copy, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
-            Assert.Equal(pkcs8, kek.Wrap(copy));
+            AssertWrapsTheKey(kek.Wrap(copy), Ed25519Oid, privateKey, publicKey);
             // Ed25519 is deterministic, so the same key signs a message to the same signature.
             var eddsa = new Mechanism(CKM.CKM_EDDSA);
             Assert.Equal(session.Sign(eddsa, original, Message), session.Sign(eddsa, copy, Message));
@@ -126,10 +132,11 @@ internal static class WrapUnwrapCurve25519TestCases
             ObjectHandle original = GenerateWrappablePrivateKey(session, CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKK.CKK_EC_MONTGOMERY, X25519Params, CKA.CKA_DERIVE);
 
             byte[] pkcs8 = kek.Wrap(original);
-            AssertRfc8410(pkcs8, X25519Oid);
+            var (privateKey, publicKey) = ReadCurvePrivateKey(pkcs8, X25519Oid);
             ObjectHandle copy = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
 
             AssertUsage(session, copy, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
+            AssertWrapsTheKey(kek.Wrap(copy), X25519Oid, privateKey, publicKey);
             Assert.Equal(HmacUnderSharedSecret(session, original, Rfc7748BobPublic),
                          HmacUnderSharedSecret(session, copy, Rfc7748BobPublic));
         });
@@ -164,10 +171,50 @@ internal static class WrapUnwrapCurve25519TestCases
         [0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, oid,
          0x04, 0x22, 0x04, 0x20, .. privateKey];
 
-    private static void AssertRfc8410(byte[] pkcs8, byte oid)
+    // Reads a wrapped Curve25519 key as RFC 8410 has it, refusing anything else: version 0, or version 1
+    // (RFC 5958 OneAsymmetricKey v2), the curve's OID with no parameters, the 32-byte key in a
+    // CurvePrivateKey OCTET STRING inside privateKey, optional [0] attributes, the [1] public key only in
+    // version 1, and nothing after. Returns the private key and the public key when the token included it.
+    private static (byte[] PrivateKey, byte[]? PublicKey) ReadCurvePrivateKey(byte[] pkcs8, byte oid)
     {
-        Assert.Equal(Convert.ToHexString(Pkcs8(oid, new byte[32])[..16]), Convert.ToHexString(pkcs8[..Math.Min(16, pkcs8.Length)]));
-        Assert.Equal(48, pkcs8.Length);
+        var outer = new AsnReader(pkcs8, AsnEncodingRules.DER);
+        AsnReader info = outer.ReadSequence();
+        outer.ThrowIfNotEmpty();
+
+        Assert.True(info.TryReadInt32(out int version) && version is 0 or 1, $"PKCS#8 version {version}");
+        AsnReader algorithm = info.ReadSequence();
+        Assert.Equal($"1.3.101.{oid}", algorithm.ReadObjectIdentifier());
+        Assert.False(algorithm.HasData, "RFC 8410 AlgorithmIdentifier has no parameters");
+
+        var curvePrivateKey = new AsnReader(info.ReadOctetString(), AsnEncodingRules.DER);
+        byte[] privateKey = curvePrivateKey.ReadOctetString();
+        curvePrivateKey.ThrowIfNotEmpty();
+        Assert.Equal(32, privateKey.Length);
+
+        Asn1Tag attributes = new(TagClass.ContextSpecific, 0, isConstructed: true);
+        if (info.HasData && info.PeekTag().HasSameClassAndValue(attributes))
+            info.ReadEncodedValue();
+
+        byte[]? publicKey = null;
+        if (info.HasData)
+        {
+            Assert.Equal(1, version);
+            publicKey = info.ReadBitString(out int unusedBits, new Asn1Tag(TagClass.ContextSpecific, 1));
+            Assert.Equal(0, unusedBits);
+            Assert.Equal(32, publicKey.Length);
+        }
+        info.ThrowIfNotEmpty();
+        return (privateKey, publicKey);
+    }
+
+    // A wrap of the key holding expectedPrivate: its public key, when the token includes one, must be
+    // expectedPublic (pass null when there is no reference for it).
+    private static void AssertWrapsTheKey(byte[] pkcs8, byte oid, byte[] expectedPrivate, byte[]? expectedPublic)
+    {
+        var (privateKey, publicKey) = ReadCurvePrivateKey(pkcs8, oid);
+        Assert.Equal(expectedPrivate, privateKey);
+        if (publicKey is not null && expectedPublic is not null)
+            Assert.Equal(expectedPublic, publicKey);
     }
 
     // An AES-256 key imported from a value the test holds, wrapping and unwrapping with

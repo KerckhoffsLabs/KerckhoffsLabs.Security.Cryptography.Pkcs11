@@ -49,6 +49,11 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     public CKR? AeadAuthFailureCode(CKM mechanism) =>
         IsV240Leg ? CKR.CKR_GENERAL_ERROR : CKR.CKR_ENCRYPTED_DATA_INVALID;
 
+    /// <inheritdoc/>
+    // SoftHSM decodes an Edwards CKA_EC_POINT with DERUTIL::octet2Raw (OSSLEDPublicKey::createOSSLKey),
+    // so a raw point is stored but every use of the key fails; it also writes the DER form on keygen.
+    public bool EcxPointIsDerEncoded => true;
+
     /// <summary>True on the dedicated SoftHSM 2.5 leg (see <c>SoftHsmV240ComplianceTests</c>), which
     /// loads a v2.40-only module whose exact error codes differ from the modern build's.</summary>
     private static bool IsV240Leg =>
