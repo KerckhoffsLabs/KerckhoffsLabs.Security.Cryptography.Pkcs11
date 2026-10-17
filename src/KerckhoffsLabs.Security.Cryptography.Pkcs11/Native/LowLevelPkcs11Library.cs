@@ -156,6 +156,9 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
     /// </summary>
     internal ConcurrentDictionary<ulong, bool> Pbkdf2PasswordLengthByReferenceBySlot { get; } = new();
 
+    /// <summary>The logins this binding's sessions hold, slot by slot (see <see cref="SlotLogins"/>).</summary>
+    internal SlotLogins Logins { get; } = new();
+
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM
     /// encapsulate/decapsulate, authenticated wrap/unwrap, signature-only verify, and
