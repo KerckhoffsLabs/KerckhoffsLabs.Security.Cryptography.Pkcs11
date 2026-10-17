@@ -169,6 +169,7 @@ public sealed partial class Pkcs11Key
     /// <exception cref="ArgumentException">Thrown if <paramref name="peerSubjectPublicKeyInfo"/> is not a DER <c>SubjectPublicKeyInfo</c>, or is an EC key without a named curve and an uncompressed point.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate lengths don't match the field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Thrown if this key's <c>CKA_EC_PARAMS</c> cannot be read or the derived value is not readable; otherwise propagated from <c>C_DeriveKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c>.</exception>
+    /// <exception cref="CryptographicException">Thrown if the token returns a shared secret that is not the curve's field size long.</exception>
     public byte[] DeriveRawSecret(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -201,6 +202,15 @@ public sealed partial class Pkcs11Key
                 throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                     "Pkcs11Key.DeriveRawSecret (derived CKA_VALUE not readable)");
             byte[] secret = attrs[0].GetValueAsByteArray();
+
+            // Z is a field element, always the field size long (SEC 1 §2.3.5). A token that drops its leading
+            // zero bytes (SoftHSM2 did before 8bc65b5) or returns more would hand back a different secret.
+            if (secret.Length != peer.FieldSizeBytes)
+            {
+                CryptographicOperations.ZeroMemory(secret);
+                throw new CryptographicException(
+                    $"The token returned a {secret.Length}-byte ECDH shared secret; this curve's is {peer.FieldSizeBytes} bytes.");
+            }
             operationFailed = false;
             return secret;
         }
