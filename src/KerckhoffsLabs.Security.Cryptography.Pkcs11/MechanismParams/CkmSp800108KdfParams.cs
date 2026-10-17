@@ -33,6 +33,12 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
 
     private readonly bool _feedback;
 
+    // Only counter mode describes its iteration variable with a CK_SP800_108_COUNTER_FORMAT. In feedback and
+    // double-pipeline mode it is the chaining value, K(i-1) or A(i), and PKCS#11 v3.0 (CK_PRF_DATA_PARAM)
+    // requires pValue = NULL_PTR and ulValueLen = 0; NSS and Kryoptic refuse anything else with
+    // CKR_MECHANISM_PARAM_INVALID.
+    private readonly bool _counterMode;
+
     // Keeps the caller's derived-key attribute objects rooted so their unmanaged value buffers
     // (referenced by the marshalled CK_ATTRIBUTE pointers) are not finalized before the derive call.
     private readonly List<IReadOnlyList<ObjectAttribute>> _retainedTemplates;
@@ -76,6 +82,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     internal CkmSp800108KdfParams(Sp800108KdfBuilder builder)
     {
         _feedback = builder.Mode == Sp800108KdfMode.Feedback;
+        _counterMode = builder.Mode == Sp800108KdfMode.Counter;
         _retainedTemplates = [.. builder.DerivedKeys];
         _prfType = builder.PrfType;
         _segments = [.. builder.Segments];
@@ -146,7 +153,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         // is written, so the arrays are built last.
         var prfEntries = new CK_PRF_DATA_PARAM[_segments.Length];
         for (int i = 0; i < _segments.Length; i++)
-            prfEntries[i] = BuildPrfEntry(_segments[i], scope);
+            prfEntries[i] = BuildPrfEntry(_segments[i], scope, _counterMode);
         IntPtr dataParams = scope.WriteStructArray<CK_PRF_DATA_PARAM>(prfEntries);
 
         IntPtr derivedKeys = IntPtr.Zero;
@@ -215,8 +222,18 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         ? block.Read<CK_SP800_108_FEEDBACK_KDF_PARAMS>().AdditionalDerivedKeysPtr
         : block.Read<CK_SP800_108_KDF_PARAMS>().AdditionalDerivedKeysPtr;
 
-    private static CK_PRF_DATA_PARAM BuildPrfEntry(Sp800108Segment seg, MechanismParameterScope scope)
+    private static CK_PRF_DATA_PARAM BuildPrfEntry(Sp800108Segment seg, MechanismParameterScope scope, bool counterMode)
     {
+        if (seg.Kind == Sp800108SegmentKind.IterationCounter && !counterMode)
+        {
+            return new CK_PRF_DATA_PARAM
+            {
+                Type = (NativeCULong)CK_SP800_108_ITERATION_VARIABLE,
+                Value = IntPtr.Zero,
+                ValueLen = (NativeCULong)0UL,
+            };
+        }
+
         ulong type;
         IntPtr value;
         int valueLen;
