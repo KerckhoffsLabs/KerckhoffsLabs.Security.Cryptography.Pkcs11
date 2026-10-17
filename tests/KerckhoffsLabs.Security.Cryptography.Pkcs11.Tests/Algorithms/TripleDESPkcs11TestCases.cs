@@ -207,13 +207,18 @@ internal static class TripleDESPkcs11TestCases
             Assert.Equal(8, des3.IV.Length);
         });
 
-    internal static void Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(IPkcs11Backend backend) =>
+    // Empty CBC input follows the BCL: unpadded it is a no-op, and padded decryption is refused, since a padded
+    // ciphertext holds at least one block. Neither touches the token, so no DES support is needed.
+    internal static void Assert_Cbc_EmptyInput_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedDes3(backend, (session, des3) =>
         {
+            // The empty-input fast path honors the gate: without the AllowInsecure policy the gated mechanism throws
+            // before the (empty) buffer reaches the token.
             Assert.Throws<CryptoPolicyViolationException>(() => des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
 
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-            Assert.Empty(des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+            Assert.ThrowsAny<CryptographicException>(() => des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+            Assert.Empty(des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8, PaddingMode.None));
         });
 
     internal static void Assert_ManagedKeyAndStreamingSurface_NotSupported(IPkcs11Backend backend) =>

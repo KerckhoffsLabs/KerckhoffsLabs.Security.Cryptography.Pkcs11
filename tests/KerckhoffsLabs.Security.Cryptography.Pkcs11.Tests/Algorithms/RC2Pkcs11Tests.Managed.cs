@@ -227,11 +227,15 @@ public sealed class RC2Pkcs11Tests_Managed
         Assert.Throws<CryptoPolicyViolationException>(() => rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedRc2((session, rc2) =>
+    public void DecryptCbc_EmptyInput_AllowInsecure_MatchesBcl() => WithImportedRc2((session, rc2) =>
     {
-        // Under the AllowInsecure policy, empty decrypt is a no-op returned without touching the token.
+        // Under the AllowInsecure policy, unpadded empty decrypt is a no-op; padded, it is refused as the BCL
+        // refuses it (a padded ciphertext holds at least one block). Neither touches the token.
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-            Assert.Empty(rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+        {
+            Assert.Empty(rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8, PaddingMode.None));
+            Assert.ThrowsAny<CryptographicException>(() => rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+        }
     });
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]

@@ -92,18 +92,21 @@ public sealed class DESPkcs11 : DES
 
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
-        // Empty input is a no-op (0 bytes in → 0 bytes out): some tokens reject an empty
-        // C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when the policy permits this
-        // mechanism (i.e. the gate would pass). Otherwise fall through so the session's policy check
-        // throws as documented (the empty buffer never reaches the token — the gate runs first).
-        // Padded encryption (CKM_DES_CBC_PAD) must emit a full padding block, so that path always
-        // goes to the token.
-        if (input.IsEmpty
-            && _key.Session.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
-            && !(encrypt && mechanism.Type == CKM.CKM_DES_CBC_PAD))
+        // Empty input skips the token (some reject an empty C_Encrypt / C_Decrypt buffer), but ONLY when the
+        // policy permits this mechanism, so a refused one still throws from the session's policy check.
+        // Unpadded, it is a no-op: 0 bytes in, 0 bytes out. Padded encryption (CKM_DES_CBC_PAD) must emit a full
+        // padding block, so it goes to the token. Padded decryption of nothing is refused as the BCL refuses it:
+        // a padded ciphertext holds at least one block. Tokens disagree here (NSS answers
+        // CKR_ENCRYPTED_DATA_LEN_RANGE), and returning empty would accept a ciphertext with no padding.
+        if (input.IsEmpty && _key.Session.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt)))
         {
-            bytesWritten = 0;
-            return true;
+            if (mechanism.Type != CKM.CKM_DES_CBC_PAD)
+            {
+                bytesWritten = 0;
+                return true;
+            }
+            if (!encrypt)
+                throw new CryptographicException("Padding is invalid and cannot be removed: the ciphertext is empty.");
         }
 
         byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);

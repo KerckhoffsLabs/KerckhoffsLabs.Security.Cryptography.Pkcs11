@@ -39,7 +39,7 @@ public sealed class DESPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void GenerateIV_ProducesBlockSizedIv() => DESPkcs11TestCases.Assert_GenerateIV_ProducesBlockSizedIv(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => DESPkcs11TestCases.Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(_backend);
+    public void Cbc_EmptyInput_MatchesBcl() => DESPkcs11TestCases.Assert_Cbc_EmptyInput_MatchesBcl(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ManagedKeyAndStreamingSurface_NotSupported() => DESPkcs11TestCases.Assert_ManagedKeyAndStreamingSurface_NotSupported(_backend);

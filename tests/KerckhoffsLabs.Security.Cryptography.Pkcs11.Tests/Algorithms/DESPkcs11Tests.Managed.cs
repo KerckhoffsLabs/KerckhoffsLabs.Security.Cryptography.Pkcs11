@@ -201,11 +201,15 @@ public sealed class DESPkcs11Tests_Managed
         Assert.Throws<CryptoPolicyViolationException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
 
     [Fact]
-    public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedDes((session, des) =>
+    public void DecryptCbc_EmptyInput_AllowInsecure_MatchesBcl() => WithImportedDes((session, des) =>
     {
-        // Under the AllowInsecure policy, empty decrypt is a no-op returned without touching the token.
+        // Under the AllowInsecure policy, unpadded empty decrypt is a no-op; padded, it is refused as the BCL
+        // refuses it (a padded ciphertext holds at least one block). Neither touches the token.
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-            Assert.Empty(des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+        {
+            Assert.Empty(des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8, PaddingMode.None));
+            Assert.ThrowsAny<CryptographicException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+        }
     });
 
     [Fact]

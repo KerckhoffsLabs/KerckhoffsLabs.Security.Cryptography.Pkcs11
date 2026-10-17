@@ -122,15 +122,18 @@ public sealed class AesPkcs11_Managed
         Assert.Throws<NotSupportedException>(() => aes.EncryptCbc(new byte[16], Iv16, PaddingMode.Zeros)));
 
     [Fact]
-    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedAes((session, aes) =>
+    public void Cbc_EmptyInput_MatchesBcl() => WithImportedAes((session, aes) =>
     {
         // Even the empty-input fast path honors the secure-defaults gate: without the AllowInsecure policy the
         // gated mechanism throws before the (empty) buffer reaches the token.
         Assert.Throws<CryptoPolicyViolationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
 
-        // Under the AllowInsecure policy, empty input is a no-op returned without touching the token.
+        // Under the AllowInsecure policy, unpadded empty input is a no-op; padded, it is refused as the BCL refuses it.
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-            Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+        {
+            Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16, PaddingMode.None));
+            Assert.ThrowsAny<CryptographicException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+        }
     });
 
     // === ECB: gated, and the token's output must match the BCL once unlocked ==============
