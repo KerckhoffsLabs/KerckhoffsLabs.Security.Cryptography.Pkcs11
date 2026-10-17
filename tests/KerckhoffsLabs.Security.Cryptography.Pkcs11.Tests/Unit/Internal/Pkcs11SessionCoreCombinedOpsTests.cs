@@ -143,7 +143,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         byte[] data = [1, 2, 3];
 
         s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-            data, signature: [9, 9], out byte[] decrypted, out bool isValid);
+            data, signature: new byte[32], out byte[] decrypted, out bool isValid);
 
         Assert.True(isValid);
         Assert.Equal(data, decrypted);

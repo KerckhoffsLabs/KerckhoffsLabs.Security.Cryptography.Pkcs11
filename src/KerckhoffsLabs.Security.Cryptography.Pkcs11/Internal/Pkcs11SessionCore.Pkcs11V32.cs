@@ -283,7 +283,7 @@ internal sealed partial class Pkcs11SessionCore
     /// Unlike <c>Verify</c>, the signature is bound at init time so the data can be
     /// fed as a stream. This is a one-shot wrapper that supplies all data at once.
     /// </summary>
-    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> on <see cref="CKR.CKR_SIGNATURE_INVALID"/>.</returns>
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> on <see cref="CKR.CKR_SIGNATURE_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_LEN_RANGE"/>, or for a fixed-length MAC of another length.</returns>
     /// <exception cref="Pkcs11Exception">Any other PKCS#11 error.</exception>
     public bool VerifySignature(
         Mechanism mechanism,
@@ -308,8 +308,8 @@ internal sealed partial class Pkcs11SessionCore
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifySignatureInit);
 
         rv = _pkcs11Library.C_VerifySignature(_sessionId, data);
-        operation.Completed(); // C_VerifySignature ends the operation whatever it returns
-        bool verified = IsVerified(rv, OpVerifySignature);
+        operation.CompletedIfVerdict(rv);
+        bool verified = IsVerified(rv, OpVerifySignature, mechanism.Type, signature.Length);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
         mechanism.AbsorbOutput(mechParams);
@@ -322,7 +322,7 @@ internal sealed partial class Pkcs11SessionCore
     /// then feeds <paramref name="inputStream"/> through C_VerifySignatureUpdate and
     /// finalizes via C_VerifySignatureFinal.
     /// </summary>
-    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> on <see cref="CKR.CKR_SIGNATURE_INVALID"/>.</returns>
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> on <see cref="CKR.CKR_SIGNATURE_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_LEN_RANGE"/>, or for a fixed-length MAC of another length.</returns>
     public bool VerifySignature(
         Mechanism mechanism,
         ObjectHandle verificationKey,
@@ -358,10 +358,8 @@ internal sealed partial class Pkcs11SessionCore
         }
 
         rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
-        // C_VerifySignatureFinal always finalizes — whether the signature was valid, invalid, or
-        // the call failed with any other CKR — the verify operation is consumed.
-        operation.Completed();
-        bool verified = IsVerified(rv, OpVerifySignatureFinal);
+        operation.CompletedIfVerdict(rv);
+        bool verified = IsVerified(rv, OpVerifySignatureFinal, mechanism.Type, signature.Length);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
         mechanism.AbsorbOutput(mechParams);
