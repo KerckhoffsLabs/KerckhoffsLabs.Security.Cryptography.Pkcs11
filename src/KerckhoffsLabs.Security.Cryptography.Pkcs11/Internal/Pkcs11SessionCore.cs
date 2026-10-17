@@ -542,6 +542,25 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         /// <summary>Records that every operation this scope began has ended.</summary>
         public void Completed() => _session._operationsInProgress = _outer;
 
+        /// <summary>
+        /// Records the end of a verify when <paramref name="rv"/> is a verdict (<see cref="CKR.CKR_OK"/> or
+        /// <see cref="CKR.CKR_SIGNATURE_INVALID"/>); any other result leaves it in progress, for
+        /// <see cref="Dispose"/> to cancel.
+        /// </summary>
+        /// <remarks>
+        /// The spec has <c>C_Verify</c>, <c>C_VerifyFinal</c> and <c>C_VerifySignature*</c> end the operation
+        /// whatever they return, but modules do not all agree: Kryoptic answers a signature of the wrong
+        /// length with CKR_SIGNATURE_LEN_RANGE before it finalizes, and SoftHSM2 returns CKR_ARGUMENTS_BAD
+        /// from C_Verify without ending it, either of which leaves the next C_VerifyInit with
+        /// CKR_OPERATION_ACTIVE. Cancelling an operation the module did end costs one
+        /// <c>C_SessionCancel</c>, answered with CKR_OPERATION_NOT_INITIALIZED, which is ignored.
+        /// </remarks>
+        public void CompletedIfVerdict(CKR rv)
+        {
+            if (rv is CKR.CKR_OK or CKR.CKR_SIGNATURE_INVALID)
+                Completed();
+        }
+
         public void Dispose()
         {
             ulong unfinished = _session._operationsInProgress & ~_outer;

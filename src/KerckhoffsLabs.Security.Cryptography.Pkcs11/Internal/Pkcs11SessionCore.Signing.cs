@@ -76,8 +76,8 @@ internal sealed partial class Pkcs11SessionCore
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
-        operation.Completed(); // C_Verify ends the operation whatever it returns
-        isValid = IsVerified(rv, OpVerify);
+        operation.CompletedIfVerdict(rv);
+        isValid = IsVerified(rv, OpVerify, mechanism.Type, signature.Length);
 
         mechanism.AbsorbOutput(mechParams);
     }
@@ -167,10 +167,8 @@ internal sealed partial class Pkcs11SessionCore
         }
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
-        // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
-        // the call failed with any other CKR — the verify operation is consumed.
-        operation.Completed();
-        isValid = IsVerified(rv, OpVerifyFinal);
+        operation.CompletedIfVerdict(rv);
+        isValid = IsVerified(rv, OpVerifyFinal, mechanism.Type, signature.Length);
 
         mechanism.AbsorbOutput(mechParams);
     }
@@ -362,8 +360,8 @@ internal sealed partial class Pkcs11SessionCore
         CryptographicOperations.ZeroMemory(lastPart);
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
-        operation.Completed(); // C_VerifyFinal ends the operation whatever it returns
-        isValid = IsVerified(rv, OpVerifyFinal);
+        operation.CompletedIfVerdict(rv);
+        isValid = IsVerified(rv, OpVerifyFinal, verificationMechanism.Type, signature.Length);
 
         verificationMechanism.AbsorbOutput(verifyParams);
         decryptionMechanism.AbsorbOutput(decryptParams);

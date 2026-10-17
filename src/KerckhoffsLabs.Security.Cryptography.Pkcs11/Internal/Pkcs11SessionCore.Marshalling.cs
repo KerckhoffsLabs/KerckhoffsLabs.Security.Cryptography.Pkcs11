@@ -61,15 +61,31 @@ internal sealed partial class Pkcs11SessionCore
 
     /// <summary>
     /// Interprets a verify return value: <see langword="true"/> on <see cref="CKR.CKR_OK"/>, <see langword="false"/> on
-    /// <see cref="CKR.CKR_SIGNATURE_INVALID"/>, and throws <see cref="Pkcs11Exception"/> for any other
-    /// code (tagged with <paramref name="operation"/>).
+    /// <see cref="CKR.CKR_SIGNATURE_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_LEN_RANGE"/> (a signature that is
+    /// invalid on its length alone, as SoftHSM2 and Kryoptic report a truncated one), and throws
+    /// <see cref="Pkcs11Exception"/> for any other code (tagged with <paramref name="operation"/>).
     /// </summary>
     private static bool IsVerified(CKR rv, string operation)
     {
         if (rv == CKR.CKR_OK) return true;
-        if (rv == CKR.CKR_SIGNATURE_INVALID) return false;
+        if (rv is CKR.CKR_SIGNATURE_INVALID or CKR.CKR_SIGNATURE_LEN_RANGE) return false;
         throw Pkcs11Exception.Create(rv, operation);
     }
+
+    /// <summary>
+    /// <see cref="IsVerified(CKR, string)"/>, except that a MAC whose length the mechanism fixes is
+    /// <see langword="false"/> at any other <paramref name="signatureLength"/>, whatever the module answered.
+    /// </summary>
+    /// <remarks>
+    /// The module's answer is no use for such a MAC. NSS since 3.126 compares only the first
+    /// <c>min(macLen, sigLen)</c> bytes of a non-general HMAC and leaves the length to the caller, so it
+    /// answers <see cref="CKR.CKR_OK"/> for a truncated or empty MAC; NSS 3.51 answers a short one with
+    /// CKR_DEVICE_ERROR. A key or mechanism error has already surfaced from the init call, which is
+    /// checked before this.
+    /// </remarks>
+    private static bool IsVerified(CKR rv, string operation, CKM mechanism, int signatureLength)
+        => (KnownOutputLength.Of(mechanism) is not { } macLength || signatureLength == macLength)
+           && IsVerified(rv, operation);
 
     /// <summary>One step of a Cryptoki two-call length probe: invoke with <paramref name="lengthOnly"/> to
     /// learn the size, then again with the allocated buffer. Capacity comes from the buffer itself, so
