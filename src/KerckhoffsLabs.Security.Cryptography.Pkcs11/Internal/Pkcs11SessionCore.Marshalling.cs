@@ -184,6 +184,12 @@ internal sealed partial class Pkcs11SessionCore
     private delegate CKR StreamingUpdate(ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen);
 
     /// <summary>
+    /// How many times <see cref="PumpStreamThrough"/> regrows its output for one block before giving up: enough
+    /// to double a one-byte buffer past any block or tag a mechanism adds.
+    /// </summary>
+    private const int MaxUnreportedGrowth = 8;
+
+    /// <summary>
     /// Drives a multi-part transform over a stream: read a block, transform it, write the result,
     /// until the input is exhausted.
     /// </summary>
@@ -213,14 +219,20 @@ internal sealed partial class Pkcs11SessionCore
                 if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
                     Pkcs11Exception.ThrowIfError(rv, operation);
 
-                if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+                // A length no longer than the buffer was not reported (opencryptoki leaves the caller's in
+                // place), and an update has no length query of its own here, so the buffer is doubled instead,
+                // a bounded number of times.
+                for (int grown = 0; rv == CKR.CKR_BUFFER_TOO_SMALL && grown < MaxUnreportedGrowth; grown++)
                 {
+                    int length = (ulong)outputLen > (ulong)output.Length
+                        ? ReportedLength.ForAllocation(outputLen, operation)
+                        : checked(output.Length * 2);
                     CryptographicOperations.ZeroMemory(output);
-                    output = new byte[ReportedLength.ForAllocation(outputLen, operation)];
+                    output = new byte[length];
 
                     rv = update(input.AsSpan(0, bytesRead), output, out outputLen);
-                    Pkcs11Exception.ThrowIfError(rv, operation);
                 }
+                Pkcs11Exception.ThrowIfError(rv, operation);
 
                 outputStream.Write(output, 0, ReportedLength.Written(outputLen, output.Length, operation));
             }

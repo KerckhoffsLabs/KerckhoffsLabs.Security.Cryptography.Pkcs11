@@ -50,8 +50,17 @@ internal sealed partial class Pkcs11SessionCore
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
-            encryptedData = new byte[ReportedLength.ForAllocation(encryptedDataLen, OpEncrypt)];
-            rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
+            // A length no longer than the buffer was not reported (opencryptoki leaves the caller's in place):
+            // ask for it, the operation being still active. NSS answers the query with
+            // CKR_OPERATION_NOT_INITIALIZED, recovered from below.
+            if ((ulong)encryptedDataLen <= (ulong)encryptedData.Length)
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, default, lengthOnly: true, out encryptedDataLen);
+
+            if (rv is CKR.CKR_OK or CKR.CKR_BUFFER_TOO_SMALL)
+            {
+                encryptedData = new byte[ReportedLength.ForAllocation(encryptedDataLen, OpEncrypt)];
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
+            }
 
             // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active for a retry.
             // NSS softoken's classic C_Encrypt violates this — it terminates the operation, so the retry
@@ -355,6 +364,13 @@ internal sealed partial class Pkcs11SessionCore
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
+            // As in Encrypt: a length no longer than the buffer was not reported, so ask for it.
+            if ((ulong)decryptedDataLen <= (ulong)decryptedData.Length)
+            {
+                rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, default, lengthOnly: true, out decryptedDataLen);
+                Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+            }
+
             CryptographicOperations.ZeroMemory(decryptedData);
             decryptedData = new byte[ReportedLength.ForAllocation(decryptedDataLen, OpDecrypt)];
             rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out decryptedDataLen);
