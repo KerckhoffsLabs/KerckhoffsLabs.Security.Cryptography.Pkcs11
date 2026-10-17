@@ -122,13 +122,38 @@ internal sealed class BouncyHsmServer : IDisposable
         using HttpResponseMessage response = _http.PostAsJsonAsync("Slot", body, PascalCase).GetAwaiter().GetResult();
         string text = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         if (!response.IsSuccessStatusCode)
-        {
-            string reason = text.Replace(userPin, "***", StringComparison.Ordinal).Replace(soPin, "***", StringComparison.Ordinal);
-            throw new InvalidOperationException(
-                $"BouncyHsm POST /Slot failed: {(int)response.StatusCode} {response.ReasonPhrase}. {reason}");
-        }
+            throw new InvalidOperationException(RejectionMessage((int)response.StatusCode, response.ReasonPhrase, text, userPin, soPin));
         using var json = JsonDocument.Parse(text);
         return json.RootElement.GetProperty("SlotId").GetInt32();
+    }
+
+    /// <summary>
+    /// The message for a rejected <c>POST /Slot</c>: its status and the server's reason, never the PINs. The
+    /// reason is the ProblemDetails <c>title</c> and <c>detail</c>, read as decoded strings so a PIN the
+    /// server escaped (System.Text.Json writes <c>+</c> and non-ASCII as <c>\uXXXX</c>) is still found. A
+    /// body that is not JSON is not echoed, since a PIN in it could be encoded any way. The longer PIN is
+    /// redacted first, so one holding the other is not half revealed.
+    /// </summary>
+    internal static string RejectionMessage(int status, string? reasonPhrase, string body, string userPin, string soPin)
+    {
+        string reason;
+        try
+        {
+            using var json = JsonDocument.Parse(body);
+            reason = json.RootElement.ValueKind == JsonValueKind.Object
+                ? string.Join(" ", new[] { "title", "detail" }
+                    .Select(name => json.RootElement.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null)
+                    .Where(text => !string.IsNullOrEmpty(text)))
+                : "";
+        }
+        catch (JsonException)
+        {
+            reason = $"(a {body.Length}-character body that is not JSON, not shown)";
+        }
+
+        foreach (string pin in new[] { userPin, soPin }.Where(pin => pin.Length > 0).OrderByDescending(pin => pin.Length))
+            reason = reason.Replace(pin, "***", StringComparison.Ordinal);
+        return $"BouncyHsm POST /Slot failed: {status} {reasonPhrase}. {reason}";
     }
 
     public void Dispose()

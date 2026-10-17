@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
@@ -39,6 +40,58 @@ public sealed partial class BouncyHsmServerTests
         Assert.Throws<ArgumentException>(() => Process.GetProcessById(pid));
         using var probe = new TcpClient();
         Assert.ThrowsAny<SocketException>(() => probe.Connect("127.0.0.1", tcp));
+    }
+
+    // The server answers a rejection with ProblemDetails, written by System.Text.Json, which escapes
+    // characters such as '+' and anything non-ASCII: a PIN can reach the body in a form a plain
+    // search for it does not find.
+    [Theory]
+    [InlineData("ab+cd-user", "so-pin-0815")]
+    [InlineData("pin-é-user", "so-pin-0815")]
+    [InlineData("user-pin-4711", "<so&pin>")]
+    public void RejectionMessage_RedactsPinsTheServerEchoesJsonEscaped(string userPin, string soPin)
+    {
+        string body = JsonSerializer.Serialize(new { title = "Bad token", detail = $"user {userPin}, so {soPin}" });
+
+        string message = BouncyHsmServer.RejectionMessage(400, "Bad Request", body, userPin, soPin);
+
+        Assert.Contains("Bad token", message, StringComparison.Ordinal);
+        Assert.DoesNotContain(userPin, message, StringComparison.Ordinal);
+        Assert.DoesNotContain(soPin, message, StringComparison.Ordinal);
+        Assert.DoesNotContain(JsonSerializer.Serialize(userPin).Trim('"'), message, StringComparison.Ordinal);
+        Assert.DoesNotContain(JsonSerializer.Serialize(soPin).Trim('"'), message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectionMessage_RedactsAPinThatContainsTheOtherWhole()
+    {
+        string body = JsonSerializer.Serialize(new { title = "Bad token", detail = "so 12345678" });
+
+        string message = BouncyHsmServer.RejectionMessage(400, "Bad Request", body, userPin: "1234", soPin: "12345678");
+
+        Assert.DoesNotContain("5678", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectionMessage_WithAnEmptyPin_StillReportsTheReason()
+    {
+        string body = JsonSerializer.Serialize(new { title = "Bad token", detail = "so so-pin-0815" });
+
+        string message = BouncyHsmServer.RejectionMessage(400, "Bad Request", body, userPin: "", soPin: "so-pin-0815");
+
+        Assert.Contains("Bad token", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("so-pin-0815", message, StringComparison.Ordinal);
+    }
+
+    // A body that is not ProblemDetails (an HTML error page, say) may hold a PIN in an encoding no
+    // search can anticipate, so it is not echoed.
+    [Fact]
+    public void RejectionMessage_DoesNotEchoABodyThatIsNotJson()
+    {
+        string message = BouncyHsmServer.RejectionMessage(502, "Bad Gateway", "<p>user ab&#43;cd</p>", "ab+cd", "so-pin-0815");
+
+        Assert.Contains("502", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ab&#43;cd", message, StringComparison.Ordinal);
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
