@@ -24,3 +24,7 @@
 	url = https://github.com/oasis-tcs/pkcs11.git
 	shallow = true
 	ignore = untracked
+[submodule "vendor/bouncyhsm"]
+	path = vendor/bouncyhsm
+	url = https://github.com/harrison314/BouncyHsm.git
+	shallow = true
