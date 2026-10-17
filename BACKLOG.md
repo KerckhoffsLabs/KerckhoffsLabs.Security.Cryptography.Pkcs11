@@ -1875,6 +1875,36 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
+### [BL-164] Lift the BouncyHsm ChaCha20 block-counter gate once harrison314/BouncyHsm#118 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsNonZeroChaCha20Counter`)
+- **Problem:** BouncyHsm v2.3.3 refuses any initial block counter but 0 for raw `CKM_CHACHA20` (`CKR_GENERAL_ERROR`), so `RawChaCha20Tests_BouncyHsm.Encrypt_MatchesBclChaCha20Poly1305Keystream` and `Decrypt_WrongCounter_ProducesGarbageNotException` skip.
+- **Proposed action:** After the bump, `BouncyHsmQuirkTests.NonZeroChaCha20Counter_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-165] Lift the BouncyHsm extract-only HKDF gate once BouncyHsm returns the PRK
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmHonoursHkdfExtractOnly`)
+- **Problem:** BouncyHsm v2.3.3's `HkdfDeriveKeyGenerator` runs the expand stage even when `bExpand` is false, so an extract-only `CKM_HKDF_DERIVE` gives HKDF-Expand(PRK, empty info) instead of the PRK (PKCS#11 v3.0 §2.43). The four extract-only HKDF cases skip. No upstream issue has been filed yet.
+- **Proposed action:** File the issue upstream. After a bump with the fix, `BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-166] Ed25519 CKA_EC_POINT encoding and RFC 5958 v2 PKCS#8 in the shared test cases
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/TestKeys.cs` (`CreateEd25519PublicKey`); `Integration/Keys/WrapUnwrapCurve25519TestCases.cs`
+- **Problem:** Two shared cases are left out on BouncyHsm because of how the test cases encode, not because of the library. `TestKeys.CreateEd25519PublicKey` writes `CKA_EC_POINT` as a DER OCTET STRING (`04 20 <point>`), as SoftHSM expects; BouncyHsm takes only the raw 32-byte point that PKCS#11 v3.0 describes, so `Ed25519_Kat` cannot run on it. And BouncyHsm wraps Curve25519 private keys as an RFC 5958 OneAsymmetricKey v2 (public key included), which the Curve25519 wrap cases reject because they compare with the exact v1 bytes.
+- **Proposed action:** Decide which `CKA_EC_POINT` form the library and its helpers should send for Edwards keys (raw per the spec, or per-token), and let the Curve25519 cases accept a v2 encoding, then enable both on BouncyHsm.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Session` expose no `Stream` overload at all. See BL-087 and BL-099.

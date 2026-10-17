@@ -55,11 +55,32 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmRejectsOutOfRangeSignatures = false;
 
+    /// <summary>
+    /// False while harrison314/BouncyHsm#118 is open: raw <c>CKM_CHACHA20</c> takes only a zero
+    /// <c>blockCounter</c> in <c>CK_CHACHA20_PARAMS</c> and refuses any other at init with
+    /// <c>CKR_GENERAL_ERROR</c>. BouncyHsmQuirkTests.NonZeroChaCha20Counter_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmAcceptsNonZeroChaCha20Counter = false;
+
+    /// <summary>
+    /// False while BouncyHsm runs the expand stage of a <c>CKM_HKDF_DERIVE</c> with <c>bExpand</c> false: an
+    /// extract-only derivation gives HKDF-Expand(PRK, empty info) instead of the PRK, against PKCS#11 v3.0
+    /// §2.43 (<c>HkdfDeriveKeyGenerator</c> in v2.3.3). BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent
+    /// fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmHonoursHkdfExtractOnly = false;
+
     /// <summary>Gate for empty-input digest and MAC cases: see <see cref="BouncyHsmAcceptsEmptyInput"/>.</summary>
     public static bool EmptyDigestAndMacAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyInput;
 
     /// <summary>Gate for cases that verify a tampered RSA-PSS signature: see <see cref="BouncyHsmRejectsOutOfRangeSignatures"/>.</summary>
     public static bool OutOfRangeSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmRejectsOutOfRangeSignatures;
+
+    /// <summary>Gate for raw ChaCha20 cases that start at a non-zero block counter: see <see cref="BouncyHsmAcceptsNonZeroChaCha20Counter"/>.</summary>
+    public static bool NonZeroChaCha20CounterAvailable => BouncyHsmAvailable && BouncyHsmAcceptsNonZeroChaCha20Counter;
+
+    /// <summary>Gate for extract-only HKDF cases: see <see cref="BouncyHsmHonoursHkdfExtractOnly"/>.</summary>
+    public static bool HkdfExtractOnlyAvailable => BouncyHsmAvailable && BouncyHsmHonoursHkdfExtractOnly;
 
     public BouncyHsmBackendFixture()
     {
