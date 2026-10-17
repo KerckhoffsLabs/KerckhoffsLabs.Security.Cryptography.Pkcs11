@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -18,6 +19,8 @@ public sealed class Pkcs11SessionCoreTokenQuirkTests
     private const ulong SessionId = 21;
     private static readonly ObjectHandle Key = new(2);
     private static readonly ObjectHandle WrappingKey = new(3);
+    private static readonly Mechanism Oaep =
+        new(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
 
     // NSS softoken's classic C_Encrypt ends the operation on CKR_BUFFER_TOO_SMALL, where the spec (§5.2)
     // keeps it active for the retry. Encrypt re-initializes, queries the length and encrypts once.
@@ -31,6 +34,33 @@ public sealed class Pkcs11SessionCoreTokenQuirkTests
 
         Assert.Equal(EndsOnBufferTooSmallFake.Ciphertext, ciphertext);
         Assert.Equal(2, fake.Inits);
+    }
+
+    // BouncyHsm (harrison314/BouncyHsm#114) answers CKR_BUFFER_TOO_SMALL without setting the length it
+    // needs, against PKCS#11 v3.2 §5.2, but keeps the operation active. Encrypt asks with a length query.
+    [Fact]
+    public void Encrypt_WhenTheTokenLeavesTheLengthUnsetOnBufferTooSmall_QueriesItAndEncrypts()
+    {
+        using var fake = new LeavesLengthUnsetFake();
+        using var session = fake.CreateSession(SessionId);
+
+        byte[] ciphertext = session.Encrypt(Oaep, Key, [1, 2, 3]);
+
+        Assert.Equal(LeavesLengthUnsetFake.Output, ciphertext);
+        Assert.Equal(1, fake.Inits);
+    }
+
+    // The same token on the decrypt side, for a mechanism whose plaintext is longer than its ciphertext.
+    [Fact]
+    public void Decrypt_WhenTheTokenLeavesTheLengthUnsetOnBufferTooSmall_QueriesItAndDecrypts()
+    {
+        using var fake = new LeavesLengthUnsetFake();
+        using var session = fake.CreateSession(SessionId);
+
+        byte[] plaintext = session.Decrypt(Oaep, Key, [1, 2, 3]);
+
+        Assert.Equal(LeavesLengthUnsetFake.Output, plaintext);
+        Assert.Equal(1, fake.Inits);
     }
 
     // NSS softoken never sets the output length for CKM_AES_KEY_WRAP_KWP, so its length probe cannot be
@@ -96,6 +126,51 @@ public sealed class Pkcs11SessionCoreTokenQuirkTests
 
             Ciphertext.CopyTo(encryptedData.Span);
             _active = false;
+            return CKR.CKR_OK;
+        }
+    }
+
+    /// <summary>
+    /// Produces more output than the session's first buffer holds and, like BouncyHsm, reports
+    /// <c>CKR_BUFFER_TOO_SMALL</c> without setting the length, while a length query is answered correctly.
+    /// The operation stays active throughout, as PKCS#11 v3.2 §5.2 requires.
+    /// </summary>
+    private sealed class LeavesLengthUnsetFake : SessionTestModule
+    {
+        public static readonly byte[] Output = [.. Enumerable.Range(0, 64).Select(i => (byte)i)];
+
+        public int Inits { get; private set; }
+
+        protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
+        {
+            Inits++;
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> encryptedData, ref NativeCULong encryptedDataLen)
+            => Produce(encryptedData, ref encryptedDataLen);
+
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
+        {
+            Inits++;
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
+            => Produce(data, ref dataLen);
+
+        private static CKR Produce(NativeBuffer<byte> output, ref NativeCULong outputLen)
+        {
+            if (output.IsNull)
+            {
+                outputLen = (NativeCULong)Output.Length;
+                return CKR.CKR_OK;
+            }
+            if (output.Span.Length < Output.Length)
+                return CKR.CKR_BUFFER_TOO_SMALL; // the length is left as the caller passed it
+
+            Output.CopyTo(output.Span);
+            outputLen = (NativeCULong)Output.Length;
             return CKR.CKR_OK;
         }
     }

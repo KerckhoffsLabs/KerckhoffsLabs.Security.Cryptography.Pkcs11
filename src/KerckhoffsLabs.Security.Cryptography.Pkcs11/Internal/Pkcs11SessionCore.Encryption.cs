@@ -38,48 +38,24 @@ internal sealed partial class Pkcs11SessionCore
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_ENCRYPT, rv, OpEncryptInit);
 
-        // Size the output for the largest single-block expansion a symmetric mechanism adds — a full
+        // Guess the output as the largest single-block expansion a symmetric mechanism adds — a full
         // block of PKCS padding (AES block = 16) or a 16-byte AEAD tag — so block and AEAD ciphers
         // finish in one C_Encrypt without a null-length probe (which makes some AEAD tokens run the
         // whole operation on the probe). This also sidesteps NSS softoken's broken single-part CBC-PAD
         // path, whose short-buffer C_Encrypt feeds the input through EncryptUpdate/Final and does not
-        // report the required length. RSA and other output-larger-than-input mechanisms still grow via
-        // the CKR_BUFFER_TOO_SMALL retry below.
-        byte[] encryptedData = new byte[data.Length + 16];
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out NativeCULong encryptedDataLen);
-
-        if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-        {
-            encryptedData = new byte[ReportedLength.ForAllocation(encryptedDataLen, OpEncrypt)];
-            rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
-
-            // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active for a retry.
-            // NSS softoken's classic C_Encrypt violates this — it terminates the operation, so the retry
-            // above returns CKR_OPERATION_NOT_INITIALIZED. Recover by re-initializing, querying the length,
-            // then encrypting once. Reachable only for output-larger-than-input
-            // mechanisms (e.g. RSA) that exceed the padded buffer above; unreachable on spec-compliant
-            // tokens, whose retry already returned CKR_OK.
-            if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
-            {
-                rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-                Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
-
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, default, lengthOnly: true, out NativeCULong probeLen);
-                Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
-
-                encryptedData = new byte[ReportedLength.ForAllocation(probeLen, OpEncrypt)];
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
-            }
-        }
-
-        Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
+        // report the required length. RSA and other output-larger-than-input mechanisms grow through
+        // CKR_BUFFER_TOO_SMALL, including on a token that does not report the length then (BouncyHsm)
+        // or that ends the operation on it (NSS softoken's classic C_Encrypt, hence the restart).
+        byte[] encryptedData = CallWithLengthProbe(data,
+            (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Encrypt(_sessionId, input, buf, lengthOnly, out len),
+            OpEncrypt,
+            data.Length + 16,
+            () => _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId));
         operation.Completed();
 
         // Inside the scope's lifetime: the parameter block the token may have written into (an AEAD
         // IV, say) is still allocated. After `scope` is disposed the bytes are zeroized and freed.
         mechanism.AbsorbOutput(mechParams);
-
-        encryptedData = ReportedLength.Trim(encryptedData, encryptedDataLen, OpEncrypt);
 
         return encryptedData;
     }
@@ -346,26 +322,19 @@ internal sealed partial class Pkcs11SessionCore
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
-        // Use input length as the initial output buffer size — avoids a null-probe call
-        // that causes AEAD tokens (e.g. SoftHSM2) to run full tag verification and return
-        // an opaque error instead of the plaintext length. Resize via CKR_BUFFER_TOO_SMALL
-        // if the token needs more space (e.g. padding expansion on some mechanisms).
-        byte[] decryptedData = new byte[encryptedData.Length];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out NativeCULong decryptedDataLen);
-
-        if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-        {
-            CryptographicOperations.ZeroMemory(decryptedData);
-            decryptedData = new byte[ReportedLength.ForAllocation(decryptedDataLen, OpDecrypt)];
-            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out decryptedDataLen);
-        }
-
-        Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+        // Guess the input length as the output size — avoids a null-probe call that causes AEAD
+        // tokens (e.g. SoftHSM2) to run full tag verification and return an opaque error instead
+        // of the plaintext length. Grow through CKR_BUFFER_TOO_SMALL if the token needs more space,
+        // including on a token that does not report the length then (BouncyHsm).
+        byte[] decryptedData = CallWithLengthProbe(encryptedData,
+            (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Decrypt(_sessionId, input, buf, lengthOnly, out len),
+            OpDecrypt,
+            encryptedData.Length);
         operation.Completed();
 
         mechanism.AbsorbOutput(mechParams);
 
-        return ReportedLength.Trim(decryptedData, decryptedDataLen, OpDecrypt);
+        return decryptedData;
     }
 
     /// <summary>
