@@ -52,8 +52,6 @@ public sealed class KnownAnswerTests_BouncyHsm(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void EcdhP256_Kat() { Require(CKM.CKM_ECDH1_DERIVE); KnownAnswerTestCases.Assert_EcdhP256_Kat(_backend); }
 
-    // No Ed25519 KAT here. Its public key import (TestKeys.CreateEd25519PublicKey) writes CKA_EC_POINT
-    // as a DER OCTET STRING, as SoftHSM expects; BouncyHsm takes only the raw 32-byte point and refuses
-    // it with CKR_ATTRIBUTE_VALUE_INVALID. Ed25519 stays KAT-covered on SoftHSM
-    // (KnownAnswerTests_SoftHsm.Ed25519_Kat).
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void Ed25519_Kat() { Require(CKM.CKM_EDDSA); KnownAnswerTestCases.Assert_Ed25519_Kat(_backend); }
 }

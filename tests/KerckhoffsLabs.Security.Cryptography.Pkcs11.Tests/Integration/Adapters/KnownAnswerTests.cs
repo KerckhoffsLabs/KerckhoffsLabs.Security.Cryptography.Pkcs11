@@ -126,7 +126,7 @@ internal static class KnownAnswerTestCases
         try
         {
             ObjectHandle priv = TestKeys.CreateEd25519PrivateKey(session, seed);
-            ObjectHandle pub = TestKeys.CreateEd25519PublicKey(session, point);
+            ObjectHandle pub = TestKeys.CreateEd25519PublicKey(session, point, backend.EcxPointIsDerEncoded);
             try
             {
                 var eddsa = new Mechanism(CKM.CKM_EDDSA);

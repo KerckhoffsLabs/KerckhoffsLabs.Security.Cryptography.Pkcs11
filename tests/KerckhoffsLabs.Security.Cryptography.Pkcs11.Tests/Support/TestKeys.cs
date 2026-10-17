@@ -106,14 +106,15 @@ internal static class TestKeys
     }
 
     /// <summary>
-    /// Imports an Ed25519 public key from its 32-byte encoded point (RFC 8032 public key).
-    /// CKA_EC_POINT is the point wrapped in a DER OCTET STRING, per PKCS#11 EdDSA.
+    /// Imports an Ed25519 public key from its 32-byte encoded point (RFC 8032 public key). CKA_EC_POINT is
+    /// the raw point, as PKCS#11 v3.1+ specifies, or the point in a DER OCTET STRING when
+    /// <paramref name="derEncodedPoint"/> (<see cref="IPkcs11Backend.EcxPointIsDerEncoded"/>: SoftHSM).
     /// </summary>
-    public static ObjectHandle CreateEd25519PublicKey(Pkcs11SessionCore session, byte[] point)
+    public static ObjectHandle CreateEd25519PublicKey(Pkcs11SessionCore session, byte[] point, bool derEncodedPoint)
     {
         if (point.Length != 32)
             throw new ArgumentException("Ed25519 public point must be 32 bytes.", nameof(point));
-        byte[] ecPoint = [0x04, 0x20, .. point];
+        byte[] ecPoint = derEncodedPoint ? [0x04, 0x20, .. point] : point;
 
         using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
