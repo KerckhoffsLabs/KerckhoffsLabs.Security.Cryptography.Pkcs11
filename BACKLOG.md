@@ -1906,13 +1906,13 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-167] Lift the BouncyHsm SP 800-108 feedback/double-pipeline gate once BouncyHsm takes a NULL iteration variable
+### [BL-167] Lift the BouncyHsm SP 800-108 feedback/double-pipeline gate once harrison314/BouncyHsm#120 ships
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
 - **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsNullSp800108IterationVariable`)
-- **Problem:** In feedback and double-pipeline mode PKCS#11 v3.0 requires the `CK_SP800_108_ITERATION_VARIABLE` entry to have `pValue = NULL_PTR`, which the library now sends. BouncyHsm v2.3.3's client requires a `CK_SP800_108_COUNTER_FORMAT` there in every mode and refuses the spec form with `CKR_MECHANISM_INVALID`; given a format, its server cuts the chaining value to the format's width, so the result is not SP 800-108's. The two `Sp800108ChainedKdfTests_BouncyHsm` cases skip. No upstream issue has been filed yet.
-- **Proposed action:** File the issue upstream with a reproduction. After a bump with the fix, `BouncyHsmQuirkTests.Sp800108NullIterationVariable_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Problem:** In feedback and double-pipeline mode PKCS#11 v3.0 requires the `CK_SP800_108_ITERATION_VARIABLE` entry to have `pValue = NULL_PTR`, which the library now sends. BouncyHsm v2.3.3's client requires a `CK_SP800_108_COUNTER_FORMAT` there in every mode and refuses the spec form with `CKR_MECHANISM_INVALID`; given a format, its server cuts the chaining value to the format's width, so the result is not SP 800-108's. The two `Sp800108ChainedKdfTests_BouncyHsm` cases skip.
+- **Proposed action:** After a bump with the fix, `BouncyHsmQuirkTests.Sp800108NullIterationVariable_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 

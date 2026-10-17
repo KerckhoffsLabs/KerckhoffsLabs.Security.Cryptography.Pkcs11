@@ -146,7 +146,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             var ex = Record.Exception(() => baseKey.Derive(feedback, derivedTemplate).Dispose());
 
             Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_MECHANISM_INVALID },
-                "BouncyHsm now accepts a NULL SP 800-108 iteration variable (got " +
+                "harrison314/BouncyHsm#120 looks fixed (a NULL SP 800-108 iteration variable is accepted; got " +
                 $"{ex?.GetType().Name ?? "no exception"}): set " +
                 "BouncyHsmBackendFixture.BouncyHsmAcceptsNullSp800108IterationVariable to true and delete this test.");
         }

@@ -71,7 +71,7 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmHonoursHkdfExtractOnly = false;
 
     /// <summary>
-    /// False while BouncyHsm's client requires a <c>CK_SP800_108_COUNTER_FORMAT</c> on the SP 800-108 iteration
+    /// False while harrison314/BouncyHsm#120 is open: its client requires a <c>CK_SP800_108_COUNTER_FORMAT</c> on the SP 800-108 iteration
     /// variable in every mode: in feedback and double-pipeline mode PKCS#11 v3.0 requires <c>pValue = NULL_PTR</c>,
     /// <c>ulValueLen = 0</c>, which it refuses with <c>CKR_MECHANISM_INVALID</c> (<c>bouncy-pkcs11-utils.c</c> in
     /// v2.3.3). Given a format instead, its server cuts the chaining value to the format's width, so the result is

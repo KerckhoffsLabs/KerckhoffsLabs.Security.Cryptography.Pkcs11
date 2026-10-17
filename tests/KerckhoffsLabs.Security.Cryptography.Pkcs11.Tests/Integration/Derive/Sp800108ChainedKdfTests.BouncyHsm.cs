@@ -8,11 +8,11 @@ public sealed class Sp800108ChainedKdfTests_BouncyHsm(BouncyHsmBackendFixture ba
 {
     private readonly BouncyHsmBackendFixture _backend = backend;
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.ChainedSp800108KdfAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm refuses the NULL iteration variable PKCS#11 requires")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.ChainedSp800108KdfAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "harrison314/BouncyHsm#120: the NULL iteration variable PKCS#11 requires is refused")]
     public void Feedback_HmacSha256_MatchesReference() =>
         Sp800108ChainedKdfTestCases.Assert_Feedback_HmacSha256_MatchesReference(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.ChainedSp800108KdfAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm refuses the NULL iteration variable PKCS#11 requires")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.ChainedSp800108KdfAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "harrison314/BouncyHsm#120: the NULL iteration variable PKCS#11 requires is refused")]
     public void DoublePipeline_HmacSha256_MatchesReference() =>
         Sp800108ChainedKdfTestCases.Assert_DoublePipeline_HmacSha256_MatchesReference(_backend);
 }
