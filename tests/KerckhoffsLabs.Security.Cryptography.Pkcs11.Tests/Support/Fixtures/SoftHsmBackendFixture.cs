@@ -52,6 +52,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <inheritdoc/>
     // SoftHSM decodes an Edwards CKA_EC_POINT with DERUTIL::octet2Raw (OSSLEDPublicKey::createOSSLKey),
     // so a raw point is stored but every use of the key fails; it also writes the DER form on keygen.
+    // Asked upstream to accept the raw form too: https://github.com/softhsm/SoftHSMv2/issues/909.
     public bool EcxPointIsDerEncoded => true;
 
     /// <summary>True on the dedicated SoftHSM 2.5 leg (see <c>SoftHsmV240ComplianceTests</c>), which
