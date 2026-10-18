@@ -11,13 +11,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 /// </summary>
 public sealed class RootNamespaceTests
 {
-    // Internal types that stay in the root namespace, each with its reason.
-    private static readonly string[] Exempt =
-    [
-        // Only const strings, compiled into [Obsolete] arguments: no code to reach through it.
-        $"{Root}.DiagnosticIds",
-    ];
-
     [Fact]
     public void EveryTopLevelTypeInTheRootNamespace_IsPublic()
     {
@@ -25,7 +18,6 @@ public sealed class RootNamespaceTests
             .Where(t => t.Namespace == Root && !t.IsNested && !t.IsPublic)
             .Where(t => !t.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
             .Select(t => t.FullName!)
-            .Where(n => !Exempt.Contains(n, StringComparer.Ordinal))
             .Order(StringComparer.Ordinal)];
 
         Assert.True(internalTypes.Length == 0,
