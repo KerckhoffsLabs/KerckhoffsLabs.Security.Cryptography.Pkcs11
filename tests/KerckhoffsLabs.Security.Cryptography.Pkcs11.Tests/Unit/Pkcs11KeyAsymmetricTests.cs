@@ -280,6 +280,23 @@ public sealed class Pkcs11KeyAsymmetricTests
         Assert.Equal(bobZ, aliceZ);
     }, allowExtraction: true);
 
+    // A token that returns Z shorter than the field (leading zeros dropped) is refused, not passed on as a
+    // different secret, and the ephemeral derived key is still destroyed.
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void DeriveRawSecret_TokenDropsLeadingBytes_Throws()
+    {
+        var token = new ManagedSoftToken { EcdhDropsLeadingBytes = 1 };
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(P256));
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+
+        var ex = Assert.Throws<CryptographicException>(() => alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
+
+        Assert.Contains("31-byte", ex.Message, StringComparison.Ordinal);
+    }
+
     // The export check runs before the peer is looked at: even garbage gets the policy refusal.
     [Fact]
     public void DeriveRawSecret_DefaultPolicy_IsRefusedBeforeThePeerIsRead() => WithEcKey(P256, alice =>
