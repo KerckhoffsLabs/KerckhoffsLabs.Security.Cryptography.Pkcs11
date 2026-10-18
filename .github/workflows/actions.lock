@@ -33,7 +33,6 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'github/codeql-action@v4.38.3'
         - 'ossf/scorecard-action@v2.4.4'
-        - 'step-security/harden-runner@v2.22.1'
 dependencies:
     'actions/attest-build-provenance@v4.2.2':
         ref: 'v4.2.2'
@@ -121,8 +120,3 @@ dependencies:
         commit: 'sha1-2d1146689b8cda280b9bc96326124645441f03bc'
         owner_id: 67707773
         repo_id: 421101922
-    'step-security/harden-runner@v2.22.1':
-        ref: 'v2.22.1'
-        commit: 'sha1-ccd8616d44fd3846e67624a50d5aad6d37bf2d25'
-        owner_id: 88700172
-        repo_id: 422287306

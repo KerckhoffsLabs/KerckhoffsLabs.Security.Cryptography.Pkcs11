@@ -28,11 +28,6 @@ jobs:
       # Sign the published results with the workflow's OIDC identity.
       id-token: write
     steps:
-      - name: Harden runner
-        uses: step-security/harden-runner@v2.22.1
-        with:
-          egress-policy: audit
-
       - name: Checkout
         uses: actions/checkout@v7.0.1
         with:
