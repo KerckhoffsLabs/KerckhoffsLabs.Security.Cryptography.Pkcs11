@@ -11,32 +11,32 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// different API, and an API never changes its id. Suppressing the compiler diagnostic does not
 /// change the session's runtime crypto policy — the two are independent.
 /// </remarks>
-internal static class DiagnosticIds
+public static class DiagnosticIds
 {
     /// <summary>Format string resolving a diagnostic id to its documentation section.</summary>
-    internal const string UrlFormat =
+    public const string UrlFormat =
         "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#{0}";
 
     /// <summary>MD5 — broken hash function (practical collisions).</summary>
-    internal const string Md5 = "KLPKCS11001";
+    public const string Md5 = "KLPKCS11001";
 
     /// <summary>SHA-1 — broken hash function (SHAttered).</summary>
-    internal const string Sha1 = "KLPKCS11002";
+    public const string Sha1 = "KLPKCS11002";
 
     /// <summary>Single DES — 56-bit key, exhaustively breakable.</summary>
-    internal const string Des = "KLPKCS11003";
+    public const string Des = "KLPKCS11003";
 
     /// <summary>Triple-DES — 64-bit block (Sweet32), NIST-deprecated.</summary>
-    internal const string TripleDes = "KLPKCS11004";
+    public const string TripleDes = "KLPKCS11004";
 
     /// <summary>RC2 — weak legacy cipher with reduced effective key length.</summary>
-    internal const string Rc2 = "KLPKCS11005";
+    public const string Rc2 = "KLPKCS11005";
 
     /// <summary>DSA — disallowed for signature generation by FIPS 186-5.</summary>
-    internal const string Dsa = "KLPKCS11006";
+    public const string Dsa = "KLPKCS11006";
 
     /// <summary>Named elliptic curves below the 128-bit security baseline.</summary>
-    internal const string WeakEcCurve = "KLPKCS11007";
+    public const string WeakEcCurve = "KLPKCS11007";
 
     /// <summary>
     /// <c>Rfc2898DeriveBytesPkcs11</c>'s instance constructors — not a security obsoletion (PBKDF2
@@ -44,5 +44,5 @@ internal static class DiagnosticIds
     /// an API-shape one: mirrors the BCL's own <c>Rfc2898DeriveBytes</c>, whose eight constructors
     /// are all <c>[Obsolete]</c> in favor of its static <c>Pbkdf2</c> method.
     /// </summary>
-    internal const string Rfc2898DeriveBytesPkcs11Constructors = "KLPKCS11011";
+    public const string Rfc2898DeriveBytesPkcs11Constructors = "KLPKCS11011";
 }
