@@ -438,9 +438,15 @@ internal sealed partial class Pkcs11SessionCore
 
     /// <summary>
     /// Finishes an active single-part operation into a <see cref="ScratchBuffer"/> of
-    /// <paramref name="size"/> bytes, the size the module asked for. The caller returns the buffer.
+    /// <paramref name="size"/> bytes, the size the module asked for, or of the size the array-returning
+    /// <see cref="Encrypt(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/> and
+    /// <see cref="Decrypt(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/> start with when that is larger.
+    /// The caller returns the buffer.
     /// </summary>
     /// <remarks>
+    /// The reported size is not trusted below that floor: NSS softoken answers a length query with the
+    /// input length plus two cipher blocks, and its AES-GCM context has a block size of 0, so the length
+    /// it reports has no room for the tag. Nor does it report one on <c>CKR_BUFFER_TOO_SMALL</c>.
     /// A <c>CKR_BUFFER_TOO_SMALL</c> here is followed once, at the size the module then reports. A module
     /// that ends the operation on <c>CKR_BUFFER_TOO_SMALL</c>, against PKCS#11 v3.2 §5.2 (NSS softoken's
     /// classic <c>C_Encrypt</c> and <c>C_Decrypt</c> do), answers the next call with
@@ -451,6 +457,8 @@ internal sealed partial class Pkcs11SessionCore
         ReadOnlySpan<byte> input, int size, out int written)
     {
         string function = encrypt ? OpEncrypt : OpDecrypt;
+        int floor = encrypt ? (int)Math.Min((long)input.Length + 16, Array.MaxLength) : input.Length;
+        size = Math.Max(size, floor);
         byte[] scratch = ScratchBuffer.Rent(size);
         try
         {
@@ -465,7 +473,7 @@ internal sealed partial class Pkcs11SessionCore
 
             if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
             {
-                int needed = ReportedLength.ForAllocation(RestartSinglePart(encrypt, in ckMechanism, keyHandle, input), function);
+                int needed = Math.Max(ReportedLength.ForAllocation(RestartSinglePart(encrypt, in ckMechanism, keyHandle, input), function), floor);
                 if (needed > scratch.Length)
                 {
                     ScratchBuffer.Return(scratch);

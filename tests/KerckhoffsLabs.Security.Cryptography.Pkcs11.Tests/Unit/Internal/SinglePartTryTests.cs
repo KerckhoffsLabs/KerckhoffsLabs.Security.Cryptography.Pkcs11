@@ -195,6 +195,25 @@ public sealed class SinglePartTryTests
         Assert.False(module.EncryptActive);
     }
 
+    // NSS softoken's AES-GCM, all at once: CKR_BUFFER_TOO_SMALL ends the operation and reports no
+    // length, and the length query after the restart answers the plaintext's length, with no room for
+    // the tag. The scratch is never smaller than the array Encrypt's first buffer, input + 16, so the
+    // real ciphertext length is still found.
+    [Fact]
+    public void Encrypt_OnNssGcm_IntoAShortDestination_ReturnsFalseWithTheRealLength()
+    {
+        using var module = new CipherModule { EndsOperationOnBufferTooSmall = true, LeavesLengthUnreported = true, QueryOmitsTag = true };
+        using var session = module.CreateSession();
+        byte[] destination = new byte[Plaintext.Length];
+
+        Assert.False(session.TryEncrypt(Gcm(), new ObjectHandle(1), Plaintext, destination, out int written));
+
+        Assert.Equal(Ciphertext.Length, written);
+        Assert.False(module.EncryptActive);
+        Assert.True(session.TryEncrypt(Gcm(), new ObjectHandle(1), Plaintext, new byte[Ciphertext.Length], out written));
+        Assert.Equal(Ciphertext.Length, written);
+    }
+
     // The array-returning Decrypt is built on the same worker and still answers through the quirk.
     [Fact]
     public void ArrayDecrypt_OnAModuleThatWantsAnInputSizedBuffer_ReturnsThePlaintext()
@@ -239,6 +258,9 @@ public sealed class SinglePartTryTests
         /// <summary>Answer <c>CKR_BUFFER_TOO_SMALL</c> without updating the length (opencryptoki).</summary>
         public bool LeavesLengthUnreported { get; init; }
 
+        /// <summary>Answer an encrypt length query with the plaintext's length, leaving out the tag (NSS's AES-GCM).</summary>
+        public bool QueryOmitsTag { get; init; }
+
         /// <summary>Write into the output, then fail with <c>CKR_ENCRYPTED_DATA_INVALID</c>.</summary>
         public bool FailsAfterWriting { get; init; }
 
@@ -278,6 +300,11 @@ public sealed class SinglePartTryTests
             if (!EncryptActive)
                 return CKR.CKR_OPERATION_NOT_INITIALIZED;
             byte[] ciphertext = [.. data, .. Enumerable.Repeat((byte)0xEE, TagLength)];
+            if (encryptedData.IsNull && QueryOmitsTag)
+            {
+                encryptedDataLen = (NativeCULong)(ulong)data.Length;
+                return CKR.CKR_OK;
+            }
             return Answer(ciphertext, ciphertext.Length, encryptedData, ref encryptedDataLen, active => EncryptActive = active);
         }
 
