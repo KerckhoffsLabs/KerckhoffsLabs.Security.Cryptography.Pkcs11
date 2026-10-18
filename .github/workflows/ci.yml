@@ -518,10 +518,11 @@ jobs:
         with:
           persist-credentials: false
 
-      # Only the two modules this job builds; no native cache, so a sanitized build never mixes with a
-      # plain one (their build stamps differ too).
+      # The two modules this job sanitizes, and the OASIS headers the ABI probe (which the test build
+      # also compiles) is built from. No native cache, so a sanitized build never mixes with a plain
+      # one (their build stamps differ too).
       - name: Init native submodules
-        run: git submodule update --init --depth 1 vendor/pkcs11-mock vendor/softhsmv2
+        run: git submodule update --init --depth 1 vendor/pkcs11-mock vendor/softhsmv2 vendor/pkcs11
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6.0.0
