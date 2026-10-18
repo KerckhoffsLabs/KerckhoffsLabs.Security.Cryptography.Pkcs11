@@ -25,7 +25,7 @@ internal static class SignEdDsaTestCases
                 byte[] sig = session.Sign(eddsa, priv, data);
                 Assert.Equal(64, sig.Length);
 
-                session.Verify(eddsa, pub, data, sig, out bool isValid);
+                bool isValid = session.Verify(eddsa, pub, data, sig);
                 Assert.True(isValid, "Ed25519 round-trip should verify.");
             }
             finally
@@ -59,7 +59,7 @@ internal static class SignEdDsaTestCases
                 byte[] sig = session.Sign(eddsa, priv, data);
                 Assert.Equal(114, sig.Length);
 
-                session.Verify(eddsa, pub, data, sig, out bool isValid);
+                bool isValid = session.Verify(eddsa, pub, data, sig);
                 Assert.True(isValid, "Ed448 round-trip should verify.");
             }
             finally

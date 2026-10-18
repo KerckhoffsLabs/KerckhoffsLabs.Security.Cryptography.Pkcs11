@@ -79,7 +79,7 @@ public sealed class OperationScopeTests
         using var output = new MemoryStream();
 
         Assert.ThrowsAny<Pkcs11Exception>(() => session.DecryptVerify(
-            Ecdsa(), new ObjectHandle(1), Gcm(), new ObjectHandle(2), input, output, new byte[64], out _));
+            Ecdsa(), new ObjectHandle(1), Gcm(), new ObjectHandle(2), input, output, new byte[64]));
 
         Assert.Equal([CKF.CKF_VERIFY], fake.Cancelled);
     }

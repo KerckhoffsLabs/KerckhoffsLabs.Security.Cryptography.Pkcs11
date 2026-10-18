@@ -24,7 +24,7 @@ internal static class VerifyRsaPkcsTestCases
             var fakeKey = new ObjectHandle(0);
             var mech = new Mechanism(CKM.CKM_RSA_PKCS);
             var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Verify(mech, fakeKey, Array.Empty<byte>(), Array.Empty<byte>(), out _));
+                session.Verify(mech, fakeKey, Array.Empty<byte>(), Array.Empty<byte>()));
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }
         finally

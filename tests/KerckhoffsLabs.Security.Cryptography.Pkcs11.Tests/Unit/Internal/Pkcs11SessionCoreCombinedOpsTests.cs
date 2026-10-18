@@ -142,8 +142,8 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
         byte[] data = [1, 2, 3];
 
-        s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-            data, signature: [9, 9], out byte[] decrypted, out bool isValid);
+        bool isValid = s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
+            data, signature: [9, 9], out byte[] decrypted);
 
         Assert.True(isValid);
         Assert.Equal(data, decrypted);
@@ -156,8 +156,8 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         using var s = fake.CreateSession(SessionId);
         Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
-        s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-            data: [1, 2, 3], signature: [9, 9], out _, out bool isValid);
+        bool isValid = s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
+            data: [1, 2, 3], signature: [9, 9], out _);
 
         Assert.False(isValid);
     }
@@ -171,7 +171,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-                data: [1, 2, 3], signature: [9, 9], out _, out _));
+                data: [1, 2, 3], signature: [9, 9], out _));
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-                data: [1, 2, 3], signature: [9, 9], out _, out _));
+                data: [1, 2, 3], signature: [9, 9], out _));
     }
 
     // === Insecure-mechanism gate fires on either mechanism ==================

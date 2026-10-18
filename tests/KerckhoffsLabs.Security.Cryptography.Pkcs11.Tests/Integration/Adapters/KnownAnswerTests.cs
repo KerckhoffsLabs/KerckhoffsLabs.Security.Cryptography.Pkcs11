@@ -133,12 +133,12 @@ internal static class KnownAnswerTestCases
                 byte[] sig = session.Sign(eddsa, priv, message);
                 Assert.Equal(expectedSig, sig);
 
-                session.Verify(eddsa, pub, message, expectedSig, out bool ok);
+                bool ok = session.Verify(eddsa, pub, message, expectedSig);
                 Assert.True(ok, "RFC 8032 test 1 signature should verify against the imported public key.");
 
                 byte[] tampered = [.. expectedSig];
                 tampered[0] ^= 0xFF;
-                session.Verify(eddsa, pub, message, tampered, out bool bad);
+                bool bad = session.Verify(eddsa, pub, message, tampered);
                 Assert.False(bad, "A tampered signature must not verify.");
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
@@ -277,12 +277,12 @@ internal static class KnownAnswerTestCases
             {
                 var pss = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32);
                 var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, pss);
-                session.Verify(mech, pub, msg, sig, out bool ok);
+                bool ok = session.Verify(mech, pub, msg, sig);
                 Assert.True(ok, "RFC 8017 RSA-PSS signature should verify under the imported public key.");
 
                 byte[] tampered = [.. sig];
                 tampered[0] ^= 0xFF;
-                session.Verify(mech, pub, msg, tampered, out bool bad);
+                bool bad = session.Verify(mech, pub, msg, tampered);
                 Assert.False(bad, "A tampered RSA-PSS signature must not verify.");
             }
             finally { session.DestroyObject(pub); }
@@ -306,12 +306,12 @@ internal static class KnownAnswerTestCases
             try
             {
                 var mech = new Mechanism(CKM.CKM_ECDSA);
-                session.Verify(mech, pub, hash, sig, out bool ok);
+                bool ok = session.Verify(mech, pub, hash, sig);
                 Assert.True(ok, "ECDSA P-256 signature should verify under the imported public key.");
 
                 byte[] tampered = [.. sig];
                 tampered[0] ^= 0xFF;
-                session.Verify(mech, pub, hash, tampered, out bool bad);
+                bool bad = session.Verify(mech, pub, hash, tampered);
                 Assert.False(bad, "A tampered ECDSA signature must not verify.");
             }
             finally { session.DestroyObject(pub); }

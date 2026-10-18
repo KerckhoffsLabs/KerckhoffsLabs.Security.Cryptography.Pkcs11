@@ -53,7 +53,7 @@ public sealed class Pkcs11SessionCoreSharedDescriptorTests
         using var output = new MemoryStream();
 
         var ex = Assert.Throws<ArgumentException>(() => session.DecryptVerify(
-            verify, Key, decrypt, Key, input, output, [4, 5], out _));
+            verify, Key, decrypt, Key, input, output, [4, 5]));
 
         Assert.Equal("decryptionMechanism", ex.ParamName);
         Assert.Contains("silently discarded", ex.Message, StringComparison.Ordinal);
@@ -111,7 +111,7 @@ public sealed class Pkcs11SessionCoreSharedDescriptorTests
 
         Assert.Throws<ArgumentException>(() => session.DigestEncrypt(a, b, Key, [1, 2, 3], out _, out _));
         Assert.Throws<ArgumentException>(() => session.DecryptDigest(a, b, Key, [1, 2, 3], out _, out _));
-        Assert.Throws<ArgumentException>(() => session.DecryptVerify(a, Key, b, Key, [1, 2, 3], [4], out _, out _));
+        Assert.Throws<ArgumentException>(() => session.DecryptVerify(a, Key, b, Key, [1, 2, 3], [4], out _));
     }
 
     /// <summary>

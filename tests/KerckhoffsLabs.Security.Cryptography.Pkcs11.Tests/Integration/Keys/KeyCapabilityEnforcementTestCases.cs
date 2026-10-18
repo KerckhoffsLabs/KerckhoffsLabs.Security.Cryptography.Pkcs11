@@ -94,7 +94,7 @@ internal static class KeyCapabilityEnforcementTestCases
             try
             {
                 Assert.ThrowsAny<Pkcs11Exception>(() =>
-                    session.Verify(new Mechanism(CKM.CKM_SHA256_HMAC), verifyOff, data, validMac, out bool _));
+                    session.Verify(new Mechanism(CKM.CKM_SHA256_HMAC), verifyOff, data, validMac));
             }
             finally { session.DestroyObject(verifyOff); }
         }
