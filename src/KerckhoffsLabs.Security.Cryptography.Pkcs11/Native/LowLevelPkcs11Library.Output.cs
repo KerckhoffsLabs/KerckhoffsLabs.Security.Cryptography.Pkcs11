@@ -30,6 +30,17 @@ internal sealed partial class LowLevelPkcs11Library
         => ref input.IsEmpty ? ref s_emptyOutput : ref MemoryMarshal.GetReference(input);
 
     /// <summary>
+    /// Refuses a C string argument whose last byte is not its NUL. The module is given only the pointer and
+    /// reads up to the first NUL, so without one inside the span it would read past the caller's memory.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is empty or does not end in a NUL.</exception>
+    private static void RequireNulTerminated(ReadOnlySpan<byte> value, string paramName)
+    {
+        if (value.IsEmpty || value[^1] != 0)
+            throw new ArgumentException("A C string argument must end in its NUL terminator: the module reads up to it.", paramName);
+    }
+
+    /// <summary>
     /// Checks the length a module reported for an output before any caller sees it. A length query must
     /// report a length that can be allocated (never <c>CK_UNAVAILABLE_INFORMATION</c>); a fill must
     /// report no more than the buffer it was given. Either violation throws rather than letting a

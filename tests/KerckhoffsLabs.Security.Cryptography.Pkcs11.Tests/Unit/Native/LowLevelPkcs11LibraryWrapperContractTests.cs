@@ -64,8 +64,15 @@ public sealed class LowLevelPkcs11LibraryWrapperContractTests
     }
 
     // Wrappers that refuse an invalid argument before they look for the function, so the default arguments
-    // the invoker passes never get that far: C_InitToken needs a 32-byte label.
-    private static readonly HashSet<string> ValidatesArgumentsFirst = [nameof(LowLevelPkcs11Library.C_InitToken)];
+    // the invoker passes never get that far: C_InitToken needs a 32-byte label, and the async functions a
+    // NUL-terminated function name.
+    private static readonly HashSet<string> ValidatesArgumentsFirst =
+    [
+        nameof(LowLevelPkcs11Library.C_InitToken),
+        nameof(LowLevelPkcs11Library.C_AsyncComplete),
+        nameof(LowLevelPkcs11Library.C_AsyncGetID),
+        nameof(LowLevelPkcs11Library.C_AsyncJoin),
+    ];
 
     // Guards the two tests above against a reflection filter that matches nothing and passes vacuously.
     [Fact]
