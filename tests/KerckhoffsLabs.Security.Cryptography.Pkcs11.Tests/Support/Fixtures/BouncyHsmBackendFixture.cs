@@ -70,6 +70,16 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmHonoursHkdfExtractOnly = false;
 
+    /// <summary>
+    /// False while harrison314/BouncyHsm#120 is open: its client requires a <c>CK_SP800_108_COUNTER_FORMAT</c> on the SP 800-108 iteration
+    /// variable in every mode: in feedback and double-pipeline mode PKCS#11 v3.0 requires <c>pValue = NULL_PTR</c>,
+    /// <c>ulValueLen = 0</c>, which it refuses with <c>CKR_MECHANISM_INVALID</c> (<c>bouncy-pkcs11-utils.c</c> in
+    /// v2.3.3). Given a format instead, its server cuts the chaining value to the format's width, so the result is
+    /// not SP 800-108's either. BouncyHsmQuirkTests.Sp800108NullIterationVariable_QuirkStillPresent fails once it
+    /// is fixed.
+    /// </summary>
+    public const bool BouncyHsmAcceptsNullSp800108IterationVariable = false;
+
     /// <summary>Gate for empty-input digest and MAC cases: see <see cref="BouncyHsmAcceptsEmptyInput"/>.</summary>
     public static bool EmptyDigestAndMacAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyInput;
 
@@ -81,6 +91,9 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for extract-only HKDF cases: see <see cref="BouncyHsmHonoursHkdfExtractOnly"/>.</summary>
     public static bool HkdfExtractOnlyAvailable => BouncyHsmAvailable && BouncyHsmHonoursHkdfExtractOnly;
+
+    /// <summary>Gate for SP 800-108 feedback and double-pipeline cases: see <see cref="BouncyHsmAcceptsNullSp800108IterationVariable"/>.</summary>
+    public static bool ChainedSp800108KdfAvailable => BouncyHsmAvailable && BouncyHsmAcceptsNullSp800108IterationVariable;
 
     public BouncyHsmBackendFixture()
     {

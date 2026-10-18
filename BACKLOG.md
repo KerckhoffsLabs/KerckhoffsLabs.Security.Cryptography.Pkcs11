@@ -4,8 +4,8 @@ _Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist d
 
 ## Summary
 
-- Total items: 166 (60 resolved, 106 open)
-- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (60 open, 27 resolved) | Low: 47 (33 open, 14 resolved)
+- Total items: 167 (60 resolved, 107 open)
+- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (60 open, 27 resolved) | Low: 48 (34 open, 14 resolved)
 - Headline risks:
   - **The advertised streaming surface does not exist, and the previous coverage matrix said it did.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer — `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099). Two matrix rows have been corrected below.
   - **Nine public-API decisions are cheap now and SemVer-major later — seven of them now settled.** Exceptions did not derive from `CryptographicException`, so `catch (CryptographicException)` around the BCL-shaped façades silently failed; they now do (BL-063, resolved); `ECCurve` collided with `System.Security.Cryptography.ECCurve` and is now `Pkcs11ECCurve`, with a reflection guard against the next such clash (BL-066, resolved); 96 `CKF`/`CK`/`CKZ` constants published the platform-width-dependent third-party `NativeCULong` and are now `ulong`, with that package gone from the public surface entirely (BL-067, resolved); every `CK_VERSION` reached the API as a lossy string in which a v3.1 module rendered as `"3.01"` and is now a comparable `System.Version` (BL-068, resolved); `LoadStaticallyLinked()` could not work on any shipped RID because `__Internal` is Mono-only, and now resolves against the entry-point module instead (BL-064, resolved); the secure-defaults key generators granted conflicting roles on one key and are now split into role-specific helpers (BL-070, resolved); and `CloseAllSessions()`'s bookkeeping gap was closed by removing the method from the public surface, its only legitimate use being narrow enough that disposing tracked sessions/sessions is the supported path (BL-071, resolved). `AdditionalDerivedKeys` now returns hydrated `Pkcs11Key` instances instead of raw `ulong` handles (BL-069, resolved). Only BL-065 (`Verify` throwing instead of returning `false`) remains open. The set is BL-063 – BL-071.
@@ -1903,6 +1903,16 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Problem:** Two shared cases are left out on BouncyHsm because of how the test cases encode, not because of the library. `TestKeys.CreateEd25519PublicKey` writes `CKA_EC_POINT` as a DER OCTET STRING (`04 20 <point>`), as SoftHSM expects; BouncyHsm takes only the raw 32-byte point PKCS#11 v3.1+ specifies, so `Ed25519_Kat` cannot run on it. And BouncyHsm wraps Curve25519 private keys as an RFC 5958 OneAsymmetricKey v2 (public key included), which the Curve25519 wrap cases reject because they compare with the exact v1 bytes.
 - **Proposed action:** Decide which `CKA_EC_POINT` form the library and its helpers should send for Edwards keys (raw per the spec, or per-token), and let the Curve25519 cases accept a v2 encoding, then enable both on BouncyHsm.
 - **Resolution:** A backend survey (source at the vendored commits, live probes, CI) found SoftHSM the only backend needing the DER point (PKCS#11 v3.0's wording); BouncyHsm, NSS 3.131 and opencryptoki take raw only, Kryoptic either. `TestKeys.CreateEd25519PublicKey` now sends raw unless `IPkcs11Backend.EcxPointIsDerEncoded` (SoftHSM only), and `Ed25519_Kat` runs on BouncyHsm, NSS and opencryptoki too. The Curve25519 cases read the PKCS#8 structurally (version 0, or 1 with a public key checked against the RFC's), so BouncyHsm's v2 passes while Kryoptic's and opencryptoki's non-RFC 8410 forms (latchset/kryoptic#527, opencryptoki/opencryptoki#983) are still refused. The library itself never encodes an Edwards point; if it ever imports Ed25519/X25519 public keys, raw is the default to take.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-167] Lift the BouncyHsm SP 800-108 feedback/double-pipeline gate once harrison314/BouncyHsm#120 ships
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsNullSp800108IterationVariable`)
+- **Problem:** In feedback and double-pipeline mode PKCS#11 v3.0 requires the `CK_SP800_108_ITERATION_VARIABLE` entry to have `pValue = NULL_PTR`, which the library now sends. BouncyHsm v2.3.3's client requires a `CK_SP800_108_COUNTER_FORMAT` there in every mode and refuses the spec form with `CKR_MECHANISM_INVALID`; given a format, its server cuts the chaining value to the format's width, so the result is not SP 800-108's. The two `Sp800108ChainedKdfTests_BouncyHsm` cases skip.
+- **Proposed action:** After a bump with the fix, `BouncyHsmQuirkTests.Sp800108NullIterationVariable_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 

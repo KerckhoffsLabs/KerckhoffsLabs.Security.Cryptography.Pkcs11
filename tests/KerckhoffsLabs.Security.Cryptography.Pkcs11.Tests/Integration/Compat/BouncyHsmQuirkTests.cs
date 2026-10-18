@@ -128,4 +128,28 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         }
         finally { ikmKey.Destroy(); }
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void Sp800108NullIterationVariable_QuirkStillPresent()
+    {
+        using var session = _backend.OpenSession();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        string label = $"quirk-sp800108-{Guid.NewGuid():N}";
+        using var baseTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Label(label).Value(RandomNumberGenerator.GetBytes(32)).Derive().Build();
+        using var derivedTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+        using var baseKey = session.ImportKey(baseTemplate);
+        // The library sends the feedback-mode iteration variable as PKCS#11 v3.0 requires: pValue = NULL_PTR.
+        var feedback = new Mechanism(CKM.CKM_SP800_108_FEEDBACK_KDF, CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC)
+            .IterationCounter().ByteArray("label"u8).WithIV(new byte[16]).Build());
+        try
+        {
+            var ex = Record.Exception(() => baseKey.Derive(feedback, derivedTemplate).Dispose());
+
+            Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_MECHANISM_INVALID },
+                "harrison314/BouncyHsm#120 looks fixed (a NULL SP 800-108 iteration variable is accepted; got " +
+                $"{ex?.GetType().Name ?? "no exception"}): set " +
+                "BouncyHsmBackendFixture.BouncyHsmAcceptsNullSp800108IterationVariable to true and delete this test.");
+        }
+        finally { baseKey.Destroy(); }
+    }
 }

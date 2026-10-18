@@ -604,7 +604,32 @@ public sealed class BuildMarshalableTests
         Assert.Equal(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
 
         AssertBlockHolds(s.IV, iv);
-        AssertPrfSequence(s.DataParams, label, spliceKey: 0xABCD);
+        AssertPrfSequence(s.DataParams, label, spliceKey: 0xABCD, chainedIterationVariable: true);
+    }
+
+    // In double-pipeline mode too, the iteration variable is the chaining value A(i), which PKCS#11 v3.0
+    // (CK_PRF_DATA_PARAM) requires as pValue = NULL_PTR, ulValueLen = 0; only counter mode gives it a
+    // CK_SP800_108_COUNTER_FORMAT. NSS's kbkdf.c and Kryoptic refuse a format here with
+    // CKR_MECHANISM_PARAM_INVALID.
+    [Fact]
+    public void Sp800108DoublePipelineKdfParams_MarshalsItsFields()
+    {
+        byte[] label = [0x64, 0x70];
+        using var keys = new ParameterKeys();
+        var p = CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC)
+            .IterationCounter(widthInBits: 16, littleEndian: true)
+            .OptionalCounter(widthInBits: 8, littleEndian: true)
+            .ByteArray(label)
+            .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
+            .Key(keys.Secret(0xABCD))
+            .Build();
+        using var scope = keys.NewScope();
+
+        var s = p.BuildMarshalable(scope).Read<CK_SP800_108_KDF_PARAMS>();
+
+        Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
+        Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
+        AssertPrfSequence(s.DataParams, label, spliceKey: 0xABCD, chainedIterationVariable: true);
     }
 
     /// <summary>
@@ -612,10 +637,12 @@ public sealed class BuildMarshalableTests
     /// every format sub-struct behind it must decode to. The fixture uses non-default widths
     /// throughout and mixes <c>littleEndian: true</c> with one <see langword="false"/> segment, so neither a
     /// dropped assignment landing on a zero-initialised field nor a hardcoded <see langword="true"/> can pass.
+    /// With <c>chainedIterationVariable</c> (feedback or double-pipeline mode) the iteration variable is the
+    /// chaining value and so carries no format: <c>pValue = NULL_PTR</c>, <c>ulValueLen = 0</c>.
     /// </summary>
     private static void AssertPrfSequence(
         IntPtr array, byte[] label, ulong spliceKey,
-        bool iterationCounterLittleEndian = true, bool optionalCounterLittleEndian = true)
+        bool iterationCounterLittleEndian = true, bool optionalCounterLittleEndian = true, bool chainedIterationVariable = false)
     {
         Assert.NotEqual(IntPtr.Zero, array);
 
@@ -624,12 +651,21 @@ public sealed class BuildMarshalableTests
 
         int counterSize = UnmanagedMemory.SizeOf<CK_SP800_108_COUNTER_FORMAT>();
 
-        // [0] iteration counter and [1] optional counter — CK_SP800_108_COUNTER_FORMAT.
+        // [0] iteration variable: a counter format in counter mode, nothing in the chained modes.
+        if (chainedIterationVariable)
+        {
+            var iteration = Entry(0);
+            Assert.Equal(IterationVariable, (ulong)iteration.Type);
+            Assert.Equal(IntPtr.Zero, iteration.Value);
+            Assert.Equal(0UL, (ulong)iteration.ValueLen);
+        }
+
+        // [0] iteration counter (counter mode only) and [1] optional counter — CK_SP800_108_COUNTER_FORMAT.
         foreach ((int index, ulong tag, ulong width, bool littleEndian) in new[]
             {
                 (0, IterationVariable, 16UL, iterationCounterLittleEndian),
                 (1, OptionalCounter, 8UL, optionalCounterLittleEndian),
-            })
+            }.Where(e => !(chainedIterationVariable && e.Item1 == 0)))
         {
             var entry = Entry(index);
             Assert.Equal(tag, (ulong)entry.Type);
