@@ -500,15 +500,42 @@ public sealed partial class Pkcs11Key : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ObjectHandle handle = IsAsymmetricKeyType(_keyType)
-            ? PublicHandle
-            : PrivateHandle;
+        return _session.Core.Encrypt(mechanism, EncryptingHandle("Pkcs11Key.Encrypt"), plaintext);
+    }
 
-        if (handle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.Encrypt (handle unavailable)");
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> into <paramref name="destination"/> using this key, as
+    /// <see cref="Encrypt"/> does, without allocating the result.
+    /// </summary>
+    /// <param name="mechanism">The encryption mechanism.</param>
+    /// <param name="plaintext">The data to encrypt.</param>
+    /// <param name="destination">Where the ciphertext is written. It must not overlap <paramref name="plaintext"/>.</param>
+    /// <param name="bytesWritten">The length of the ciphertext in <paramref name="destination"/>; 0 when this returns <see langword="false"/>.</param>
+    /// <returns>
+    /// <see langword="true"/> when the ciphertext was written; <see langword="false"/> when it is longer than
+    /// <paramref name="destination"/>. The operation is finished either way, and <paramref name="destination"/> is cleared
+    /// after <see langword="false"/> or an exception.
+    /// </returns>
+    /// <remarks>
+    /// <see langword="false"/> means the ciphertext itself does not fit. A module that asks for a larger
+    /// buffer than the ciphertext needs gets one from a pool, zeroized after use, and the ciphertext is
+    /// copied into <paramref name="destination"/>.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> overlaps <paramref name="plaintext"/>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_Encrypt</c> call.</exception>
+    public bool TryEncrypt(Mechanism mechanism, ReadOnlySpan<byte> plaintext, Span<byte> destination, out int bytesWritten)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ThrowIfOverlapping(plaintext, destination, nameof(destination));
 
-        return _session.Core.Encrypt(mechanism, handle, plaintext);
+        bool written = _session.Core.TryEncrypt(mechanism, EncryptingHandle("Pkcs11Key.TryEncrypt"), plaintext, destination, out bytesWritten);
+        if (!written)
+            bytesWritten = 0;
+        return written;
     }
 
     /// <summary>
@@ -524,11 +551,69 @@ public sealed partial class Pkcs11Key : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (PrivateHandle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.Decrypt (no private handle)");
+        return _session.Core.Decrypt(mechanism, DecryptingHandle("Pkcs11Key.Decrypt"), ciphertext);
+    }
 
-        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext);
+    /// <summary>
+    /// Decrypts <paramref name="ciphertext"/> into <paramref name="destination"/> using this key, as
+    /// <see cref="Decrypt"/> does, without allocating the result.
+    /// </summary>
+    /// <param name="mechanism">The decryption mechanism.</param>
+    /// <param name="ciphertext">The data to decrypt.</param>
+    /// <param name="destination">Where the plaintext is written. It must not overlap <paramref name="ciphertext"/>.</param>
+    /// <param name="bytesWritten">The length of the plaintext in <paramref name="destination"/>; 0 when this returns <see langword="false"/>.</param>
+    /// <returns>
+    /// <see langword="true"/> when the plaintext was written; <see langword="false"/> when it is longer than
+    /// <paramref name="destination"/>. The operation is finished either way, and <paramref name="destination"/> is cleared
+    /// after <see langword="false"/> or an exception.
+    /// </returns>
+    /// <remarks>
+    /// <see langword="false"/> means the plaintext itself does not fit. Some modules refuse an AEAD
+    /// decrypt into a buffer shorter than the ciphertext (SoftHSM 2.7 does), even when the plaintext would
+    /// fit: the plaintext then goes through a pooled buffer of the ciphertext's length, zeroized after
+    /// use, and is copied into <paramref name="destination"/>. This is remembered for the slot and
+    /// mechanism, so later calls take one round trip.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> overlaps <paramref name="ciphertext"/>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Decrypt</c> call.</exception>
+    public bool TryDecrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, Span<byte> destination, out int bytesWritten)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ThrowIfOverlapping(ciphertext, destination, nameof(destination));
+
+        bool written = _session.Core.TryDecrypt(mechanism, DecryptingHandle("Pkcs11Key.TryDecrypt"), ciphertext, destination, out bytesWritten);
+        if (!written)
+            bytesWritten = 0;
+        return written;
+    }
+
+    // The handle an encryption uses: the public half of an asymmetric pair, the key itself otherwise.
+    private ObjectHandle EncryptingHandle(string operation)
+    {
+        ObjectHandle handle = IsAsymmetricKeyType(_keyType) ? PublicHandle : PrivateHandle;
+        if (handle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID, $"{operation} (handle unavailable)");
+        return handle;
+    }
+
+    // The handle a decryption uses: the private half of an asymmetric pair, the key itself otherwise.
+    private ObjectHandle DecryptingHandle(string operation)
+    {
+        if (PrivateHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID, $"{operation} (no private handle)");
+        return PrivateHandle;
+    }
+
+    // The token reads the input while it writes the output, and a failed call clears the output before
+    // the input is used again, so the two must be separate memory.
+    private static void ThrowIfOverlapping(ReadOnlySpan<byte> input, Span<byte> destination, string paramName)
+    {
+        if (input.Overlaps(destination))
+            throw new ArgumentException("The destination must not overlap the input.", paramName);
     }
 
     /// <summary>
