@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.ThreadSafety;
 
 /// <summary>Cross-session concurrency over BouncyHsm — thin wrapper over <see cref="SessionParallelTestCases"/>.</summary>
-/// <remarks>The multi-session cases run here because BouncyHsm counts logins per session rather than per application (harrison314/BouncyHsm#121), so each session's C_Login succeeds; on a token following PKCS#11 they are blocked by BL-084.</remarks>
+/// <remarks>The multi-session cases run here because BouncyHsm counts logins per session rather than per application (harrison314/BouncyHsm#121), so each session's C_Login succeeds; on a token following PKCS#11, which shares login state across an application's sessions, the second C_Login returns CKR_USER_ALREADY_LOGGED_IN.</remarks>
 [Collection("BouncyHsm")]
 public sealed class SessionParallelTests_BouncyHsm(BouncyHsmBackendFixture backend)
 {
