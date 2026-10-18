@@ -39,14 +39,14 @@ jobs:
       # ossf/scorecard-action documents in a secret of its own and pass it here as repo_token; do
       # not reuse a broader token.
       - name: Run Scorecard
-        uses: ossf/scorecard-action@v2.4.4
+        uses: ossf/scorecard-action@v2.5.0
         with:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
 
       - name: Upload SARIF to code scanning
-        uses: github/codeql-action/upload-sarif@v4.38.3
+        uses: github/codeql-action/upload-sarif@v4.39.0
         with:
           sarif_file: results.sarif
 
