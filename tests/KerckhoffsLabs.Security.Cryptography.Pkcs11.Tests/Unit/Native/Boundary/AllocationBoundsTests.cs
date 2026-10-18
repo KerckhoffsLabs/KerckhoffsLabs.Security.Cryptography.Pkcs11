@@ -232,22 +232,22 @@ public sealed class AllocationBoundsTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void TryFindAllocation_FindsEveryByteOfALiveBlock_AndNothingPastIt()
+    public void LiveAllocations_FindsEveryByteOfALiveBlock_AndNothingPastIt()
     {
         IntPtr block = UnmanagedMemory.Allocate(13);
         try
         {
-            Assert.True(UnmanagedMemory.TryFindAllocation(block, out IntPtr start, out int size));
+            Assert.True(LiveAllocations.TryFind(block, out IntPtr start, out int size));
             Assert.Equal((block, 13), (start, size));
-            Assert.True(UnmanagedMemory.TryFindAllocation(block + 12, out start, out _));
+            Assert.True(LiveAllocations.TryFind(block + 12, out start, out _));
             Assert.Equal(block, start);
-            Assert.False(UnmanagedMemory.TryFindAllocation(block + 13, out start, out _) && start == block);
+            Assert.False(LiveAllocations.TryFind(block + 13, out start, out _) && start == block);
         }
         finally
         {
             IntPtr freed = block;
             UnmanagedMemory.Free(ref block);
-            Assert.False(UnmanagedMemory.TryFindAllocation(freed, out IntPtr start, out _) && start == freed);
+            Assert.False(LiveAllocations.TryFind(freed, out IntPtr start, out _) && start == freed);
         }
     }
 }

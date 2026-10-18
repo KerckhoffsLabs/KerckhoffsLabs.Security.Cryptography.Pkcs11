@@ -69,33 +69,6 @@ internal static class UnmanagedMemory
     internal static int ThreadAllocationCount => t_allocationCount;
 
     /// <summary>
-    /// Finds the live block that holds <paramref name="address"/>: the start and size of an allocation not
-    /// yet freed whose bytes include it (a zero-size block holds only its own address).
-    /// </summary>
-    /// <remarks>
-    /// For tests that check what the library lends a module: a pointer it builds into a structure must
-    /// lie in a live block, with its stated length inside that block. A linear scan, so not for
-    /// production paths. A block freed concurrently may or may not be found.
-    /// </remarks>
-    /// <returns><see langword="false"/> when no live block holds the address.</returns>
-    internal static bool TryFindAllocation(IntPtr address, out IntPtr start, out int size)
-    {
-        foreach ((IntPtr block, int length) in _allocations)
-        {
-            if ((nuint)address >= (nuint)block && (nuint)address - (nuint)block < (nuint)Math.Max(length, 1))
-            {
-                start = block;
-                size = length;
-                return true;
-            }
-        }
-
-        start = IntPtr.Zero;
-        size = 0;
-        return false;
-    }
-
-    /// <summary>
     /// Allocates unmanaged zero-filled memory
     /// </summary>
     /// <param name="size">Number of bytes required</param>

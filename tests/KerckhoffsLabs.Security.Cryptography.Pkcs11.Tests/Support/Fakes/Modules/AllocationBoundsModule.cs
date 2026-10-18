@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Module
 /// Guard pages (<c>GuardedMemory</c>) catch this for memory a caller lends, but cannot reach
 /// memory the library allocates for itself; AddressSanitizer would, but it does not see the reads of a
 /// managed module. The library allocates all of it through <see cref="UnmanagedMemory"/>, which tracks
-/// every live block, so the check is exact.
+/// every live block (read through <see cref="LiveAllocations"/>), so the check is exact.
 /// </para>
 /// <para>
 /// Every function succeeds. <c>C_GetAttributeValue</c> answers each length query with
@@ -48,7 +48,7 @@ internal sealed unsafe class AllocationBoundsModule : SessionTestModule
             Violations.Add($"{what}: NULL with length {length}");
             return false;
         }
-        if (!UnmanagedMemory.TryFindAllocation(address, out IntPtr start, out int size))
+        if (!LiveAllocations.TryFind(address, out IntPtr start, out int size))
         {
             Violations.Add($"{what}: 0x{address:X} is in no live block (freed, or not allocated by the library)");
             return false;
