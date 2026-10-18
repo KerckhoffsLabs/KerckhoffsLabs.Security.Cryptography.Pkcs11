@@ -27,6 +27,8 @@
 
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "build-opencryptoki.sh: opencryptoki is Linux-only (got $(uname -s)); nothing to do." >&2
   exit 0
@@ -52,10 +54,16 @@ if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
 
 DAEMON="${PREFIX}/sbin/pkcsslotd"
 
-# Skip the rebuild when the installed daemon is newer than the submodule HEAD commit.
+# NATIVE_SANITIZE=address builds the library, the soft-token STDLL, pkcsslotd and pkcsconf with
+# AddressSanitizer (see sanitizer_flags). A process loading libopencryptoki.so must then preload the
+# ASan runtime; the daemon and tools link it themselves.
+SANITIZE="$(sanitizer_flags)"
+
+# Skip the rebuild when the installed daemon is newer than the submodule HEAD commit. Never for a
+# sanitized build: the install's age cannot tell a sanitized one from a plain one.
 HEAD_TS="$(git -C "${SRC_DIR}" log -1 --format=%ct HEAD 2>/dev/null || echo 0)"
 _ts() { local f="$1"; [[ -f "$f" ]] && stat -c %Y "$f" 2>/dev/null || echo 0; }
-if (( "$(_ts "${DAEMON}")" > HEAD_TS )); then
+if [[ -z "${SANITIZE}" ]] && (( "$(_ts "${DAEMON}")" > HEAD_TS )); then
   echo "opencryptoki up to date at ${DAEMON}"
   exit 0
 fi
@@ -81,6 +89,13 @@ if [[ -n "${OPENSSL_PREFIX:-}" && -d "${OPENSSL_PREFIX}" ]]; then
     fi
   done
   echo "Using OpenSSL from ${OPENSSL_PREFIX}"
+fi
+
+if [[ -n "${SANITIZE}" ]]; then
+  export CFLAGS="${SANITIZE} ${CFLAGS:-}" LDFLAGS="${SANITIZE} ${LDFLAGS:-}"
+  # configure runs the programs it builds, and LeakSanitizer would fail its feature probes.
+  export ASAN_OPTIONS="detect_leaks=0${ASAN_OPTIONS:+:${ASAN_OPTIONS}}"
+  echo "Sanitizer: ${NATIVE_SANITIZE}"
 fi
 
 # bootstrap.sh runs autoreconf in-tree to generate ./configure.

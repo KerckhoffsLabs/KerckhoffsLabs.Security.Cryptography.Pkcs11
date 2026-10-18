@@ -74,12 +74,26 @@ fi
 # does not re-expose "dynamic" as a selectable feature of the `kryoptic` package itself (only of
 # its kryoptic-lib/ossl/ossl-sys dependencies) — it only reaches the build via `default`, so
 # `--no-default-features` here would silently drop it. Add features; never disable defaults.
+CARGO=(cargo build --release -p kryoptic --features pqc)
+OUT_DIR="${SRC_DIR}/target/release"
+# NATIVE_SANITIZE=address: Rust's sanitizers are nightly-only (-Zsanitizer). An explicit --target
+# keeps the build scripts and proc macros, which run during the build, uninstrumented, and puts the
+# sanitized build in its own target directory. The cdylib does not carry the ASan runtime: the
+# process loading it preloads one, as for the C modules.
+if [[ -n "$(sanitizer_flags)" ]]; then
+  TARGET="$(rustc -vV | sed -n 's/^host: //p')"
+  export RUSTFLAGS="-Zsanitizer=${NATIVE_SANITIZE} ${RUSTFLAGS:-}"
+  CARGO=(cargo +nightly build --release --target "${TARGET}" -p kryoptic --features pqc)
+  OUT_DIR="${SRC_DIR}/target/${TARGET}/release"
+  echo "Sanitizer: ${NATIVE_SANITIZE} (nightly, ${TARGET})"
+fi
+
 (
   cd "${SRC_DIR}"
-  cargo build --release -p kryoptic --features pqc
+  "${CARGO[@]}"
 ) 2>&1
 
-SRC_LIB="${SRC_DIR}/target/release/libkryoptic_pkcs11.so"
+SRC_LIB="${OUT_DIR}/libkryoptic_pkcs11.so"
 if [[ ! -f "${SRC_LIB}" ]]; then
   echo "build succeeded but ${SRC_LIB} not found" >&2; exit 1
 fi

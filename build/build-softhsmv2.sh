@@ -67,6 +67,15 @@ if [[ -n "${OPENSSL_PREFIX:-}" && -d "${OPENSSL_PREFIX}" ]]; then
   echo "Using OpenSSL from ${OPENSSL_PREFIX}"
 fi
 
+SANITIZE="$(sanitizer_flags)"
+if [[ -n "${SANITIZE}" ]]; then
+  export CFLAGS="${SANITIZE} ${CFLAGS:-}" CXXFLAGS="${SANITIZE} ${CXXFLAGS:-}" LDFLAGS="${SANITIZE} ${LDFLAGS:-}"
+  # configure runs the programs it builds: LeakSanitizer would fail its feature probes (which leak by
+  # design) and they would detect features as missing ("OpenSSL library has no ECC support").
+  export ASAN_OPTIONS="detect_leaks=0${ASAN_OPTIONS:+:${ASAN_OPTIONS}}"
+  echo "Sanitizer: ${NATIVE_SANITIZE}"
+fi
+
 # autogen.sh generates ./configure in the source tree; build out-of-tree (VPATH) to keep it clean.
 ( cd "${SRC_DIR}" && sh ./autogen.sh ) 2>&1
 

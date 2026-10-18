@@ -56,12 +56,25 @@ fetch_deb() {
 
 # build_stamp <source-dir>: prints what a build is made from, the source's HEAD commit and the
 # calling script's own git blob hash, so a different submodule commit or a changed build script
-# both count as a different build. Prints nothing when either cannot be read.
+# both count as a different build; and the sanitizer, if any, so a sanitized build is never taken
+# for a plain one or the reverse. Prints nothing when the commit or the script cannot be read.
 build_stamp() {
   local src="$1" head script
   head="$(git -C "${src}" rev-parse HEAD 2>/dev/null)" || return 0
   script="$(git hash-object "$0" 2>/dev/null)" || return 0
-  echo "${head} ${script}"
+  echo "${head} ${script}${NATIVE_SANITIZE:+ sanitize=${NATIVE_SANITIZE}}"
+}
+
+# sanitizer_flags: prints the compiler and linker flags NATIVE_SANITIZE asks for, or nothing when it
+# is unset. Only "address" (AddressSanitizer) is supported; any other value fails. A process that
+# loads a module built this way must preload the ASan runtime (LD_PRELOAD=$(gcc
+# -print-file-name=libasan.so)), since the test host itself is not instrumented.
+sanitizer_flags() {
+  case "${NATIVE_SANITIZE:-}" in
+    "") ;;
+    address) echo "-fsanitize=address -fno-omit-frame-pointer -g" ;;
+    *) echo "unsupported NATIVE_SANITIZE='${NATIVE_SANITIZE}' (only 'address')" >&2; return 1 ;;
+  esac
 }
 
 # is_built_from <stamp-file> <stamp> <output>...: succeeds when every <output> exists and
