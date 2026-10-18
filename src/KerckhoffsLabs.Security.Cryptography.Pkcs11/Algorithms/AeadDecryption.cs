@@ -36,20 +36,47 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </remarks>
 internal static class AeadDecryption
 {
+    // Each method's operation argument, where it has one, names the operation in errors, e.g. "AES-GCM decrypt".
+
     /// <summary>
-    /// Single-part <c>C_Decrypt</c> of <paramref name="ciphertextAndTag"/>. If the tag does not verify,
-    /// <paramref name="plaintext"/>, the caller's destination, is cleared before the throw.
+    /// Single-part <c>C_Decrypt</c> of <paramref name="ciphertext"/> followed by <paramref name="tag"/>,
+    /// the input layout PKCS#11 expects, straight into <paramref name="plaintext"/>. The input is
+    /// assembled in an <see cref="AeadBuffer"/>. If the tag does not verify, or the plaintext is not
+    /// exactly <paramref name="plaintext"/>'s length, <paramref name="plaintext"/> is cleared before the
+    /// throw.
     /// </summary>
-    public static byte[] Decrypt(
-        Pkcs11Key key, Mechanism mechanism, ReadOnlySpan<byte> ciphertextAndTag, Span<byte> plaintext)
+    public static void DecryptConcatenated(Pkcs11Key key, Mechanism mechanism, ReadOnlySpan<byte> ciphertext,
+        ReadOnlySpan<byte> tag, Span<byte> plaintext, string operation)
     {
+        int length = ciphertext.Length + tag.Length;
+        byte[] input = AeadBuffer.Rent(length);
         try
         {
-            return key.Decrypt(mechanism, ciphertextAndTag);
+            ciphertext.CopyTo(input);
+            tag.CopyTo(input.AsSpan(ciphertext.Length));
+
+            bool fits;
+            int written;
+            try
+            {
+                fits = key.TryDecrypt(mechanism, input.AsSpan(0, length), plaintext, out written);
+            }
+            catch (Pkcs11Exception ex) when (IsTagMismatch(ex.ReturnValue))
+            {
+                throw TagMismatch(ex, plaintext);
+            }
+
+            if (!fits)
+                throw new InvalidOperationException($"{operation} returned more than {plaintext.Length} bytes.");
+            if (written != plaintext.Length)
+            {
+                CryptographicOperations.ZeroMemory(plaintext);
+                throw new InvalidOperationException($"{operation} returned {written} bytes; expected {plaintext.Length}.");
+            }
         }
-        catch (Pkcs11Exception ex) when (IsTagMismatch(ex.ReturnValue))
+        finally
         {
-            throw TagMismatch(ex, plaintext);
+            AeadBuffer.Return(input);
         }
     }
 

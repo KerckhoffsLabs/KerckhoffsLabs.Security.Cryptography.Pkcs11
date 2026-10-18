@@ -1496,6 +1496,8 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.MessageEncrypt(KerckhoffsL
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Sign(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> data) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.SupportsMechanism(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKM mechanism) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.SupportsMessageApi.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.TryDecrypt(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> ciphertext, System.Span<byte> destination, out int bytesWritten) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.TryEncrypt(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> plaintext, System.Span<byte> destination, out int bytesWritten) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Unwrap(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> wrappedBytes, KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! template) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Verify(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> data, System.ReadOnlySpan<byte> signature) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Wrap(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! targetKey) -> byte[]!

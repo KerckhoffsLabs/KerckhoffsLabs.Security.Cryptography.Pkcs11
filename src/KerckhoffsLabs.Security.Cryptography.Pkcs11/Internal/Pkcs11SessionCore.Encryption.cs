@@ -22,76 +22,26 @@ internal sealed partial class Pkcs11SessionCore
     /// <returns>A freshly-allocated byte array containing the ciphertext.</returns>
     public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
     {
-        using var _ = AcquireExclusive();
-
-        ArgumentNullException.ThrowIfNull(mechanism);
-
-
-        Enforce(mechanism, CryptoOperation.Encrypt);
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
-
-        using var scope = new SessionParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
-
-        using var operation = BeginOperation("Encrypt");
-        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        operation.Begin(CKF.CKF_ENCRYPT, rv, OpEncryptInit);
-
         // Size the output for the largest single-block expansion a symmetric mechanism adds — a full
         // block of PKCS padding (AES block = 16) or a 16-byte AEAD tag — so block and AEAD ciphers
         // finish in one C_Encrypt without a null-length probe (which makes some AEAD tokens run the
         // whole operation on the probe). This also sidesteps NSS softoken's broken single-part CBC-PAD
         // path, whose short-buffer C_Encrypt feeds the input through EncryptUpdate/Final and does not
         // report the required length. RSA and other output-larger-than-input mechanisms still grow via
-        // the CKR_BUFFER_TOO_SMALL retry below.
+        // the CKR_BUFFER_TOO_SMALL retry.
         byte[] encryptedData = new byte[data.Length + 16];
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out NativeCULong encryptedDataLen);
-
-        if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-        {
-            // A length no longer than the buffer was not reported (opencryptoki leaves the caller's in place):
-            // ask for it, the operation being still active. NSS answers the query with
-            // CKR_OPERATION_NOT_INITIALIZED, recovered from below.
-            if ((ulong)encryptedDataLen <= (ulong)encryptedData.Length)
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, default, lengthOnly: true, out encryptedDataLen);
-
-            if (rv is CKR.CKR_OK or CKR.CKR_BUFFER_TOO_SMALL)
-            {
-                encryptedData = new byte[ReportedLength.ForAllocation(encryptedDataLen, OpEncrypt)];
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
-            }
-
-            // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active for a retry.
-            // NSS softoken's classic C_Encrypt violates this — it terminates the operation, so the retry
-            // above returns CKR_OPERATION_NOT_INITIALIZED. Recover by re-initializing, querying the length,
-            // then encrypting once. Reachable only for output-larger-than-input
-            // mechanisms (e.g. RSA) that exceed the padded buffer above; unreachable on spec-compliant
-            // tokens, whose retry already returned CKR_OK.
-            if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
-            {
-                rv = _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-                Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
-
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, default, lengthOnly: true, out NativeCULong probeLen);
-                Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
-
-                encryptedData = new byte[ReportedLength.ForAllocation(probeLen, OpEncrypt)];
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
-            }
-        }
-
-        Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
-        operation.Completed();
-
-        // Inside the scope's lifetime: the parameter block the token may have written into (an AEAD
-        // IV, say) is still allocated. After `scope` is disposed the bytes are zeroized and freed.
-        mechanism.AbsorbOutput(mechParams);
-
-        encryptedData = ReportedLength.Trim(encryptedData, encryptedDataLen, OpEncrypt);
-
-        return encryptedData;
+        RunSinglePart(encrypt: true, mechanism, keyHandle, data, encryptedData, growIfNeeded: true, checkInput: null, out int written, out byte[]? grown);
+        return grown ?? ReportedLength.Trim(encryptedData, (NativeCULong)(ulong)written, OpEncrypt);
     }
+
+    /// <summary>
+    /// Encrypts <paramref name="data"/> into <paramref name="destination"/>. Returns <see langword="false"/>
+    /// only when the ciphertext is longer than <paramref name="destination"/>; <paramref name="written"/>
+    /// is then its length, the operation has still been completed, and <paramref name="destination"/>
+    /// is cleared.
+    /// </summary>
+    internal bool TryEncrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, Span<byte> destination, out int written)
+        => RunSinglePart(encrypt: true, mechanism, keyHandle, data, destination, growIfNeeded: false, checkInput: null, out written, out _);
 
     /// <summary>
     /// Encrypts single-part data
@@ -342,60 +292,254 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="checkInput">Refuses a ciphertext the key cannot have produced; see <see cref="InputCheck"/>.</param>
     internal byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData, InputCheck? checkInput)
     {
+        // The input length as the output size: plaintext is never longer than its ciphertext for the
+        // mechanisms in use, it avoids a null-length probe (which makes AEAD tokens such as SoftHSM run
+        // the whole tag check and answer with an opaque error), and it is what modules that size the
+        // output from the input ask for.
+        byte[] decryptedData = new byte[encryptedData.Length];
+        RunSinglePart(encrypt: false, mechanism, keyHandle, encryptedData, decryptedData, growIfNeeded: true, checkInput, out int written, out byte[]? grown);
+        return grown ?? ReportedLength.Trim(decryptedData, (NativeCULong)(ulong)written, OpDecrypt);
+    }
+
+    /// <summary>
+    /// Decrypts <paramref name="encryptedData"/> into <paramref name="destination"/>. Returns
+    /// <see langword="false"/> only when the plaintext is longer than <paramref name="destination"/>;
+    /// <paramref name="written"/> is then its length, the operation has still been completed, and
+    /// <paramref name="destination"/> is cleared.
+    /// </summary>
+    /// <remarks>
+    /// A module that wants an output buffer larger than the plaintext (SoftHSM 2.7's AEAD decrypt asks
+    /// for the ciphertext's length) does not make this fail: the plaintext goes through a zeroized
+    /// <see cref="ScratchBuffer"/> instead, and after the first time the quirk is known for the slot and
+    /// mechanism, so later decrypts go there directly in one call.
+    /// </remarks>
+    internal bool TryDecrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData, Span<byte> destination, out int written)
+        => TryDecrypt(mechanism, keyHandle, encryptedData, destination, checkInput: null, out written);
+
+    /// <inheritdoc cref="TryDecrypt(Mechanism, ObjectHandle, ReadOnlySpan{byte}, Span{byte}, out int)"/>
+    /// <param name="mechanism">The decryption mechanism to use.</param>
+    /// <param name="keyHandle">Handle of the key to decrypt with.</param>
+    /// <param name="encryptedData">Ciphertext to decrypt.</param>
+    /// <param name="destination">Where the plaintext goes.</param>
+    /// <param name="checkInput">Refuses a ciphertext the key cannot have produced; see <see cref="InputCheck"/>.</param>
+    /// <param name="written">The plaintext's length, whether or not it fit.</param>
+    internal bool TryDecrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData, Span<byte> destination,
+        InputCheck? checkInput, out int written)
+        => RunSinglePart(encrypt: false, mechanism, keyHandle, encryptedData, destination, growIfNeeded: false, checkInput, out written, out _);
+
+    /// <summary>
+    /// One single-part <c>C_Encrypt</c> or <c>C_Decrypt</c>, from the policy check to the result, writing
+    /// into <paramref name="destination"/>.
+    /// </summary>
+    /// <param name="encrypt">Encrypt, or decrypt.</param>
+    /// <param name="mechanism">The mechanism.</param>
+    /// <param name="keyHandle">The key.</param>
+    /// <param name="input">The data to transform.</param>
+    /// <param name="destination">Where the output goes when it fits.</param>
+    /// <param name="growIfNeeded">
+    /// When the output does not fit, return it in <paramref name="grown"/>, a new array of exactly its
+    /// length, instead of returning <see langword="false"/>.
+    /// </param>
+    /// <param name="checkInput">Refuses an input the key cannot have produced; see <see cref="InputCheck"/>.</param>
+    /// <param name="written">The output's length, whether or not it fit.</param>
+    /// <param name="grown">The output, when it did not fit and <paramref name="growIfNeeded"/> was set.</param>
+    /// <returns><see langword="false"/> when the output did not fit and was not kept.</returns>
+    private bool RunSinglePart(bool encrypt, Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> input,
+        Span<byte> destination, bool growIfNeeded, InputCheck? checkInput, out int written, out byte[]? grown)
+    {
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        Enforce(mechanism, CryptoOperation.Decrypt);
-        checkInput?.Invoke(encryptedData);
+        Enforce(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt);
+        checkInput?.Invoke(input);
 
-        Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
+        Log.SessionTrace(_logger, (ulong)_sessionId, encrypt ? "Encrypt" : "Decrypt");
 
         using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
-        using var operation = BeginOperation("Decrypt");
-        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
+        using var operation = BeginOperation(encrypt ? "Encrypt" : "Decrypt");
+        CKR rv = InitSinglePart(encrypt, in ckMechanism, keyHandle);
+        operation.Begin(encrypt ? CKF.CKF_ENCRYPT : CKF.CKF_DECRYPT, rv, encrypt ? OpEncryptInit : OpDecryptInit);
 
-        // Use input length as the initial output buffer size — avoids a null-probe call
-        // that causes AEAD tokens (e.g. SoftHSM2) to run full tag verification and return
-        // an opaque error instead of the plaintext length. Resize via CKR_BUFFER_TOO_SMALL
-        // if the token needs more space (e.g. padding expansion on some mechanisms).
-        byte[] decryptedData = new byte[encryptedData.Length];
+        bool kept;
         try
         {
-            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out NativeCULong decryptedDataLen);
-
-            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-            {
-                // As in Encrypt: a length no longer than the buffer was not reported, so ask for it.
-                if ((ulong)decryptedDataLen <= (ulong)decryptedData.Length)
-                {
-                    rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, default, lengthOnly: true, out decryptedDataLen);
-                    Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
-                }
-
-                CryptographicOperations.ZeroMemory(decryptedData);
-                decryptedData = new byte[ReportedLength.ForAllocation(decryptedDataLen, OpDecrypt)];
-                rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out decryptedDataLen);
-            }
-
-            Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
-            operation.Completed();
-
-            mechanism.AbsorbOutput(mechParams);
-
-            return ReportedLength.Trim(decryptedData, decryptedDataLen, OpDecrypt);
+            kept = TransformSinglePart(encrypt, in ckMechanism, keyHandle, mechanism.Type, input, destination, growIfNeeded, out written, out grown);
         }
         catch
         {
-            // A token can write into the buffer before it fails: part of the plaintext, or plaintext
-            // whose tag or integrity check then failed. None of it outlives the call.
-            CryptographicOperations.ZeroMemory(decryptedData);
+            // Whatever the module wrote before failing is not left behind.
+            CryptographicOperations.ZeroMemory(destination);
+            throw;
+        }
+        operation.Completed();
+
+        // Inside the scope's lifetime: the parameter block the token may have written into (an AEAD
+        // IV, say) is still allocated. After `scope` is disposed the bytes are zeroized and freed.
+        mechanism.AbsorbOutput(mechParams);
+
+        return kept;
+    }
+
+    /// <summary>
+    /// The transforming call of <see cref="RunSinglePart"/>, on an initialized operation. Whatever
+    /// happens, the operation is finished when this returns or throws, and
+    /// <paramref name="destination"/> holds output only if this returns <see langword="true"/> without
+    /// <paramref name="grown"/>.
+    /// </summary>
+    private bool TransformSinglePart(bool encrypt, in CK_MECHANISM ckMechanism, ObjectHandle keyHandle, CKM mechanismType,
+        ReadOnlySpan<byte> input, Span<byte> destination, bool growIfNeeded, out int written, out byte[]? grown)
+    {
+        string function = encrypt ? OpEncrypt : OpDecrypt;
+
+        var quirkKey = ((ulong)_slotId, mechanismType);
+        if (!encrypt && destination.Length < input.Length
+            && _pkcs11Library.DecryptWantsInputSizedOutput.ContainsKey(quirkKey))
+        {
+            byte[] scratch = FinishSinglePartInScratch(encrypt, in ckMechanism, keyHandle, input, input.Length, out written);
+            return DeliverFromScratch(scratch, written, destination, growIfNeeded, out grown);
+        }
+
+        CKR rv = CallSinglePart(encrypt, input, destination, lengthOnly: false, out NativeCULong length);
+        if (rv == CKR.CKR_OK)
+        {
+            grown = null;
+            written = ReportedLength.Written(length, destination.Length, function);
+            return true;
+        }
+
+        CryptographicOperations.ZeroMemory(destination);
+        if (rv != CKR.CKR_BUFFER_TOO_SMALL)
+            throw Pkcs11Exception.Create(rv, function);
+
+        // PKCS#11 v3.2 §5.2: the module reports the length it needs and leaves the operation active. A
+        // length no longer than the destination was not reported (opencryptoki leaves the caller's in
+        // place), so it is asked for; NSS answers that query with CKR_OPERATION_NOT_INITIALIZED, having
+        // ended the operation, which is then started again.
+        if ((ulong)length <= (ulong)destination.Length)
+        {
+            rv = CallSinglePart(encrypt, input, default, lengthOnly: true, out length);
+            if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
+                length = RestartSinglePart(encrypt, in ckMechanism, keyHandle, input);
+            else
+                Pkcs11Exception.ThrowIfError(rv, function);
+        }
+
+        // The reported length can exceed the result (a module that sizes the output from the input), so
+        // the operation is finished in a buffer of that size and the result itself decides.
+        byte[] sized = FinishSinglePartInScratch(encrypt, in ckMechanism, keyHandle, input,
+            ReportedLength.ForAllocation(length, function), out written);
+        if (!encrypt && written <= destination.Length)
+            _pkcs11Library.DecryptWantsInputSizedOutput.TryAdd(quirkKey, true);
+        return DeliverFromScratch(sized, written, destination, growIfNeeded, out grown);
+    }
+
+    /// <summary>
+    /// Finishes an active single-part operation into a <see cref="ScratchBuffer"/> of
+    /// <paramref name="size"/> bytes, the size the module asked for. The caller returns the buffer.
+    /// </summary>
+    /// <remarks>
+    /// A <c>CKR_BUFFER_TOO_SMALL</c> here is followed once, at the size the module then reports. A module
+    /// that ends the operation on <c>CKR_BUFFER_TOO_SMALL</c>, against PKCS#11 v3.2 §5.2 (NSS softoken's
+    /// classic <c>C_Encrypt</c> and <c>C_Decrypt</c> do), answers the next call with
+    /// <c>CKR_OPERATION_NOT_INITIALIZED</c>: the operation is then started again, its length queried, and
+    /// run once.
+    /// </remarks>
+    private byte[] FinishSinglePartInScratch(bool encrypt, in CK_MECHANISM ckMechanism, ObjectHandle keyHandle,
+        ReadOnlySpan<byte> input, int size, out int written)
+    {
+        string function = encrypt ? OpEncrypt : OpDecrypt;
+        byte[] scratch = ScratchBuffer.Rent(size);
+        try
+        {
+            CKR rv = CallSinglePart(encrypt, input, scratch.AsSpan(0, size), lengthOnly: false, out NativeCULong length);
+            if (rv == CKR.CKR_BUFFER_TOO_SMALL && (ulong)length > (ulong)size)
+            {
+                size = ReportedLength.ForAllocation(length, function);
+                ScratchBuffer.Return(scratch);
+                scratch = ScratchBuffer.Rent(size);
+                rv = CallSinglePart(encrypt, input, scratch.AsSpan(0, size), lengthOnly: false, out length);
+            }
+
+            if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
+            {
+                int needed = ReportedLength.ForAllocation(RestartSinglePart(encrypt, in ckMechanism, keyHandle, input), function);
+                if (needed > scratch.Length)
+                {
+                    ScratchBuffer.Return(scratch);
+                    scratch = ScratchBuffer.Rent(needed);
+                }
+                size = needed;
+                rv = CallSinglePart(encrypt, input, scratch.AsSpan(0, size), lengthOnly: false, out length);
+            }
+
+            Pkcs11Exception.ThrowIfError(rv, function);
+            written = ReportedLength.Written(length, size, function);
+            return scratch;
+        }
+        catch
+        {
+            ScratchBuffer.Return(scratch);
             throw;
         }
     }
+
+    /// <summary>
+    /// Starts the single-part operation again, after a module ended it on <c>CKR_BUFFER_TOO_SMALL</c>,
+    /// and returns the output length it reports.
+    /// </summary>
+    private NativeCULong RestartSinglePart(bool encrypt, in CK_MECHANISM ckMechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> input)
+    {
+        CKR rv = InitSinglePart(encrypt, in ckMechanism, keyHandle);
+        Pkcs11Exception.ThrowIfError(rv, encrypt ? OpEncryptInit : OpDecryptInit);
+
+        rv = CallSinglePart(encrypt, input, default, lengthOnly: true, out NativeCULong length);
+        Pkcs11Exception.ThrowIfError(rv, encrypt ? OpEncrypt : OpDecrypt);
+        return length;
+    }
+
+    /// <summary>
+    /// Moves a finished result out of <paramref name="scratch"/>, which is returned here: into
+    /// <paramref name="destination"/> when it fits, into a new array when it does not and
+    /// <paramref name="growIfNeeded"/> is set, and nowhere otherwise. <paramref name="destination"/> is
+    /// cleared whenever it does not receive the result, so a <see langword="false"/> leaves it the same
+    /// on every path.
+    /// </summary>
+    private static bool DeliverFromScratch(byte[] scratch, int written, Span<byte> destination, bool growIfNeeded, out byte[]? grown)
+    {
+        try
+        {
+            grown = null;
+            if (written <= destination.Length)
+            {
+                scratch.AsSpan(0, written).CopyTo(destination);
+                return true;
+            }
+            CryptographicOperations.ZeroMemory(destination);
+            if (growIfNeeded)
+            {
+                grown = scratch.AsSpan(0, written).ToArray();
+                return true;
+            }
+            return false;
+        }
+        finally
+        {
+            ScratchBuffer.Return(scratch);
+        }
+    }
+
+    private CKR InitSinglePart(bool encrypt, in CK_MECHANISM ckMechanism, ObjectHandle keyHandle)
+        => encrypt
+            ? _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId)
+            : _pkcs11Library.C_DecryptInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
+
+    private CKR CallSinglePart(bool encrypt, ReadOnlySpan<byte> input, Span<byte> output, bool lengthOnly, out NativeCULong length)
+        => encrypt
+            ? _pkcs11Library.C_Encrypt(_sessionId, input, output, lengthOnly, out length)
+            : _pkcs11Library.C_Decrypt(_sessionId, input, output, lengthOnly, out length);
 
     /// <summary>
     /// Decrypts single-part data

@@ -803,8 +803,8 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.Equal(notFromTheKey.Length, decrypts);
     }
 
-    // Pkcs11Key's own Decrypt and Unwrap refuse them too, under either RSA encryption mechanism. The fake has no
-    // C_UnwrapKey, so an unwrap that reaches the token throws CKR_FUNCTION_NOT_SUPPORTED.
+    // Pkcs11Key's own Decrypt, TryDecrypt and Unwrap refuse them too, under either RSA encryption mechanism. The
+    // fake has no C_UnwrapKey, so an unwrap that reaches the token throws CKR_FUNCTION_NOT_SUPPORTED.
     [Theory]
     [InlineData(CKM.CKM_RSA_PKCS)]
     [InlineData(CKM.CKM_RSA_PKCS_OAEP)]
@@ -818,12 +818,15 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.All(RSAPkcs11TestCases.CiphertextsNotFromTheKey(FakeModulus, FakeCiphertext), c =>
         {
             Assert.Throws<CryptographicException>(() => key.Key.Decrypt(mechanism, c.Ciphertext));
+            Assert.Throws<CryptographicException>(() => key.Key.TryDecrypt(mechanism, c.Ciphertext, new byte[FakeModulus.Length], out _));
             Assert.Throws<CryptographicException>(() => key.Key.Unwrap(mechanism, c.Ciphertext, template));
         });
         Assert.Equal(0, decrypts);
 
         Assert.Empty(key.Key.Decrypt(mechanism, FakeCiphertext));
-        Assert.Equal(1, decrypts);
+        Assert.True(key.Key.TryDecrypt(mechanism, FakeCiphertext, new byte[FakeModulus.Length], out int written));
+        Assert.Equal(0, written);
+        Assert.Equal(2, decrypts);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Key.Unwrap(mechanism, FakeCiphertext, template));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
