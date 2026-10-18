@@ -65,10 +65,23 @@ if [[ -n "${NSS_WITH_NSPR:-}" ]]; then
   NSPR_ARGS=(--with-nspr="${NSS_WITH_NSPR}")
 fi
 
+# NATIVE_SANITIZE=address: NSS's own --asan, which adds -fsanitize=address (with use-after-scope) to
+# every compile and link and builds the shared libraries with no_zdefs, leaving the ASan runtime to
+# the process that loads them (it must preload one). The build runs shlibsign, itself instrumented,
+# to sign freebl and softoken; LeakSanitizer would fail it, so leak detection is off while building.
+# Built with clang, as NSS's own sanitizer builds are: with -fsanitize=address, gcc 13 reports a
+# -Wmaybe-uninitialized in libstdc++'s <regex> (nss-tool), which -Werror turns into a failed build.
+SANITIZE_ARGS=()
+if [[ -n "$(sanitizer_flags)" ]]; then
+  SANITIZE_ARGS=(--asan --clang)
+  export ASAN_OPTIONS="detect_leaks=0${ASAN_OPTIONS:+:${ASAN_OPTIONS}}"
+  echo "Sanitizer: ${NATIVE_SANITIZE}" >&2
+fi
+
 build_status=0
 (
   cd "${SRC_DIR}"
-  ./build.sh --opt "${NSPR_ARGS[@]}" --disable-tests
+  ./build.sh --opt "${NSPR_ARGS[@]}" --disable-tests "${SANITIZE_ARGS[@]}"
 ) >&2 || build_status=$?
 
 # NSS 3.129 (Bug 2065423) generates nss.pc/nss-config as build.sh's last step by reading
