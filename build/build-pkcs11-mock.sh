@@ -34,6 +34,11 @@ case "${RID}" in
   *) echo "no pkcs11-mock build for ${RID}" >&2; exit 1 ;;
 esac
 
+SANITIZE="$(sanitizer_flags)"
+if [[ -n "${SANITIZE}" && "${RID}" != linux-* ]]; then
+  echo "NATIVE_SANITIZE is supported for the Linux build only" >&2; exit 1
+fi
+
 DEST_DIR="${OUT_BASE}/runtimes/${RID}/native"
 DEST_FILE="${DEST_DIR}/pkcs11-mock.${LIB_EXT}"
 
@@ -58,9 +63,12 @@ case "${RID}" in
     LIBNAME="pkcs11-mock-${LIB_SUFFIX}.${LIB_EXT}"
     make distclean 2>/dev/null || true
 
+    # ARCH_FLAGS reaches both the compile and the link, which is where a sanitizer must be; a
+    # sanitized build keeps its symbols, so its reports name the mock's own functions and lines.
     cat Makefile \
-      | sed "s|^ARCH_FLAGS=.*|ARCH_FLAGS= ${ARCH_FLAGS}|" \
+      | sed "s|^ARCH_FLAGS=.*|ARCH_FLAGS= ${ARCH_FLAGS} ${SANITIZE}|" \
       | sed "s|^LIBNAME=.*|LIBNAME=${LIBNAME}|" \
+      | if [[ -n "${SANITIZE}" ]]; then sed "/strip --strip-all/d"; else cat; fi \
       > Makefile.host
     make -f Makefile.host
     rm -f Makefile.host

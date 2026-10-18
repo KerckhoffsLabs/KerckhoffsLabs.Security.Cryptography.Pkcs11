@@ -498,3 +498,74 @@ jobs:
         env:
           FILTER: ${{ matrix.filter }}
         run: dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "$FILTER"
+
+  # AddressSanitizer over the C modules the suite loads in process. pkcs11-mock and SoftHSM2 are built
+  # with NATIVE_SANITIZE=address (see build/lib/common.sh) and the suite runs with the ASan runtime
+  # preloaded, so a module that reads or writes outside the memory it was lent, or uses memory after it
+  # is freed, stops the run with a report naming the access. ASan sees memory that comes from malloc:
+  # the module's own heap, and what the library allocates through UnmanagedMemory (attribute values,
+  # mechanism parameters). It does not see the managed heap, which the hermetic boundary tests cover
+  # (BufferBoundaryTests: guard pages; AllocationBoundsTests: the allocation registry).
+  #
+  # The ASan options are the ones CoreCLR needs: it handles SIGSEGV itself (null references) on its own
+  # alternate stack, and the GC's heap would read as leaks.
+  asan:
+    name: AddressSanitizer (linux-x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      # Only the two modules this job builds; no native cache, so a sanitized build never mixes with a
+      # plain one (their build stamps differ too).
+      - name: Init native submodules
+        run: git submodule update --init --depth 1 vendor/pkcs11-mock vendor/softhsmv2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install native build deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev autoconf automake libtool
+
+      - name: OpenSSL 3.5
+        uses: $/.github/actions/openssl35
+
+      - name: Restore
+        run: dotnet restore KerckhoffsLabs.sln
+
+      - name: Build (modules with AddressSanitizer)
+        env:
+          NATIVE_SANITIZE: address
+        run: dotnet build KerckhoffsLabs.sln --no-restore -c Release
+
+      - name: Test under AddressSanitizer
+        env:
+          ASAN_OPTIONS: detect_leaks=0:handle_segv=0:allow_user_segv_handler=1:use_sigaltstack=0:halt_on_error=1:log_path=${{ runner.temp }}/asan/report
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/asan"
+          LD_PRELOAD="$(gcc -print-file-name=libasan.so)" \
+            dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed | tee "$RUNNER_TEMP/test.log"
+          # A sanitized SoftHSM that failed to load would only skip its tests; insist they ran.
+          passed="$(grep -cE 'passed.* [A-Za-z0-9_.]+_SoftHsm[A-Za-z0-9]*\.' "$RUNNER_TEMP/test.log" || true)"
+          echo "SoftHSM tests passed under ASan: ${passed}"
+          [[ "${passed}" -gt 0 ]] || { echo "::error::No SoftHSM test ran under AddressSanitizer"; exit 1; }
+
+      - name: AddressSanitizer reports
+        if: always()
+        run: |
+          shopt -s nullglob
+          reports=("$RUNNER_TEMP"/asan/report.*)
+          for report in "${reports[@]}"; do
+            echo "::group::${report}"
+            cat "${report}"
+            echo "::endgroup::"
+          done
+          if [[ ${#reports[@]} -gt 0 ]]; then
+            echo "::error::AddressSanitizer reported ${#reports[@]} error(s)"
+            exit 1
+          fi
