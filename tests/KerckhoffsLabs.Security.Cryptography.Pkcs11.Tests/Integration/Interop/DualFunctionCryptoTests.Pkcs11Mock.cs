@@ -140,8 +140,8 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
             // pkcs11-mock's C_VerifyFinal only accepts this exact 10-byte canned signature.
             byte[] signature = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
 
-            session.DecryptVerify(verificationMechanism, publicKey, decryptionMechanism, secretKey,
-                ciphertext, signature, out byte[] decryptedData, out bool isValid);
+            bool isValid = session.DecryptVerify(verificationMechanism, publicKey, decryptionMechanism, secretKey,
+                ciphertext, signature, out byte[] decryptedData);
 
             Assert.True(isValid);
             Assert.Equal(XorAb(ciphertext), decryptedData);

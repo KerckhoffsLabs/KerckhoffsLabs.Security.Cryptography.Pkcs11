@@ -275,7 +275,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
-        s.Verify(mech, new ObjectHandle(1), input, [9, 9], out bool isValid);
+        bool isValid = s.Verify(mech, new ObjectHandle(1), input, [9, 9]);
 
         Assert.True(isValid);
     }
@@ -288,7 +288,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
-        s.Verify(mech, new ObjectHandle(1), input, [9, 9], out bool isValid);
+        bool isValid = s.Verify(mech, new ObjectHandle(1), input, [9, 9]);
 
         Assert.False(isValid);
     }
@@ -302,7 +302,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
-            s.Verify(mech, new ObjectHandle(1), input, [9, 9], out _));
+            s.Verify(mech, new ObjectHandle(1), input, [9, 9]));
     }
 
     [Fact]
@@ -313,7 +313,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
-        s.Verify(mech, new ObjectHandle(1), input, [9, 9], out bool isValid, bufferLength: 2);
+        bool isValid = s.Verify(mech, new ObjectHandle(1), input, [9, 9], bufferLength: 2);
 
         Assert.True(isValid);
         Assert.Equal(3, fake.UpdateCalls);
@@ -328,7 +328,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         using var s = fake.CreateSession(SessionId);
         var mech = Pss();
 
-        byte[] recovered = s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
+        bool isValid = s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out byte[] recovered);
 
         Assert.True(isValid);
         Assert.Equal(new byte[] { 1, 2, 3 }, recovered);
@@ -341,7 +341,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         using var s = fake.CreateSession(SessionId);
         var mech = Pss();
 
-        s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
+        bool isValid = s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out _);
 
         Assert.False(isValid);
     }

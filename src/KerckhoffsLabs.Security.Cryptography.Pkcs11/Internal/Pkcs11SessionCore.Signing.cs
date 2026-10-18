@@ -56,8 +56,8 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="keyHandle">Handle of the public/MAC key.</param>
     /// <param name="data">Data the signature was computed over.</param>
     /// <param name="signature">Signature bytes to verify.</param>
-    /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
-    public void Verify(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool Verify(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
         using var _ = AcquireExclusive();
 
@@ -77,9 +77,10 @@ internal sealed partial class Pkcs11SessionCore
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
         operation.Completed(); // C_Verify ends the operation whatever it returns
-        isValid = IsVerified(rv, OpVerify);
+        bool isValid = IsVerified(rv, OpVerify);
 
         mechanism.AbsorbOutput(mechParams);
+        return isValid;
     }
 
     /// <summary>
@@ -89,12 +90,12 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="keyHandle">Verification key</param>
     /// <param name="data">Data that was signed</param>
     /// <param name="signature">Signature</param>
-    /// <param name="isValid">Flag indicating whether signature is valid</param>
-    public void Verify(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, byte[] signature, out bool isValid)
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool Verify(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, byte[] signature)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(signature);
-        Verify(mechanism, keyHandle, data.AsSpan(), signature.AsSpan(), out isValid);
+        return Verify(mechanism, keyHandle, data.AsSpan(), signature.AsSpan());
     }
 
     /// <summary>
@@ -104,8 +105,8 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="keyHandle">Verification key</param>
     /// <param name="inputStream">Input stream from which data that was signed should be read</param>
     /// <param name="signature">Signature</param>
-    /// <param name="isValid">Flag indicating whether signature is valid</param>
-    public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid)
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature)
     {
         using var _ = AcquireExclusive();
 
@@ -120,7 +121,7 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(signature);
 
-        Verify(mechanism, keyHandle, inputStream, signature, out isValid, 4096);
+        return Verify(mechanism, keyHandle, inputStream, signature, 4096);
     }
 
     /// <summary>
@@ -130,9 +131,9 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="keyHandle">Verification key</param>
     /// <param name="inputStream">Input stream from which data that was signed should be read</param>
     /// <param name="signature">Signature</param>
-    /// <param name="isValid">Flag indicating whether signature is valid</param>
     /// <param name="bufferLength">Size of read buffer in bytes</param>
-    public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid, int bufferLength)
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, int bufferLength)
     {
         using var _ = AcquireExclusive();
 
@@ -170,9 +171,10 @@ internal sealed partial class Pkcs11SessionCore
         // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
         // the call failed with any other CKR — the verify operation is consumed.
         operation.Completed();
-        isValid = IsVerified(rv, OpVerifyFinal);
+        bool isValid = IsVerified(rv, OpVerifyFinal);
 
         mechanism.AbsorbOutput(mechParams);
+        return isValid;
     }
 
     /// <summary>
@@ -181,9 +183,9 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="mechanism">Verification mechanism;</param>
     /// <param name="keyHandle">Verification key</param>
     /// <param name="signature">Signature</param>
-    /// <param name="isValid">Flag indicating whether signature is valid</param>
-    /// <returns>Data recovered from the signature</returns>
-    public byte[] VerifyRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] signature, out bool isValid)
+    /// <param name="data">Data recovered from the signature; empty when it does not verify.</param>
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool VerifyRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] signature, out byte[] data)
     {
         using var _ = AcquireExclusive();
 
@@ -206,20 +208,22 @@ internal sealed partial class Pkcs11SessionCore
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, default, lengthOnly: true, out NativeCULong dataLen);
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecover);
 
-        byte[] data = new byte[ReportedLength.ForAllocation(dataLen, OpVerifyRecover)];
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, data, lengthOnly: false, out dataLen);
+        byte[] recovered = new byte[ReportedLength.ForAllocation(dataLen, OpVerifyRecover)];
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, recovered, lengthOnly: false, out dataLen);
         operation.Completed(); // the call with a buffer ends the operation whatever it returns
-        isValid = IsVerified(rv, OpVerifyRecover);
+        bool isValid = IsVerified(rv, OpVerifyRecover);
 
         mechanism.AbsorbOutput(mechParams);
 
         if (!isValid)
         {
             // Nothing was recovered, and the reported length is not one to trust.
-            CryptographicOperations.ZeroMemory(data);
-            return [];
+            CryptographicOperations.ZeroMemory(recovered);
+            data = [];
+            return false;
         }
-        return ReportedLength.Trim(data, dataLen, OpVerifyRecover);
+        data = ReportedLength.Trim(recovered, dataLen, OpVerifyRecover);
+        return true;
     }
 
     /// <summary>
@@ -232,8 +236,8 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="data">Data to be processed</param>
     /// <param name="signature">Signature</param>
     /// <param name="decryptedData">Decrypted data</param>
-    /// <param name="isValid">Flag indicating whether signature is valid</param>
-    public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, byte[] data, byte[] signature, out byte[] decryptedData, out bool isValid)
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, byte[] data, byte[] signature, out byte[] decryptedData)
     {
         using var _ = AcquireExclusive();
 
@@ -253,8 +257,9 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(signature);
 
         using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new();
-        DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputMemoryStream, outputMemorySteam, signature, out isValid);
+        bool isValid = DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputMemoryStream, outputMemorySteam, signature);
         decryptedData = outputMemorySteam.ToArray();
+        return isValid;
     }
 
     /// <summary>
@@ -267,8 +272,8 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="inputStream">Input stream from which data to be processed should be read</param>
     /// <param name="outputStream">Output stream where decrypted data should be written</param>
     /// <param name="signature">Signature</param>
-    /// <param name="isValid">Flag indicating whether signature is valid</param>
-    public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid)
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature)
     {
         using var _ = AcquireExclusive();
 
@@ -291,7 +296,7 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(signature);
 
-        DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputStream, outputStream, signature, out isValid, 4096);
+        return DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputStream, outputStream, signature, 4096);
     }
 
     /// <summary>
@@ -304,9 +309,9 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="inputStream">Input stream from which data to be processed should be read</param>
     /// <param name="outputStream">Output stream where decrypted data should be written</param>
     /// <param name="signature">Signature</param>
-    /// <param name="isValid">Flag indicating whether signature is valid</param>
     /// <param name="bufferLength">Size of read buffer in bytes</param>
-    public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid, int bufferLength)
+    /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    public bool DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, int bufferLength)
     {
         using var _ = AcquireExclusive();
 
@@ -363,9 +368,10 @@ internal sealed partial class Pkcs11SessionCore
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
         operation.Completed(); // C_VerifyFinal ends the operation whatever it returns
-        isValid = IsVerified(rv, OpVerifyFinal);
+        bool isValid = IsVerified(rv, OpVerifyFinal);
 
         verificationMechanism.AbsorbOutput(verifyParams);
         decryptionMechanism.AbsorbOutput(decryptParams);
+        return isValid;
     }
 }

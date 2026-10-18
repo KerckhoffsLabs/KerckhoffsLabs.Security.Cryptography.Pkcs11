@@ -19,7 +19,7 @@ internal static class VerifyEdDsaTestCases
             byte[] tampered = [.. data];
             tampered[0] ^= 0xFF;
 
-            session.Verify(eddsa, pub, tampered, sig, out bool isValid);
+            bool isValid = session.Verify(eddsa, pub, tampered, sig);
             Assert.False(isValid, "Tampered data must not verify.");
         }
         finally

@@ -45,14 +45,14 @@ public sealed class SignEdDsaContextTests_OpenCryptoki(OpenCryptokiBackendFixtur
                 Assert.Equal(64, sig.Length);
 
                 var verifyMech = new Mechanism(CKM.CKM_EDDSA, new CkmEddsaParams(phFlag: false, context));
-                session.Verify(verifyMech, pub, data, sig, out bool isValid);
+                bool isValid = session.Verify(verifyMech, pub, data, sig);
                 Assert.True(isValid, "Ed25519ctx round-trip should verify with the same context.");
 
                 // A context-bound signature must not verify under a different (or absent) context —
                 // the whole point of Ed25519ctx is domain separation by context string.
                 var wrongContextMech = new Mechanism(CKM.CKM_EDDSA,
                     new CkmEddsaParams(phFlag: false, Encoding.UTF8.GetBytes("different-context")));
-                session.Verify(wrongContextMech, pub, data, sig, out bool isValidWrongContext);
+                bool isValidWrongContext = session.Verify(wrongContextMech, pub, data, sig);
                 Assert.False(isValidWrongContext, "Ed25519ctx must not verify under a different context.");
             }
             finally
@@ -87,13 +87,13 @@ public sealed class SignEdDsaContextTests_OpenCryptoki(OpenCryptokiBackendFixtur
                 Assert.Equal(64, sig.Length);
 
                 var verifyMech = new Mechanism(CKM.CKM_EDDSA, new CkmEddsaParams(phFlag: true));
-                session.Verify(verifyMech, pub, data, sig, out bool isValid);
+                bool isValid = session.Verify(verifyMech, pub, data, sig);
                 Assert.True(isValid, "Ed25519ph round-trip should verify.");
 
                 // The same signature must not verify as a plain (non-prehash) Ed25519 signature —
                 // phFlag selects a different OpenSSL "instance" (Ed25519ph vs Ed25519).
                 var plainMech = new Mechanism(CKM.CKM_EDDSA, new CkmEddsaParams(phFlag: false));
-                session.Verify(plainMech, pub, data, sig, out bool isValidAsPlain);
+                bool isValidAsPlain = session.Verify(plainMech, pub, data, sig);
                 Assert.False(isValidAsPlain, "An Ed25519ph signature must not verify as plain Ed25519.");
             }
             finally

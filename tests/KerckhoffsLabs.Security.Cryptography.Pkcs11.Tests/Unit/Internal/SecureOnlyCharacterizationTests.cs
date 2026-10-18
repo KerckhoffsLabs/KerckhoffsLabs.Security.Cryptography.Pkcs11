@@ -69,7 +69,7 @@ public sealed class SecureOnlyCharacterizationTests
         using var session = NewSession(module);
         var mech = new Mechanism(CKM.CKM_SHA1_RSA_PKCS);
         Assert.Throws<CryptoPolicyViolationException>(() => session.Sign(mech, AnyKey, [1]));
-        Assert.Throws<CryptoPolicyViolationException>(() => session.Verify(mech, AnyKey, [1], [1], out _));
+        Assert.Throws<CryptoPolicyViolationException>(() => session.Verify(mech, AnyKey, [1], [1]));
     }
 
     [Fact]

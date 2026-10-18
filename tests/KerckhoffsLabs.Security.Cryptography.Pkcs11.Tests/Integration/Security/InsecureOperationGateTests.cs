@@ -170,7 +170,7 @@ internal static class InsecureOperationGateTestCases
             var mech = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
             var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>(), out _));
+                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>()));
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
         }
         finally
@@ -222,7 +222,7 @@ internal static class InsecureOperationGateTestCases
             var mech = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
             var ex = Record.Exception(() =>
-                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>(), out _));
+                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>()));
             Assert.False(ex is CryptoPolicyViolationException,
                 $"Mechanism {(CKM)mechanismId} must not be refused under the AllowInsecure policy.");
         }

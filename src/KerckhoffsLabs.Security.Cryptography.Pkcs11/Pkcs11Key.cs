@@ -459,10 +459,7 @@ public sealed partial class Pkcs11Key : IDisposable
 
         // Prefer the real public handle.
         if (!PublicHandle.IsInvalid)
-        {
-            _session.Core.Verify(mechanism, PublicHandle, data, signature, out bool isValid);
-            return isValid;
-        }
+            return _session.Core.Verify(mechanism, PublicHandle, data, signature);
 
         // Fall back to managed verify via synthesized public parameters. No session call happens on this
         // path, so the session policy is consulted here — the same verdict the token path gets from
