@@ -325,7 +325,7 @@ public sealed class Pkcs11Library : IDisposable
         Log.LibraryTrace(_logger, _libraryPath, "GetInfo");
 
         CK_INFO info = new();
-        CKR rv = LowLevel.C_GetInfo(ref info);
+        CKR rv = LowLevel.C_GetInfo(out info);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetInfo);
 
         return new LibraryInfo(info);
@@ -533,7 +533,7 @@ public sealed class Pkcs11Library : IDisposable
 
         NativeCULong flags = (NativeCULong)(nonBlocking ? CKF.CKF_DONT_BLOCK : 0UL);
         NativeCULong slotIdOut = new(0);
-        CKR rv = LowLevel.C_WaitForSlotEvent(flags, ref slotIdOut, IntPtr.Zero);
+        CKR rv = LowLevel.C_WaitForSlotEvent(flags, out slotIdOut, IntPtr.Zero);
 
         if (rv == CKR.CKR_OK) return (ulong)slotIdOut;
 

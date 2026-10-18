@@ -384,7 +384,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         if (_supportedMechanisms is null)
         {
             CK_SESSION_INFO info = new();
-            CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref info);
+            CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out info);
             if (rv != CKR.CKR_OK) return false;
 
             rv = _pkcs11Library.C_GetMechanismList(info.SlotId, [], out NativeCULong count);

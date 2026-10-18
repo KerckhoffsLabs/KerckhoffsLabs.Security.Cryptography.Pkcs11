@@ -8,7 +8,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// Begins a message-signing sequence (PKCS#11 v3.0 §5.13.6).
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public unsafe CKR C_MessageSignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    public unsafe CKR C_MessageSignInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key)
     {
         using ModuleCall call = EnterModule();
         var messageSignInit = call.Functions.C_MessageSignInit;

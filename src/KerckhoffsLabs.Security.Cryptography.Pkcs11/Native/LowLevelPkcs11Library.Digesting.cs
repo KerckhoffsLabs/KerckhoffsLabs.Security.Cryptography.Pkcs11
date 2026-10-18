@@ -10,7 +10,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="session">The session's handle</param>
     /// <param name="mechanism">The digesting mechanism</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public unsafe CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism)
+    public unsafe CKR C_DigestInit(NativeCULong session, in CK_MECHANISM mechanism)
     {
         using ModuleCall call = EnterModule();
         var digestInit = call.Functions.C_DigestInit;

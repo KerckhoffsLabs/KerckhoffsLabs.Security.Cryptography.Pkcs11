@@ -26,16 +26,14 @@ public sealed class SessionDispatchTests
         new(nameof(LowLevelPkcs11Library.C_SetPIN), l => l.C_SetPIN(DispatchSmoke.Session, Pin, Pin)),
         new(nameof(LowLevelPkcs11Library.C_OpenSession), l =>
         {
-            NativeCULong session = default;
-            CKR rv = l.C_OpenSession((NativeCULong)Slot, (NativeCULong)(ulong)CKF.CKF_SERIAL_SESSION, ref session);
+            CKR rv = l.C_OpenSession((NativeCULong)Slot, (NativeCULong)(ulong)CKF.CKF_SERIAL_SESSION, out NativeCULong session);
             return rv == CKR.CKR_OK && (ulong)session != Opened ? CKR.CKR_GENERAL_ERROR : rv;
         }),
         new(nameof(LowLevelPkcs11Library.C_CloseSession), l => l.C_CloseSession(DispatchSmoke.Session)),
         new(nameof(LowLevelPkcs11Library.C_CloseAllSessions), l => l.C_CloseAllSessions((NativeCULong)Slot)),
         new(nameof(LowLevelPkcs11Library.C_GetSessionInfo), l =>
         {
-            CK_SESSION_INFO info = default;
-            CKR rv = l.C_GetSessionInfo(DispatchSmoke.Session, ref info);
+            CKR rv = l.C_GetSessionInfo(DispatchSmoke.Session, out CK_SESSION_INFO info);
             return rv == CKR.CKR_OK && ((ulong)info.SlotId != Slot || (ulong)info.State != 3 || (ulong)info.Flags != 6) ? CKR.CKR_GENERAL_ERROR : rv;
         }),
         new(nameof(LowLevelPkcs11Library.C_GetOperationState), l => l.C_GetOperationState(DispatchSmoke.Session, new byte[8], lengthOnly: false, out _)),
@@ -46,8 +44,7 @@ public sealed class SessionDispatchTests
         new(nameof(LowLevelPkcs11Library.C_SessionCancel), l => l.C_SessionCancel(DispatchSmoke.Session, (NativeCULong)(ulong)CKF.CKF_SIGN)),
         new(nameof(LowLevelPkcs11Library.C_GetSessionValidationFlags), l =>
         {
-            NativeCULong flags = default;
-            CKR rv = l.C_GetSessionValidationFlags(DispatchSmoke.Session, (NativeCULong)0, ref flags);
+            CKR rv = l.C_GetSessionValidationFlags(DispatchSmoke.Session, (NativeCULong)0, out NativeCULong flags);
             return rv == CKR.CKR_OK && (ulong)flags != 0x10 ? CKR.CKR_GENERAL_ERROR : rv;
         }),
     }.ToDictionary(c => c.Function, StringComparer.Ordinal);

@@ -8,7 +8,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// Begins an AEAD encrypt-message sequence (PKCS#11 v3.0 §5.9.4). Pair with C_EncryptMessage or C_EncryptMessageBegin/Next + C_MessageEncryptFinal.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public unsafe CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    public unsafe CKR C_MessageEncryptInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key)
     {
         using ModuleCall call = EnterModule();
         var messageEncryptInit = call.Functions.C_MessageEncryptInit;

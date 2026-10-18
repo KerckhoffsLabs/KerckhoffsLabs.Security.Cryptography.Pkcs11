@@ -32,8 +32,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
     /// <exception cref="ArgumentException"><paramref name="functionName"/> does not end in its NUL terminator.</exception>
-    public unsafe CKR C_AsyncGetID(NativeCULong session, ReadOnlySpan<byte> functionName, ref NativeCULong id)
+    public unsafe CKR C_AsyncGetID(NativeCULong session, ReadOnlySpan<byte> functionName, out NativeCULong id)
     {
+        id = default;
         using ModuleCall call = EnterModule();
         RequireNulTerminated(functionName, nameof(functionName));
         var asyncGetId = call.Functions.C_AsyncGetID;

@@ -20,13 +20,13 @@ public sealed class VerifyingDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_VerifyInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_VerifyInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_VerifyInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_VerifyInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_Verify), l => l.C_Verify(DispatchSmoke.Session, Data, Signature)),
         new(nameof(LowLevelPkcs11Library.C_VerifyUpdate), l => l.C_VerifyUpdate(DispatchSmoke.Session, Data)),
         new(nameof(LowLevelPkcs11Library.C_VerifyFinal), l => l.C_VerifyFinal(DispatchSmoke.Session, Signature)),
-        new(nameof(LowLevelPkcs11Library.C_VerifyRecoverInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_VerifyRecoverInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_VerifyRecoverInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_VerifyRecoverInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_VerifyRecover), l => l.C_VerifyRecover(DispatchSmoke.Session, Signature, new byte[8], lengthOnly: false, out _)),
-        new(nameof(LowLevelPkcs11Library.C_VerifySignatureInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_VerifySignatureInit(DispatchSmoke.Session, ref m, (NativeCULong)3, Signature); }),
+        new(nameof(LowLevelPkcs11Library.C_VerifySignatureInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_VerifySignatureInit(DispatchSmoke.Session, in m, (NativeCULong)3, Signature); }),
         new(nameof(LowLevelPkcs11Library.C_VerifySignature), l => l.C_VerifySignature(DispatchSmoke.Session, Data)),
         new(nameof(LowLevelPkcs11Library.C_VerifySignatureUpdate), l => l.C_VerifySignatureUpdate(DispatchSmoke.Session, Data)),
         new(nameof(LowLevelPkcs11Library.C_VerifySignatureFinal), l => l.C_VerifySignatureFinal(DispatchSmoke.Session)),

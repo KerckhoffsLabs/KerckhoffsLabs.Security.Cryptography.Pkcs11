@@ -35,16 +35,17 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="slotId">The ID of the slot</param>
     /// <param name="info">Structure that receives the slot information</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SLOT_ID_INVALID</returns>
-    public unsafe CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info)
+    public unsafe CKR C_GetSlotInfo(NativeCULong slotId, out CK_SLOT_INFO info)
     {
+        info = default;
         using ModuleCall call = EnterModule();
         var getSlotInfo = call.Functions.C_GetSlotInfo;
         if (getSlotInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        // Zeroed, so a field the module leaves untouched reads as zero.
         byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_SLOT_INFO>()];
-        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        new Span<byte>(p, Pkcs11Marshal.SizeOf<CK_SLOT_INFO>()).Clear();
         CKR rv = getSlotInfo(slotId, p).ToCKR();
         info = Pkcs11Marshal.ReadStructure<CK_SLOT_INFO>((IntPtr)p);
         return rv;
@@ -56,16 +57,17 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="slotId">The ID of the token's slot</param>
     /// <param name="info">Structure that receives the token information</param>
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_ARGUMENTS_BAD</returns>
-    public unsafe CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info)
+    public unsafe CKR C_GetTokenInfo(NativeCULong slotId, out CK_TOKEN_INFO info)
     {
+        info = default;
         using ModuleCall call = EnterModule();
         var getTokenInfo = call.Functions.C_GetTokenInfo;
         if (getTokenInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        // Zeroed, so a field the module leaves untouched reads as zero.
         byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_TOKEN_INFO>()];
-        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        new Span<byte>(p, Pkcs11Marshal.SizeOf<CK_TOKEN_INFO>()).Clear();
         CKR rv = getTokenInfo(slotId, p).ToCKR();
         info = Pkcs11Marshal.ReadStructure<CK_TOKEN_INFO>((IntPtr)p);
         return rv;
@@ -121,16 +123,17 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="type">The type of mechanism</param>
     /// <param name="info">Structure that receives the mechanism information</param>
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_MECHANISM_INVALID, CKR_OK, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_ARGUMENTS_BAD</returns>
-    public unsafe CKR C_GetMechanismInfo(NativeCULong slotId, CKM type, ref CK_MECHANISM_INFO info)
+    public unsafe CKR C_GetMechanismInfo(NativeCULong slotId, CKM type, out CK_MECHANISM_INFO info)
     {
+        info = default;
         using ModuleCall call = EnterModule();
         var getMechanismInfo = call.Functions.C_GetMechanismInfo;
         if (getMechanismInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        // Zeroed, so a field the module leaves untouched reads as zero.
         byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM_INFO>()];
-        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        new Span<byte>(p, Pkcs11Marshal.SizeOf<CK_MECHANISM_INFO>()).Clear();
         CKR rv = getMechanismInfo(slotId, type.ToCULong(), p).ToCKR();
         info = Pkcs11Marshal.ReadStructure<CK_MECHANISM_INFO>((IntPtr)p);
         return rv;
@@ -177,8 +180,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// called concurrently the wait holds the module's call lock like any call, so nothing else reaches
     /// the module until it returns; <c>Pkcs11Library.WaitForSlotEvent</c> refuses to block there.
     /// </remarks>
-    public unsafe CKR C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot, IntPtr reserved)
+    public unsafe CKR C_WaitForSlotEvent(NativeCULong flags, out NativeCULong slot, IntPtr reserved)
     {
+        slot = default;
         bool blocking = ((ulong)flags & CKF.CKF_DONT_BLOCK) == 0;
         using ModuleCall call = EnterModule(holdsOffFinalize: !blocking);
         var waitForSlotEvent = call.Functions.C_WaitForSlotEvent;

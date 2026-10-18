@@ -22,7 +22,7 @@ public sealed class MessageDecryptionDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_MessageDecryptInit), l => { CK_MECHANISM m = Mechanism(); return l.C_MessageDecryptInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_MessageDecryptInit), l => { CK_MECHANISM m = Mechanism(); return l.C_MessageDecryptInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_DecryptMessage), l => l.C_DecryptMessage(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, AssociatedData, Input, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_DecryptMessageBegin), l => l.C_DecryptMessageBegin(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, AssociatedData)),
         new(nameof(LowLevelPkcs11Library.C_DecryptMessageNext), l => l.C_DecryptMessageNext(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, Input, new byte[8], lengthOnly: false, out _, (NativeCULong)0)),

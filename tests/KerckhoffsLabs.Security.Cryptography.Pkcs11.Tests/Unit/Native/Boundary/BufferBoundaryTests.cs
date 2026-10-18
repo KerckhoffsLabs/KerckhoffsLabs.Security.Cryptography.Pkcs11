@@ -40,18 +40,18 @@ public sealed class BufferBoundaryTests
         ["C_SetOperationState"] = (l, b) => l.C_SetOperationState(Session, b.In(), Key, Key),
 
         // Operation initialization.
-        ["C_EncryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_EncryptInit(Session, ref m, Key); },
-        ["C_DecryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_DecryptInit(Session, ref m, Key); },
-        ["C_DigestInit"] = (l, b) => { var m = b.Mechanism(); return l.C_DigestInit(Session, ref m); },
-        ["C_SignInit"] = (l, b) => { var m = b.Mechanism(); return l.C_SignInit(Session, ref m, Key); },
-        ["C_SignRecoverInit"] = (l, b) => { var m = b.Mechanism(); return l.C_SignRecoverInit(Session, ref m, Key); },
-        ["C_VerifyInit"] = (l, b) => { var m = b.Mechanism(); return l.C_VerifyInit(Session, ref m, Key); },
-        ["C_VerifyRecoverInit"] = (l, b) => { var m = b.Mechanism(); return l.C_VerifyRecoverInit(Session, ref m, Key); },
-        ["C_VerifySignatureInit"] = (l, b) => { var m = b.Mechanism(); return l.C_VerifySignatureInit(Session, ref m, Key, b.In()); },
-        ["C_MessageEncryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageEncryptInit(Session, ref m, Key); },
-        ["C_MessageDecryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageDecryptInit(Session, ref m, Key); },
-        ["C_MessageSignInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageSignInit(Session, ref m, Key); },
-        ["C_MessageVerifyInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageVerifyInit(Session, ref m, Key); },
+        ["C_EncryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_EncryptInit(Session, in m, Key); },
+        ["C_DecryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_DecryptInit(Session, in m, Key); },
+        ["C_DigestInit"] = (l, b) => { var m = b.Mechanism(); return l.C_DigestInit(Session, in m); },
+        ["C_SignInit"] = (l, b) => { var m = b.Mechanism(); return l.C_SignInit(Session, in m, Key); },
+        ["C_SignRecoverInit"] = (l, b) => { var m = b.Mechanism(); return l.C_SignRecoverInit(Session, in m, Key); },
+        ["C_VerifyInit"] = (l, b) => { var m = b.Mechanism(); return l.C_VerifyInit(Session, in m, Key); },
+        ["C_VerifyRecoverInit"] = (l, b) => { var m = b.Mechanism(); return l.C_VerifyRecoverInit(Session, in m, Key); },
+        ["C_VerifySignatureInit"] = (l, b) => { var m = b.Mechanism(); return l.C_VerifySignatureInit(Session, in m, Key, b.In()); },
+        ["C_MessageEncryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageEncryptInit(Session, in m, Key); },
+        ["C_MessageDecryptInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageDecryptInit(Session, in m, Key); },
+        ["C_MessageSignInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageSignInit(Session, in m, Key); },
+        ["C_MessageVerifyInit"] = (l, b) => { var m = b.Mechanism(); return l.C_MessageVerifyInit(Session, in m, Key); },
 
         // Single- and multi-part operations.
         ["C_Encrypt"] = (l, b) => l.C_Encrypt(Session, b.In(), b.Out(), false, out _),
@@ -81,15 +81,15 @@ public sealed class BufferBoundaryTests
         ["C_DecryptVerifyUpdate"] = (l, b) => l.C_DecryptVerifyUpdate(Session, b.In(), b.Out(), false, out _),
 
         // Key management.
-        ["C_GenerateKey"] = (l, b) => { var m = b.Mechanism(); NativeCULong k = default; return l.C_GenerateKey(Session, ref m, [], ref k); },
-        ["C_GenerateKeyPair"] = (l, b) => { var m = b.Mechanism(); NativeCULong pub = default, priv = default; return l.C_GenerateKeyPair(Session, ref m, [], [], ref pub, ref priv); },
-        ["C_DeriveKey"] = (l, b) => { var m = b.Mechanism(); NativeCULong k = default; return l.C_DeriveKey(Session, ref m, Key, [], ref k); },
-        ["C_WrapKey"] = (l, b) => { var m = b.Mechanism(); return l.C_WrapKey(Session, ref m, Key, Key, b.Out(), false, out _); },
-        ["C_UnwrapKey"] = (l, b) => { var m = b.Mechanism(); NativeCULong k = default; return l.C_UnwrapKey(Session, ref m, Key, b.In(), [], ref k); },
-        ["C_EncapsulateKey"] = (l, b) => { var m = b.Mechanism(); NativeCULong k = default; return l.C_EncapsulateKey(Session, ref m, Key, [], b.Out(), false, out _, ref k); },
-        ["C_DecapsulateKey"] = (l, b) => { var m = b.Mechanism(); NativeCULong k = default; return l.C_DecapsulateKey(Session, ref m, Key, [], b.In(), ref k); },
-        ["C_WrapKeyAuthenticated"] = (l, b) => { var m = b.Mechanism(); return l.C_WrapKeyAuthenticated(Session, ref m, Key, Key, b.In(), b.Out(), false, out _); },
-        ["C_UnwrapKeyAuthenticated"] = (l, b) => { var m = b.Mechanism(); NativeCULong k = default; return l.C_UnwrapKeyAuthenticated(Session, ref m, Key, b.In(), [], b.In(), ref k); },
+        ["C_GenerateKey"] = (l, b) => { var m = b.Mechanism(); return l.C_GenerateKey(Session, in m, [], out NativeCULong k); },
+        ["C_GenerateKeyPair"] = (l, b) => { var m = b.Mechanism(); return l.C_GenerateKeyPair(Session, in m, [], [], out NativeCULong pub, out NativeCULong priv); },
+        ["C_DeriveKey"] = (l, b) => { var m = b.Mechanism(); return l.C_DeriveKey(Session, in m, Key, [], out NativeCULong k); },
+        ["C_WrapKey"] = (l, b) => { var m = b.Mechanism(); return l.C_WrapKey(Session, in m, Key, Key, b.Out(), false, out _); },
+        ["C_UnwrapKey"] = (l, b) => { var m = b.Mechanism(); return l.C_UnwrapKey(Session, in m, Key, b.In(), [], out NativeCULong k); },
+        ["C_EncapsulateKey"] = (l, b) => { var m = b.Mechanism(); return l.C_EncapsulateKey(Session, in m, Key, [], b.Out(), false, out _, out NativeCULong k); },
+        ["C_DecapsulateKey"] = (l, b) => { var m = b.Mechanism(); return l.C_DecapsulateKey(Session, in m, Key, [], b.In(), out NativeCULong k); },
+        ["C_WrapKeyAuthenticated"] = (l, b) => { var m = b.Mechanism(); return l.C_WrapKeyAuthenticated(Session, in m, Key, Key, b.In(), b.Out(), false, out _); },
+        ["C_UnwrapKeyAuthenticated"] = (l, b) => { var m = b.Mechanism(); return l.C_UnwrapKeyAuthenticated(Session, in m, Key, b.In(), [], b.In(), out NativeCULong k); },
 
         // Random numbers.
         ["C_SeedRandom"] = (l, b) => l.C_SeedRandom(Session, b.In()),
@@ -111,7 +111,7 @@ public sealed class BufferBoundaryTests
 
         // Asynchronous operations.
         ["C_AsyncComplete"] = (l, b) => { CK_ASYNC_DATA result = default; return l.C_AsyncComplete(Session, b.Name("C_GenerateRandom"), ref result); },
-        ["C_AsyncGetID"] = (l, b) => { NativeCULong id = default; return l.C_AsyncGetID(Session, b.Name("C_GenerateRandom"), ref id); },
+        ["C_AsyncGetID"] = (l, b) => { return l.C_AsyncGetID(Session, b.Name("C_GenerateRandom"), out NativeCULong id); },
         ["C_AsyncJoin"] = (l, b) => l.C_AsyncJoin(Session, b.Name("C_GenerateRandom"), (NativeCULong)1, b.In()),
     };
 
@@ -165,7 +165,7 @@ public sealed class BufferBoundaryTests
             return function switch
             {
                 "C_AsyncComplete" => lowLevel.C_AsyncComplete(Session, name.Span, ref result),
-                "C_AsyncGetID" => lowLevel.C_AsyncGetID(Session, name.Span, ref id),
+                "C_AsyncGetID" => lowLevel.C_AsyncGetID(Session, name.Span, out id),
                 "C_AsyncJoin" => lowLevel.C_AsyncJoin(Session, name.Span, (NativeCULong)1, []),
                 _ => lowLevel.C_GetInterface(name.Span, default, out _),
             };

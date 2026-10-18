@@ -27,14 +27,12 @@ public sealed class SlotTokenDispatchTests
         }),
         new(nameof(LowLevelPkcs11Library.C_GetSlotInfo), l =>
         {
-            CK_SLOT_INFO info = default;
-            CKR rv = l.C_GetSlotInfo((NativeCULong)Slot, ref info);
+            CKR rv = l.C_GetSlotInfo((NativeCULong)Slot, out CK_SLOT_INFO info);
             return rv == CKR.CKR_OK && ((ulong)info.Flags != 7 || info.FirmwareVersion.Major != 3) ? CKR.CKR_GENERAL_ERROR : rv;
         }),
         new(nameof(LowLevelPkcs11Library.C_GetTokenInfo), l =>
         {
-            CK_TOKEN_INFO info = default;
-            CKR rv = l.C_GetTokenInfo((NativeCULong)Slot, ref info);
+            CKR rv = l.C_GetTokenInfo((NativeCULong)Slot, out CK_TOKEN_INFO info);
             return rv == CKR.CKR_OK && (ulong)info.Flags != 9 ? CKR.CKR_GENERAL_ERROR : rv;
         }),
         new(nameof(LowLevelPkcs11Library.C_GetMechanismList), l =>
@@ -45,15 +43,13 @@ public sealed class SlotTokenDispatchTests
         }),
         new(nameof(LowLevelPkcs11Library.C_GetMechanismInfo), l =>
         {
-            CK_MECHANISM_INFO info = default;
-            CKR rv = l.C_GetMechanismInfo((NativeCULong)Slot, CKM.CKM_AES_GCM, ref info);
+            CKR rv = l.C_GetMechanismInfo((NativeCULong)Slot, CKM.CKM_AES_GCM, out CK_MECHANISM_INFO info);
             return rv == CKR.CKR_OK && (ulong)info.MaxKeySize != 256 ? CKR.CKR_GENERAL_ERROR : rv;
         }),
         new(nameof(LowLevelPkcs11Library.C_InitToken), l => l.C_InitToken((NativeCULong)Slot, "1234"u8, Label)),
         new(nameof(LowLevelPkcs11Library.C_WaitForSlotEvent), l =>
         {
-            NativeCULong slot = default;
-            CKR rv = l.C_WaitForSlotEvent((NativeCULong)(ulong)CKF.CKF_DONT_BLOCK, ref slot, IntPtr.Zero);
+            CKR rv = l.C_WaitForSlotEvent((NativeCULong)(ulong)CKF.CKF_DONT_BLOCK, out NativeCULong slot, IntPtr.Zero);
             return rv == CKR.CKR_OK && (ulong)slot != Slot ? CKR.CKR_GENERAL_ERROR : rv;
         }),
     }.ToDictionary(c => c.Function, StringComparer.Ordinal);

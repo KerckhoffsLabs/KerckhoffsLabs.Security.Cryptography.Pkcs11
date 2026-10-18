@@ -18,7 +18,7 @@ public sealed class EncryptionDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_EncryptInit), l => { CK_MECHANISM m = Mechanism(); return l.C_EncryptInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_EncryptInit), l => { CK_MECHANISM m = Mechanism(); return l.C_EncryptInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_Encrypt), l => l.C_Encrypt(DispatchSmoke.Session, Input, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_EncryptUpdate), l => l.C_EncryptUpdate(DispatchSmoke.Session, Input, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_EncryptFinal), l => l.C_EncryptFinal(DispatchSmoke.Session, new byte[8], lengthOnly: false, out _)),

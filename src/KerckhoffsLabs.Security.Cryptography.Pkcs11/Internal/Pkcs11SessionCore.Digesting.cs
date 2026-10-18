@@ -29,7 +29,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("DigestKey");
-        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, in ckMechanism);
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
@@ -68,14 +68,14 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Digest");
-        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, in ckMechanism);
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         byte[] digest = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, lengthOnly, out len),
             OpDigest,
             KnownOutputLength.Of(mechanism.Type),
-            () => _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism));
+            () => _pkcs11Library.C_DigestInit(_sessionId, in ckMechanism));
         operation.Completed();
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -143,7 +143,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Digest");
-        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, in ckMechanism);
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         byte[] part = new byte[bufferLength];
@@ -262,8 +262,8 @@ internal sealed partial class Pkcs11SessionCore
         return DigestAndTransformStream(
             digestingMechanism, encryptionMechanism, keyHandle, inputStream, outputStream, bufferLength,
             new CombinedTransform(
-                Init: (ref CK_MECHANISM mechanism, NativeCULong key)
-                    => _pkcs11Library.C_EncryptInit(_sessionId, ref mechanism, key),
+                Init: (in CK_MECHANISM mechanism, NativeCULong key)
+                    => _pkcs11Library.C_EncryptInit(_sessionId, in mechanism, key),
                 InitOperation: OpEncryptInit,
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                     => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
@@ -371,8 +371,8 @@ internal sealed partial class Pkcs11SessionCore
         return DigestAndTransformStream(
             digestingMechanism, decryptionMechanism, keyHandle, inputStream, outputStream, bufferLength,
             new CombinedTransform(
-                Init: (ref CK_MECHANISM mechanism, NativeCULong key)
-                    => _pkcs11Library.C_DecryptInit(_sessionId, ref mechanism, key),
+                Init: (in CK_MECHANISM mechanism, NativeCULong key)
+                    => _pkcs11Library.C_DecryptInit(_sessionId, in mechanism, key),
                 InitOperation: OpDecryptInit,
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                     => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),

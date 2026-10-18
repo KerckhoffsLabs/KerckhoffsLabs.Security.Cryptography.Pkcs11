@@ -43,7 +43,7 @@ public sealed class SignVerifyRecoverTests(MockBackendFixture f)
             using (var scope = new MechanismParameterScope())
             {
                 CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_RSA_PKCS).Marshal(scope, out _);
-                CKR rv = lowLevel.C_SignRecoverInit(sessionId, ref ckMechanism, (NativeCULong)privateKey.ObjectId);
+                CKR rv = lowLevel.C_SignRecoverInit(sessionId, in ckMechanism, (NativeCULong)privateKey.ObjectId);
                 Assert.Equal(CKR.CKR_OK, rv);
             }
 
@@ -67,7 +67,7 @@ public sealed class SignVerifyRecoverTests(MockBackendFixture f)
             using (var scope = new MechanismParameterScope())
             {
                 CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_RSA_PKCS).Marshal(scope, out _);
-                CKR rv = lowLevel.C_VerifyRecoverInit(sessionId, ref ckMechanism, (NativeCULong)publicKey.ObjectId);
+                CKR rv = lowLevel.C_VerifyRecoverInit(sessionId, in ckMechanism, (NativeCULong)publicKey.ObjectId);
                 Assert.Equal(CKR.CKR_OK, rv);
             }
 

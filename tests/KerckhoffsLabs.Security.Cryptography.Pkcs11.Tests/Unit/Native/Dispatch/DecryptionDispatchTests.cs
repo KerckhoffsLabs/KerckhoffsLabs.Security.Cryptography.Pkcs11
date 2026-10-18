@@ -18,7 +18,7 @@ public sealed class DecryptionDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_DecryptInit), l => { CK_MECHANISM m = Mechanism(); return l.C_DecryptInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_DecryptInit), l => { CK_MECHANISM m = Mechanism(); return l.C_DecryptInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_Decrypt), l => l.C_Decrypt(DispatchSmoke.Session, Input, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_DecryptUpdate), l => l.C_DecryptUpdate(DispatchSmoke.Session, Input, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_DecryptFinal), l => l.C_DecryptFinal(DispatchSmoke.Session, new byte[8], lengthOnly: false, out _)),

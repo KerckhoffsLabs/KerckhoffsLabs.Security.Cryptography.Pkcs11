@@ -96,7 +96,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetSessionInfo");
 
         CK_SESSION_INFO sessionInfo = new();
-        CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref sessionInfo);
+        CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out sessionInfo);
         Pkcs11Exception.ThrowIfError(rv, OpGetSessionInfo);
 
         return new SessionInfo(_sessionId, sessionInfo);

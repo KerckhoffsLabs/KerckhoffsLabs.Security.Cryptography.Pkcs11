@@ -20,8 +20,7 @@ public sealed class GeneralDispatchTests
         new(nameof(LowLevelPkcs11Library.C_Finalize), l => l.C_Finalize(IntPtr.Zero)),
         new(nameof(LowLevelPkcs11Library.C_GetInfo), l =>
         {
-            CK_INFO info = default;
-            CKR rv = l.C_GetInfo(ref info);
+            CKR rv = l.C_GetInfo(out CK_INFO info);
             return rv == CKR.CKR_OK && (info.CryptokiVersion.Major != 3 || info.CryptokiVersion.Minor != 2) ? CKR.CKR_GENERAL_ERROR : rv;
         }),
         new(nameof(LowLevelPkcs11Library.C_GetInterfaceList), l =>

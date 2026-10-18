@@ -84,7 +84,7 @@ public sealed class LibraryDisposeRaceTests
         library.Dispose();
 
         CK_INFO info = default;
-        Assert.Throws<ObjectDisposedException>(() => lowLevel.C_GetInfo(ref info));
+        Assert.Throws<ObjectDisposedException>(() => lowLevel.C_GetInfo(out info));
 
         module.Release.Set();
         await call.WaitAsync(Generous, Token);

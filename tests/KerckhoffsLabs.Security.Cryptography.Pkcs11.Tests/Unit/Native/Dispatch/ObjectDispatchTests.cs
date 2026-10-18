@@ -28,21 +28,18 @@ public sealed class ObjectDispatchTests
     {
         new(nameof(LowLevelPkcs11Library.C_CreateObject), l =>
         {
-            NativeCULong id = default;
-            CKR rv = l.C_CreateObject(DispatchSmoke.Session, Template(), ref id);
+            CKR rv = l.C_CreateObject(DispatchSmoke.Session, Template(), out NativeCULong id);
             return Returned(rv, id);
         }),
         new(nameof(LowLevelPkcs11Library.C_CopyObject), l =>
         {
-            NativeCULong id = default;
-            CKR rv = l.C_CopyObject(DispatchSmoke.Session, (NativeCULong)Object, Template(), ref id);
+            CKR rv = l.C_CopyObject(DispatchSmoke.Session, (NativeCULong)Object, Template(), out NativeCULong id);
             return Returned(rv, id);
         }),
         new(nameof(LowLevelPkcs11Library.C_DestroyObject), l => l.C_DestroyObject(DispatchSmoke.Session, (NativeCULong)Object)),
         new(nameof(LowLevelPkcs11Library.C_GetObjectSize), l =>
         {
-            NativeCULong size = default;
-            CKR rv = l.C_GetObjectSize(DispatchSmoke.Session, (NativeCULong)Object, ref size);
+            CKR rv = l.C_GetObjectSize(DispatchSmoke.Session, (NativeCULong)Object, out NativeCULong size);
             return Returned(rv, size);
         }),
         new(nameof(LowLevelPkcs11Library.C_GetAttributeValue), l => l.C_GetAttributeValue(DispatchSmoke.Session, (NativeCULong)Object, Template())),

@@ -63,16 +63,17 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="info">Structure that receives the information</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
-    public unsafe CKR C_GetInfo(ref CK_INFO info)
+    public unsafe CKR C_GetInfo(out CK_INFO info)
     {
+        info = default;
         using ModuleCall call = EnterModule();
         var getInfo = call.Functions.C_GetInfo;
         if (getInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        // Zeroed, so a field the module leaves untouched reads as zero.
         byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_INFO>()];
-        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        new Span<byte>(p, Pkcs11Marshal.SizeOf<CK_INFO>()).Clear();
         CKR rv = getInfo(p).ToCKR();
         info = Pkcs11Marshal.ReadStructure<CK_INFO>((IntPtr)p);
         return rv;

@@ -20,7 +20,7 @@ public sealed class Pkcs11ModuleHandleTests
         lowLevel.Dispose();
 
         CK_INFO info = default;
-        Assert.Throws<ObjectDisposedException>(() => lowLevel.C_GetInfo(ref info));
+        Assert.Throws<ObjectDisposedException>(() => lowLevel.C_GetInfo(out info));
         Assert.Equal(0, module.CallCount("C_GetInfo"));
     }
 
@@ -173,8 +173,7 @@ public sealed class Pkcs11ModuleHandleTests
         lowLevel.C_Initialize(null);
         lowLevel.FinalizeOnLastRelease();
 
-        CK_INFO info = default;
-        Assert.Equal(CKR.CKR_OK, lowLevel.C_GetInfo(ref info));
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_GetInfo(out CK_INFO info));
         Assert.Equal(0, module.CallCount("C_Finalize"));
 
         lowLevel.Dispose();

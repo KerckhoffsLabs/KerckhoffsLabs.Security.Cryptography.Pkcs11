@@ -29,54 +29,54 @@ public sealed class KeyManagementDispatchTests
     {
         new(nameof(LowLevelPkcs11Library.C_GenerateKey), l =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong key = default;
-            CKR rv = l.C_GenerateKey(DispatchSmoke.Session, ref m, Template, ref key);
+            CK_MECHANISM m = Mechanism();
+            CKR rv = l.C_GenerateKey(DispatchSmoke.Session, in m, Template, out NativeCULong key);
             return Returned(rv, key);
         }),
         new(nameof(LowLevelPkcs11Library.C_GenerateKeyPair), l =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong pub = default, priv = default;
-            CKR rv = l.C_GenerateKeyPair(DispatchSmoke.Session, ref m, Template, Template, ref pub, ref priv);
+            CK_MECHANISM m = Mechanism();
+            CKR rv = l.C_GenerateKeyPair(DispatchSmoke.Session, in m, Template, Template, out NativeCULong pub, out NativeCULong priv);
             return (ulong)priv == NewKey + 1 ? Returned(rv, pub) : Returned(rv, default);
         }),
         new(nameof(LowLevelPkcs11Library.C_WrapKey), l =>
         {
             CK_MECHANISM m = Mechanism();
-            return l.C_WrapKey(DispatchSmoke.Session, ref m, (NativeCULong)3, (NativeCULong)4, new byte[8], lengthOnly: false, out _);
+            return l.C_WrapKey(DispatchSmoke.Session, in m, (NativeCULong)3, (NativeCULong)4, new byte[8], lengthOnly: false, out _);
         }),
         new(nameof(LowLevelPkcs11Library.C_UnwrapKey), l =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong key = default;
-            CKR rv = l.C_UnwrapKey(DispatchSmoke.Session, ref m, (NativeCULong)3, Input, Template, ref key);
+            CK_MECHANISM m = Mechanism();
+            CKR rv = l.C_UnwrapKey(DispatchSmoke.Session, in m, (NativeCULong)3, Input, Template, out NativeCULong key);
             return Returned(rv, key);
         }),
         new(nameof(LowLevelPkcs11Library.C_DeriveKey), l =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong key = default;
-            CKR rv = l.C_DeriveKey(DispatchSmoke.Session, ref m, (NativeCULong)3, Template, ref key);
+            CK_MECHANISM m = Mechanism();
+            CKR rv = l.C_DeriveKey(DispatchSmoke.Session, in m, (NativeCULong)3, Template, out NativeCULong key);
             return Returned(rv, key);
         }),
         new(nameof(LowLevelPkcs11Library.C_EncapsulateKey), l =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong key = default;
-            CKR rv = l.C_EncapsulateKey(DispatchSmoke.Session, ref m, (NativeCULong)3, Template, new byte[8], lengthOnly: false, out _, ref key);
+            CK_MECHANISM m = Mechanism();
+            CKR rv = l.C_EncapsulateKey(DispatchSmoke.Session, in m, (NativeCULong)3, Template, new byte[8], lengthOnly: false, out _, out NativeCULong key);
             return Returned(rv, key);
         }),
         new(nameof(LowLevelPkcs11Library.C_DecapsulateKey), l =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong key = default;
-            CKR rv = l.C_DecapsulateKey(DispatchSmoke.Session, ref m, (NativeCULong)3, Template, Input, ref key);
+            CK_MECHANISM m = Mechanism();
+            CKR rv = l.C_DecapsulateKey(DispatchSmoke.Session, in m, (NativeCULong)3, Template, Input, out NativeCULong key);
             return Returned(rv, key);
         }),
         new(nameof(LowLevelPkcs11Library.C_WrapKeyAuthenticated), l =>
         {
             CK_MECHANISM m = Mechanism();
-            return l.C_WrapKeyAuthenticated(DispatchSmoke.Session, ref m, (NativeCULong)3, (NativeCULong)4, Input, new byte[8], lengthOnly: false, out _);
+            return l.C_WrapKeyAuthenticated(DispatchSmoke.Session, in m, (NativeCULong)3, (NativeCULong)4, Input, new byte[8], lengthOnly: false, out _);
         }),
         new(nameof(LowLevelPkcs11Library.C_UnwrapKeyAuthenticated), l =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong key = default;
-            CKR rv = l.C_UnwrapKeyAuthenticated(DispatchSmoke.Session, ref m, (NativeCULong)3, Input, Template, Input, ref key);
+            CK_MECHANISM m = Mechanism();
+            CKR rv = l.C_UnwrapKeyAuthenticated(DispatchSmoke.Session, in m, (NativeCULong)3, Input, Template, Input, out NativeCULong key);
             return Returned(rv, key);
         }),
     }.ToDictionary(c => c.Function, StringComparer.Ordinal);
@@ -102,17 +102,17 @@ public sealed class KeyManagementDispatchTests
         [nameof(LowLevelPkcs11Library.C_WrapKey)] = (LowLevelPkcs11Library l, Span<byte> output, bool lengthOnly, out NativeCULong length) =>
         {
             CK_MECHANISM m = Mechanism();
-            return l.C_WrapKey(DispatchSmoke.Session, ref m, (NativeCULong)3, (NativeCULong)4, output, lengthOnly, out length);
+            return l.C_WrapKey(DispatchSmoke.Session, in m, (NativeCULong)3, (NativeCULong)4, output, lengthOnly, out length);
         },
         [nameof(LowLevelPkcs11Library.C_EncapsulateKey)] = (LowLevelPkcs11Library l, Span<byte> output, bool lengthOnly, out NativeCULong length) =>
         {
-            CK_MECHANISM m = Mechanism(); NativeCULong key = default;
-            return l.C_EncapsulateKey(DispatchSmoke.Session, ref m, (NativeCULong)3, Template, output, lengthOnly, out length, ref key);
+            CK_MECHANISM m = Mechanism();
+            return l.C_EncapsulateKey(DispatchSmoke.Session, in m, (NativeCULong)3, Template, output, lengthOnly, out length, out NativeCULong key);
         },
         [nameof(LowLevelPkcs11Library.C_WrapKeyAuthenticated)] = (LowLevelPkcs11Library l, Span<byte> output, bool lengthOnly, out NativeCULong length) =>
         {
             CK_MECHANISM m = Mechanism();
-            return l.C_WrapKeyAuthenticated(DispatchSmoke.Session, ref m, (NativeCULong)3, (NativeCULong)4, Input, output, lengthOnly, out length);
+            return l.C_WrapKeyAuthenticated(DispatchSmoke.Session, in m, (NativeCULong)3, (NativeCULong)4, Input, output, lengthOnly, out length);
         },
     };
 

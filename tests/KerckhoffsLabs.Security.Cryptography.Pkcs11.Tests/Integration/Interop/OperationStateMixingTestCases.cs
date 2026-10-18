@@ -121,7 +121,7 @@ internal static class OperationStateMixingTestCases
             using (var scope = new MechanismParameterScope())
             {
                 CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256));
-                AssertOk(lowLevel.C_DigestInit(sid, ref mech), "DigestInit");
+                AssertOk(lowLevel.C_DigestInit(sid, in mech), "DigestInit");
             }
             AssertOk(lowLevel.C_DigestUpdate(sid, Data1), "DigestUpdate");
 
@@ -139,7 +139,7 @@ internal static class OperationStateMixingTestCases
             using (var scope = new MechanismParameterScope())
             {
                 CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256));
-                AssertOk(lowLevel.C_DigestInit(sid, ref mech), "DigestInit");
+                AssertOk(lowLevel.C_DigestInit(sid, in mech), "DigestInit");
             }
             AssertOk(lowLevel.C_DigestUpdate(sid, Data1), "DigestUpdate");
 
@@ -162,7 +162,7 @@ internal static class OperationStateMixingTestCases
             using (var scope = new MechanismParameterScope())
             {
                 CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256));
-                AssertOk(lowLevel.C_DigestInit(sid, ref mech), "DigestInit");
+                AssertOk(lowLevel.C_DigestInit(sid, in mech), "DigestInit");
             }
             AssertOk(lowLevel.C_Digest(sid, Data1, new byte[64], lengthOnly: false, out NativeCULong _), "Digest");
 
@@ -183,7 +183,7 @@ internal static class OperationStateMixingTestCases
                 using (var scope = new MechanismParameterScope())
                 {
                     CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256_HMAC));
-                    AssertOk(lowLevel.C_SignInit(sid, ref mech, (NativeCULong)key.ObjectId), "SignInit");
+                    AssertOk(lowLevel.C_SignInit(sid, in mech, (NativeCULong)key.ObjectId), "SignInit");
                 }
                 AssertOk(lowLevel.C_SignUpdate(sid, Data1), "SignUpdate");
 
@@ -208,7 +208,7 @@ internal static class OperationStateMixingTestCases
                 using (var scope = new MechanismParameterScope())
                 {
                     CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256_HMAC));
-                    AssertOk(lowLevel.C_SignInit(sid, ref mech, (NativeCULong)key.ObjectId), "SignInit");
+                    AssertOk(lowLevel.C_SignInit(sid, in mech, (NativeCULong)key.ObjectId), "SignInit");
                 }
                 AssertOk(lowLevel.C_SignUpdate(sid, Data1), "SignUpdate");
 
@@ -244,7 +244,7 @@ internal static class OperationStateMixingTestCases
                 using (var scope = new MechanismParameterScope())
                 {
                     CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_AES_CBC_PAD, iv));
-                    AssertOk(lowLevel.C_EncryptInit(sid, ref mech, (NativeCULong)key.ObjectId), "EncryptInit");
+                    AssertOk(lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)key.ObjectId), "EncryptInit");
                 }
                 byte[] updBuf = new byte[64];
                 AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, updBuf, lengthOnly: false, out NativeCULong updLen), "EncryptUpdate");
@@ -310,7 +310,7 @@ internal static class OperationStateMixingTestCases
                 using (var scope = new MechanismParameterScope())
                 {
                     CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_AES_CBC_PAD, iv));
-                    AssertOk(lowLevel.C_EncryptInit(sid, ref mech, (NativeCULong)key.ObjectId), "EncryptInit(setup)");
+                    AssertOk(lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)key.ObjectId), "EncryptInit(setup)");
                 }
                 byte[] part1 = new byte[64];
                 AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, part1, lengthOnly: false, out NativeCULong part1Len), "EncryptUpdate(setup)");
@@ -321,7 +321,7 @@ internal static class OperationStateMixingTestCases
                 using (var scope = new MechanismParameterScope())
                 {
                     CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_AES_CBC_PAD, iv));
-                    AssertOk(lowLevel.C_DecryptInit(sid, ref mech, (NativeCULong)key.ObjectId), "DecryptInit");
+                    AssertOk(lowLevel.C_DecryptInit(sid, in mech, (NativeCULong)key.ObjectId), "DecryptInit");
                 }
                 AssertOk(lowLevel.C_DecryptUpdate(sid, validCiphertext.AsSpan(0, 16), new byte[64], lengthOnly: false, out NativeCULong _), "DecryptUpdate");
 
