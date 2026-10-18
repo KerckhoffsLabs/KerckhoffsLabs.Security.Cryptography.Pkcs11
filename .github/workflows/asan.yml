@@ -17,23 +17,29 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # AddressSanitizer over the native modules the suite loads in process: pkcs11-mock, SoftHSM2 and
-  # opencryptoki (C, built with NATIVE_SANITIZE=address, see build/lib/common.sh) and Kryoptic (Rust,
-  # nightly -Zsanitizer=address). The suite runs with the ASan runtime preloaded, so a module that
+  # AddressSanitizer over every native module the suite loads in process: pkcs11-mock, SoftHSM2,
+  # opencryptoki and NSS softoken (C, built with NATIVE_SANITIZE=address, see build/lib/common.sh) and
+  # Kryoptic (Rust, nightly -Zsanitizer=address). The suite runs with the ASan runtime preloaded, so a module that
   # reads or writes outside the memory it was lent, or uses memory after it is freed, stops the run
   # with a report naming the access. ASan sees memory that comes from malloc: each module's own heap,
   # and what the library allocates through UnmanagedMemory (attribute values, mechanism parameters).
   # It does not see the managed heap, which the hermetic boundary tests cover (BufferBoundaryTests:
-  # guard pages; AllocationBoundsTests: the allocation registry). NSS is not sanitized.
+  # guard pages; AllocationBoundsTests: the allocation registry). NSS allocates much of its state from
+  # NSPR arenas, and the distro's NSPR is not instrumented, so an overrun that stays inside an arena
+  # chunk may go unseen.
   #
   # The ASan options are the ones CoreCLR needs: it handles SIGSEGV itself (null references) on its own
-  # alternate stack, and the GC's heap would read as leaks.
+  # alternate stack, and the GC's heap would read as leaks. allow_user_poisoning=0 is for NSS: compiled
+  # with ASan, its NSPR arena macros (plarena.h) poison each chunk's unused tail, but the distro NSPR
+  # that clears the pool (PL_ClearArenaPool) is uninstrumented and never unpoisons it, so ASan would
+  # report NSS's own arena clearing as use-after-poison. Manual poisoning is ignored instead; redzones
+  # (overflows, use after free) are unaffected, and no other module here poisons by hand.
   asan:
     name: AddressSanitizer (linux-x64)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      ASAN_RUNTIME_OPTIONS: detect_leaks=0:handle_segv=0:allow_user_segv_handler=1:use_sigaltstack=0:halt_on_error=1
+      ASAN_RUNTIME_OPTIONS: detect_leaks=0:handle_segv=0:allow_user_segv_handler=1:use_sigaltstack=0:allow_user_poisoning=0:halt_on_error=1
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -43,7 +49,7 @@ jobs:
       # compiles) is built from. No native cache, so a sanitized build never mixes with a plain one
       # (their build stamps differ too).
       - name: Init native submodules
-        run: git submodule update --init --recursive --depth 1 vendor/pkcs11-mock vendor/softhsmv2 vendor/pkcs11 vendor/opencryptoki vendor/kryoptic
+        run: git submodule update --init --recursive --depth 1 vendor/pkcs11-mock vendor/softhsmv2 vendor/pkcs11 vendor/opencryptoki vendor/kryoptic vendor/nss
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6.0.0
@@ -53,7 +59,8 @@ jobs:
       - name: Install native build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev autoconf automake libtool flex bison libcap-dev libldap2-dev pkg-config
+          sudo apt-get install -y build-essential libssl-dev autoconf automake libtool flex bison libcap-dev libldap2-dev pkg-config \
+            ninja-build libnspr4 libnspr4-dev patchelf clang
 
       # Rust's sanitizers are nightly-only; build-kryoptic.sh selects it with `cargo +nightly`.
       - name: Rust nightly (Kryoptic)
@@ -91,6 +98,21 @@ jobs:
           lib="$(./build/provision-opencryptoki.sh)"
           echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$lib" >> "$GITHUB_ENV"
 
+      # NSS's own --asan build (build-nss.sh passes it for NATIVE_SANITIZE=address), against the distro
+      # NSPR, as on the ubuntu-latest leg; no cache, like every module here.
+      - name: Build NSS softoken with AddressSanitizer
+        env:
+          NATIVE_SANITIZE: address
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user --only-binary :all: 'gyp-next==0.22.2'
+          PATH="$HOME/.local/bin:$PATH" bash build/build-nss.sh "$RUNNER_TEMP/nss"
+          nss="$RUNNER_TEMP/nss/runtimes/linux-x64/native/nss"
+          {
+            echo "PKCS11_TEST_NSS_LIBRARY=$nss/libsoftokn3.so"
+            echo "PKCS11_TEST_NSS_DIR=$nss"
+          } >> "$GITHUB_ENV"
+
       - name: Restore
         run: dotnet restore KerckhoffsLabs.sln
 
@@ -107,14 +129,15 @@ jobs:
           ASAN_OPTIONS: ${{ env.ASAN_RUNTIME_OPTIONS }}:log_path=${{ runner.temp }}/asan/report
           PKCS11_TEST_EXPECT_OPENCRYPTOKI: '1'
           PKCS11_TEST_EXPECT_KRYOPTIC: '1'
+          PKCS11_TEST_EXPECT_NSS: '1'
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/asan"
           chmod 777 "$RUNNER_TEMP/asan"
-          sg pkcs11 -c "LD_PRELOAD=$(gcc -print-file-name=libasan.so) LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64 dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed" \
+          sg pkcs11 -c "LD_PRELOAD=$(gcc -print-file-name=libasan.so) LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed" \
             | tee "$RUNNER_TEMP/test.log"
           # A sanitized SoftHSM that failed to load would only skip its tests; insist they ran. (The
-          # opencryptoki and Kryoptic availability guards fail the run on their own, armed above.)
+          # opencryptoki, Kryoptic and NSS availability guards fail the run on their own, armed above.)
           passed="$(grep -cE 'passed.* [A-Za-z0-9_.]+_SoftHsm[A-Za-z0-9]*\.' "$RUNNER_TEMP/test.log" || true)"
           echo "SoftHSM tests passed under ASan: ${passed}"
           [[ "${passed}" -gt 0 ]] || { echo "::error::No SoftHSM test ran under AddressSanitizer"; exit 1; }
