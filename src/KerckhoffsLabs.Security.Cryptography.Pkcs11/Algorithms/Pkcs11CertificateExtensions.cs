@@ -10,6 +10,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </summary>
 public static class Pkcs11CertificateExtensions
 {
+    // The one use of non-public API in Algorithms, kept on purpose: the internal Oids constants. Every OID
+    // is spelled out once, in Common/Oids.cs (OidLiteralTests), and a const is compiled into this file,
+    // so nothing reaches into the core at run time.
+
     /// <summary>
     /// Returns the certificate's on-token RSA private key (located by <see cref="Pkcs11Certificate.Id"/>)
     /// as a token-backed <see cref="RSA"/>. Returns <see langword="null"/> when the certificate is not RSA, or

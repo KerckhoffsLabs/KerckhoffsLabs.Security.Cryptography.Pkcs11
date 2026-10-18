@@ -2100,3 +2100,13 @@ override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.ToString() 
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog.Default.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.operator !=(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? right) -> bool
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.operator ==(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? right) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.UrlFormat = "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#{0}" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.Md5 = "KLPKCS11001" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.Sha1 = "KLPKCS11002" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.Des = "KLPKCS11003" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.TripleDes = "KLPKCS11004" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.Rc2 = "KLPKCS11005" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.Dsa = "KLPKCS11006" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.WeakEcCurve = "KLPKCS11007" -> string!
+const KerckhoffsLabs.Security.Cryptography.Pkcs11.DiagnosticIds.Rfc2898DeriveBytesPkcs11Constructors = "KLPKCS11011" -> string!
