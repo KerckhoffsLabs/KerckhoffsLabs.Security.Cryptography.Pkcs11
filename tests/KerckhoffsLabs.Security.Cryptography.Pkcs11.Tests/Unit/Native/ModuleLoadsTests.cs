@@ -39,9 +39,9 @@ public sealed class ModuleLoadsTests
     }
 
     /// <summary>
-    /// BL-083 as reported: the library that initialized the module is disposed while another library
-    /// of the same module has a session open. That session must stay open and usable, and the module
-    /// is finalized only after it and its library are gone.
+    /// One library's C_Finalize must not tear down another's sessions: the library that initialized the
+    /// module is disposed while another library of the same module has a session open. That session
+    /// must stay open and usable, and the module is finalized only after it and its library are gone.
     /// </summary>
     [Fact]
     public void DisposingTheFirstLoad_LeavesTheSecondLoadsSessionOpenAndUsable()
