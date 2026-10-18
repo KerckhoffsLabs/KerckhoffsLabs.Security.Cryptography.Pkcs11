@@ -39,8 +39,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
-        NativeCULong keyId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, in ckMechanism, template, out keyId);
+        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, in ckMechanism, template, out NativeCULong keyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -104,8 +103,8 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes);
         CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes);
 
-        NativeCULong publicKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        NativeCULong privateKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
+        NativeCULong publicKeyId;
+        NativeCULong privateKeyId;
 
         // NSS bug 1012786: C_GenerateKeyPair (RSA in particular) can fail with CKR_FUNCTION_FAILED
         // under a transient RNG hiccup (e.g. an interrupted read()/getentropy() syscall). PKCS#11
@@ -232,8 +231,7 @@ internal sealed partial class Pkcs11SessionCore
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
-        NativeCULong unwrappedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, in ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, out unwrappedKey);
+        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, in ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, out NativeCULong unwrappedKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -385,8 +383,7 @@ internal sealed partial class Pkcs11SessionCore
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
-        NativeCULong derivedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, in ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, out derivedKey);
+        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, in ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, out NativeCULong derivedKey);
         Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.

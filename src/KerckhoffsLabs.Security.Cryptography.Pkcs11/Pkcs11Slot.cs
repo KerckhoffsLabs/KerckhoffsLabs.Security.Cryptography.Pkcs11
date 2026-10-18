@@ -72,8 +72,7 @@ public sealed class Pkcs11Slot
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetSlotInfo");
 
-        CK_SLOT_INFO slotInfo = new();
-        CKR rv = _pkcs11Library.C_GetSlotInfo(_slotId, out slotInfo);
+        CKR rv = _pkcs11Library.C_GetSlotInfo(_slotId, out CK_SLOT_INFO slotInfo);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetSlotInfo);
 
         return new SlotInfo(_slotId, slotInfo);
@@ -88,8 +87,7 @@ public sealed class Pkcs11Slot
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetTokenInfo");
 
-        CK_TOKEN_INFO tokenInfo = new();
-        CKR rv = _pkcs11Library.C_GetTokenInfo(_slotId, out tokenInfo);
+        CKR rv = _pkcs11Library.C_GetTokenInfo(_slotId, out CK_TOKEN_INFO tokenInfo);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetTokenInfo);
 
         return new TokenInfo(_slotId, tokenInfo);
@@ -137,8 +135,7 @@ public sealed class Pkcs11Slot
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetMechanismInfo");
 
-        CK_MECHANISM_INFO mechanismInfo = new();
-        CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, out mechanismInfo);
+        CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, out CK_MECHANISM_INFO mechanismInfo);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetMechanismInfo);
 
         return new MechanismInfo(mechanism, mechanismInfo);
@@ -238,8 +235,7 @@ public sealed class Pkcs11Slot
         if (readWrite)
             flags |= CKF.CKF_RW_SESSION;
 
-        NativeCULong sessionId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, out sessionId);
+        CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, out NativeCULong sessionId);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpOpenSession);
 
         // Owned before any consumer code (the logger) runs, so a throw there closes the session

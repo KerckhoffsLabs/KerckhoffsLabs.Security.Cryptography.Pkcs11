@@ -70,7 +70,7 @@ internal sealed partial class Pkcs11SessionCore
             template[idx++] = d.CkAttribute;
 
         NativeCULong ctLen;
-        NativeCULong sharedHandle = (NativeCULong)CK.CK_INVALID_HANDLE;
+        NativeCULong sharedHandle;
         CKR rv;
         byte[] ct;
 
@@ -165,11 +165,10 @@ internal sealed partial class Pkcs11SessionCore
         foreach (ObjectAttribute d in secureDefaults)
             template[idx++] = d.CkAttribute;
 
-        NativeCULong sharedHandle = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DecapsulateKey(
             _sessionId, in ckMechanism, (NativeCULong)decapsulatingPrivateKey.ObjectId,
             template,
-            ciphertext, out sharedHandle);
+            ciphertext, out NativeCULong sharedHandle);
         Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
@@ -259,12 +258,11 @@ internal sealed partial class Pkcs11SessionCore
         foreach (ObjectAttribute d in secureDefaults)
             template[idx++] = d.CkAttribute;
 
-        NativeCULong newKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKeyAuthenticated(
             _sessionId, in ckMechanism, (NativeCULong)unwrappingKey.ObjectId,
             wrappedKey,
             template,
-            associatedData, out newKey);
+            associatedData, out NativeCULong newKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
