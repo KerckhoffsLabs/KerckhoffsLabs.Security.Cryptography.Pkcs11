@@ -127,9 +127,9 @@ internal sealed unsafe partial class GuardedMemory : IDisposable
             if (written == 1)
                 return true;
             int errno = Marshal.GetLastPInvokeError();
-            return errno == EFault
-                ? false
-                : throw new InvalidOperationException($"write failed (errno {errno}).");
+            if (errno != EFault)
+                throw new InvalidOperationException($"write failed (errno {errno}).");
+            return false;
         }
         finally
         {
@@ -149,13 +149,14 @@ internal sealed unsafe partial class GuardedMemory : IDisposable
     private const uint PageReadWrite = 0x04, PageNoAccess = 0x01, PageGuard = 0x100;
     private const int EFault = 14; // Linux and macOS alike
 
+    // MEMORY_BASIC_INFORMATION. Its WORD PartitionId exists on 64-bit Windows only, where it sits in the
+    // padding before RegionSize; leaving it out gives the right offsets on both.
     [StructLayout(LayoutKind.Sequential)]
     private struct MemoryBasicInformation
     {
         public IntPtr BaseAddress;
         public IntPtr AllocationBase;
         public uint AllocationProtect;
-        public ushort PartitionId;
         public nuint RegionSize;
         public uint State;
         public uint Protect;
