@@ -8,9 +8,11 @@ internal sealed partial class LowLevelPkcs11Library
     /// Retrieve the result of a previously-pending async crypto operation (PKCS#11 v3.2 §5.20.2).
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    /// <exception cref="ArgumentException"><paramref name="functionName"/> does not end in its NUL terminator.</exception>
     public unsafe CKR C_AsyncComplete(NativeCULong session, ReadOnlySpan<byte> functionName, ref CK_ASYNC_DATA result)
     {
         using ModuleCall call = EnterModule();
+        RequireNulTerminated(functionName, nameof(functionName));
         var asyncComplete = call.Functions.C_AsyncComplete;
         if (asyncComplete is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
@@ -29,9 +31,11 @@ internal sealed partial class LowLevelPkcs11Library
     /// Obtain a persistent identifier for an async operation so it can be rejoined later (PKCS#11 v3.2 §5.20.3).
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    /// <exception cref="ArgumentException"><paramref name="functionName"/> does not end in its NUL terminator.</exception>
     public unsafe CKR C_AsyncGetID(NativeCULong session, ReadOnlySpan<byte> functionName, ref NativeCULong id)
     {
         using ModuleCall call = EnterModule();
+        RequireNulTerminated(functionName, nameof(functionName));
         var asyncGetId = call.Functions.C_AsyncGetID;
         if (asyncGetId is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
@@ -45,9 +49,11 @@ internal sealed partial class LowLevelPkcs11Library
     /// Reattach to a previously-issued async operation using its persistent ID (PKCS#11 v3.2 §5.20.4).
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    /// <exception cref="ArgumentException"><paramref name="functionName"/> does not end in its NUL terminator.</exception>
     public unsafe CKR C_AsyncJoin(NativeCULong session, ReadOnlySpan<byte> functionName, NativeCULong id, ReadOnlySpan<byte> data)
     {
         using ModuleCall call = EnterModule();
+        RequireNulTerminated(functionName, nameof(functionName));
         var asyncJoin = call.Functions.C_AsyncJoin;
         if (asyncJoin is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;

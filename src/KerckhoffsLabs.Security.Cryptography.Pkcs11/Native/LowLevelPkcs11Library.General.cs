@@ -118,9 +118,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="flags">Interface flags constraining the request (typically 0).</param>
     /// <param name="iface">Receives the token-owned interface descriptor on success.</param>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    /// <exception cref="ArgumentException"><paramref name="interfaceName"/> is not empty and does not end in its NUL terminator.</exception>
     public unsafe CKR C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface)
     {
         using ModuleCall call = EnterModule();
+        if (!interfaceName.IsEmpty)
+            RequireNulTerminated(interfaceName, nameof(interfaceName));
         var getInterface = call.Functions.C_GetInterface;
         iface = default;
         if (getInterface is null)
