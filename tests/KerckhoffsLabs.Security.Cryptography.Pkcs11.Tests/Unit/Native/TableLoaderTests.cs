@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
@@ -36,9 +38,14 @@ public sealed unsafe class TableLoaderTests : IDisposable
     // ---------------------------------------------------------------------------
 
     private static IntPtr s_functionListPtr;   // handed out by FakeGetFunctionList
+    private static uint s_getFunctionListRv;   // CKR FakeGetFunctionList returns
     private static IntPtr s_interfacePtr;      // handed out by FakeGetInterface for the default interface
     private static uint s_getInterfaceRv;      // CKR FakeGetInterface returns
     private static Dictionary<(byte Major, byte Minor), IntPtr>? s_versioned; // null: requested version ignored
+    private static readonly List<InterfaceRequest> s_requests = []; // every C_GetInterface call, in order
+
+    /// <summary>One <c>C_GetInterface</c> call as the module saw it; a null name or version was NULL_PTR.</summary>
+    private readonly record struct InterfaceRequest(string? Name, (byte Major, byte Minor)? Version, ulong Flags);
 
     private readonly List<IntPtr> _allocations = [];
 
@@ -64,6 +71,7 @@ public sealed unsafe class TableLoaderTests : IDisposable
     /// <param name="functionList">Table <c>C_GetFunctionList</c> hands out.</param>
     /// <param name="interfaceTable">Table <c>C_GetInterface</c> hands out; none by default.</param>
     /// <param name="getInterfaceRv">CKR <c>C_GetInterface</c> returns; <c>CKR_OK</c> by default.</param>
+    /// <param name="getFunctionListRv">CKR <c>C_GetFunctionList</c> returns; <c>CKR_OK</c> by default.</param>
     /// <param name="versioned">
     /// Interfaces served for a requested version; any other requested version is refused
     /// (<c>CKR_ARGUMENTS_BAD</c>). <see langword="null"/> (the default) models a module that ignores the
@@ -71,24 +79,30 @@ public sealed unsafe class TableLoaderTests : IDisposable
     /// </param>
     private static void InstallModule(
         IntPtr functionList, IntPtr interfaceTable = default, uint getInterfaceRv = 0,
-        Dictionary<(byte Major, byte Minor), IntPtr>? versioned = null)
+        Dictionary<(byte Major, byte Minor), IntPtr>? versioned = null, uint getFunctionListRv = 0)
     {
         s_functionListPtr = functionList;
+        s_getFunctionListRv = getFunctionListRv;
         s_interfacePtr = interfaceTable;
         s_getInterfaceRv = getInterfaceRv;
         s_versioned = versioned;
+        s_requests.Clear();
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static NativeCULong FakeGetFunctionList(IntPtr* ppFunctionList)
     {
         *ppFunctionList = s_functionListPtr;
-        return new NativeCULong(0); // CKR_OK
+        return new NativeCULong(s_getFunctionListRv);
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static NativeCULong FakeGetInterface(byte* pInterfaceName, IntPtr pVersion, IntPtr* ppInterface, NativeCULong flags)
     {
+        s_requests.Add(new InterfaceRequest(
+            Marshal.PtrToStringUTF8((IntPtr)pInterfaceName),
+            pVersion == IntPtr.Zero ? null : (((CK_VERSION*)pVersion)->Major, ((CK_VERSION*)pVersion)->Minor),
+            (ulong)flags));
         if (pVersion != IntPtr.Zero && s_versioned is not null)
         {
             CK_VERSION wanted = *(CK_VERSION*)pVersion;
@@ -516,6 +530,175 @@ public sealed unsafe class TableLoaderTests : IDisposable
             Assert.Null(error);
         else
             Assert.IsType<EntryPointNotFoundException>(error);
+    }
+
+    // A failed bootstrap is the module's own error, reported with its code and the function that failed.
+    [Fact]
+    public void GetFunctionList_ReturningAnError_ThrowsWithItsCode()
+    {
+        var (table, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        InstallModule(table, getFunctionListRv: 0x00000005); // CKR_GENERAL_ERROR
+
+        var e = Assert.ThrowsAny<Pkcs11Exception>(
+            () => LowLevelPkcs11Library.LoadTable(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub })));
+        Assert.Equal(CKR.CKR_GENERAL_ERROR, e.ReturnValue);
+        Assert.Equal("C_GetFunctionList", e.Method);
+    }
+
+    // Each known version is asked for by the standard interface name, newest first, with no flags; only
+    // then the default interface, with a NULL name and version.
+    [Fact]
+    public void Negotiation_RequestsEachKnownVersionNewestFirst_ThenTheDefault()
+    {
+        var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        InstallModule(baseTable, getInterfaceRv: 0x00000006, versioned: []); // default: CKR_FUNCTION_FAILED
+
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        Assert.Equal<InterfaceRequest>(
+        [
+            new("PKCS 11", (3, 2), 0),
+            new("PKCS 11", (3, 1), 0),
+            new("PKCS 11", (3, 0), 0),
+            new(null, null, 0),
+        ], s_requests);
+        AssertBoundTo(loaded, baseSentinels);
+    }
+
+    // The first version served is taken: an older one the module also offers is not asked for.
+    [Fact]
+    public void Negotiation_StopsAtTheFirstVersionServed()
+    {
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v30Table, _) = BuildTable(3, 0, CryptokiTable.V30SlotCount, 0x0B00_0000);
+        var (v32Table, v32Sentinels) = BuildTable(3, 2, CryptokiTable.V32SlotCount, 0x0C00_0000);
+        InstallModule(baseTable, versioned: new()
+        {
+            [(3, 2)] = BuildInterface(v32Table),
+            [(3, 0)] = BuildInterface(v30Table),
+        });
+
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        Assert.Equal<InterfaceRequest>([new("PKCS 11", (3, 2), 0)], s_requests);
+        AssertBoundTo(loaded, v32Sentinels, "C_GetInterface");
+    }
+
+    // v3.1 added no functions: its table is read as the v3.0 table it extends, whether it was asked for
+    // by version or handed back as the default.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void V31Interface_BindsTheV30Prefix(bool servedOnRequest)
+    {
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v31Table, v31Sentinels) = BuildTable(3, 1, CryptokiTable.V32SlotCount, 0x0B00_0000);
+        IntPtr v31 = BuildInterface(v31Table);
+        if (servedOnRequest)
+            InstallModule(baseTable, versioned: new() { [(3, 1)] = v31 });
+        else
+            InstallModule(baseTable, v31, versioned: []);
+
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        var v30Slots = SlotNames(CryptokiTable.V30SlotCount).ToHashSet();
+        AssertBoundTo(loaded, v31Sentinels.Where(kv => v30Slots.Contains(kv.Key)).ToDictionary(), "C_GetInterface");
+        AssertAllZero(loaded, V32AdditionNames());
+    }
+
+    // A default interface of another major version has a layout this library does not know: it is not
+    // read at all, and the v2.40 table is used instead.
+    [Theory]
+    [InlineData(2, 40)]
+    [InlineData(4, 0)]
+    public void DefaultInterfaceOfAnotherMajorVersion_IsNotRead(byte major, byte minor)
+    {
+        var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (otherTable, _) = BuildTable(major, minor, CryptokiTable.V32SlotCount, 0x0B00_0000);
+        InstallModule(baseTable, BuildInterface(otherTable), versioned: []);
+
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        AssertBoundTo(loaded, baseSentinels);
+        AssertAllZero(loaded, V30AdditionNames(), "C_GetInterface");
+        AssertAllZero(loaded, V32AdditionNames());
+    }
+
+    // CKR_OK with no interface is a refusal, not something to read.
+    [Fact]
+    public void GetInterface_SucceedingWithoutAnInterface_FallsBackToGetFunctionList()
+    {
+        var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        InstallModule(baseTable, interfaceTable: IntPtr.Zero);
+
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        AssertBoundTo(loaded, baseSentinels);
+        AssertAllZero(loaded, V30AdditionNames(), "C_GetInterface");
+    }
+
+    // A version served without a table is skipped like a refused one; the next version is still asked for.
+    [Fact]
+    public void VersionServedWithANullFunctionList_TriesTheNextVersion()
+    {
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v30Table, v30Sentinels) = BuildTable(3, 0, CryptokiTable.V30SlotCount, 0x0B00_0000);
+        InstallModule(baseTable, versioned: new()
+        {
+            [(3, 2)] = BuildInterface(IntPtr.Zero),
+            [(3, 0)] = BuildInterface(v30Table),
+        });
+
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        AssertBoundTo(loaded, v30Sentinels, "C_GetInterface");
+        AssertAllZero(loaded, V32AdditionNames());
+    }
+
+    // C_GetFunctionList is only the fallback: a module whose interface table is usable needs no other export.
+    [Fact]
+    public void ModuleExportingOnlyC_GetInterface_LoadsFromItsInterfaceTable()
+    {
+        var (v30Table, v30Sentinels) = BuildTable(3, 0, CryptokiTable.V30SlotCount, 0x0B00_0000);
+        InstallModule(IntPtr.Zero, BuildInterface(v30Table));
+
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new() { ["C_GetInterface"] = GetInterfaceStub }));
+
+        AssertBoundTo(loaded, v30Sentinels, "C_GetInterface");
+    }
+
+    // With no usable interface table, the missing fallback export is fatal as it is for a v2.40 module.
+    [Fact]
+    public void ModuleExportingOnlyC_GetInterface_WithoutAUsableTable_ThrowsEntryPointNotFound()
+    {
+        InstallModule(IntPtr.Zero, getInterfaceRv: 0x00000006); // CKR_FUNCTION_FAILED
+
+        Assert.Throws<EntryPointNotFoundException>(
+            () => LowLevelPkcs11Library.LoadTable(Resolver(new() { ["C_GetInterface"] = GetInterfaceStub })));
     }
 
     [Fact]
