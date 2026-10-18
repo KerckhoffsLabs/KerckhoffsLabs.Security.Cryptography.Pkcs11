@@ -48,8 +48,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <remarks>No notification callback is registered: <c>pApplication</c> and <c>Notify</c> are NULL.</remarks>
     /// <param name="session">Location that receives the handle for the new session</param>
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SESSION_COUNT, CKR_SESSION_PARALLEL_NOT_SUPPORTED, CKR_SESSION_READ_WRITE_SO_EXISTS, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_TOKEN_WRITE_PROTECTED, CKR_ARGUMENTS_BAD</returns>
-    public unsafe CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
+    public unsafe CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, out NativeCULong session)
     {
+        session = default;
         using ModuleCall call = EnterModule();
         var openSession = call.Functions.C_OpenSession;
         if (openSession is null)
@@ -95,16 +96,17 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="session">The session's handle</param>
     /// <param name="info">Structure that receives the session information</param>
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_ARGUMENTS_BAD</returns>
-    public unsafe CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
+    public unsafe CKR C_GetSessionInfo(NativeCULong session, out CK_SESSION_INFO info)
     {
+        info = default;
         using ModuleCall call = EnterModule();
         var getSessionInfo = call.Functions.C_GetSessionInfo;
         if (getSessionInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        // Zeroed, so a field the module leaves untouched reads as zero.
         byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_SESSION_INFO>()];
-        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        new Span<byte>(p, Pkcs11Marshal.SizeOf<CK_SESSION_INFO>()).Clear();
         CKR rv = getSessionInfo(session, p).ToCKR();
         info = Pkcs11Marshal.ReadStructure<CK_SESSION_INFO>((IntPtr)p);
         return rv;
@@ -214,8 +216,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// Reads the session's validation flags for the requested validation-state type (PKCS#11 v3.2 §5.6.10).
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public unsafe CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags)
+    public unsafe CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, out NativeCULong flags)
     {
+        flags = default;
         using ModuleCall call = EnterModule();
         var getSessionValidationFlags = call.Functions.C_GetSessionValidationFlags;
         if (getSessionValidationFlags is null)

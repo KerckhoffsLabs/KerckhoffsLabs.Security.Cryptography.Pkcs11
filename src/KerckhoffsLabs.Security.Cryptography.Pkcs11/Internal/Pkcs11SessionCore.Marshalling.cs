@@ -246,7 +246,7 @@ internal sealed partial class Pkcs11SessionCore
     }
 
     /// <summary>Initializes the non-digest half of a combined operation (<c>C_EncryptInit</c> / <c>C_DecryptInit</c>).</summary>
-    private delegate CKR TransformInit(ref CK_MECHANISM mechanism, NativeCULong keyHandle);
+    private delegate CKR TransformInit(in CK_MECHANISM mechanism, NativeCULong keyHandle);
 
     /// <summary>
     /// The non-digest half of a combined digest-and-transform operation: the three native calls that
@@ -288,12 +288,12 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out Pkcs11ParameterBlock? digestParams);
 
         using var operation = BeginOperation(operationName);
-        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, in ckDigestingMechanism);
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         CK_MECHANISM ckTransformMechanism = transformMechanism.Marshal(scope, out Pkcs11ParameterBlock? transformParams);
 
-        rv = transform.Init(ref ckTransformMechanism, (NativeCULong)(keyHandle.ObjectId));
+        rv = transform.Init(in ckTransformMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(transform.CancelFlag, rv, transform.InitOperation);
 
         PumpStreamThrough(inputStream, outputStream, bufferLength, transform.Update, transform.UpdateOperation);

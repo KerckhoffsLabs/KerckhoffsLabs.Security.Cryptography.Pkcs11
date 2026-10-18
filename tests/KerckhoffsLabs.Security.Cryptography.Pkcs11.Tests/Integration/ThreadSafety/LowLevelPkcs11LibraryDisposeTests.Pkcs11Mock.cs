@@ -19,6 +19,6 @@ public sealed class LowLevelPkcs11LibraryDisposeTests(MockBackendFixture f)
         lib.Dispose();
 
         var info = new CK_INFO();
-        Assert.Throws<ObjectDisposedException>(() => lib.C_GetInfo(ref info));
+        Assert.Throws<ObjectDisposedException>(() => lib.C_GetInfo(out info));
     }
 }

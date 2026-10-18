@@ -24,11 +24,10 @@ internal sealed partial class Pkcs11SessionCore
         // Any object class may arrive here, so the refusal applies but key defaults do not.
         EnforceKeyTemplate(attributes, null);
 
-        NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
-        CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, ref objectId);
+        CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, out NativeCULong objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCreateObject);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -53,11 +52,10 @@ internal sealed partial class Pkcs11SessionCore
         EnforceKeyTemplate(attributes, null);
 
 
-        NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
-        CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, ref objectId);
+        CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, out NativeCULong objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCopyObject);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -93,8 +91,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetObjectSize");
 
 
-        NativeCULong objectSize = (NativeCULong)0;
-        CKR rv = _pkcs11Library.C_GetObjectSize(_sessionId, (NativeCULong)(objectHandle.ObjectId), ref objectSize);
+        CKR rv = _pkcs11Library.C_GetObjectSize(_sessionId, (NativeCULong)(objectHandle.ObjectId), out NativeCULong objectSize);
         Pkcs11Exception.ThrowIfError(rv, OpGetObjectSize);
 
         return (ulong)(objectSize);

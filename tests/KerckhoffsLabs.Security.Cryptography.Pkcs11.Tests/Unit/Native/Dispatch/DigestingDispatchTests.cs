@@ -18,7 +18,7 @@ public sealed class DigestingDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_DigestInit), l => { CK_MECHANISM m = Mechanism(); return l.C_DigestInit(DispatchSmoke.Session, ref m); }),
+        new(nameof(LowLevelPkcs11Library.C_DigestInit), l => { CK_MECHANISM m = Mechanism(); return l.C_DigestInit(DispatchSmoke.Session, in m); }),
         new(nameof(LowLevelPkcs11Library.C_Digest), l => l.C_Digest(DispatchSmoke.Session, Input, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_DigestUpdate), l => l.C_DigestUpdate(DispatchSmoke.Session, Input)),
         new(nameof(LowLevelPkcs11Library.C_DigestKey), l => l.C_DigestKey(DispatchSmoke.Session, (NativeCULong)3)),

@@ -18,11 +18,11 @@ public sealed class SigningDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_SignInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_SignInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_SignInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_SignInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_Sign), l => l.C_Sign(DispatchSmoke.Session, Data, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_SignUpdate), l => l.C_SignUpdate(DispatchSmoke.Session, Data)),
         new(nameof(LowLevelPkcs11Library.C_SignFinal), l => l.C_SignFinal(DispatchSmoke.Session, new byte[8], lengthOnly: false, out _)),
-        new(nameof(LowLevelPkcs11Library.C_SignRecoverInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_SignRecoverInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_SignRecoverInit), l => { CK_MECHANISM m = Ecdsa(); return l.C_SignRecoverInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_SignRecover), l => l.C_SignRecover(DispatchSmoke.Session, Data, new byte[8], lengthOnly: false, out _)),
     }.ToDictionary(c => c.Function, StringComparer.Ordinal);
 

@@ -39,8 +39,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
-        NativeCULong keyId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, ref keyId);
+        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, in ckMechanism, template, out NativeCULong keyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -104,8 +103,8 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes);
         CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes);
 
-        NativeCULong publicKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        NativeCULong privateKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
+        NativeCULong publicKeyId;
+        NativeCULong privateKeyId;
 
         // NSS bug 1012786: C_GenerateKeyPair (RSA in particular) can fail with CKR_FUNCTION_FAILED
         // under a transient RNG hiccup (e.g. an interrupted read()/getentropy() syscall). PKCS#11
@@ -118,7 +117,7 @@ internal sealed partial class Pkcs11SessionCore
         int attempt = 0;
         do
         {
-            rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, privateKeyTemplate, ref publicKeyId, ref privateKeyId);
+            rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, in ckMechanism, publicKeyTemplate, privateKeyTemplate, out publicKeyId, out privateKeyId);
         } while (rv == CKR.CKR_FUNCTION_FAILED && ++attempt < maxAttempts);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
         // Root the managed attributes past the native call: the template holds raw copies of
@@ -154,11 +153,11 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         byte[]? wrappedKey = mechanism.Type == CKM.CKM_AES_KEY_WRAP_KWP
-            ? TryWrapKeyKwp(ref ckMechanism, wrappingKeyHandle, keyHandle)
+            ? TryWrapKeyKwp(in ckMechanism, wrappingKeyHandle, keyHandle)
             : null;
 
         wrappedKey ??= CallWithLengthProbe(
-            (Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, lengthOnly, out len),
+            (Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, in ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, lengthOnly, out len),
             OpWrapKey);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -184,7 +183,7 @@ internal sealed partial class Pkcs11SessionCore
     // probing path. That path still hits the underlying NSS bug for a private key wrapped via
     // KWP, same as before this workaround existed, but at least fails with the token's own
     // CKR_BUFFER_TOO_SMALL rather than an unrelated "CKA_VALUE_LEN could not be read" from here.
-    private byte[]? TryWrapKeyKwp(ref CK_MECHANISM ckMechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
+    private byte[]? TryWrapKeyKwp(in CK_MECHANISM ckMechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
     {
         using ReadOnlyDisposableList<ObjectAttribute> classAttrs = GetAttributeValue(keyHandle, [CKA.CKA_CLASS]);
         if (classAttrs[0].GetValueAsUlong() != (ulong)CKO.CKO_SECRET_KEY)
@@ -195,7 +194,7 @@ internal sealed partial class Pkcs11SessionCore
         ulong wrappedLen = 8 + ((valueLen + 7) / 8 * 8);
 
         byte[] buffer = new byte[wrappedLen];
-        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, lengthOnly: false, out NativeCULong len);
+        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, in ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, lengthOnly: false, out NativeCULong len);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKey);
 
         return ReportedLength.Trim(buffer, len, OpWrapKey);
@@ -232,8 +231,7 @@ internal sealed partial class Pkcs11SessionCore
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
-        NativeCULong unwrappedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, ref unwrappedKey);
+        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, in ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, out NativeCULong unwrappedKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -385,8 +383,7 @@ internal sealed partial class Pkcs11SessionCore
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
-        NativeCULong derivedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, ref derivedKey);
+        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, in ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, out NativeCULong derivedKey);
         Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.

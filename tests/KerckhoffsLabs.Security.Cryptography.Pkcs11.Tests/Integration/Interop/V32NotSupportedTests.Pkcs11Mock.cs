@@ -173,8 +173,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         try
         {
             LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-            NativeCULong id = default;
-            CKR rv = lowLevel.C_AsyncGetID((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, ref id);
+            CKR rv = lowLevel.C_AsyncGetID((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, out NativeCULong id);
             Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
         }
         finally

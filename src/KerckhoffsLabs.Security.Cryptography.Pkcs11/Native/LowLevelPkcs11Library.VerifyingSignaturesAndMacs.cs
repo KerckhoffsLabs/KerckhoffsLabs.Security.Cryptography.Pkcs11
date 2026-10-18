@@ -8,7 +8,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// Initialize a signature-only verify operation, supplying the signature up front (PKCS#11 v3.2 §5.16.10). Data is fed via C_VerifySignature(Update) and the final check happens in C_VerifySignatureFinal.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public unsafe CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature)
+    public unsafe CKR C_VerifySignatureInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature)
     {
         using ModuleCall call = EnterModule();
         var verifySignatureInit = call.Functions.C_VerifySignatureInit;
@@ -72,7 +72,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="mechanism">The verification mechanism</param>
     /// <param name="key">The handle of the verification key</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_KEY_FUNCTION_NOT_PERMITTED, CKR_KEY_HANDLE_INVALID, CKR_KEY_SIZE_RANGE, CKR_KEY_TYPE_INCONSISTENT, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public unsafe CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    public unsafe CKR C_VerifyInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key)
     {
         using ModuleCall call = EnterModule();
         var verifyInit = call.Functions.C_VerifyInit;
@@ -144,7 +144,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="mechanism">Verification mechanism</param>
     /// <param name="key">The handle of the verification key</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_KEY_FUNCTION_NOT_PERMITTED, CKR_KEY_HANDLE_INVALID, CKR_KEY_SIZE_RANGE, CKR_KEY_TYPE_INCONSISTENT, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public unsafe CKR C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    public unsafe CKR C_VerifyRecoverInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key)
     {
         using ModuleCall call = EnterModule();
         var verifyRecoverInit = call.Functions.C_VerifyRecoverInit;

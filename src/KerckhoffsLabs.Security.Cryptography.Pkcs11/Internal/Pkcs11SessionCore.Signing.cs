@@ -31,14 +31,14 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Sign");
-        CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
+        CKR rv = _pkcs11Library.C_SignInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
         operation.Begin(CKF.CKF_SIGN, rv, OpSignInit);
 
         byte[] signature = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, lengthOnly, out len),
             OpSign,
             KnownOutputLength.OfSignature(mechanism.Type),
-            () => _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId));
+            () => _pkcs11Library.C_SignInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId));
         operation.Completed();
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -72,7 +72,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Verify");
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
@@ -155,7 +155,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Verify");
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
         byte[] part = new byte[bufferLength];
@@ -202,7 +202,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("VerifyRecover");
-        CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_VERIFY_RECOVER, rv, OpVerifyRecoverInit);
 
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, default, lengthOnly: true, out NativeCULong dataLen);
@@ -341,12 +341,12 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckVerificationMechanism = verificationMechanism.Marshal(scope, out Pkcs11ParameterBlock? verifyParams);
 
         using var operation = BeginOperation("DecryptVerify");
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckVerificationMechanism, (NativeCULong)(verificationKeyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, in ckVerificationMechanism, (NativeCULong)(verificationKeyHandle.ObjectId));
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
         CK_MECHANISM ckDecryptionMechanism = decryptionMechanism.Marshal(scope, out Pkcs11ParameterBlock? decryptParams);
 
-        rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
+        rv = _pkcs11Library.C_DecryptInit(_sessionId, in ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,

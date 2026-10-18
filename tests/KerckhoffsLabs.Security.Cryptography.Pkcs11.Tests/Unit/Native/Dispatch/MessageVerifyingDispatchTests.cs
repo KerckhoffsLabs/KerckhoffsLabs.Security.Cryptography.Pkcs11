@@ -19,7 +19,7 @@ public sealed class MessageVerifyingDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_MessageVerifyInit), l => { CK_MECHANISM m = Mechanism(); return l.C_MessageVerifyInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_MessageVerifyInit), l => { CK_MECHANISM m = Mechanism(); return l.C_MessageVerifyInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_VerifyMessage), l => l.C_VerifyMessage(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, Data, Signature)),
         new(nameof(LowLevelPkcs11Library.C_VerifyMessageBegin), l => l.C_VerifyMessageBegin(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength)),
         new(nameof(LowLevelPkcs11Library.C_VerifyMessageNext), l => l.C_VerifyMessageNext(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, Data, Signature)),

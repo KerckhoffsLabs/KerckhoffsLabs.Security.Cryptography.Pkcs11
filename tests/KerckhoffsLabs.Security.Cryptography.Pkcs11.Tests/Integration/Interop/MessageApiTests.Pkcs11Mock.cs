@@ -107,7 +107,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
             using var scope = new MechanismParameterScope();
             CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
 
-            CKR rv = lowLevel.C_MessageSignInit((NativeCULong)session.SessionId, ref ckMechanism, (NativeCULong)key.ObjectId);
+            CKR rv = lowLevel.C_MessageSignInit((NativeCULong)session.SessionId, in ckMechanism, (NativeCULong)key.ObjectId);
             Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
         }
         finally
@@ -130,7 +130,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
             using var scope = new MechanismParameterScope();
             CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
 
-            CKR rv = lowLevel.C_MessageVerifyInit((NativeCULong)session.SessionId, ref ckMechanism, (NativeCULong)key.ObjectId);
+            CKR rv = lowLevel.C_MessageVerifyInit((NativeCULong)session.SessionId, in ckMechanism, (NativeCULong)key.ObjectId);
             Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
         }
         finally

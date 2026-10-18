@@ -21,7 +21,7 @@ public sealed class MessageSigningDispatchTests
 
     private static readonly Dictionary<string, DispatchCase> Cases = new DispatchCase[]
     {
-        new(nameof(LowLevelPkcs11Library.C_MessageSignInit), l => { CK_MECHANISM m = Mechanism(); return l.C_MessageSignInit(DispatchSmoke.Session, ref m, (NativeCULong)3); }),
+        new(nameof(LowLevelPkcs11Library.C_MessageSignInit), l => { CK_MECHANISM m = Mechanism(); return l.C_MessageSignInit(DispatchSmoke.Session, in m, (NativeCULong)3); }),
         new(nameof(LowLevelPkcs11Library.C_SignMessage), l => l.C_SignMessage(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, Data, new byte[8], lengthOnly: false, out _)),
         new(nameof(LowLevelPkcs11Library.C_SignMessageBegin), l => l.C_SignMessageBegin(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength)),
         new(nameof(LowLevelPkcs11Library.C_SignMessageNext), l => l.C_SignMessageNext(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, Data, new byte[8], lengthOnly: false, out _)),

@@ -23,9 +23,8 @@ public sealed class TemplateLayoutDispatchTests
     {
         using var module = new TemplateModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        NativeCULong objectId = default;
 
-        Assert.Equal(CKR.CKR_OK, lowLevel.C_CreateObject(DispatchSmoke.Session, Template(attributes), ref objectId));
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_CreateObject(DispatchSmoke.Session, Template(attributes), out NativeCULong objectId));
 
         Assert.Equal(Enumerable.Range(0, attributes).Select(i => (ulong)i), module.LastTypes);
     }
@@ -50,10 +49,9 @@ public sealed class TemplateLayoutDispatchTests
         using var module = new TemplateModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
         CK_ATTRIBUTE[] template = Template(8);
-        NativeCULong objectId = default;
         int before = UnmanagedMemory.ThreadAllocationCount;
 
-        lowLevel.C_CreateObject(DispatchSmoke.Session, template, ref objectId);
+        lowLevel.C_CreateObject(DispatchSmoke.Session, template, out NativeCULong objectId);
 
         Assert.Equal(before, UnmanagedMemory.ThreadAllocationCount);
     }

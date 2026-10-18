@@ -35,7 +35,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Encrypt");
-        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_ENCRYPT, rv, OpEncryptInit);
 
         // Size the output for the largest single-block expansion a symmetric mechanism adds — a full
@@ -70,7 +70,7 @@ internal sealed partial class Pkcs11SessionCore
             // tokens, whose retry already returned CKR_OK.
             if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
             {
-                rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+                rv = _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
                 Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
 
                 rv = _pkcs11Library.C_Encrypt(_sessionId, data, default, lengthOnly: true, out NativeCULong probeLen);
@@ -161,7 +161,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Encrypt");
-        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_ENCRYPT, rv, OpEncryptInit);
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,
@@ -240,8 +240,7 @@ internal sealed partial class Pkcs11SessionCore
     /// <exception cref="Pkcs11Exception"><c>C_GetSlotInfo</c> or <c>C_GetInfo</c> failed.</exception>
     private bool DetectPbkdf2PasswordLengthByReference(NativeCULong slotId, out string reason)
     {
-        CK_SLOT_INFO slot = default;
-        CKR rv = _pkcs11Library.C_GetSlotInfo(slotId, ref slot);
+        CKR rv = _pkcs11Library.C_GetSlotInfo(slotId, out CK_SLOT_INFO slot);
         if (rv != CKR.CKR_FUNCTION_NOT_SUPPORTED)
         {
             Pkcs11Exception.ThrowIfError(rv, OpGetSlotInfo);
@@ -253,8 +252,7 @@ internal sealed partial class Pkcs11SessionCore
             }
         }
 
-        CK_INFO info = default;
-        rv = _pkcs11Library.C_GetInfo(ref info);
+        rv = _pkcs11Library.C_GetInfo(out CK_INFO info);
         if (rv == CKR.CKR_FUNCTION_NOT_SUPPORTED)
         {
             reason = "module version unknown";
@@ -300,7 +298,7 @@ internal sealed partial class Pkcs11SessionCore
         // per-message block below, and outlives every native call that reads or writes them.
         using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
-        CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
+        CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageEncryptInit);
 
         mechanism.AbsorbOutput(mechParams);
@@ -352,7 +350,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Decrypt");
-        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
         // Use input length as the initial output buffer size — avoids a null-probe call
@@ -450,7 +448,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Decrypt");
-        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,
@@ -506,7 +504,7 @@ internal sealed partial class Pkcs11SessionCore
         // per-message block below, and outlives every native call that reads or writes them.
         using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
-        CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
+        CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageDecryptInit);
 
         mechanism.AbsorbOutput(mechParams);

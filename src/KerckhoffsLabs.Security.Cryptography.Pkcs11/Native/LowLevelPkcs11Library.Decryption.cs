@@ -11,7 +11,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="mechanism">The decryption mechanism</param>
     /// <param name="key">The handle of the decryption key</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_KEY_FUNCTION_NOT_PERMITTED, CKR_KEY_HANDLE_INVALID, CKR_KEY_SIZE_RANGE, CKR_KEY_TYPE_INCONSISTENT, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public unsafe CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    public unsafe CKR C_DecryptInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key)
     {
         using ModuleCall call = EnterModule();
         var decryptInit = call.Functions.C_DecryptInit;

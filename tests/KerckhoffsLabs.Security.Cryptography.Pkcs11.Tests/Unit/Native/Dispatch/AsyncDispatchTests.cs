@@ -27,8 +27,7 @@ public sealed class AsyncDispatchTests
         }),
         new(nameof(LowLevelPkcs11Library.C_AsyncGetID), l =>
         {
-            NativeCULong id = default;
-            CKR rv = l.C_AsyncGetID(DispatchSmoke.Session, FunctionName, ref id);
+            CKR rv = l.C_AsyncGetID(DispatchSmoke.Session, FunctionName, out NativeCULong id);
             return rv == CKR.CKR_OK && (ulong)id != Id ? CKR.CKR_GENERAL_ERROR : rv;
         }),
         new(nameof(LowLevelPkcs11Library.C_AsyncJoin), l => l.C_AsyncJoin(DispatchSmoke.Session, FunctionName, (NativeCULong)Id, Data)),
