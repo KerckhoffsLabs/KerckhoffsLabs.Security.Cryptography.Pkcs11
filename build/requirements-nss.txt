@@ -1,0 +1,14 @@
+gyp-next==0.22.3 \
+    --hash=sha256:4278d5b0b368d898389be74bb77c1a17631a50587d1b49e5607e40d211d4592d \
+    --hash=sha256:cda65d585e378250685bf2f63afa365ac6738501bef992337914e219caf71c69
+    # via -r requirements-nss.in
+packaging==26.3 \
+    --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+    # via gyp-next
+
+# The following packages are considered to be unsafe in a requirements file:
+setuptools==84.0.0 \
+    --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670 \
+    --hash=sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73
+    # via gyp-next
