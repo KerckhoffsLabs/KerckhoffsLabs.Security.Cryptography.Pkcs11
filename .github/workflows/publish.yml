@@ -4,8 +4,12 @@ on:
   push:
     tags: ['v*']
 
-# None by default: the publish job declares the three it needs (contents: read, id-token: write,
-# attestations: write), and a job added later starts with no token permissions until it asks.
+# Pushing a v* tag releases: this workflow publishes the package to NuGet, then creates the GitHub
+# release with the attested packages attached. Don't create the release by hand first: releases are
+# immutable, so one already published can't take the packages and the release job fails.
+#
+# None by default: each job declares what it needs (publish: contents read, id-token and attestations
+# write; release: contents write), and a job added later starts with no token permissions until it asks.
 permissions: {}
 
 jobs:
@@ -42,9 +46,33 @@ jobs:
       - name: Pack
         run: dotnet pack src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj --no-build -c Release -o ./artifacts /p:Version=$VERSION
 
+      # nuget.org signs each package it accepts by adding .signature.p7s to it, so the .nupkg users
+      # download no longer has the digest attested here. That signature leaves the assemblies inside
+      # unchanged: attesting them too lets a package from nuget.org be checked file by file, and the
+      # release job attaches the attested packages themselves to the GitHub release.
+      - name: Extract the packaged assemblies
+        run: |
+          for package in ./artifacts/*.nupkg; do
+            destination="./artifacts/contents/$(basename "$package" .nupkg)"
+            mkdir -p "$destination"
+            unzip -q "$package" '*.dll' -d "$destination"
+          done
+
       - uses: actions/attest-build-provenance@v4.2.2
         with:
-          subject-path: ./artifacts/*.nupkg
+          subject-path: |
+            ./artifacts/*.nupkg
+            ./artifacts/*.snupkg
+            ./artifacts/contents/**/*.dll
+
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: packages
+          path: |
+            ./artifacts/*.nupkg
+            ./artifacts/*.snupkg
+          if-no-files-found: error
+          retention-days: 7
 
       - name: NuGet login (OIDC)
         uses: nuget/login@v1.2.0
@@ -57,3 +85,26 @@ jobs:
       # `dotnet nuget push` ships symbols unless --no-symbols is given. Do not add a
       # separate *.snupkg push: that would be a duplicate and fail with 409 Conflict.
       - run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+
+  # Separate from publish so that contents: write is never held by the job that builds and runs the
+  # tests. Runs only once the push to NuGet succeeded.
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write  # create the release and attach the packages
+
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: packages
+          path: ./artifacts
+
+      # With assets given, gh creates the release as a draft, uploads them, then publishes it, so the
+      # packages are in place before the release becomes immutable.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" ./artifacts/*.nupkg ./artifacts/*.snupkg --verify-tag --generate-notes
