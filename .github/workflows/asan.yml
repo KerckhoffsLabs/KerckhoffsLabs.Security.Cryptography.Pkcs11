@@ -105,7 +105,7 @@ jobs:
           NATIVE_SANITIZE: address
         run: |
           set -euo pipefail
-          python3 -m pip install --user --only-binary :all: 'gyp-next==0.22.3'
+          python3 -m pip install --user --require-hashes --only-binary :all: -r build/requirements-nss.txt
           PATH="$HOME/.local/bin:$PATH" bash build/build-nss.sh "$RUNNER_TEMP/nss"
           nss="$RUNNER_TEMP/nss/runtimes/linux-x64/native/nss"
           {

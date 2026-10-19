@@ -32,6 +32,25 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
+  # NSS's build tools: requirements-nss.txt is compiled from requirements-nss.in with hashes, which
+  # Dependabot regenerates along with the version.
+  - package-ecosystem: pip
+    directory: /build
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-patch-days: 1
+    groups:
+      pip:
+        applies-to: version-updates
+        patterns: ["*"]
+      pip-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+
   # Workflows reference actions by tag and pin them in .github/workflows/actions.lock, which the
   # organization's "Require lockfile" policy enforces. A bump that leaves the lockfile behind is
   # blocked until it is regenerated: run `gh actions-lock` on the pull request's branch.
