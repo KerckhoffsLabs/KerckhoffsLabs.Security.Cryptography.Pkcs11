@@ -25,7 +25,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.402' # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
       # Derive the version from the tag once so the build stamps it into the
       # assembly (AssemblyVersion/FileVersion/InformationalVersion), not just the
@@ -33,7 +33,7 @@ jobs:
       - name: Derive version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - run: dotnet restore KerckhoffsLabs.sln
+      - run: dotnet restore KerckhoffsLabs.sln --locked-mode
 
       - run: dotnet build KerckhoffsLabs.sln --no-restore -c Release /p:Version=$VERSION
 

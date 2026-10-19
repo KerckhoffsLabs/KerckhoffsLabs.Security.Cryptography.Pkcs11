@@ -56,7 +56,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.402' # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
       # The Sonar analysis engine is JVM-based; the .NET scanner shells out to it.
       - name: Setup Java
@@ -102,11 +102,13 @@ jobs:
           path: tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/bouncyhsm
           key: bouncyhsm-${{ runner.os }}-${{ runner.arch }}-${{ steps.bouncyhsmrev.outputs.sha }}-${{ hashFiles('build/build-bouncyhsm.sh', 'build/lib/common.sh') }}-v1
 
+      # Pinned: unpinned, `dotnet tool install` takes whatever is newest on the day, so the scanner could
+      # change between two runs of the same commit. Bump it deliberately.
       - name: Install SonarScanner for .NET
-        run: dotnet tool install --global dotnet-sonarscanner
+        run: dotnet tool install --global dotnet-sonarscanner --version 12.0.0
 
       - name: Restore
-        run: dotnet restore KerckhoffsLabs.sln
+        run: dotnet restore KerckhoffsLabs.sln --locked-mode
 
       # sonar.sourceEncoding is explicit because the scanner otherwise assumes the runner's default
       # charset, which is not guaranteed to be UTF-8 and mis-decodes every source file containing a
