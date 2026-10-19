@@ -32,6 +32,11 @@ concurrency:
 jobs:
   sonar:
     name: sonar
+    # Not for runs Dependabot triggers: they get Dependabot secrets, not these, so SONAR_TOKEN and
+    # CODECOV_TOKEN would be empty and the scan would fail. Keyed on who triggered the run, not who
+    # opened the pull request: a maintainer's push to a Dependabot branch has the secrets and is
+    # analysed as usual.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # The scanner reads the token from SONAR_TOKEN; pass it via the environment rather
