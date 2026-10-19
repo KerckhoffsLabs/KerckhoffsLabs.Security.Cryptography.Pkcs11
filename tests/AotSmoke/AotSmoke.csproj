@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- No lock file, unlike the other projects: PublishAot makes the SDK add the AOT compiler package for
+         the machine doing the restore (runtime.<host-rid>.Microsoft.DotNet.ILCompiler), so a lock file
+         written on one platform fails locked restores on every other CI leg. This test app ships nothing;
+         the library it references is locked. -->
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <PublishAot>true</PublishAot>

@@ -6,6 +6,8 @@
     TreatAsLocalProperty="PublishAot;IsAotCompatible" on its <Project> element (see below).
   -->
   <PropertyGroup>
+    <!-- See the PKCS#11 library's project file for why every project restores from a lock file. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <!-- Roslyn loads compiler extensions into every compiler host, including Visual Studio's
          .NET Framework MSBuild and design-time compiler, so they must target netstandard2.0 (RS1041). -->
     <TargetFramework>netstandard2.0</TargetFramework>
