@@ -4,6 +4,10 @@ on:
   push:
     tags: ['v*']
 
+# None by default: the publish job declares the three it needs (contents: read, id-token: write,
+# attestations: write), and a job added later starts with no token permissions until it asks.
+permissions: {}
+
 jobs:
   publish:
     runs-on: ubuntu-latest

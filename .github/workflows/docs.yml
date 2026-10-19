@@ -13,7 +13,9 @@ on:
   workflow_dispatch:
 
 # Permissions are declared per job (least privilege): the build job only reads, the deploy job
-# holds the pages:write + id-token:write the deployment needs.
+# holds the pages:write + id-token:write the deployment needs. None at workflow level, so a job
+# added later starts with no token permissions until it asks.
+permissions: {}
 
 # Serialize Pages deployments; don't cancel an in-flight publish.
 concurrency:
