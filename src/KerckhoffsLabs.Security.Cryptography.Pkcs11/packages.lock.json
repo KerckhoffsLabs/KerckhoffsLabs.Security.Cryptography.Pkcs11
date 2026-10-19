@@ -4,9 +4,9 @@
     "net10.0": {
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Direct",
-        "requested": "[1.4.0, )",
-        "resolved": "1.4.0",
-        "contentHash": "GjyUf36fk8qRqgZiMM9gV7w8t7KIR8A/Y+XfLsVH9+0jfKcZkyLwLNLtEyuIJvVkeBBxpJY3FV+W1M8OM3u3qQ=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
         "type": "Direct",
@@ -67,49 +67,49 @@
     "net10.0/linux-arm64": {
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Direct",
-        "requested": "[1.4.0, )",
-        "resolved": "1.4.0",
-        "contentHash": "GjyUf36fk8qRqgZiMM9gV7w8t7KIR8A/Y+XfLsVH9+0jfKcZkyLwLNLtEyuIJvVkeBBxpJY3FV+W1M8OM3u3qQ=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
       }
     },
     "net10.0/linux-x64": {
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Direct",
-        "requested": "[1.4.0, )",
-        "resolved": "1.4.0",
-        "contentHash": "GjyUf36fk8qRqgZiMM9gV7w8t7KIR8A/Y+XfLsVH9+0jfKcZkyLwLNLtEyuIJvVkeBBxpJY3FV+W1M8OM3u3qQ=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
       }
     },
     "net10.0/osx-arm64": {
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Direct",
-        "requested": "[1.4.0, )",
-        "resolved": "1.4.0",
-        "contentHash": "GjyUf36fk8qRqgZiMM9gV7w8t7KIR8A/Y+XfLsVH9+0jfKcZkyLwLNLtEyuIJvVkeBBxpJY3FV+W1M8OM3u3qQ=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
       }
     },
     "net10.0/osx-x64": {
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Direct",
-        "requested": "[1.4.0, )",
-        "resolved": "1.4.0",
-        "contentHash": "GjyUf36fk8qRqgZiMM9gV7w8t7KIR8A/Y+XfLsVH9+0jfKcZkyLwLNLtEyuIJvVkeBBxpJY3FV+W1M8OM3u3qQ=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
       }
     },
     "net10.0/win-x64": {
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Direct",
-        "requested": "[1.4.0, )",
-        "resolved": "1.4.0",
-        "contentHash": "GjyUf36fk8qRqgZiMM9gV7w8t7KIR8A/Y+XfLsVH9+0jfKcZkyLwLNLtEyuIJvVkeBBxpJY3FV+W1M8OM3u3qQ=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
       }
     },
     "net10.0/win-x86": {
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Direct",
-        "requested": "[1.4.0, )",
-        "resolved": "1.4.0",
-        "contentHash": "GjyUf36fk8qRqgZiMM9gV7w8t7KIR8A/Y+XfLsVH9+0jfKcZkyLwLNLtEyuIJvVkeBBxpJY3FV+W1M8OM3u3qQ=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
       }
     }
   }
