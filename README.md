@@ -8,6 +8,7 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![codecov](https://codecov.io/gh/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/graph/badge.svg?token=4IJFAX88L9)](https://codecov.io/gh/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=KerckhoffsLabs_KerckhoffsLabs.Security.Cryptography.Pkcs11&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=KerckhoffsLabs_KerckhoffsLabs.Security.Cryptography.Pkcs11)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/badge)](https://scorecard.dev/viewer/?uri=github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11)
 
 ## Overview
 
