@@ -1,0 +1,3 @@
+# Every path is owned by the maintainer: the main ruleset requires a code owner's review, which the
+# maintainer gives on pull requests from others (Dependabot included) and bypasses on their own.
+* @AlexLaroche
