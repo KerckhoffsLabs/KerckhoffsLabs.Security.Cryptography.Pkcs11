@@ -72,12 +72,13 @@ internal static class EcdhPeerValidator
         return key.Session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()));
     }
 
+    // A peer with explicit curve parameters has no Oid at all, and never matches a named local curve.
     private static void CheckCurve(Pkcs11ECCurve localCurve, ECParameters peer, string operationName)
     {
-        string? peerOid = peer.Curve.Oid.Value;
+        string? peerOid = peer.Curve.Oid?.Value;
         if (peerOid is null || !string.Equals(peerOid, localCurve.Oid, StringComparison.Ordinal))
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
-                $"{operationName} (peer public key is on curve {peer.Curve.Oid.FriendlyName ?? peerOid ?? "unknown"}, expected {localCurve.FriendlyName ?? localCurve.Oid})");
+                $"{operationName} (peer public key is on curve {peer.Curve.Oid?.FriendlyName ?? peerOid ?? "unknown"}, expected {localCurve.FriendlyName ?? localCurve.Oid})");
     }
 
     // The field size in bytes, from the most trusted source available:
