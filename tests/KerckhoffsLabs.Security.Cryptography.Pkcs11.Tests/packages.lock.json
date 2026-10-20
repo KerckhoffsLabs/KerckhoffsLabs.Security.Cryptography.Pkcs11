@@ -31,8 +31,8 @@
       },
       "KerckhoffsLabs.Runtime.InteropServices": {
         "type": "Transitive",
-        "resolved": "1.5.0",
-        "contentHash": "WYzcd3WV5mJjda/V6etL20CWo80kmgINwmfnujyTsIjfeRtKO6qoQoIJB7sD2l3Kokt9/BgrnGjLCeFh0qFjjg=="
+        "resolved": "1.6.0",
+        "contentHash": "fodqcDeTX9bRaikyw5iUfrLp39geQ362d5QjnvI4tfyrfC+mN3S0w5z1BFj+GGqqd5NkI1bC4nhBo6LC4fYIdQ=="
       },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",
@@ -244,7 +244,7 @@
       "kerckhoffslabs.security.cryptography.pkcs11": {
         "type": "Project",
         "dependencies": {
-          "KerckhoffsLabs.Runtime.InteropServices": "[1.5.0, )",
+          "KerckhoffsLabs.Runtime.InteropServices": "[1.6.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.13, )"
         }
       },
