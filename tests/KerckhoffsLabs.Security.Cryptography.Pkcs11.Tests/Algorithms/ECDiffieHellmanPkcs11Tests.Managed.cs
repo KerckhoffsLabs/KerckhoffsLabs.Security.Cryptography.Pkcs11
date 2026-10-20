@@ -513,6 +513,40 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecretAgreement(bob.PublicKey));
     });
 
+    // Explicit curve parameters carry no OID: refused like any other curve mismatch, not a
+    // NullReferenceException from reading the missing OID. The adapter decodes its peer through
+    // SubjectPublicKeyInfo, which already refuses explicit parameters; the session overload taking
+    // ECParameters hands them to the peer validator as is.
+    // P-256 as explicit domain parameters (SEC 2 §2.4.2), built by hand: macOS cannot export them.
+    private static readonly BclECCurve ExplicitNistP256 = new()
+    {
+        CurveType = BclECCurve.ECCurveType.PrimeShortWeierstrass,
+        Prime = H("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF"),
+        A = H("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC"),
+        B = H("5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B"),
+        G = new ECPoint
+        {
+            X = H("6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296"),
+            Y = H("4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5"),
+        },
+        Order = H("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551"),
+        Cofactor = [0x01],
+    };
+
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void DeriveSharedSecretEcdh_PeerWithExplicitCurveParameters_Throws()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+        ECParameters explicitPeer = bob.ExportParameters(includePrivateParameters: false);
+        explicitPeer.Curve = ExplicitNistP256;
+
+        var ex = Assert.Throws<Pkcs11ArgumentException>(() => session.DeriveSharedSecretEcdh(alice, explicitPeer));
+        Assert.Contains("(peer public key is on curve unknown, expected nistP256)", ex.Message, StringComparison.Ordinal);
+    }
+
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHash_OffCurvePoint_Throws() => WithEcdh("P-256", alice =>
     {
