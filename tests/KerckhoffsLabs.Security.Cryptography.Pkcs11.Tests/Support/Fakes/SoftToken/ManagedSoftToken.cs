@@ -55,6 +55,25 @@ internal sealed partial class ManagedSoftToken : FakeModule
     /// implements either way — lets tests exercise an adapter's path for a token that lacks it.</summary>
     public bool AdvertisesAesKeyWrapKwp { get; set; } = true;
 
+    /// <summary>The <c>CKF_*</c> flags <c>C_GetMechanismInfo</c> reports for <c>CKM_AES_KEY_WRAP_KWP</c>.
+    /// Encryption, decryption, wrap and unwrap by default; a token can list the mechanism for
+    /// <c>C_WrapKey</c>/<c>C_UnwrapKey</c> only (Craton HSM does), which tests set here.</summary>
+    public ulong AesKeyWrapKwpFlags { get; set; } = CKF.CKF_ENCRYPT | CKF.CKF_DECRYPT | CKF.CKF_WRAP | CKF.CKF_UNWRAP;
+
+    // Answers for CKM_AES_KEY_WRAP_KWP only; every other mechanism keeps the not-supported answer the
+    // token gave before it implemented this function.
+    protected override CKR C_GetMechanismInfo(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info)
+    {
+        if ((CKM)(ulong)type != CKM.CKM_AES_KEY_WRAP_KWP)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+        if (!AdvertisesAesKeyWrapKwp)
+            return CKR.CKR_MECHANISM_INVALID;
+        info.MinKeySize = (NativeCULong)16;
+        info.MaxKeySize = (NativeCULong)32;
+        info.Flags = (NativeCULong)AesKeyWrapKwpFlags;
+        return CKR.CKR_OK;
+    }
+
     protected override CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count)
     {
         CKM[] mechs =

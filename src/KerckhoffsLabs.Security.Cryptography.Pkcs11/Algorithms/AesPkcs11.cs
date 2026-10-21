@@ -113,11 +113,12 @@ public sealed class AesPkcs11 : Aes
     /// Wraps with the token's <c>CKM_AES_KEY_WRAP_KWP</c> in one encryption, which the built-in policies
     /// allow. The base class instead runs RFC 5649 in managed code over raw AES-ECB block operations,
     /// which the policy judges, and <c>SecureOnly</c> refuses, as ECB; that remains the path for a token
-    /// that does not advertise the mechanism.
+    /// that does not advertise the mechanism, or advertises it without <c>CKF_ENCRYPT</c> (for
+    /// <c>C_WrapKey</c> only, as Craton HSM does).
     /// </remarks>
     protected override void EncryptKeyWrapPaddedCore(ReadOnlySpan<byte> source, Span<byte> destination)
     {
-        if (!_key.SupportsMechanism(CKM.CKM_AES_KEY_WRAP_KWP))
+        if (!_key.SupportsMechanism(CKM.CKM_AES_KEY_WRAP_KWP, CKF.CKF_ENCRYPT))
         {
             base.EncryptKeyWrapPaddedCore(source, destination);
             return;
@@ -133,11 +134,12 @@ public sealed class AesPkcs11 : Aes
     /// <remarks>
     /// Unwraps with the token's <c>CKM_AES_KEY_WRAP_KWP</c>, as <see cref="EncryptKeyWrapPaddedCore"/>
     /// wraps. A ciphertext whose integrity check fails throws <see cref="CryptographicException"/>, as the
-    /// BCL does, with the token's error as the inner exception.
+    /// BCL does, with the token's error as the inner exception. A token whose mechanism lacks
+    /// <c>CKF_DECRYPT</c> unwraps through the base class, judged as ECB.
     /// </remarks>
     protected override int DecryptKeyWrapPaddedCore(ReadOnlySpan<byte> source, Span<byte> destination)
     {
-        if (!_key.SupportsMechanism(CKM.CKM_AES_KEY_WRAP_KWP))
+        if (!_key.SupportsMechanism(CKM.CKM_AES_KEY_WRAP_KWP, CKF.CKF_DECRYPT))
             return base.DecryptKeyWrapPaddedCore(source, destination);
 
         byte[] unwrapped;

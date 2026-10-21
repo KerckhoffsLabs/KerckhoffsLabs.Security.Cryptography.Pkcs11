@@ -187,6 +187,12 @@ public sealed partial class Pkcs11Key : IDisposable
     public bool SupportsMechanism(CKM mechanism) => _session.Core.SupportsMechanism(mechanism);
 
     /// <summary>
+    /// <see cref="SupportsMechanism(CKM)"/>, and the token's C_GetMechanismInfo flags for the mechanism
+    /// include every <c>CKF_*</c> operation in <paramref name="requiredFlags"/> when it reports them.
+    /// </summary>
+    internal bool SupportsMechanism(CKM mechanism, ulong requiredFlags) => _session.Core.SupportsMechanism(mechanism, requiredFlags);
+
+    /// <summary>
     /// Reads the requested attribute values from this key. Uses the public-key handle for
     /// asymmetric keys when it is available (matching the rule <see cref="Encrypt"/> follows), and
     /// the private-key handle otherwise — covering both public-companion key pairs and private-only

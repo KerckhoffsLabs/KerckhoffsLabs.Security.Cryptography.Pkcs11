@@ -363,6 +363,16 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     private HashSet<CKM>? _supportedMechanisms;
 
     /// <summary>
+    /// Lazy-cached <c>CKF_*</c> flags of the mechanisms <see cref="SupportsMechanism(CKM, ulong)"/> was
+    /// asked about, from C_GetMechanismInfo; <see langword="null"/> for one whose call failed. Guarded by
+    /// <see cref="_busyLock"/>, like <see cref="_supportedMechanisms"/>.
+    /// </summary>
+    private Dictionary<CKM, ulong?>? _mechanismFlags;
+
+    /// <summary>The slot the mechanism list was read from, set with <see cref="_supportedMechanisms"/>.</summary>
+    private NativeCULong _mechanismSlotId;
+
+    /// <summary>
     /// Returns true if the token in this session's slot supports the given mechanism.
     /// Result is cached after the first call.
     /// </summary>
@@ -380,11 +390,46 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     internal bool SupportsMechanism(CKM mechanism)
     {
         using var _ = AcquireExclusive();
+        return IsMechanismListed(mechanism);
+    }
 
+    /// <summary>
+    /// Returns true if the token in this session's slot supports <paramref name="mechanism"/> for every
+    /// operation in <paramref name="requiredFlags"/> (<c>CKF_ENCRYPT</c>, <c>CKF_DECRYPT</c>, ...): it is in
+    /// the mechanism list, and its C_GetMechanismInfo flags include them. A token can list a mechanism for
+    /// some operations only, e.g. <c>CKM_AES_KEY_WRAP_KWP</c> for C_WrapKey but not C_Encrypt. When
+    /// C_GetMechanismInfo fails, the flags are unknown and the listing alone decides, as for
+    /// <see cref="SupportsMechanism(CKM)"/>. Results are cached per mechanism.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if another thread is currently inside an operation on this session.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    internal bool SupportsMechanism(CKM mechanism, ulong requiredFlags)
+    {
+        using var _ = AcquireExclusive();
+
+        if (!IsMechanismListed(mechanism))
+            return false;
+
+        _mechanismFlags ??= [];
+        if (!_mechanismFlags.TryGetValue(mechanism, out ulong? flags))
+        {
+            CKR rv = _pkcs11Library.C_GetMechanismInfo(_mechanismSlotId, mechanism, out CK_MECHANISM_INFO info);
+            flags = rv == CKR.CKR_OK ? (ulong)info.Flags : null;
+            _mechanismFlags[mechanism] = flags;
+        }
+        return flags is not { } known || (known & requiredFlags) == requiredFlags;
+    }
+
+    // The caller holds the busy lock.
+    private bool IsMechanismListed(CKM mechanism)
+    {
         if (_supportedMechanisms is null)
         {
             CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out CK_SESSION_INFO info);
             if (rv != CKR.CKR_OK) return false;
+            _mechanismSlotId = info.SlotId;
 
             rv = _pkcs11Library.C_GetMechanismList(info.SlotId, [], out NativeCULong count);
             if (rv != CKR.CKR_OK || count.Value == 0)
