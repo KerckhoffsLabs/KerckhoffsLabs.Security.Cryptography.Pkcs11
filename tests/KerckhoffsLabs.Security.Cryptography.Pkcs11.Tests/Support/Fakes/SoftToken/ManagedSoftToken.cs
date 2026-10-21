@@ -51,6 +51,10 @@ internal sealed partial class ManagedSoftToken : FakeModule
         return CKR.CKR_OK;
     }
 
+    /// <summary>Whether <c>C_GetMechanismList</c> lists <c>CKM_AES_KEY_WRAP_KWP</c>, which the token
+    /// implements either way — lets tests exercise an adapter's path for a token that lacks it.</summary>
+    public bool AdvertisesAesKeyWrapKwp { get; set; } = true;
+
     protected override CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count)
     {
         CKM[] mechs =
@@ -60,6 +64,7 @@ internal sealed partial class ManagedSoftToken : FakeModule
             CKM.CKM_SHA256, CKM.CKM_SHA384, CKM.CKM_SHA512,
             CKM.CKM_SHA3_256, CKM.CKM_SHA3_384, CKM.CKM_SHA3_512,
             CKM.CKM_SHA256_HMAC, CKM.CKM_SHA384_HMAC, CKM.CKM_SHA512_HMAC,
+            .. (CKM[])(AdvertisesAesKeyWrapKwp ? [CKM.CKM_AES_KEY_WRAP_KWP] : []),
         ];
         if (mechanismList.IsNull) { count = (NativeCULong)mechs.Length; return CKR.CKR_OK; }
         if (mechanismList.Span.Length < mechs.Length) { count = (NativeCULong)mechs.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
