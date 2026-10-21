@@ -6,7 +6,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 /// <see cref="SignEdDsaTestCases"/> assertions gate on the live mechanism list via
 /// <c>IPkcs11Backend.RequireMechanism</c>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class SignEdDsaTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

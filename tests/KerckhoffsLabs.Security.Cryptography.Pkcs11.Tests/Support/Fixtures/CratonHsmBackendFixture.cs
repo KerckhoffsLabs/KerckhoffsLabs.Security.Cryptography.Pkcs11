@@ -1,9 +1,6 @@
 using System.Reflection;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using Xunit.v3;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -48,10 +45,6 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     private const int SlotNumber = 0;
 
     private readonly string _configPath = string.Empty;
-    private readonly Pkcs11Slot? _slot;
-
-    /// <summary>The fixture of the running collection, for <see cref="ResetCratonHsmLoginAttribute"/>.</summary>
-    internal static CratonHsmBackendFixture? Current { get; private set; }
 
     public static bool CratonHsmAvailable =>
         (Settings.CratonHsmLibraryPath is { } p && File.Exists(p)) ||
@@ -113,8 +106,6 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
 
             SlotId = (NativeCULong)slot.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(slot.GetMechanismList());
-            _slot = slot;
-            Current = this;
         }
         catch
         {
@@ -123,31 +114,8 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
         }
     }
 
-    /// <summary>
-    /// Logs out a login the last test left behind. PKCS#11 returns the token to public sessions when
-    /// the application's last session closes (<c>C_CloseSession</c>); Craton HSM's only decrements its
-    /// session count, so a test that logs in on a low-level session and just closes it leaves the user
-    /// logged in, and the next test's <c>C_Login</c> fails with <c>CKR_USER_ALREADY_LOGGED_IN</c>.
-    /// </summary>
-    internal void LogOutLeftoverLogin()
-    {
-        if (_slot is null)
-            return;
-
-        using Pkcs11SessionCore session = _slot.OpenSessionCore(readWrite: false);
-        try
-        {
-            session.Logout();
-        }
-        catch (Pkcs11Exception e) when (e.ReturnValue == CKR.CKR_USER_NOT_LOGGED_IN)
-        {
-            // Nothing left over: the test logged out, or never logged in.
-        }
-    }
-
     public void Dispose()
     {
-        Current = null;
         Library?.Dispose();
         try
         {
@@ -172,15 +140,3 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
 [CollectionDefinition("CratonHsm")]
 public sealed class CratonHsmBackendCollection : ICollectionFixture<CratonHsmBackendFixture>
 { }
-
-/// <summary>
-/// Restores, after each test of a Craton HSM class, the logout PKCS#11 performs when the last session
-/// closes and Craton HSM does not; see <see cref="CratonHsmBackendFixture.LogOutLeftoverLogin"/>. Every
-/// <c>[Collection("CratonHsm")]</c> class carries it.
-/// </summary>
-[AttributeUsage(AttributeTargets.Class)]
-public sealed class ResetCratonHsmLoginAttribute : BeforeAfterTestAttribute
-{
-    public override void After(MethodInfo methodUnderTest, IXunitTest test)
-        => CratonHsmBackendFixture.Current?.LogOutLeftoverLogin();
-}

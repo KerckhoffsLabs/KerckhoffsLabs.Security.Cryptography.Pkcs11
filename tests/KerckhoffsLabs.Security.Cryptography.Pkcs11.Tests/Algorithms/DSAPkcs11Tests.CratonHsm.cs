@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>DSAPkcs11 over Craton HSM — thin wrapper over <see cref="DSAPkcs11TestCases"/>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class DSAPkcs11Tests_CratonHsm(CratonHsmBackendFixture f)
 {
     private readonly CratonHsmBackendFixture _backend = f;

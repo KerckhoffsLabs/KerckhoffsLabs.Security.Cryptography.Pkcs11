@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security
 
 /// <summary><see cref="CryptoPolicy.FipsOnly"/> over Craton HSM — thin wrapper over <see cref="FipsOnlyPolicyTestCases"/>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class FipsOnlyPolicyTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

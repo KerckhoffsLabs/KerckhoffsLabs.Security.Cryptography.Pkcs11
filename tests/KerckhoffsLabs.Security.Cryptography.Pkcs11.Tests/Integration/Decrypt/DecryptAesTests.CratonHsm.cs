@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Decrypt;
 
 /// <summary>AES decrypt gate tests against Craton HSM.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class DecryptAesTests_CratonHsm(CratonHsmBackendFixture f)
 {
     private readonly CratonHsmBackendFixture _backend = f;

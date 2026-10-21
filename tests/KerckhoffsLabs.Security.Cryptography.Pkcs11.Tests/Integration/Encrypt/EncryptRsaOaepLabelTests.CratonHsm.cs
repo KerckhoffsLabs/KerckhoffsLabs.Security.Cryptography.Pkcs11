@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 
 /// <summary>RSA-OAEP with a label over Craton HSM — thin wrapper over <see cref="EncryptRsaOaepLabelTestCases"/>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class EncryptRsaOaepLabelTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

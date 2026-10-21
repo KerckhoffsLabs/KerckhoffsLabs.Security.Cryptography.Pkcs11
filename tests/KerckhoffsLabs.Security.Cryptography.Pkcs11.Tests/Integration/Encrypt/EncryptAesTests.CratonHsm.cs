@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 
 /// <summary>AES encrypt (CBC-PAD round-trip + ECB gate) tests against Craton HSM.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class EncryptAesTests_CratonHsm(CratonHsmBackendFixture f)
 {
     private readonly CratonHsmBackendFixture _backend = f;

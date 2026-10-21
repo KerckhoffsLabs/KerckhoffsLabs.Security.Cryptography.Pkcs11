@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 
 /// <summary>Cross-backend port of the SoftHSM2 object lifecycle integration tests, run against Craton HSM.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class ObjectLifecycleTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

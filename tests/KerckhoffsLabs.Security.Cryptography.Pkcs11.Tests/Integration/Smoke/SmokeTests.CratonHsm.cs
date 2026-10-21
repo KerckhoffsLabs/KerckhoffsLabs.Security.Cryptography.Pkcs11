@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 
 /// <summary>End-to-end smoke check against Craton HSM (shares SmokeTestAssertions with SoftHSM/opencryptoki).</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class SmokeTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

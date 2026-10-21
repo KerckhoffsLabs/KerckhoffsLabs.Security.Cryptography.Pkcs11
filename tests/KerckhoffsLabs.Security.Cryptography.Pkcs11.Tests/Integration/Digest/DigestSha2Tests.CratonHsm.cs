@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Digest;
 
 /// <summary>Cross-backend port of the SoftHSM2 SHA-2 digest integration tests, run against Craton HSM.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class DigestSha2Tests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

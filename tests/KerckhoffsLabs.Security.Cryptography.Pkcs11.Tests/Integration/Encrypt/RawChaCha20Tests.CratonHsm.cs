@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 
 /// <summary>Raw CKM_CHACHA20 over Craton HSM — thin wrapper over <see cref="RawChaCha20TestCases"/>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class RawChaCha20Tests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

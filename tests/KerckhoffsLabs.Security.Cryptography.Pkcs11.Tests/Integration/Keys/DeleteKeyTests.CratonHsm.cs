@@ -9,7 +9,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// Requires a real token to verify the object is actually gone after deletion.
 /// </summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class DeleteKeyTests_CratonHsm(CratonHsmBackendFixture f)
 {
     private readonly CratonHsmBackendFixture _backend = f;

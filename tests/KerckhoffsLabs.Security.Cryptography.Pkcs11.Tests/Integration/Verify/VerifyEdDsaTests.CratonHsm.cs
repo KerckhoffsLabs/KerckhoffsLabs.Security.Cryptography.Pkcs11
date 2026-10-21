@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Verify;
 
 /// <summary>Cross-backend port of the SoftHSM2 EdDSA verify test, run against Craton HSM.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class VerifyEdDsaTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

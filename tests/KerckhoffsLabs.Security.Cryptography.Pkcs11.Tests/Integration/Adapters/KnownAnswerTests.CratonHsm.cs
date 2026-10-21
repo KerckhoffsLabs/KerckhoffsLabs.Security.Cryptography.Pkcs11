@@ -11,7 +11,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters
 /// KnownAnswerTests.cs) take an <c>IPkcs11Backend</c>, which this fixture is.
 /// </summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class KnownAnswerTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

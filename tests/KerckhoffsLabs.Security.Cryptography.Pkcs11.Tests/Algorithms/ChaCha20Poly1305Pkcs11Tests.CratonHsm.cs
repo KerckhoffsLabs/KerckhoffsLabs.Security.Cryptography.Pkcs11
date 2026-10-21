@@ -4,7 +4,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>ChaCha20Poly1305Pkcs11 over Craton HSM — thin wrapper over <see cref="ChaCha20Poly1305Pkcs11TestCases"/>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class ChaCha20Poly1305Pkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

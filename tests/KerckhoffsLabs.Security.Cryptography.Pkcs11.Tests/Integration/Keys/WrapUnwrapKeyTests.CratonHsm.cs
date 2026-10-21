@@ -10,7 +10,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// (added in the commit range picked up after 1.5.2), but never the legacy
 /// <see cref="CKM.CKM_AES_KEY_WRAP_PAD"/>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class WrapUnwrapKeyTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

@@ -6,7 +6,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// <summary>Pkcs5Pbkd2ReferenceVectorTests over Craton HSM -- thin wrapper over
 /// <see cref="Pkcs5Pbkd2ReferenceVectorTestCases"/>.</summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class Pkcs5Pbkd2ReferenceVectorTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

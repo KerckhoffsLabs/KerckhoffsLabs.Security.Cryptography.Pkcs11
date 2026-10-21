@@ -4,7 +4,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class Pkcs11SessionFindKeysTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

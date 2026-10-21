@@ -7,7 +7,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// <see cref="EcxPublicKeyInfoTestCases"/>.
 /// </summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class EcxPublicKeyInfoTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;

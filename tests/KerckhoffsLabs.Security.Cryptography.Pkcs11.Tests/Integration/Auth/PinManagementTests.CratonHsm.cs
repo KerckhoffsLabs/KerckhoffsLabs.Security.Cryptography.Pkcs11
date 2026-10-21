@@ -10,7 +10,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 /// round-trip and always restores the shared token's user PIN.
 /// </summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class PinManagementTests_CratonHsm(CratonHsmBackendFixture f)
 {
     private readonly CratonHsmBackendFixture _backend = f;

@@ -8,7 +8,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// is not RFC 8410's (see <see cref="SupportsRfc8410PrivateKeys"/>).
 /// </summary>
 [Collection("CratonHsm")]
-[ResetCratonHsmLogin]
 public sealed class WrapUnwrapCurve25519Tests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;
