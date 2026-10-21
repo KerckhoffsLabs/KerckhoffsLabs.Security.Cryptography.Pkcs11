@@ -121,6 +121,66 @@ public sealed class AesPkcs11 : Aes
         ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> iv, Span<byte> destination, PaddingMode paddingMode, int feedbackSizeInBits, out int bytesWritten)
         => RunBlock(CfbMechanism(iv, paddingMode, feedbackSizeInBits), encrypt: false, ciphertext, destination, out bytesWritten);
 
+    // -----------------------------------------------------------------------
+    // Key wrap with padding (RFC 5649): one CKM_AES_KEY_WRAP_KWP operation on the token
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Wraps with the token's <c>CKM_AES_KEY_WRAP_KWP</c> in one encryption, which the built-in policies
+    /// allow. The base class instead runs RFC 5649 in managed code over raw AES-ECB block operations,
+    /// which the policy judges, and <c>SecureOnly</c> refuses, as ECB; that remains the path for a token
+    /// that does not advertise the mechanism.
+    /// </remarks>
+    protected override void EncryptKeyWrapPaddedCore(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        if (!_key.SupportsMechanism(CKM.CKM_AES_KEY_WRAP_KWP))
+        {
+            base.EncryptKeyWrapPaddedCore(source, destination);
+            return;
+        }
+
+        byte[] wrapped = _key.Encrypt(new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP), source);
+        if (wrapped.Length != destination.Length)
+            throw new CryptographicException($"The token returned a {wrapped.Length}-byte key wrap; expected {destination.Length} bytes.");
+        wrapped.CopyTo(destination);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Unwraps with the token's <c>CKM_AES_KEY_WRAP_KWP</c>, as <see cref="EncryptKeyWrapPaddedCore"/>
+    /// wraps. A ciphertext whose integrity check fails throws <see cref="CryptographicException"/>, as the
+    /// BCL does, with the token's error as the inner exception.
+    /// </remarks>
+    protected override int DecryptKeyWrapPaddedCore(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        if (!_key.SupportsMechanism(CKM.CKM_AES_KEY_WRAP_KWP))
+            return base.DecryptKeyWrapPaddedCore(source, destination);
+
+        byte[] unwrapped;
+        try
+        {
+            unwrapped = _key.Decrypt(new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP), source);
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_ENCRYPTED_DATA_INVALID or CKR.CKR_ENCRYPTED_DATA_LEN_RANGE)
+        {
+            throw new CryptographicException("The key wrap's integrity check failed.", ex);
+        }
+
+        try
+        {
+            if (unwrapped.Length > destination.Length)
+                throw new CryptographicException($"The token returned a {unwrapped.Length}-byte key; at most {destination.Length} bytes fit.");
+            unwrapped.CopyTo(destination);
+            return unwrapped.Length;
+        }
+        finally
+        {
+            // The unwrapped key material: the caller receives it through destination.
+            CryptographicOperations.ZeroMemory(unwrapped);
+        }
+    }
+
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
         // Empty input skips the token (some reject an empty C_Encrypt / C_Decrypt buffer), but ONLY when the

@@ -174,6 +174,71 @@ public sealed class AesPkcs11_Managed
         }
     });
 
+    // === Key wrap with padding (RFC 5649) ==================================================
+
+    // Imports Key256 on a managed token that advertises CKM_AES_KEY_WRAP_KWP or not.
+    private static void WithKwpToken(bool advertisesKwp, Action<ManagedSoftToken, Pkcs11Session, AesPkcs11> body)
+    {
+        var token = new ManagedSoftToken { AdvertisesAesKeyWrapKwp = advertisesKwp };
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(Key256).Encrypt().Decrypt().Build();
+        using var key = session.ImportKey(tpl);
+        using var aes = new AesPkcs11(key);
+        body(token, session, aes);
+    }
+
+    // On a token with CKM_AES_KEY_WRAP_KWP the wrap is one operation there, allowed by the default
+    // policy, and gives the BCL's RFC 5649 output, whatever the padding needed.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(8)]
+    [InlineData(20)]
+    [InlineData(32)]
+    public void KeyWrapPadded_IsTheTokensKwp_UnderTheDefaultPolicy_AndMatchesBcl(int keyLength) => WithKwpToken(advertisesKwp: true, (token, _, aes) =>
+    {
+        byte[] keyToWrap = RandomNumberGenerator.GetBytes(keyLength);
+        using var bcl = BclAes();
+        int initsBefore = token.EncryptInitCallCount;
+
+        byte[] wrapped = aes.EncryptKeyWrapPadded(keyToWrap);
+
+        Assert.Equal(1, token.EncryptInitCallCount - initsBefore);
+        Assert.Equal(bcl.EncryptKeyWrapPadded(keyToWrap), wrapped);
+        Assert.Equal(keyToWrap, aes.DecryptKeyWrapPadded(wrapped));
+        Assert.Equal(keyToWrap, aes.DecryptKeyWrapPadded(bcl.EncryptKeyWrapPadded(keyToWrap)));
+    });
+
+    // As in the BCL, a wrap that fails its integrity check throws CryptographicException.
+    [Fact]
+    public void DecryptKeyWrapPadded_Tampered_Throws() => WithKwpToken(advertisesKwp: true, (_, _, aes) =>
+    {
+        byte[] wrapped = aes.EncryptKeyWrapPadded(new byte[20]);
+        wrapped[^1] ^= 0x01;
+
+        var e = Assert.Throws<CryptographicException>(() => aes.DecryptKeyWrapPadded(wrapped));
+        Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, Assert.IsAssignableFrom<Pkcs11Exception>(e.InnerException).ReturnValue);
+    });
+
+    // A token without the mechanism keeps the base class's managed RFC 5649 over AES-ECB, which the
+    // policy judges as ECB: refused by default, the same output once ECB is allowed.
+    [Fact]
+    public void KeyWrapPadded_WithoutKwp_FallsBackToEcb_JudgedAsEcb() => WithKwpToken(advertisesKwp: false, (_, session, aes) =>
+    {
+        byte[] keyToWrap = RandomNumberGenerator.GetBytes(20);
+        using var bcl = BclAes();
+
+        var refused = Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptKeyWrapPadded(keyToWrap));
+        Assert.Equal(CKM.CKM_AES_ECB, refused.Mechanism);
+
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            byte[] wrapped = aes.EncryptKeyWrapPadded(keyToWrap);
+            Assert.Equal(bcl.EncryptKeyWrapPadded(keyToWrap), wrapped);
+            Assert.Equal(keyToWrap, aes.DecryptKeyWrapPadded(wrapped));
+        }
+    });
+
     // === ECB: gated, and the token's output must match the BCL once unlocked ==============
 
     [Fact]

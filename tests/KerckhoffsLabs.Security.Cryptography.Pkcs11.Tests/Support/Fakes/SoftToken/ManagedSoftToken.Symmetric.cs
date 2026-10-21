@@ -142,6 +142,13 @@ internal sealed partial class ManagedSoftToken
     private static byte[] BlockTransform(SymOp op, byte[] data, bool encrypt)
     {
         var mech = (CKM)op.Mechanism;
+        if (mech == CKM.CKM_AES_KEY_WRAP_KWP)
+        {
+            // RFC 5649 key wrap with padding; a failed integrity check throws CryptographicException.
+            using var aes = Aes.Create();
+            aes.Key = op.Key;
+            return encrypt ? aes.EncryptKeyWrapPadded(data) : aes.DecryptKeyWrapPadded(data);
+        }
         using SymmetricAlgorithm alg = CreateBlockCipher(mech);
         var (mode, padding) = MapBlockMode(mech);
         alg.Key = op.Key;

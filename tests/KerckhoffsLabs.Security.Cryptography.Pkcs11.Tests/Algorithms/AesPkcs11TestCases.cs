@@ -152,6 +152,22 @@ internal static class AesPkcs11TestCases
             Assert.Equal(plaintext, aes.DecryptEcb(ct, PaddingMode.None));
         });
 
+    // A token that advertises CKM_AES_KEY_WRAP_KWP wraps in one operation, under the default policy, and
+    // gives the BCL's RFC 5649 output; each side unwraps the other's.
+    internal static void Assert_KeyWrapPadded_UsesTheTokensKwp_AndMatchesBcl(IPkcs11Backend backend) =>
+        WithImportedAes(backend, (_, aes) =>
+        {
+            backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_KWP);
+            byte[] keyToWrap = RandomNumberGenerator.GetBytes(20);
+            using var bcl = BclAes();
+
+            byte[] wrapped = aes.EncryptKeyWrapPadded(keyToWrap);
+
+            Assert.Equal(bcl.EncryptKeyWrapPadded(keyToWrap), wrapped);
+            Assert.Equal(keyToWrap, aes.DecryptKeyWrapPadded(wrapped));
+            Assert.Equal(keyToWrap, bcl.DecryptKeyWrapPadded(wrapped));
+        });
+
     internal static void Assert_GenerateIV_ProducesBlockSizedIv(IPkcs11Backend backend) =>
         WithImportedAes(backend, (_, aes) =>
         {
