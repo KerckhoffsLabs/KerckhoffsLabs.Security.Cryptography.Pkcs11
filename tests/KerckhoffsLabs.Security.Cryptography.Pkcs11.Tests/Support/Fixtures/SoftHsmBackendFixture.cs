@@ -139,15 +139,19 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         _tokenStoreDir = OperatingSystem.IsWindows()
             ? Path.Join(Path.GetTempPath(), "sthsm-" + Guid.NewGuid().ToString("N")[..8])
             : Path.Join(nativeDir, "tokens");
+
+        // Start from an empty store. Dispose deletes it, but a run killed mid-way (a test timeout, Ctrl+C)
+        // leaves what it had: a token whose directory was created but never initialized cannot be read
+        // by softhsm2-util, so neither --delete-token nor --init-token gets past it, and every later run
+        // fails here.
+        if (Directory.Exists(_tokenStoreDir))
+            Directory.Delete(_tokenStoreDir, recursive: true);
         Directory.CreateDirectory(_tokenStoreDir);
 
         File.WriteAllText(_configPath,
             $"directories.tokendir = {_tokenStoreDir}\n" +
             "objectstore.backend = file\n" +
             "log.level = ERROR\n");
-
-        // Remove any leftover token with the same label from a previous run.
-        RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true);
 
         RunUtil("--init-token --free " +
                 $"--label \"{TokenLabel}\" " +
