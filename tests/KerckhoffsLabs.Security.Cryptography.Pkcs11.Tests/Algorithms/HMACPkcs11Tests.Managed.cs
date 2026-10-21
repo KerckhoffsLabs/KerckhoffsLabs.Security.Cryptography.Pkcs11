@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -144,6 +145,95 @@ public sealed class HMACPkcs11Tests_Managed
             Assert.Equal(BclHmac("SHA384", keyBytes, whole), streamed);
         });
     }
+
+    // The span one-shot works like ComputeHash, into a destination of exactly the MAC size or larger,
+    // and leaves the instance ready for the next computation.
+    [Theory]
+    [InlineData("SHA256", 32)]
+    [InlineData("SHA384", 48)]
+    [InlineData("SHA512", 64)]
+    public void TryComputeHash_MatchesBcl_AndTheInstanceCanBeReused(string hashName, int macLen)
+    {
+        byte[] keyBytes = RandomNumberGenerator.GetBytes(32);
+        byte[] first = Encoding.UTF8.GetBytes("first message");
+        byte[] second = Encoding.UTF8.GetBytes("second message");
+
+        WithImportedHmacKey(keyBytes, (_, key) =>
+        {
+            using var hmac = new HMACPkcs11(key, new HashAlgorithmName(hashName));
+            byte[] exact = new byte[macLen];
+            byte[] larger = new byte[macLen + 8];
+
+            Assert.True(hmac.TryComputeHash(first, exact, out int written));
+            Assert.Equal(macLen, written);
+            Assert.Equal(BclHmac(hashName, keyBytes, first), exact);
+
+            Assert.True(hmac.TryComputeHash(second, larger, out written));
+            Assert.Equal(macLen, written);
+            Assert.Equal(BclHmac(hashName, keyBytes, second), larger[..macLen]);
+        });
+    }
+
+    // A short destination is refused before any data is taken in, so the next computation is unaffected.
+    [Fact]
+    public void TryComputeHash_DestinationTooSmall_ReturnsFalse_AndBuffersNothing()
+    {
+        byte[] keyBytes = RandomNumberGenerator.GetBytes(32);
+        byte[] data = Encoding.UTF8.GetBytes("authenticated");
+
+        WithImportedHmacKey(keyBytes, (_, key) =>
+        {
+            using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA256);
+
+            Assert.False(hmac.TryComputeHash([1, 2, 3], new byte[31], out int written));
+            Assert.Equal(0, written);
+
+            Assert.Equal(BclHmac("SHA256", keyBytes, data), hmac.ComputeHash(data));
+        });
+    }
+
+    // TryComputeHash checks the size before it calls TryHashFinal, so the protected override is called
+    // directly here: it keeps HashAlgorithm's contract for any caller.
+    [Fact]
+    public void TryHashFinal_DestinationTooSmall_ReturnsFalse() => WithGeneratedHmacKey(32, (_, key) =>
+    {
+        using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA256);
+        MethodInfo tryHashFinal = typeof(HMACPkcs11).GetMethod("TryHashFinal", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        // Span arguments cannot be boxed for Invoke, so the call goes through a delegate.
+        var call = tryHashFinal.CreateDelegate<TryHashFinalCall>(hmac);
+        bool ok = call(new byte[31], out int written);
+
+        Assert.False(ok);
+        Assert.Equal(0, written);
+    });
+
+    private delegate bool TryHashFinalCall(Span<byte> destination, out int bytesWritten);
+
+    // A MAC of another length than the hash's is the token's fault, and is not passed off as a result.
+    [Fact]
+    public void TryComputeHash_TokenMacOfTheWrongLength_Throws()
+    {
+        var token = new ManagedSoftToken { SignatureOverride = mac => mac[..^1] };
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Sign().Build();
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA256);
+
+        var ex = Assert.Throws<CryptographicException>(() => hmac.TryComputeHash([1, 2, 3], new byte[32], out _));
+        Assert.Contains("31-byte HMAC", ex.Message, StringComparison.Ordinal);
+    }
+
+    // The MAC is always computed with the token key, so raw key bytes can be neither read nor substituted.
+    [Fact]
+    public void Key_CanNeitherBeReadNorReplaced() => WithGeneratedHmacKey(32, (_, key) =>
+    {
+        using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA256);
+
+        Assert.Throws<NotSupportedException>(() => hmac.Key);
+        Assert.Throws<NotSupportedException>(() => hmac.Key = new byte[32]);
+    });
 
     // SHA-1 HMAC is insecure-by-default (CKM_SHA_1_HMAC); it requires the AllowInsecure policy. This also
     // covers the SHA1 branch of the internal hash-size mapping.

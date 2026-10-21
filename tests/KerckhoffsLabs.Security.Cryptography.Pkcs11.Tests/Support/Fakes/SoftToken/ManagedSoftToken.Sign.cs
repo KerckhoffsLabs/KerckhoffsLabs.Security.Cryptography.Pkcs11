@@ -14,6 +14,10 @@ internal sealed partial class ManagedSoftToken
     private readonly Dictionary<ulong, SignOp> _signOps = [];
     private readonly Dictionary<ulong, SignOp> _verifyOps = [];
 
+    /// <summary>When set, replaces what <c>C_Sign</c> returns — lets tests exercise a token whose
+    /// signature or MAC is not the length the mechanism produces.</summary>
+    public Func<byte[], byte[]>? SignatureOverride { get; set; }
+
     private readonly record struct SignOp(ulong Mechanism, ulong Key, byte[] Context);
 
     protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
@@ -65,6 +69,7 @@ internal sealed partial class ManagedSoftToken
         }
         catch (CryptographicException) { _signOps.Remove((ulong)session); return CKR.CKR_FUNCTION_FAILED; }
 
+        if (SignatureOverride is { } replace) sig = replace(sig);
         if (signature.IsNull) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_OK; }
         if (signature.Span.Length < sig.Length) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
