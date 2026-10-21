@@ -77,7 +77,11 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
         _targetCopyPath = Path.Join(_gateDir, Path.GetFileName(softHsmPath));
         File.Copy(softHsmPath, _targetCopyPath, overwrite: true);
 
+        // From an empty store, for the reason SoftHsmBackendFixture gives: a killed run can leave a token
+        // that softhsm2-util can neither delete nor initialize over.
         string tokenStoreDir = Path.Join(_gateDir, "tokens");
+        if (Directory.Exists(tokenStoreDir))
+            Directory.Delete(tokenStoreDir, recursive: true);
         Directory.CreateDirectory(tokenStoreDir);
         _configPath = Path.Join(_gateDir, "softhsm2.conf");
         File.WriteAllText(_configPath,
@@ -85,7 +89,6 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
             "objectstore.backend = file\n" +
             "log.level = ERROR\n");
 
-        RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true);
         RunUtil("--init-token --free " +
                 $"--label \"{TokenLabel}\" " +
                 $"--so-pin \"{Settings.SoPin}\" " +
