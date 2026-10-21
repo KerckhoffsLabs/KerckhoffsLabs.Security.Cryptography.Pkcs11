@@ -26,6 +26,19 @@ internal static class Oids
     }
 
     /// <summary>
+    /// Hash <c>AlgorithmIdentifier</c> OIDs: the <c>digestAlgorithm</c> of a PKCS#1 v1.5 <c>DigestInfo</c>
+    /// (RFC 8017 Appendix B.1).
+    /// </summary>
+    internal static class HashAlgorithms
+    {
+        internal const string Sha1 = "1.3.14.3.2.26";
+        internal const string Sha224 = "2.16.840.1.101.3.4.2.4";
+        internal const string Sha256 = "2.16.840.1.101.3.4.2.1";
+        internal const string Sha384 = "2.16.840.1.101.3.4.2.2";
+        internal const string Sha512 = "2.16.840.1.101.3.4.2.3";
+    }
+
+    /// <summary>
     /// <i>namedCurve</i> OIDs: the <c>CKA_EC_PARAMS</c> value of a key on the curve, and the parameters of an
     /// <c>id-ecPublicKey</c> <c>SubjectPublicKeyInfo</c>.
     /// </summary>

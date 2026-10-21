@@ -107,8 +107,9 @@ public sealed class RSAPkcs11 : RSA
     /// <remarks>
     /// Byte-array entry-point — the .NET 10 BCL routes <c>SignData(byte[], …)</c> through
     /// here, NOT through <see cref="TrySignData"/>. Without this override the default
-    /// implementation calls the unimplemented <c>SignHash(byte[], …)</c> and throws
-    /// <see cref="NotImplementedException"/>.
+    /// implementation would hash in managed code and sign the digest with
+    /// <see cref="SignHash(byte[], HashAlgorithmName, RSASignaturePadding)"/>, through the raw mechanisms
+    /// rather than the combined one that hashes on the token.
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="offset"/> or <paramref name="count"/> is negative or outside the bounds of <paramref name="data"/>.</exception>
@@ -129,6 +130,25 @@ public sealed class RSAPkcs11 : RSA
 
         var mech = SignMechanismFor(hashAlgorithm, padding);
         return _key.Sign(mech, data.AsSpan(offset, count));
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Hashes <paramref name="data"/> in managed code, as the BCL does, and signs the digest with
+    /// <see cref="SignHash(byte[], HashAlgorithmName, RSASignaturePadding)"/>, under its policy.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>, or <paramref name="hashAlgorithm"/> has no name.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="padding"/> or <paramref name="hashAlgorithm"/> is not supported.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses the hash or the mechanism.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
+    public override byte[] SignData(Stream data, HashAlgorithmName hashAlgorithm, RSASignaturePadding padding)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ThrowIfNoHashName(hashAlgorithm);
+        ArgumentNullException.ThrowIfNull(padding);
+
+        GuardHash(hashAlgorithm, CryptoOperation.Sign);
+        return SignHash(base.HashData(data, hashAlgorithm), hashAlgorithm, padding);
     }
 
     // -----------------------------------------------------------------------
@@ -180,6 +200,74 @@ public sealed class RSAPkcs11 : RSA
 
         var mech = SignMechanismFor(hashAlgorithm, padding);
         return _key.Verify(mech, data.AsSpan(offset, count), signature);
+    }
+
+    // -----------------------------------------------------------------------
+    // Signing a digest — RSASSA-PKCS1-v1_5 over a DigestInfo, or CKM_RSA_PKCS_PSS
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Signs a digest the caller computed. PKCS#1 v1.5 is raw <c>CKM_RSA_PKCS</c> over the DER DigestInfo
+    /// (RFC 8017 §9.2), which the session's policy judges as the combined mechanism for the hash
+    /// (<c>CKM_SHA256_RSA_PKCS</c> for SHA-256): the verdict <c>SignData</c> gets for the same scheme. PSS is
+    /// <c>CKM_RSA_PKCS_PSS</c> with the hash and a salt of its length in the parameters. The hash itself is
+    /// put to the policy too. <see cref="RSA.TrySignHash"/> and the <see cref="Stream"/> overloads come here.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="hash"/> or <paramref name="padding"/> is <see langword="null"/>, or <paramref name="hashAlgorithm"/> has no name.</exception>
+    /// <exception cref="CryptographicException"><paramref name="hash"/> is not the length of a <paramref name="hashAlgorithm"/> digest.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="padding"/> or <paramref name="hashAlgorithm"/> is not supported.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses the hash or the mechanism.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
+    public override byte[] SignHash(byte[] hash, HashAlgorithmName hashAlgorithm, RSASignaturePadding padding)
+    {
+        ArgumentNullException.ThrowIfNull(hash);
+        ThrowIfNoHashName(hashAlgorithm);
+        ArgumentNullException.ThrowIfNull(padding);
+
+        GuardHash(hashAlgorithm, CryptoOperation.Sign);
+        if (hash.Length != DigestLength(hashAlgorithm))
+            throw new CryptographicException($"The hash is {hash.Length} bytes; a {hashAlgorithm.Name} digest is {DigestLength(hashAlgorithm)}.");
+
+        return padding == RSASignaturePadding.Pkcs1
+            ? _key.SignPkcs1Digest(hashAlgorithm, hash)
+            : _key.Sign(PssDigestMechanism(hashAlgorithm, padding), hash);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The counterpart of <see cref="SignHash(byte[], HashAlgorithmName, RSASignaturePadding)"/>, under
+    /// the same policy. A <paramref name="hash"/> of another length than the algorithm's digest does not
+    /// verify. <see cref="RSA.VerifyHash(ReadOnlySpan{byte}, ReadOnlySpan{byte}, HashAlgorithmName, RSASignaturePadding)"/>
+    /// and <see cref="RSA.VerifyData(Stream, byte[], HashAlgorithmName, RSASignaturePadding)"/> come here too.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="hash"/>, <paramref name="signature"/> or <paramref name="padding"/> is <see langword="null"/>, or <paramref name="hashAlgorithm"/> has no name.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="padding"/> or <paramref name="hashAlgorithm"/> is not supported.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses the hash or the mechanism.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
+    public override bool VerifyHash(byte[] hash, byte[] signature, HashAlgorithmName hashAlgorithm, RSASignaturePadding padding)
+    {
+        ArgumentNullException.ThrowIfNull(hash);
+        ArgumentNullException.ThrowIfNull(signature);
+        ThrowIfNoHashName(hashAlgorithm);
+        ArgumentNullException.ThrowIfNull(padding);
+
+        GuardHash(hashAlgorithm, CryptoOperation.Verify);
+        if (hash.Length != DigestLength(hashAlgorithm))
+            return false;
+
+        return padding == RSASignaturePadding.Pkcs1
+            ? _key.VerifyPkcs1Digest(hashAlgorithm, hash, signature)
+            : _key.Verify(PssDigestMechanism(hashAlgorithm, padding), hash, signature);
+    }
+
+    // Reached only by the non-virtual VerifyData(Stream, ...): the Stream signing overload above hashes
+    // itself, so this can name the operation.
+    /// <inheritdoc/>
+    protected override byte[] HashData(Stream data, HashAlgorithmName hashAlgorithm)
+    {
+        GuardHash(hashAlgorithm, CryptoOperation.Verify);
+        return base.HashData(data, hashAlgorithm);
     }
 
     // -----------------------------------------------------------------------
@@ -287,6 +375,38 @@ public sealed class RSAPkcs11 : RSA
             return Pkcs11MechanismMap.RsaPssSign(hash, saltLength: -1);
         throw new NotSupportedException($"Unsupported RSA signature padding: {padding}.");
     }
+
+    // As the BCL: a missing name is an ArgumentNullException and an empty one an ArgumentException, both
+    // naming hashAlgorithm rather than its Name.
+    private static void ThrowIfNoHashName(HashAlgorithmName hashAlgorithm)
+    {
+        if (hashAlgorithm.Name is null)
+            throw new ArgumentNullException(nameof(hashAlgorithm));
+        if (hashAlgorithm.Name.Length == 0)
+            throw new ArgumentException("The value cannot be an empty string.", nameof(hashAlgorithm));
+    }
+
+    // The combined mechanisms carry the hash, so the policy judges it there; a digest the caller computed
+    // reaches the token through a raw mechanism, so the hash is put to the policy on its own.
+    private void GuardHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
+        => _key.Session.Enforce(new HashUseRequest(hashAlgorithm, operation));
+
+    private static int DigestLength(HashAlgorithmName hash) => hash.Name switch
+    {
+        "SHA1" => 20,
+        "SHA224" => 28,
+        "SHA256" => 32,
+        "SHA384" => 48,
+        "SHA512" => 64,
+        _ => throw new NotSupportedException($"RSA does not support hash {hash.Name}."),
+    };
+
+    // CKM_RSA_PKCS_PSS over a digest, with the parameters the combined PSS mechanism would carry: the
+    // hash, its MGF1, and a salt of the hash's length, as the BCL's Pss uses.
+    private static Mechanism PssDigestMechanism(HashAlgorithmName hashAlgorithm, RSASignaturePadding padding)
+        => padding.Mode == RSASignaturePaddingMode.Pss
+            ? new Mechanism(CKM.CKM_RSA_PKCS_PSS, Pkcs11MechanismMap.RsaPssSign(hashAlgorithm, saltLength: -1).Parameters!)
+            : throw new NotSupportedException($"Unsupported RSA signature padding: {padding}.");
 
     private static Mechanism EncryptMechanismFor(RSAEncryptionPadding padding)
     {

@@ -12,8 +12,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 #pragma warning disable KLPKCS11008
 // SHA-1 mechanisms are used on purpose: the synthesis tests cover every mapped mechanism, and the
 // policy tests pin that the managed fallback refuses them under SecureOnly (and allows legacy
-// verification under FipsOnly).
-#pragma warning disable KLPKCS11009
+// verification under FipsOnly), and that PKCS#1 v1.5 over a SHA-1 digest is refused.
+#pragma warning disable KLPKCS11009, KLPKCS11010
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -121,6 +121,10 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
             () => key.Verify(new Mechanism(CKM.CKM_SHA256_RSA_PKCS), Data, new byte[256]));
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+
+        var digest = Assert.ThrowsAny<Pkcs11Exception>(
+            () => key.VerifyPkcs1Digest(HashAlgorithmName.SHA256, new byte[32], new byte[256]));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, digest.ReturnValue);
     }
 
     // === EC ==================================================================
@@ -254,6 +258,26 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         Pkcs11Key key = fake;
 
         Assert.True(key.Verify(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS), Data, signature));
+    }
+
+    // PKCS#1 v1.5 over a caller's digest takes the same fallback on a private-only key, judged as the
+    // combined mechanism: allowed for SHA-256 under SecureOnly, refused for SHA-1.
+    [Fact]
+    public void ManagedFallback_Pkcs1DigestVerification_IsJudgedAsTheCombinedMechanism()
+    {
+        using var rsa = RSA.Create(2048);
+        byte[] digest = SHA256.HashData(Data);
+        byte[] signature = rsa.SignHash(digest, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
+        Pkcs11Key key = fake;
+
+        Assert.True(key.VerifyPkcs1Digest(HashAlgorithmName.SHA256, digest, signature));
+        signature[0] ^= 0xFF;
+        Assert.False(key.VerifyPkcs1Digest(HashAlgorithmName.SHA256, digest, signature));
+
+        var e = Assert.Throws<CryptoPolicyViolationException>(
+            () => key.VerifyPkcs1Digest(HashAlgorithmName.SHA1, SHA1.HashData(Data), signature));
+        Assert.Equal(CKM.CKM_SHA1_RSA_PKCS, e.Mechanism);
     }
 
     [Fact]
