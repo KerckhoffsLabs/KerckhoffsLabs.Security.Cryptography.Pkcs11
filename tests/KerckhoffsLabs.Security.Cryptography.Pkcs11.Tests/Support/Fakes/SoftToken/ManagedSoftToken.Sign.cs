@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -18,7 +19,8 @@ internal sealed partial class ManagedSoftToken
     /// signature or MAC is not the length the mechanism produces.</summary>
     public Func<byte[], byte[]>? SignatureOverride { get; set; }
 
-    private readonly record struct SignOp(ulong Mechanism, ulong Key, byte[] Context);
+    // PssHash: for CKM_RSA_PKCS_PSS, the hash its parameters name.
+    private readonly record struct SignOp(ulong Mechanism, ulong Key, byte[] Context, HashAlgorithmName PssHash = default);
 
     protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         => InitSignOp(_signOps, (ulong)session, ref mechanism, (ulong)key);
@@ -34,8 +36,29 @@ internal sealed partial class ManagedSoftToken
         if (!_objects.ContainsKey(key)) return CKR.CKR_KEY_HANDLE_INVALID;
 
         byte[] context = IsPqcSign(m) ? ReadPqcContext(ref mech) : [];
-        store[session] = new SignOp((ulong)m, key, context);
+        HashAlgorithmName pssHash = default;
+        if (m == CKM.CKM_RSA_PKCS_PSS && !TryReadPssHash(ref mech, out pssHash))
+            return CKR.CKR_MECHANISM_PARAM_INVALID;
+        store[session] = new SignOp((ulong)m, key, context, pssHash);
         return CKR.CKR_OK;
+    }
+
+    // The BCL's PSS uses MGF1 with the message hash and a salt of the hash's length, so other parameters
+    // cannot be honoured and are refused.
+    private static bool TryReadPssHash(ref CK_MECHANISM mech, out HashAlgorithmName hash)
+    {
+        hash = default;
+        if (mech.Parameter == IntPtr.Zero) return false;
+        var p = UnmanagedMemory.Read<CK_RSA_PKCS_PSS_PARAMS>(mech.Parameter);
+        (hash, CKG mgf, int length) = (CKM)(ulong)p.HashAlg switch
+        {
+            CKM.CKM_SHA_1 => (HashAlgorithmName.SHA1, CKG.CKG_MGF1_SHA1, 20),
+            CKM.CKM_SHA256 => (HashAlgorithmName.SHA256, CKG.CKG_MGF1_SHA256, 32),
+            CKM.CKM_SHA384 => (HashAlgorithmName.SHA384, CKG.CKG_MGF1_SHA384, 48),
+            CKM.CKM_SHA512 => (HashAlgorithmName.SHA512, CKG.CKG_MGF1_SHA512, 64),
+            _ => (default, default, -1),
+        };
+        return length > 0 && (CKG)(ulong)p.Mgf == mgf && (ulong)p.Len == (ulong)length;
     }
 
     private static byte[] ReadPqcContext(ref CK_MECHANISM mech)
@@ -64,7 +87,9 @@ internal sealed partial class ManagedSoftToken
             else
             {
                 if (!_asymKeys.TryGetValue(op.Key, out var alg)) return CKR.CKR_KEY_HANDLE_INVALID;
-                sig = IsPqcSign(m) ? PqcSign(m, alg, input, op.Context) : AsymSign(m, (AsymmetricAlgorithm)alg, input);
+                sig = IsPqcSign(m) ? PqcSign(m, alg, input, op.Context)
+                    : IsRawRsaSign(m) ? RawRsaSign(m, (RSA)alg, input, op.PssHash)
+                    : AsymSign(m, (AsymmetricAlgorithm)alg, input);
             }
         }
         catch (CryptographicException) { _signOps.Remove((ulong)session); return CKR.CKR_FUNCTION_FAILED; }
@@ -99,7 +124,9 @@ internal sealed partial class ManagedSoftToken
             else
             {
                 if (!_asymKeys.TryGetValue(op.Key, out var alg)) return CKR.CKR_KEY_HANDLE_INVALID;
-                ok = IsPqcSign(m) ? PqcVerify(m, alg, input, sig, op.Context) : AsymVerify(m, (AsymmetricAlgorithm)alg, input, sig);
+                ok = IsPqcSign(m) ? PqcVerify(m, alg, input, sig, op.Context)
+                    : IsRawRsaSign(m) ? RawRsaVerify(m, (RSA)alg, input, sig, op.PssHash)
+                    : AsymVerify(m, (AsymmetricAlgorithm)alg, input, sig);
             }
         }
         catch (CryptographicException) { return CKR.CKR_SIGNATURE_INVALID; }
@@ -119,7 +146,9 @@ internal sealed partial class ManagedSoftToken
     private static bool IsDsaSign(CKM m) => m is
         CKM.CKM_DSA or CKM.CKM_DSA_SHA1 or CKM.CKM_DSA_SHA256 or CKM.CKM_DSA_SHA384 or CKM.CKM_DSA_SHA512;
 
-    private static bool IsAsymSign(CKM m) => IsEcdsaSign(m) || IsRsaSign(m) || IsDsaSign(m);
+    private static bool IsRawRsaSign(CKM m) => m is CKM.CKM_RSA_PKCS or CKM.CKM_RSA_PKCS_PSS;
+
+    private static bool IsAsymSign(CKM m) => IsEcdsaSign(m) || IsRsaSign(m) || IsDsaSign(m) || IsRawRsaSign(m);
 
     private static byte[] AsymSign(CKM m, AsymmetricAlgorithm alg, byte[] input) => m switch
     {
@@ -163,6 +192,53 @@ internal sealed partial class ManagedSoftToken
     {
         var (hash, padding) = RsaHashPadding(m);
         return rsa.VerifyData(data, sig, hash, padding);
+    }
+
+    // Raw RSA signing over a caller-computed digest. CKM_RSA_PKCS signs a DER DigestInfo; the BCL signs a
+    // digest only together with its hash, so the DigestInfo is read back into one, which gives the same
+    // signature. A DigestInfo that does not parse fails like any other bad input.
+    private static byte[] RawRsaSign(CKM m, RSA rsa, byte[] input, HashAlgorithmName pssHash)
+    {
+        if (m == CKM.CKM_RSA_PKCS_PSS)
+            return rsa.SignHash(input, pssHash, RSASignaturePadding.Pss);
+        var (hash, digest) = ReadDigestInfo(input);
+        return rsa.SignHash(digest, hash, RSASignaturePadding.Pkcs1);
+    }
+
+    private static bool RawRsaVerify(CKM m, RSA rsa, byte[] input, byte[] sig, HashAlgorithmName pssHash)
+    {
+        if (m == CKM.CKM_RSA_PKCS_PSS)
+            return rsa.VerifyHash(input, sig, pssHash, RSASignaturePadding.Pss);
+        var (hash, digest) = ReadDigestInfo(input);
+        return rsa.VerifyHash(digest, sig, hash, RSASignaturePadding.Pkcs1);
+    }
+
+    private static (HashAlgorithmName Hash, byte[] Digest) ReadDigestInfo(byte[] digestInfo)
+    {
+        try
+        {
+            var reader = new AsnReader(digestInfo, AsnEncodingRules.DER);
+            AsnReader info = reader.ReadSequence();
+            reader.ThrowIfNotEmpty();
+            AsnReader algorithm = info.ReadSequence();
+            HashAlgorithmName hash = algorithm.ReadObjectIdentifier() switch
+            {
+                "1.3.14.3.2.26" => HashAlgorithmName.SHA1,
+                "2.16.840.1.101.3.4.2.1" => HashAlgorithmName.SHA256,
+                "2.16.840.1.101.3.4.2.2" => HashAlgorithmName.SHA384,
+                "2.16.840.1.101.3.4.2.3" => HashAlgorithmName.SHA512,
+                var oid => throw new CryptographicException($"ManagedSoftToken: unsupported DigestInfo hash {oid}."),
+            };
+            algorithm.ReadNull();
+            algorithm.ThrowIfNotEmpty();
+            byte[] digest = info.ReadOctetString();
+            info.ThrowIfNotEmpty();
+            return (hash, digest);
+        }
+        catch (AsnContentException e)
+        {
+            throw new CryptographicException("ManagedSoftToken: malformed DigestInfo.", e);
+        }
     }
 
     private static (HashAlgorithmName hash, RSASignaturePadding padding) RsaHashPadding(CKM m) => m switch

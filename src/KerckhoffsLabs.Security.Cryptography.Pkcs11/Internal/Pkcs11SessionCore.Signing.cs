@@ -24,7 +24,36 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(mechanism);
         Enforce(mechanism, CryptoOperation.Sign);
+        return SignAfterPolicyCheck(mechanism, keyHandle, data);
+    }
 
+    /// <summary>
+    /// Signs a digest the caller computed with RSASSA-PKCS1-v1_5: raw <c>CKM_RSA_PKCS</c> over the
+    /// DigestInfo this method encodes, which the policy judges as the combined mechanism for
+    /// <paramref name="hash"/> (<c>CKM_SHA256_RSA_PKCS</c> for SHA-256), the scheme the operation is.
+    /// Raw <c>CKM_RSA_PKCS</c> keeps its own verdict through <see cref="Sign"/>, which signs any input.
+    /// </summary>
+    /// <exception cref="CryptoPolicyViolationException">The policy refuses the combined mechanism for signing.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="hash"/> is not supported.</exception>
+    /// <exception cref="CryptographicException"><paramref name="digest"/> is not the length of a <paramref name="hash"/> digest.</exception>
+    internal byte[] SignPkcs1Digest(HashAlgorithmName hash, ObjectHandle keyHandle, ReadOnlySpan<byte> digest)
+    {
+        using var _ = AcquireExclusive();
+
+        (CKM scheme, byte[] digestInfo) = Pkcs1DigestInfo.Encode(hash, digest);
+        Enforce(new Mechanism(scheme), CryptoOperation.Sign);
+        return SignAfterPolicyCheck(RawRsaPkcs1(), keyHandle, digestInfo);
+    }
+
+    // KLPKCS11008 warns a caller who selects CKM_RSA_PKCS, for its PKCS#1 v1.5 encryption. The two methods
+    // above sign and verify only the DigestInfo they encode, under the verdict on the combined signature
+    // scheme, so this is the one place the library names it for that.
+#pragma warning disable KLPKCS11008
+    private static Mechanism RawRsaPkcs1() => new(CKM.CKM_RSA_PKCS);
+#pragma warning restore KLPKCS11008
+
+    private byte[] SignAfterPolicyCheck(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
+    {
         Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
 
         using var scope = new SessionParameterScope(this);
@@ -62,25 +91,8 @@ internal sealed partial class Pkcs11SessionCore
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
-
-
         Enforce(mechanism, CryptoOperation.Verify);
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
-
-        using var scope = new SessionParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
-
-        using var operation = BeginOperation("Verify");
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
-
-        rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
-        operation.Completed(); // C_Verify ends the operation whatever it returns
-        bool isValid = IsVerified(rv, OpVerify);
-
-        mechanism.AbsorbOutput(mechParams);
-        return isValid;
+        return VerifyAfterPolicyCheck(mechanism, keyHandle, data, signature);
     }
 
     /// <summary>
@@ -172,6 +184,42 @@ internal sealed partial class Pkcs11SessionCore
         // the call failed with any other CKR — the verify operation is consumed.
         operation.Completed();
         bool isValid = IsVerified(rv, OpVerifyFinal);
+
+        mechanism.AbsorbOutput(mechParams);
+        return isValid;
+    }
+
+    /// <summary>
+    /// Verifies an RSASSA-PKCS1-v1_5 signature over a digest the caller computed, judged as
+    /// <see cref="SignPkcs1Digest"/> signs: raw <c>CKM_RSA_PKCS</c> over the DigestInfo this method
+    /// encodes, under the policy's verdict on the combined mechanism for <paramref name="hash"/>.
+    /// </summary>
+    /// <exception cref="CryptoPolicyViolationException">The policy refuses the combined mechanism for verification.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="hash"/> is not supported.</exception>
+    /// <exception cref="CryptographicException"><paramref name="digest"/> is not the length of a <paramref name="hash"/> digest.</exception>
+    internal bool VerifyPkcs1Digest(HashAlgorithmName hash, ObjectHandle keyHandle, ReadOnlySpan<byte> digest, ReadOnlySpan<byte> signature)
+    {
+        using var _ = AcquireExclusive();
+
+        (CKM scheme, byte[] digestInfo) = Pkcs1DigestInfo.Encode(hash, digest);
+        Enforce(new Mechanism(scheme), CryptoOperation.Verify);
+        return VerifyAfterPolicyCheck(RawRsaPkcs1(), keyHandle, digestInfo, signature);
+    }
+
+    private bool VerifyAfterPolicyCheck(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
+    {
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
+
+        using var scope = new SessionParameterScope(this);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
+
+        using var operation = BeginOperation("Verify");
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
+
+        rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
+        operation.Completed(); // C_Verify ends the operation whatever it returns
+        bool isValid = IsVerified(rv, OpVerify);
 
         mechanism.AbsorbOutput(mechParams);
         return isValid;

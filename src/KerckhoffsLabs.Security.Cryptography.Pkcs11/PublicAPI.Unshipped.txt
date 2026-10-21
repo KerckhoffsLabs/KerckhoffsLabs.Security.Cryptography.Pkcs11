@@ -1806,9 +1806,12 @@ override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.Encryp
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.ExportParameters(bool includePrivateParameters) -> System.Security.Cryptography.RSAParameters
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.ImportParameters(System.Security.Cryptography.RSAParameters parameters) -> void
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.SignData(byte[]! data, int offset, int count, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding! padding) -> byte[]!
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.SignData(System.IO.Stream! data, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding! padding) -> byte[]!
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.SignHash(byte[]! hash, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding! padding) -> byte[]!
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.TrySignData(System.ReadOnlySpan<byte> data, System.Span<byte> destination, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding! padding, out int bytesWritten) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.VerifyData(byte[]! data, int offset, int count, byte[]! signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding! padding) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.VerifyData(System.ReadOnlySpan<byte> data, System.ReadOnlySpan<byte> signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding! padding) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11.VerifyHash(byte[]! hash, byte[]! signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding! padding) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SHA1Pkcs11.Initialize() -> void
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SHA256Pkcs11.Initialize() -> void
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SHA384Pkcs11.Initialize() -> void

@@ -7,10 +7,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
-// These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
-// secure-defaults policy check is the behaviour under test), so the compile-time warning is suppressed
-// for this file only — the per-id suppression the diagnostic exists to enable.
-#pragma warning disable KLPKCS11008
+// These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths and SHA-1 signing on purpose (the
+// runtime secure-defaults policy check is the behaviour under test), so the compile-time warnings are
+// suppressed for this file only — the per-id suppression the diagnostics exist to enable.
+#pragma warning disable KLPKCS11008, KLPKCS11010
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -187,6 +187,182 @@ public sealed class RSAPkcs11Tests_Managed
     public void VerifyData_Span_NullPadding_Throws() => WithRsa((_, rsa) =>
         Assert.Throws<ArgumentNullException>(() =>
             rsa.VerifyData(new byte[4].AsSpan(), new byte[256].AsSpan(), HashAlgorithmName.SHA256, null!)));
+
+    // === Signing a digest: SignHash / VerifyHash and the Stream overloads ===
+
+    public static TheoryData<string> DigestHashes => ["SHA256", "SHA384", "SHA512"];
+
+    private static RSA BclPublic(RSAPkcs11 rsa)
+    {
+        var bcl = RSA.Create();
+        bcl.ImportParameters(rsa.ExportParameters(false));
+        return bcl;
+    }
+
+    // A PSS signature over a digest verifies on the token and in the BCL, and the BCL's verifies on the token.
+    [Theory]
+    [MemberData(nameof(DigestHashes))]
+    public void SignHash_Pss_RoundTrips_AndInteropsWithBcl(string hashName) => WithRsa((_, rsa) =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        byte[] digest = CryptographicOperations.HashData(hash, Encoding.UTF8.GetBytes("a digest to sign"));
+        using RSA bcl = BclPublic(rsa);
+
+        byte[] sig = rsa.SignHash(digest, hash, RSASignaturePadding.Pss);
+
+        Assert.Equal(256, sig.Length);
+        Assert.True(rsa.VerifyHash(digest, sig, hash, RSASignaturePadding.Pss));
+        Assert.True(bcl.VerifyHash(digest, sig, hash, RSASignaturePadding.Pss));
+
+        byte[] tampered = [.. digest];
+        tampered[0] ^= 0xFF;
+        Assert.False(rsa.VerifyHash(tampered, sig, hash, RSASignaturePadding.Pss));
+    });
+
+    // SignData hashes on the token and SignHash signs the caller's digest: the signatures interoperate.
+    [Fact]
+    public void SignHash_Pss_AndSignData_VerifyEachOther() => WithRsa((_, rsa) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("signed both ways");
+        byte[] digest = SHA256.HashData(data);
+
+        byte[] overData = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        byte[] overDigest = rsa.SignHash(digest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+
+        Assert.True(rsa.VerifyHash(digest, overData, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        Assert.True(rsa.VerifyData(data, overDigest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+    });
+
+    // PKCS#1 v1.5 over a digest is judged as the scheme it is, the combined mechanism for the hash, so the
+    // default policy allows it as it allows SignData; the scheme is deterministic, so the signatures match.
+    [Theory]
+    [MemberData(nameof(DigestHashes))]
+    public void SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(string hashName) => WithRsa((_, rsa) =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        byte[] data = Encoding.UTF8.GetBytes("pkcs1 over a digest");
+        byte[] digest = CryptographicOperations.HashData(hash, data);
+        byte[] overData = rsa.SignData(data, hash, RSASignaturePadding.Pkcs1);
+        using RSA bcl = BclPublic(rsa);
+
+        Assert.Equal(overData, rsa.SignHash(digest, hash, RSASignaturePadding.Pkcs1));
+        Assert.True(rsa.VerifyHash(digest, overData, hash, RSASignaturePadding.Pkcs1));
+        Assert.True(bcl.VerifyHash(digest, overData, hash, RSASignaturePadding.Pkcs1));
+    });
+
+    // Judged as CKM_SHA1_RSA_PKCS, PKCS#1 v1.5 over a SHA-1 digest is refused as SignData's would be.
+    [Fact]
+    public void SignHash_Pkcs1_Sha1_IsRefused() => WithRsa((_, rsa) =>
+        Assert.Throws<CryptoPolicyViolationException>(
+            () => rsa.SignHash(SHA1.HashData([1, 2, 3]), HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1)));
+
+    // The adapter's DigestInfo path does not open raw CKM_RSA_PKCS: signing arbitrary input with it is
+    // still refused by the default policy.
+    [Fact]
+    public void RawRsaPkcs_IsStillRefused_ForAnyOtherCaller()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var key = session.GenerateRsaSigningKeyPair(modulusBits: 2048);
+
+        var e = Assert.Throws<CryptoPolicyViolationException>(() => key.Sign(new Mechanism(CKM.CKM_RSA_PKCS), new byte[51]));
+        Assert.Equal(CKM.CKM_RSA_PKCS, e.Mechanism);
+    }
+
+    [Fact]
+    public void Stream_Pkcs1_UnderTheDefaultPolicy_RoundTrips() => WithRsa((_, rsa) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("streamed pkcs1");
+        using var toSign = new MemoryStream(data);
+        using var toVerify = new MemoryStream(data);
+
+        byte[] sig = rsa.SignData(toSign, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+        Assert.Equal(rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1), sig);
+        Assert.True(rsa.VerifyData(toVerify, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+    });
+
+    // The token sees only a raw mechanism, so the hash is put to the policy on its own.
+    [Fact]
+    public void SignHash_Sha1_IsRefusedByThePolicy() => WithRsa((_, rsa) =>
+    {
+        byte[] digest = SHA1.HashData([1, 2, 3]);
+
+        var e = Assert.Throws<CryptoPolicyViolationException>(() => rsa.SignHash(digest, HashAlgorithmName.SHA1, RSASignaturePadding.Pss));
+        Assert.Equal(HashAlgorithmName.SHA1, Assert.IsType<HashUseRequest>(e.Request).Hash);
+    });
+
+    // As the BCL: a digest of the wrong length cannot be signed, and does not verify.
+    [Fact]
+    public void SignHash_DigestOfTheWrongLength_Throws_AndDoesNotVerify() => WithRsa((_, rsa) =>
+    {
+        byte[] sig = rsa.SignHash(new byte[32], HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+
+        Assert.Throws<CryptographicException>(() => rsa.SignHash(new byte[31], HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        Assert.False(rsa.VerifyHash(new byte[31], sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+    });
+
+    // The BCL's argument checks, in its order: the hash, the hash name, then the padding.
+    [Fact]
+    public void SignHash_VerifyHash_ArgumentErrors_MatchTheBcl() => WithRsa((_, rsa) =>
+    {
+        byte[] digest = new byte[32];
+        var sha256 = HashAlgorithmName.SHA256;
+        var pss = RSASignaturePadding.Pss;
+
+        Assert.Equal("hash", Assert.Throws<ArgumentNullException>(() => rsa.SignHash(null!, default, null!)).ParamName);
+        Assert.Equal("hashAlgorithm", Assert.Throws<ArgumentNullException>(() => rsa.SignHash(digest, default, null!)).ParamName);
+        Assert.Equal("hashAlgorithm", Assert.Throws<ArgumentException>(() => rsa.SignHash(digest, new HashAlgorithmName(""), pss)).ParamName);
+        Assert.Equal("padding", Assert.Throws<ArgumentNullException>(() => rsa.SignHash(digest, sha256, null!)).ParamName);
+        Assert.Equal("signature", Assert.Throws<ArgumentNullException>(() => rsa.VerifyHash(digest, null!, sha256, pss)).ParamName);
+        Assert.Equal("padding", Assert.Throws<ArgumentNullException>(() => rsa.VerifyHash(digest, new byte[256], sha256, null!)).ParamName);
+    });
+
+    [Fact]
+    public void TrySignHash_And_SpanVerifyHash_Work() => WithRsa((_, rsa) =>
+    {
+        byte[] digest = SHA256.HashData([4, 5, 6]);
+        byte[] destination = new byte[256];
+
+        Assert.False(rsa.TrySignHash(digest, new byte[255], HashAlgorithmName.SHA256, RSASignaturePadding.Pss, out int written));
+        Assert.Equal(0, written);
+
+        Assert.True(rsa.TrySignHash(digest, destination, HashAlgorithmName.SHA256, RSASignaturePadding.Pss, out written));
+        Assert.Equal(256, written);
+        Assert.True(rsa.VerifyHash(digest.AsSpan(), destination.AsSpan(), HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+    });
+
+    // The Stream overloads hash in managed code, as the BCL does, then sign or verify the digest.
+    [Fact]
+    public void SignData_Stream_AndVerifyData_Stream_RoundTrip() => WithRsa((_, rsa) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("streamed data");
+        using var toSign = new MemoryStream(data);
+        using var toVerify = new MemoryStream(data);
+
+        byte[] sig = rsa.SignData(toSign, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+
+        Assert.True(rsa.VerifyData(toVerify, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        Assert.True(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        Assert.Equal("data", Assert.Throws<ArgumentNullException>(
+            () => rsa.SignData((Stream)null!, HashAlgorithmName.SHA256, RSASignaturePadding.Pss)).ParamName);
+    });
+
+    // Both Stream overloads put the hash to the policy, in the direction of the operation.
+    [Fact]
+    public void Stream_Sha1_IsRefusedByThePolicy_ForSigningAndVerifying() => WithRsa((_, rsa) =>
+    {
+        using var toSign = new MemoryStream([1, 2, 3]);
+        using var toVerify = new MemoryStream([1, 2, 3]);
+
+        var sign = Assert.Throws<CryptoPolicyViolationException>(
+            () => rsa.SignData(toSign, HashAlgorithmName.SHA1, RSASignaturePadding.Pss));
+        var verify = Assert.Throws<CryptoPolicyViolationException>(
+            () => rsa.VerifyData(toVerify, new byte[256], HashAlgorithmName.SHA1, RSASignaturePadding.Pss));
+
+        Assert.Equal(CryptoOperation.Sign, Assert.IsType<HashUseRequest>(sign.Request).Operation);
+        Assert.Equal(CryptoOperation.Verify, Assert.IsType<HashUseRequest>(verify.Request).Operation);
+    });
 
     // === Encryption / decryption ===========================================
 

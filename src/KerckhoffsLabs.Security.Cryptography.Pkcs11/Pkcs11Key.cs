@@ -484,6 +484,48 @@ public sealed partial class Pkcs11Key : IDisposable
     }
 
     /// <summary>
+    /// Signs a digest the caller computed with RSASSA-PKCS1-v1_5, judged by the session's policy as the
+    /// combined mechanism for <paramref name="hash"/>; see <see cref="Pkcs11SessionCore.SignPkcs1Digest"/>.
+    /// </summary>
+    internal byte[] SignPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (PrivateHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.SignPkcs1Digest (no private handle)");
+
+        return _session.Core.SignPkcs1Digest(hash, PrivateHandle, digest);
+    }
+
+    /// <summary>
+    /// Verifies an RSASSA-PKCS1-v1_5 signature over a digest the caller computed, under the policy's verdict
+    /// on the combined mechanism for <paramref name="hash"/>. Uses the public handle when present, otherwise
+    /// the synthesized public parameters, as <see cref="Verify"/> does.
+    /// </summary>
+    internal bool VerifyPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest, ReadOnlySpan<byte> signature)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (!PublicHandle.IsInvalid)
+            return _session.Core.VerifyPkcs1Digest(hash, PublicHandle, digest, signature);
+
+        // No session call happens on this path, so the policy is asked here, as Verify asks it.
+        (CKM scheme, _) = Pkcs1DigestInfo.Encode(hash, digest);
+        _session.Enforce(new MechanismUseRequest(new Mechanism(scheme), CryptoOperation.Verify));
+
+        if (_keyType == CKK.CKK_RSA && GetSynthesizedRsaParameters() is { } rsaParams)
+        {
+            using var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportParameters(rsaParams);
+            return rsa.VerifyHash(digest, signature, hash, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        }
+
+        throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+            "Pkcs11Key.VerifyPkcs1Digest (no public handle and synthesis unavailable)");
+    }
+
+    /// <summary>
     /// Encrypts <paramref name="plaintext"/> using this key. Symmetric keys use the
     /// single handle; asymmetric public-side encryption (RSA-OAEP / RSA-PKCS) uses the
     /// public handle.

@@ -508,4 +508,43 @@ internal static class RSAPkcs11TestCases
             Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
         });
     }
+
+    // === Signing a digest ===================================================
+
+    // A PSS signature over a digest (raw CKM_RSA_PKCS_PSS) verifies on the token and in the BCL, and the
+    // one SignData makes over the data verifies against the digest.
+    internal static void Assert_SignHash_Pss_InteropsWithSignDataAndBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_PSS, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        WithRsa(backend, (_, rsa) =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes("signed over its digest");
+            byte[] digest = SHA256.HashData(data);
+
+            byte[] overDigest = rsa.SignHash(digest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+            byte[] overData = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+
+            Assert.True(rsa.VerifyHash(digest, overDigest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+            Assert.True(rsa.VerifyHash(digest, overData, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+            using var bcl = RSA.Create();
+            bcl.ImportParameters(rsa.ExportParameters(includePrivateParameters: false));
+            Assert.True(bcl.VerifyHash(digest, overDigest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        });
+    }
+
+    // PKCS#1 v1.5 over a digest is raw CKM_RSA_PKCS over the DigestInfo, judged as CKM_SHA256_RSA_PKCS,
+    // so the default policy allows it; the scheme is deterministic, so the signature equals SignData's.
+    internal static void Assert_SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS, CKM.CKM_SHA256_RSA_PKCS);
+        WithRsa(backend, (_, rsa) =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes("pkcs1 over a digest");
+            byte[] digest = SHA256.HashData(data);
+            byte[] overData = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+            Assert.Equal(overData, rsa.SignHash(digest, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+            Assert.True(rsa.VerifyHash(digest, overData, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+        });
+    }
 }
