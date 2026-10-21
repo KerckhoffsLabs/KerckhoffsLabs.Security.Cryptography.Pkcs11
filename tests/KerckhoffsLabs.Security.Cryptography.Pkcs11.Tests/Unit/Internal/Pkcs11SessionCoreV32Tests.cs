@@ -265,10 +265,14 @@ public sealed class Pkcs11SessionCoreV32Tests
         Assert.True(s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
     }
 
-    [Fact]
-    public void VerifySignature_OneShot_SignatureInvalid_ReturnsFalse()
+    // CKR_SIGNATURE_LEN_RANGE is a signature invalid solely because of its length (PKCS#11), so it
+    // does not verify either.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID)]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE)]
+    public void VerifySignature_OneShot_SignatureInvalidOrWrongLength_ReturnsFalse(CKR verdict)
     {
-        using var fake = new V32Fake { VerifySigRv = CKR.CKR_SIGNATURE_INVALID };
+        using var fake = new V32Fake { VerifySigRv = verdict };
         using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_ECDSA);
         Assert.False(s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
@@ -308,10 +312,14 @@ public sealed class Pkcs11SessionCoreV32Tests
         Assert.Equal(3, fake.VerifyUpdateCalls);
     }
 
-    [Fact]
-    public void VerifySignature_Stream_SignatureInvalid_ReturnsFalse()
+    // CKR_SIGNATURE_LEN_RANGE is a signature invalid solely because of its length (PKCS#11), so it
+    // does not verify either.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID)]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE)]
+    public void VerifySignature_Stream_SignatureInvalidOrWrongLength_ReturnsFalse(CKR verdict)
     {
-        using var fake = new V32Fake { VerifySigFinalRv = CKR.CKR_SIGNATURE_INVALID };
+        using var fake = new V32Fake { VerifySigFinalRv = verdict };
         using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_ECDSA);
         using var input = new MemoryStream([1, 2, 3]);

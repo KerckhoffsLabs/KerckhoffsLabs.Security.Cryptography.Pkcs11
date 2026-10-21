@@ -399,10 +399,14 @@ public sealed class Pkcs11SessionCoreTests
         Assert.True(valid);
     }
 
-    [Fact]
-    public void Verify_SignatureInvalid_SetsValidFalse()
+    // CKR_SIGNATURE_LEN_RANGE is a signature invalid solely because of its length (PKCS#11), so it
+    // does not verify either.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID)]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE)]
+    public void Verify_SignatureInvalidOrWrongLength_SetsValidFalse(CKR verdict)
     {
-        using var fake = new CryptoFake { VerifyRv = CKR.CKR_SIGNATURE_INVALID };
+        using var fake = new CryptoFake { VerifyRv = verdict };
         using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         bool valid = s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 });

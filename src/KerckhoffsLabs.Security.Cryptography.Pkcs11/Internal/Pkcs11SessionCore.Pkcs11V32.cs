@@ -306,7 +306,7 @@ internal sealed partial class Pkcs11SessionCore
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifySignatureInit);
 
         rv = _pkcs11Library.C_VerifySignature(_sessionId, data);
-        operation.Completed(); // C_VerifySignature ends the operation whatever it returns
+        operation.CompletedVerify(rv);
         bool verified = IsVerified(rv, OpVerifySignature);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -358,7 +358,7 @@ internal sealed partial class Pkcs11SessionCore
         rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
         // C_VerifySignatureFinal always finalizes — whether the signature was valid, invalid, or
         // the call failed with any other CKR — the verify operation is consumed.
-        operation.Completed();
+        operation.CompletedVerify(rv);
         bool verified = IsVerified(rv, OpVerifySignatureFinal);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.

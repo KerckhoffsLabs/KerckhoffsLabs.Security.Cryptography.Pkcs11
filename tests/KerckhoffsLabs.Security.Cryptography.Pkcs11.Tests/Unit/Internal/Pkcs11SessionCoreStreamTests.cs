@@ -281,10 +281,14 @@ public sealed class Pkcs11SessionCoreStreamTests
         Assert.True(isValid);
     }
 
-    [Fact]
-    public void Verify_Stream_SignatureInvalid_SetsValidFalse()
+    // CKR_SIGNATURE_LEN_RANGE is a signature invalid solely because of its length (PKCS#11), so it
+    // does not verify either.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID)]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE)]
+    public void Verify_Stream_SignatureInvalidOrWrongLength_SetsValidFalse(CKR verdict)
     {
-        using var fake = new StreamFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID };
+        using var fake = new StreamFake { VerifyFinalRv = verdict };
         using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
@@ -335,10 +339,14 @@ public sealed class Pkcs11SessionCoreStreamTests
         Assert.Equal(new byte[] { 1, 2, 3 }, recovered);
     }
 
-    [Fact]
-    public void VerifyRecover_SignatureInvalid_SetsValidFalse()
+    // CKR_SIGNATURE_LEN_RANGE is a signature invalid solely because of its length (PKCS#11), so it
+    // does not verify either.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID)]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE)]
+    public void VerifyRecover_SignatureInvalidOrWrongLength_SetsValidFalse(CKR verdict)
     {
-        using var fake = new StreamFake { VerifyRecoverRv = CKR.CKR_SIGNATURE_INVALID };
+        using var fake = new StreamFake { VerifyRecoverRv = verdict };
         using var s = fake.CreateSession(SessionId);
         var mech = Pss();
 
@@ -409,6 +417,21 @@ public sealed class Pkcs11SessionCoreStreamTests
         Assert.Equal(CKR.CKR_KEY_HANDLE_INVALID, e.ReturnValue);
     }
 
+    // A module may leave the operation active after CKR_SIGNATURE_LEN_RANGE, although PKCS#11 ends it, so it is
+    // cancelled; after CKR_SIGNATURE_INVALID, which modules do end on, it is not.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE, true)]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID, false)]
+    public void Verify_Stream_WrongLength_CancelsTheOperation(CKR verdict, bool cancelled)
+    {
+        using var fake = new StreamFake { VerifyFinalRv = verdict };
+        using var s = fake.CreateSession(SessionId);
+        using var input = new MemoryStream([1, 2, 3]);
+
+        Assert.False(s.Verify(Pss(), new ObjectHandle(1), input, [9], 2));
+        Assert.Equal(cancelled, fake.Canceled);
+    }
+
     [Fact]
     public void Verify_Stream_Ok_DoesNotCancelTheCompletedOperation()
     {
@@ -472,10 +495,14 @@ public sealed class Pkcs11SessionCoreStreamTests
         Assert.True(verified);
     }
 
-    [Fact]
-    public void VerifySignature_Stream_SignatureInvalid_SetsValidFalse()
+    // CKR_SIGNATURE_LEN_RANGE is a signature invalid solely because of its length (PKCS#11), so it
+    // does not verify either.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID)]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE)]
+    public void VerifySignature_Stream_SignatureInvalidOrWrongLength_SetsValidFalse(CKR verdict)
     {
-        using var fake = new StreamFake { VerifySignatureFinalRv = CKR.CKR_SIGNATURE_INVALID };
+        using var fake = new StreamFake { VerifySignatureFinalRv = verdict };
         using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
         using var input = new MemoryStream([1, 2, 3]);

@@ -80,6 +80,34 @@ internal static class ECDsaPkcs11TestCases
         }
     }
 
+    // A token reports a signature of the wrong length as CKR_SIGNATURE_LEN_RANGE, which PKCS#11 defines as
+    // invalid solely because of its length: like the BCL, the signature does not verify, rather than throwing.
+    // NSS 3.51 reports it as CKR_DATA_LEN_RANGE instead, a code PKCS#11 reserves for input data of a bad
+    // length, which the library does not take as a verdict; on that token the call may throw it.
+    internal static void Assert_VerifyData_SignatureOfTheWrongLength_ReturnsFalse(
+        IPkcs11Backend backend, bool tokenReportsItAsDataLenRange = false) =>
+        WithEcDsa(backend, "P-256", (ec, hash) =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes("a signature of the wrong length");
+            byte[] sig = ec.SignData(data, hash);
+
+            AssertDoesNotVerify(() => ec.VerifyData(data.AsSpan(), sig.AsSpan(0, sig.Length - 1), hash), tokenReportsItAsDataLenRange);
+            AssertDoesNotVerify(() => ec.VerifyData(data.AsSpan(), [.. sig, 0], hash), tokenReportsItAsDataLenRange);
+            AssertDoesNotVerify(() => ec.VerifyHash(SHA256.HashData(data), sig[..^1]), tokenReportsItAsDataLenRange);
+        });
+
+    private static void AssertDoesNotVerify(Func<bool> verify, bool dataLenRangeAllowed)
+    {
+        try
+        {
+            Assert.False(verify());
+        }
+        catch (Pkcs11Exception e) when (dataLenRangeAllowed && e.ReturnValue == CKR.CKR_DATA_LEN_RANGE)
+        {
+            // The token's misreport of a signature of the wrong length; see above.
+        }
+    }
+
     internal static void Assert_Ctor_NonEcKey_Throws(IPkcs11Backend backend)
     {
         using var session = OpenSession(backend);

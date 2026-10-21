@@ -61,13 +61,18 @@ internal sealed partial class Pkcs11SessionCore
 
     /// <summary>
     /// Interprets a verify return value: <see langword="true"/> on <see cref="CKR.CKR_OK"/>, <see langword="false"/> on
-    /// <see cref="CKR.CKR_SIGNATURE_INVALID"/>, and throws <see cref="Pkcs11Exception"/> for any other
-    /// code (tagged with <paramref name="operation"/>).
+    /// <see cref="CKR.CKR_SIGNATURE_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_LEN_RANGE"/>, and throws
+    /// <see cref="Pkcs11Exception"/> for any other code (tagged with <paramref name="operation"/>).
     /// </summary>
+    /// <remarks>
+    /// PKCS#11 returns <see cref="CKR.CKR_SIGNATURE_LEN_RANGE"/> for a signature that is invalid solely on the
+    /// basis of its length: it does not verify, as the BCL's own verifiers report for a malformed signature,
+    /// rather than an operational failure.
+    /// </remarks>
     private static bool IsVerified(CKR rv, string operation)
     {
         if (rv == CKR.CKR_OK) return true;
-        if (rv == CKR.CKR_SIGNATURE_INVALID) return false;
+        if (rv is CKR.CKR_SIGNATURE_INVALID or CKR.CKR_SIGNATURE_LEN_RANGE) return false;
         throw Pkcs11Exception.Create(rv, operation);
     }
 

@@ -158,10 +158,14 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         Assert.Equal(data, decrypted);
     }
 
-    [Fact]
-    public void DecryptVerify_SignatureInvalid_SetsValidFalse()
+    // CKR_SIGNATURE_LEN_RANGE is a signature invalid solely because of its length (PKCS#11), so it
+    // does not verify either.
+    [Theory]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID)]
+    [InlineData(CKR.CKR_SIGNATURE_LEN_RANGE)]
+    public void DecryptVerify_SignatureInvalidOrWrongLength_SetsValidFalse(CKR verdict)
     {
-        using var fake = new CombinedFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID };
+        using var fake = new CombinedFake { VerifyFinalRv = verdict };
         using var s = fake.CreateSession(SessionId);
         Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
