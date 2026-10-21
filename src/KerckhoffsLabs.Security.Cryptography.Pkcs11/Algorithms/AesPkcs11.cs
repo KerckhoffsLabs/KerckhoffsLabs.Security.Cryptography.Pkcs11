@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
 // enforcement side of the check (the session's crypto policy check rejects them at the point of
