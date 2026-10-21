@@ -586,6 +586,18 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         /// <summary>Records that every operation this scope began has ended.</summary>
         public void Completed() => _session._operationsInProgress = _outer;
 
+        /// <summary>
+        /// Records that the verify call that finishes the operation returned <paramref name="rv"/>. Every
+        /// code ends the operation (PKCS#11 v3.2 §5.2), but a module may leave it active after
+        /// <c>CKR_SIGNATURE_LEN_RANGE</c> (Kryoptic does): that one is left to the cancel on disposal, which
+        /// finds nothing to cancel on a module that ended it.
+        /// </summary>
+        public void CompletedVerify(CKR rv)
+        {
+            if (rv != CKR.CKR_SIGNATURE_LEN_RANGE)
+                Completed();
+        }
+
         public void Dispose()
         {
             ulong unfinished = _session._operationsInProgress & ~_outer;
