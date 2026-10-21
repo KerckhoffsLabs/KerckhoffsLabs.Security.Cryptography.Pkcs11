@@ -123,6 +123,7 @@ internal static class TripleDESPkcs11TestCases
 
     internal static void Assert_Ctor_NonDes3Key_Throws(IPkcs11Backend backend)
     {
+        backend.RequireMechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN);
         using var session = OpenSession(backend);
         string label = $"nondes3-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)

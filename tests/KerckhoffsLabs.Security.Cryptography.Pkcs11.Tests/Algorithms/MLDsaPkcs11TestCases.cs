@@ -133,7 +133,10 @@ internal static class MLDsaPkcs11TestCases
         });
     }
 
-    internal static void Assert_SignVerifyData_WithContext_RoundTrips(IPkcs11Backend backend) =>
+    internal static void Assert_SignVerifyData_WithContext_RoundTrips(IPkcs11Backend backend)
+    {
+        if (!backend.SupportsPqcSignContext)
+            Assert.Skip("Backend refuses a non-empty ML-DSA context string.");
         WithMlDsa(backend, CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         {
             byte[] data = Encoding.UTF8.GetBytes("context-bound message");
@@ -144,6 +147,7 @@ internal static class MLDsaPkcs11TestCases
             // A signature made with a context must not verify without it.
             Assert.False(mldsa.VerifyData(data, sig));
         });
+    }
 
     internal static void Assert_SignData_ContextTooLong_Throws(IPkcs11Backend backend) =>
         WithMlDsa(backend, CkpMlDsa.CKP_ML_DSA_65, mldsa =>

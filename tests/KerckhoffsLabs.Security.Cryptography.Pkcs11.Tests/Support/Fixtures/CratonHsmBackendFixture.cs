@@ -42,6 +42,21 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when <paramref name="mechanism"/> appears in the token's mechanism list.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
+    /// <inheritdoc/>
+    // "AES-GCM and RSA-OAEP are single-shot only" (src/pkcs11_abi/functions.rs): C_EncryptUpdate
+    // answers CKR_MECHANISM_INVALID.
+    public bool SupportsMultipartAesGcm => false;
+
+    /// <inheritdoc/>
+    // Signing is deterministic with an empty context, and resolve_pqc_sign_mechanism
+    // (src/pkcs11_abi/functions.rs) refuses a non-empty one rather than ignore it.
+    public bool SupportsPqcSignContext => false;
+
+    /// <inheritdoc/>
+    // Only SHA2-128s and SHA2-256s (CKP 1 and 9); its CKM_SLH_DSA_KEY_PAIR_GEN key-size range of 1..9
+    // names those two, not the seven in between.
+    public CkpSlhDsa SlhDsaTestParameterSet => CkpSlhDsa.CKP_SLH_DSA_SHA2_128S;
+
     private const int SlotNumber = 0;
 
     private readonly string _configPath = string.Empty;

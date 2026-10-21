@@ -22,6 +22,12 @@ internal static class AesPkcs11TestCases
     private static readonly byte[] Iv16 =
         Convert.FromHexString("0F0E0D0C0B0A09080706050403020100");
 
+    // A fresh IV for each encryption on the token. Every test imports the same Key256, and Craton HSM
+    // refuses an IV it has already seen under the same key value, across sessions and objects, so
+    // encrypting with Key256 and the fixed Iv16 would pass or fail depending on test order. Iv16 stays
+    // for calls that never encrypt on the token.
+    private static byte[] NewIv() => RandomNumberGenerator.GetBytes(16);
+
     private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
         backend.OpenSession();
 
@@ -60,6 +66,7 @@ internal static class AesPkcs11TestCases
 
     internal static void Assert_Ctor_NonAesKey_Throws(IPkcs11Backend backend)
     {
+        backend.RequireMechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN);
         using var session = OpenSession(backend);
         string label = $"nonaes-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
@@ -87,9 +94,10 @@ internal static class AesPkcs11TestCases
 
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclAes();
-            byte[] ct = aes.EncryptCbc(plaintext, Iv16); // default PaddingMode.PKCS7
-            Assert.Equal(bcl.EncryptCbc(plaintext, Iv16), ct);
-            Assert.Equal(plaintext, aes.DecryptCbc(ct, Iv16));
+            byte[] iv = NewIv();
+            byte[] ct = aes.EncryptCbc(plaintext, iv); // default PaddingMode.PKCS7
+            Assert.Equal(bcl.EncryptCbc(plaintext, iv), ct);
+            Assert.Equal(plaintext, aes.DecryptCbc(ct, iv));
         });
 
     internal static void Assert_EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl(IPkcs11Backend backend) =>
@@ -103,9 +111,10 @@ internal static class AesPkcs11TestCases
 
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclAes();
-            byte[] ct = aes.EncryptCbc(plaintext, Iv16, PaddingMode.None);
-            Assert.Equal(bcl.EncryptCbc(plaintext, Iv16, PaddingMode.None), ct);
-            Assert.Equal(plaintext, aes.DecryptCbc(ct, Iv16, PaddingMode.None));
+            byte[] iv = NewIv();
+            byte[] ct = aes.EncryptCbc(plaintext, iv, PaddingMode.None);
+            Assert.Equal(bcl.EncryptCbc(plaintext, iv, PaddingMode.None), ct);
+            Assert.Equal(plaintext, aes.DecryptCbc(ct, iv, PaddingMode.None));
         });
 
     internal static void Assert_Cfb_GatedByDefault_Throws(IPkcs11Backend backend) =>
@@ -238,7 +247,7 @@ internal static class AesPkcs11TestCases
     internal static void Assert_KeyWrapPadded_UsesTheTokensKwp_AndMatchesBcl(IPkcs11Backend backend) =>
         WithImportedAes(backend, (_, aes) =>
         {
-            backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_KWP);
+            backend.RequireMechanismFlags(CKM.CKM_AES_KEY_WRAP_KWP, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT and CKF_DECRYPT");
             byte[] keyToWrap = RandomNumberGenerator.GetBytes(20);
             using var bcl = BclAes();
 

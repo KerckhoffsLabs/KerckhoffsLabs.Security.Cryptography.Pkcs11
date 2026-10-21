@@ -94,8 +94,11 @@ internal static class SlhDsaPkcs11TestCases
             Assert.False(slhdsa.VerifyData(tampered, sig));
         });
 
-    internal static void Assert_SignVerifyData_WithContext_RoundTrips(IPkcs11Backend backend) =>
-        WithSlhDsa(backend, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
+    internal static void Assert_SignVerifyData_WithContext_RoundTrips(IPkcs11Backend backend)
+    {
+        if (!backend.SupportsPqcSignContext)
+            Assert.Skip("Backend refuses a non-empty SLH-DSA context string.");
+        WithSlhDsa(backend, backend.SlhDsaTestParameterSet, slhdsa =>
         {
             byte[] data = Encoding.UTF8.GetBytes("context-bound message");
             byte[] context = Encoding.UTF8.GetBytes("app-context");
@@ -105,25 +108,26 @@ internal static class SlhDsaPkcs11TestCases
             // A signature made with a context must not verify without it.
             Assert.False(slhdsa.VerifyData(data, sig));
         });
+    }
 
     internal static void Assert_SignData_ContextTooLong_Throws(IPkcs11Backend backend) =>
-        WithSlhDsa(backend, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
+        WithSlhDsa(backend, backend.SlhDsaTestParameterSet, slhdsa =>
             // The BCL validates the >255-byte context first (ArgumentOutOfRangeException) before our own
             // ArgumentException would fire; both derive from ArgumentException.
             Assert.ThrowsAny<ArgumentException>(() => slhdsa.SignData(new byte[4], new byte[256])));
 
     internal static void Assert_ExportSlhDsaPublicKey_ReturnsStandardEncoding(IPkcs11Backend backend) =>
-        WithSlhDsa(backend, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
+        WithSlhDsa(backend, backend.SlhDsaTestParameterSet, slhdsa =>
         {
             byte[] pub = slhdsa.ExportSlhDsaPublicKey();
             Assert.Equal(slhdsa.Algorithm.PublicKeySizeInBytes, pub.Length);
         });
 
     internal static void Assert_ExportSlhDsaPrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
-        WithSlhDsa(backend, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
+        WithSlhDsa(backend, backend.SlhDsaTestParameterSet, slhdsa =>
             Assert.Throws<CryptoPolicyViolationException>(() => slhdsa.ExportSlhDsaPrivateKey()));
 
     internal static void Assert_ExportPkcs8PrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
-        WithSlhDsa(backend, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
+        WithSlhDsa(backend, backend.SlhDsaTestParameterSet, slhdsa =>
             Assert.Throws<CryptoPolicyViolationException>(() => slhdsa.ExportPkcs8PrivateKey()));
 }

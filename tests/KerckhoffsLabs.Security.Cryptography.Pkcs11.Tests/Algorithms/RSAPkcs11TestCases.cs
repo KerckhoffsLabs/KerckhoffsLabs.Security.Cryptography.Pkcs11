@@ -67,7 +67,8 @@ internal static class RSAPkcs11TestCases
         }
     }
 
-    // Turns a token that advertises OAEP but rejects a non-SHA-1 hash parameter into a skip.
+    // Turns a token that advertises OAEP but rejects the hash parameter into a skip: SoftHSM 2.5 accepts
+    // only SHA-1, and Craton HSM refuses SHA-1 (parse_oaep_hash), in C_Encrypt rather than C_EncryptInit.
     private static byte[] OrSkipIfOaepHashUnsupported(Func<byte[]> op)
     {
         try
@@ -338,7 +339,7 @@ internal static class RSAPkcs11TestCases
             using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha1 payload");
-                byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA1);
+                byte[] ct = OrSkipIfOaepHashUnsupported(() => rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA1));
                 byte[] recovered = rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1);
                 Assert.Equal(plaintext, recovered);
             }
@@ -428,7 +429,8 @@ internal static class RSAPkcs11TestCases
         {
             using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
-                byte[] ct = rsa.Encrypt(Encoding.UTF8.GetBytes("integrity matters"), RSAEncryptionPadding.OaepSHA1);
+                byte[] ct = OrSkipIfOaepHashUnsupported(
+                    () => rsa.Encrypt(Encoding.UTF8.GetBytes("integrity matters"), RSAEncryptionPadding.OaepSHA1));
                 ct[ct.Length / 2] ^= 0xFF; // flip one ciphertext byte
 
                 Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
@@ -447,7 +449,8 @@ internal static class RSAPkcs11TestCases
                 using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 {
                     using var otherRsa = new RSAPkcs11(other);
-                    byte[] ct = otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1);
+                    byte[] ct = OrSkipIfOaepHashUnsupported(
+                        () => otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1));
 
                     Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
                 }

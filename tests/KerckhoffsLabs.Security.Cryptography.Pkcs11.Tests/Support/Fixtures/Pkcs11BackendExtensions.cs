@@ -29,6 +29,20 @@ internal static class Pkcs11BackendExtensions
     }
 
     /// <summary>
+    /// Skips the test unless the backend advertises <paramref name="mechanism"/> and its
+    /// <c>C_GetMechanismInfo</c> flags include every capability <paramref name="hasFlags"/> checks. For a
+    /// mechanism a token lists for some operations only, e.g. <c>CKM_AES_KEY_WRAP_KWP</c> for
+    /// <c>C_WrapKey</c> but not <c>C_Encrypt</c>.
+    /// </summary>
+    internal static void RequireMechanismFlags(this IPkcs11Backend backend, CKM mechanism, Func<MechanismFlags, bool> hasFlags, string operation)
+    {
+        backend.RequireMechanism(mechanism);
+        Pkcs11Slot slot = backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)backend.SlotId);
+        if (!hasFlags(slot.GetMechanismInfo(mechanism).MechanismFlags))
+            Assert.Skip($"Backend advertises {mechanism} without {operation}.");
+    }
+
+    /// <summary>
     /// Skips the test unless the backend's <c>CKM_ML_KEM_KEY_PAIR_GEN</c> mechanism info reports a
     /// min/max key-size range (in encapsulation-key bytes) covering <paramref name="encapsulationKeySizeInBytes"/>.
     /// ML-KEM has exactly three discrete parameter sets, so this range doubles as a per-parameter-set
