@@ -10,18 +10,9 @@ public sealed class SlhDsaPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
     private readonly CratonHsmBackendFixture _backend = backend;
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    // Craton HSM implements SHA2-128s and SHA2-256s only; the other parameter sets get CKR_ATTRIBUTE_VALUE_INVALID.
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128S)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_192S)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_192F)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F)]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_256S)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_256F)]
-    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F)]
     public void SignVerifyData_RoundTrips(CkpSlhDsa parameterSet) => SlhDsaPkcs11TestCases.Assert_SignVerifyData_RoundTrips(_backend, parameterSet);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]

@@ -18,7 +18,9 @@ public sealed class PinManagementTests_CratonHsm(CratonHsmBackendFixture f)
     public void SetPinWithPin_ChangesUserPin_RoundTrip()
     {
         byte[] original = _backend.UserPin.ToArray();
-        byte[] temp = Encoding.UTF8.GetBytes("87654321");
+        // Meets Craton HSM's PIN rule (at least 3 distinct bytes and 2 character classes), as the
+        // fixture PINs do.
+        byte[] temp = Encoding.UTF8.GetBytes("craton-temp-8765");
 
         using var session = _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original));

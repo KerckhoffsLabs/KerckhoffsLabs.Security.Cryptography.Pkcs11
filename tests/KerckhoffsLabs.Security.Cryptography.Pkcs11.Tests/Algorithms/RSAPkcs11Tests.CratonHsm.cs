@@ -9,12 +9,10 @@ public sealed class RSAPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
     private readonly CratonHsmBackendFixture _backend = backend;
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    [InlineData(1024)]
+    // Craton HSM generates RSA 2048..4096 only (CKM_RSA_PKCS_KEY_PAIR_GEN); other sizes get CKR_KEY_SIZE_RANGE.
     [InlineData(2048)]
     [InlineData(3072)]
     [InlineData(4096)]
-    [InlineData(8192)]
-    [InlineData(16384)]
     public void SignVerifyData_AcrossKeySizes_RoundTrips(int modulusBits) => RSAPkcs11TestCases.Assert_SignVerifyData_AcrossKeySizes_RoundTrips(_backend, modulusBits);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]

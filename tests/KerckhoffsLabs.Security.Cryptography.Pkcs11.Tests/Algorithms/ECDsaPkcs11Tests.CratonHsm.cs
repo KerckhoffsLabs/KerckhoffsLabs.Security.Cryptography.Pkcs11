@@ -2,7 +2,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
-/// <summary>ECDsaPkcs11 over Craton HSM — thin wrapper over <see cref="ECDsaPkcs11TestCases"/>.</summary>
+/// <summary>ECDsaPkcs11 over Craton HSM — thin wrapper over <see cref="ECDsaPkcs11TestCases"/>. No P-521 cases:
+/// Craton HSM implements P-256 and P-384 only (CKM_EC_KEY_PAIR_GEN key sizes 256..384) and refuses
+/// other curves with CKR_CURVE_NOT_SUPPORTED.</summary>
 [Collection("CratonHsm")]
 public sealed class ECDsaPkcs11Tests_CratonHsm(CratonHsmBackendFixture f)
 {
@@ -15,15 +17,11 @@ public sealed class ECDsaPkcs11Tests_CratonHsm(CratonHsmBackendFixture f)
     [InlineData("P-384", "SHA256")]
     [InlineData("P-384", "SHA384")]
     [InlineData("P-384", "SHA512")]
-    [InlineData("P-521", "SHA256")]
-    [InlineData("P-521", "SHA384")]
-    [InlineData("P-521", "SHA512")]
     public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName) => ECDsaPkcs11TestCases.Assert_SignVerifyData_CurveHashMatrix_RoundTrips(_backend, curve, hashName);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [InlineData("P-256")]
     [InlineData("P-384")]
-    [InlineData("P-521")]
     public void TrySignData_Span_VerifyData_Span_RoundTrips(string curve) => ECDsaPkcs11TestCases.Assert_TrySignData_Span_VerifyData_Span_RoundTrips(_backend, curve);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
@@ -35,13 +33,11 @@ public sealed class ECDsaPkcs11Tests_CratonHsm(CratonHsmBackendFixture f)
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [InlineData("P-256")]
     [InlineData("P-384")]
-    [InlineData("P-521")]
     public void ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(string curve) => ECDsaPkcs11TestCases.Assert_ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(_backend, curve);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [InlineData("P-256")]
     [InlineData("P-384")]
-    [InlineData("P-521")]
     public void SignData_VerifiesUnderBclFromExportedPublicKey(string curve) => ECDsaPkcs11TestCases.Assert_SignData_VerifiesUnderBclFromExportedPublicKey(_backend, curve);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]

@@ -52,7 +52,7 @@ public sealed class AesGcmPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
     public void EncryptDecrypt_RoundTrips_NoAad() => AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_NoAad(_backend);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    [InlineData(12)]
+    // 16 only: Craton HSM's AES-GCM takes a 96-bit IV and a 128-bit tag, nothing else.
     [InlineData(16)]
     public void EncryptDecrypt_RoundTrips_VariousTagSizes(int tagLen) => AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_VariousTagSizes(_backend, tagLen);
 
