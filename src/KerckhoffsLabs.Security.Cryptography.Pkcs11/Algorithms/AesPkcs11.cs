@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
 // enforcement side of the check (the session's crypto policy check rejects them at the point of
@@ -64,32 +63,15 @@ public sealed class AesPkcs11 : Aes
             throw new ArgumentException($"Expected an AES key, got {key.KeyType}.", nameof(key));
         _key = key;
 
-        // Reflect the token key's real size (CKA_VALUE_LEN is the byte length and is not sensitive).
-        // Best-effort: the Aes base constructor leaves KeySize=256, which we keep if the token does
-        // not expose the length. BlockSize stays 128 and the legal-size tables are set by the base.
-        int? bits = TryReadKeySizeBits(key);
-        if (bits is int b)
-            KeySizeValue = b;
+        // The token key's size, and only that size, when the token reports it; otherwise the Aes base
+        // constructor's 256 and AES range stay. BlockSize stays 128.
+        if (SecretKeySize.TryReadBits(key, bytes => bytes is 16 or 24 or 32) is int bits)
+        {
+            KeySizeValue = bits;
+            LegalKeySizesValue = SecretKeySize.Only(bits);
+        }
     }
 
-    private static int? TryReadKeySizeBits(Pkcs11Key key)
-    {
-        try
-        {
-            var attrs = key.GetAttributeValue(CKA.CKA_VALUE_LEN);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-            {
-                int bytes = (int)attrs[0].GetValueAsUlong();
-                if (bytes is 16 or 24 or 32)
-                    return bytes * 8;
-            }
-        }
-        catch (Pkcs11Exception)
-        {
-            // Token doesn't expose CKA_VALUE_LEN — fall back to the base default.
-        }
-        return null;
-    }
 
     /// <inheritdoc/>
     protected override bool TryEncryptCbcCore(
