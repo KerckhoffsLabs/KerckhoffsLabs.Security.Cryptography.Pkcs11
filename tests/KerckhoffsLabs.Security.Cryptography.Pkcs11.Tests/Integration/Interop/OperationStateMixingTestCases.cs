@@ -54,6 +54,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// the remainder, so the single-part call's own output is a PREFIX of the full combined result
 /// whenever the combined input doesn't land on a block boundary — not a different behavior, just
 /// what "continuation, no Final follows" looks like for a block cipher).</description></item>
+/// <item><description>Craton HSM (not part of the three above): Encrypt-1 is enforced
+/// (<c>CKR_OPERATION_ACTIVE</c>, since craton-co/craton-hsm-core#87); it has no HMAC, so Sign-2 skips.</description></item>
 /// <item><description>Decrypt-1: enforced on all three (naturally, via a padding/tag mismatch
 /// downstream of the malformed combined ciphertext — not because any of them checks operation state
 /// here either).</description></item>
@@ -172,7 +174,9 @@ internal static class OperationStateMixingTestCases
 
     // === Sign =================================================================
 
-    internal static void Assert_Sign_SinglePartAfterUpdate_Throws(IPkcs11Backend backend) =>
+    internal static void Assert_Sign_SinglePartAfterUpdate_Throws(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         WithRawSession(backend, (lowLevel, sid, session) =>
         {
             byte[] rawKey = new byte[32];
@@ -196,8 +200,11 @@ internal static class OperationStateMixingTestCases
             }
             finally { session.DestroyObject(key); }
         });
+    }
 
-    internal static void Assert_Sign_SinglePartAfterUpdate_TreatsAsContinuation(IPkcs11Backend backend) =>
+    internal static void Assert_Sign_SinglePartAfterUpdate_TreatsAsContinuation(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         WithRawSession(backend, (lowLevel, sid, session) =>
         {
             byte[] rawKey = new byte[32];
@@ -227,10 +234,12 @@ internal static class OperationStateMixingTestCases
             }
             finally { session.DestroyObject(key); }
         });
+    }
 
     // === Encrypt / Decrypt ====================================================
 
-    // Not enforced on any of the three real backends this project targets — see the class remarks.
+    // Not enforced on NSS, SoftHSM2 or Kryoptic — see the class remarks. Craton HSM enforces it
+    // (Assert_Encrypt_SinglePartAfterUpdate_Throws).
     internal static void Assert_Encrypt_SinglePartAfterUpdate_TreatsAsContinuation(IPkcs11Backend backend) =>
         WithRawSession(backend, (lowLevel, sid, session) =>
         {
@@ -263,6 +272,35 @@ internal static class OperationStateMixingTestCases
                 Assert.True(combinedSoFar.Length <= expectedFull.Length,
                     "More ciphertext was emitted than AES-CBC-PAD(data1||data2) would ever produce.");
                 Assert.Equal(expectedFull.AsSpan(0, combinedSoFar.Length).ToArray(), combinedSoFar);
+
+                // Ends the operation if it is still active. Its return code does not matter (the operation
+                // may already have ended); a failure comes back as one, not as an exception.
+                _ = lowLevel.C_EncryptFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
+            }
+            finally { session.DestroyObject(key); }
+        });
+
+    // PKCS#11 v3.0 §5.8: C_Encrypt "cannot be used to terminate a multi-part operation"; v3.2 names the
+    // code, CKR_OPERATION_ACTIVE, which Craton HSM returns since craton-co/craton-hsm-core#87.
+    internal static void Assert_Encrypt_SinglePartAfterUpdate_Throws(IPkcs11Backend backend) =>
+        WithRawSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = new byte[32];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(rawKey);
+            byte[] iv = new byte[16];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(iv);
+            ObjectHandle key = CreateAes(session, rawKey);
+            try
+            {
+                using (var scope = new MechanismParameterScope())
+                {
+                    CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_AES_CBC_PAD, iv));
+                    AssertOk(lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)key.ObjectId), "EncryptInit");
+                }
+                AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, new byte[64], lengthOnly: false, out NativeCULong _), "EncryptUpdate");
+
+                CKR rv = lowLevel.C_Encrypt(sid, Data2, new byte[64], lengthOnly: false, out NativeCULong _);
+                Assert.NotEqual(CKR.CKR_OK, rv);
 
                 // Ends the operation if it is still active. Its return code does not matter (the operation
                 // may already have ended); a failure comes back as one, not as an exception.
