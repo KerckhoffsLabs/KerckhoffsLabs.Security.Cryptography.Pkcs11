@@ -16,8 +16,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// Only the span overloads (<c>TrySignData</c>, <c>VerifyData(ReadOnlySpan, ReadOnlySpan, ...)</c>),
 /// which this class overrides directly, forward the full un-hashed data to PKCS#11 for on-token
 /// hashing + signing/verification via the combined mechanism (e.g. <c>CKM_ECDSA_SHA256</c>). The
-/// non-virtual <c>byte[]</c> convenience overloads (<c>SignData(byte[], HashAlgorithmName)</c>,
-/// <c>VerifyData(byte[], byte[], HashAlgorithmName)</c>) do NOT dispatch through them — verified
+/// <c>byte[]</c> convenience overloads (<c>SignData(byte[], HashAlgorithmName)</c>, virtual but not
+/// overridden here, and the non-virtual <c>VerifyData(byte[], byte[], HashAlgorithmName)</c>) do NOT
+/// dispatch through them — verified
 /// empirically, not assumed: the BCL's own <see cref="ECDsa"/> base-class implementation pre-hashes
 /// via the protected <c>HashData</c> override below, then signs/verifies that hash directly through
 /// <c>SignHash</c>/<c>VerifyHash</c> (raw <c>CKM_ECDSA</c>, no combined mechanism). One consequence:
@@ -83,8 +84,8 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// The virtual span entry-point: callers who invoke this directly (or through
     /// <c>TrySignData(ReadOnlySpan, ...)</c> generically) get the complete, un-hashed data forwarded
     /// to PKCS#11, which hashes on-token (e.g. <c>CKM_ECDSA_SHA256</c> for SHA-256). The BCL's
-    /// non-virtual <c>SignData(byte[], HashAlgorithmName)</c> convenience overload does NOT reach
-    /// this method — see the class remarks.
+    /// <c>SignData(byte[], HashAlgorithmName)</c> convenience overload, which this class does not
+    /// override, does NOT reach this method — see the class remarks.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
