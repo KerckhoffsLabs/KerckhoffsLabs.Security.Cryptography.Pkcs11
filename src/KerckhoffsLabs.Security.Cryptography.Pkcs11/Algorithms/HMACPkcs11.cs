@@ -87,6 +87,40 @@ public sealed class HMACPkcs11 : HMAC
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// <see cref="HMAC"/>'s own implementation throws <see cref="PlatformNotSupportedException"/>, which
+    /// would make <see cref="HashAlgorithm.TryComputeHash"/> fail where
+    /// <see cref="HashAlgorithm.ComputeHash(byte[])"/> works. This restores <see cref="HashAlgorithm"/>'s
+    /// contract over <see cref="HashFinal"/>.
+    /// </remarks>
+    protected override bool TryHashFinal(Span<byte> destination, out int bytesWritten)
+    {
+        int hashSizeInBytes = HashSizeValue / 8;
+        if (destination.Length < hashSizeInBytes)
+        {
+            bytesWritten = 0;
+            return false;
+        }
+
+        byte[] mac = HashFinal();
+        if (mac.Length != hashSizeInBytes)
+            throw new CryptographicException(
+                $"The token returned a {mac.Length}-byte HMAC; expected {hashSizeInBytes} bytes.");
+
+        mac.CopyTo(destination);
+        bytesWritten = mac.Length;
+        return true;
+    }
+
+    /// <summary>Not supported: the HMAC key is token-resident, and the MAC is always computed with it.</summary>
+    /// <exception cref="NotSupportedException">Always.</exception>
+    public override byte[] Key
+    {
+        get => throw new NotSupportedException("The HMAC key is token-resident and not extractable; HMACPkcs11 wraps a Pkcs11Key handle.");
+        set => throw new NotSupportedException("HMACPkcs11 wraps a token key; setting raw key bytes is not supported.");
+    }
+
+    /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
         if (disposing) _buffer.Dispose();

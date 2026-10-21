@@ -1790,6 +1790,8 @@ override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ECDsaPkcs11.Veri
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ECDsaPkcs11.VerifyData(System.ReadOnlySpan<byte> data, System.ReadOnlySpan<byte> signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ECDsaPkcs11.VerifyHash(byte[]! hash, byte[]! signature) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.HMACPkcs11.Initialize() -> void
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.HMACPkcs11.Key.get -> byte[]!
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.HMACPkcs11.Key.set -> void
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.MD5Pkcs11.Initialize() -> void
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RC2Pkcs11.CreateDecryptor(byte[]! rgbKey, byte[]? rgbIV) -> System.Security.Cryptography.ICryptoTransform!
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RC2Pkcs11.CreateEncryptor(byte[]! rgbKey, byte[]? rgbIV) -> System.Security.Cryptography.ICryptoTransform!
