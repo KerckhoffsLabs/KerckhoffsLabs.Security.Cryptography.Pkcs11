@@ -8,8 +8,8 @@ using Xunit.v3;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 /// <summary>
-/// xUnit collection fixture wrapping Craton HSM (craton-hsm-core) — a fifth, fully independent real
-/// PKCS#11 implementation alongside SoftHSM2, opencryptoki, NSS softoken and Kryoptic. Pure Rust on the
+/// xUnit collection fixture wrapping Craton HSM (craton-hsm-core) — another fully independent real
+/// PKCS#11 implementation alongside SoftHSM2, opencryptoki, NSS softoken, Kryoptic and BouncyHsm. Pure Rust on the
 /// RustCrypto crates (no OpenSSL), PKCS#11 v3.0, with ML-KEM, ML-DSA and SLH-DSA: a second real backend
 /// for the post-quantum families that does not share Kryoptic's or SoftHSM's OpenSSL code.
 ///
@@ -148,8 +148,16 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public void Dispose()
     {
         Current = null;
-        try { Library?.Dispose(); } catch { /* best-effort */ }
-        try { if (_configPath.Length > 0) File.Delete(_configPath); } catch { /* best-effort */ }
+        Library?.Dispose();
+        try
+        {
+            if (_configPath.Length > 0)
+                File.Delete(_configPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Best effort: a config left next to the library is rewritten by the next run.
+        }
     }
 
     internal static string? BuiltLibraryPath()
