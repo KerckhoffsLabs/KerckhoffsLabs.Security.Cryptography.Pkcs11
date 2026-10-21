@@ -1767,6 +1767,8 @@ override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.Create
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.ExportParameters(bool includePrivateParameters) -> System.Security.Cryptography.DSAParameters
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.ImportParameters(System.Security.Cryptography.DSAParameters parameters) -> void
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.TrySignData(System.ReadOnlySpan<byte> data, System.Span<byte> destination, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, out int bytesWritten) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.VerifyData(byte[]! data, int offset, int count, byte[]! signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.VerifyData(System.IO.Stream! data, byte[]! signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.VerifyData(System.ReadOnlySpan<byte> data, System.ReadOnlySpan<byte> signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DSAPkcs11.VerifySignature(byte[]! rgbHash, byte[]! rgbSignature) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ECDiffieHellmanPkcs11.DeriveKeyFromHash(System.Security.Cryptography.ECDiffieHellmanPublicKey! otherPartyPublicKey, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, byte[]? secretPrepend, byte[]? secretAppend) -> byte[]!

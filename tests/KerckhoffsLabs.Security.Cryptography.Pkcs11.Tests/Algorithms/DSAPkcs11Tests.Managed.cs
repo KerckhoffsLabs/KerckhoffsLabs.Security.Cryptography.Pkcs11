@@ -9,6 +9,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // DSAPkcs11 is intentionally [Obsolete] (DSA is disallowed by FIPS 186-5); exercising it here is deliberate.
 #pragma warning disable KLPKCS11006
+// SHA-1 is passed on purpose: its refusal is the behaviour under test.
+#pragma warning disable KLPKCS11010
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -443,4 +445,86 @@ public sealed class DSAPkcs11Tests_Managed
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.ExportParameters(includePrivateParameters: false));
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
     }
+
+    // === The hash is put to the policy on every path that hashes on the managed side ==========
+
+    // Permits DSA but refuses SHA-1, whether asked about the hash or about the combined CKM_DSA_SHA1. The
+    // built-in policies refuse or allow the two together; a custom one may not, and must still be obeyed.
+    private sealed class NoSha1Policy : ICryptoPolicy
+    {
+        public string Name => "NoSha1";
+        public bool AllowsOverride => true;
+        public PolicyDecision Evaluate(PolicyRequest request) => request switch
+        {
+            HashUseRequest { Hash.Name: "SHA1" } => PolicyDecision.Deny("no SHA-1"),
+            MechanismUseRequest { Mechanism.Type: CKM.CKM_DSA_SHA1 } => PolicyDecision.Deny("no SHA-1"),
+            _ => PolicyDecision.Allow,
+        };
+    }
+
+    private static readonly HashAlgorithmName Sha1 = HashAlgorithmName.SHA1;
+    private const DSASignatureFormat Der = DSASignatureFormat.Rfc3279DerSequence;
+
+    // A byte[], not a collection expression: the BCL has span overloads too, which C# would prefer.
+    private static readonly byte[] Data = [1, 2, 3];
+
+    // Each entry point, and the operation the refusal must name; the Stream ones read the stream the theory
+    // owns. The managed token does not advertise CKM_DSA_SHA1, so TrySignData takes the fallback that
+    // hashes on the managed side.
+    private static readonly Dictionary<string, (Action<DSAPkcs11, Stream> Call, CryptoOperation Operation)> Sha1Calls = new()
+    {
+        ["SignData(byte[])"] = ((d, _) => d.SignData(Data, Sha1), CryptoOperation.Sign),
+        ["SignData(byte[], format)"] = ((d, _) => d.SignData(Data, Sha1, Der), CryptoOperation.Sign),
+        ["SignData(Stream)"] = ((d, stream) => d.SignData(stream, Sha1), CryptoOperation.Sign),
+        ["SignData(Stream, format)"] = ((d, stream) => d.SignData(stream, Sha1, Der), CryptoOperation.Sign),
+        ["TrySignData(span)"] = ((d, _) => d.TrySignData(Data, new byte[256], Sha1, out int _), CryptoOperation.Sign),
+        ["VerifyData(byte[])"] = ((d, _) => d.VerifyData(Data, new byte[64], Sha1), CryptoOperation.Verify),
+        ["VerifyData(byte[], format)"] = ((d, _) => d.VerifyData(Data, new byte[64], Sha1, Der), CryptoOperation.Verify),
+        ["VerifyData(Stream)"] = ((d, stream) => d.VerifyData(stream, new byte[64], Sha1), CryptoOperation.Verify),
+        ["VerifyData(Stream, format)"] = ((d, stream) => d.VerifyData(stream, new byte[64], Sha1, Der), CryptoOperation.Verify),
+        ["VerifyData(span, format)"] = ((d, _) => d.VerifyData(Data.AsSpan(), new byte[64].AsSpan(), Sha1, Der), CryptoOperation.Verify),
+    };
+
+    public static TheoryData<string> Sha1CallNames() => [.. Sha1Calls.Keys];
+
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    [MemberData(nameof(Sha1CallNames))]
+    public void Sha1_IsRefused_ByAPolicyThatPermitsDsa(string call) => WithDsa((dsa, _, session) =>
+    {
+        using var policy = session.UsePolicy(new NoSha1Policy());
+
+        using var stream = new MemoryStream(Data);
+
+        var e = Assert.Throws<CryptoPolicyViolationException>(() => Sha1Calls[call].Call(dsa, stream));
+
+        Assert.Equal(Sha1Calls[call].Operation, Assert.IsType<HashUseRequest>(e.Request).Operation);
+    });
+
+    // The verification overrides check the hash name as the BCL does, naming hashAlgorithm.
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void VerifyData_HashName_IsCheckedAsTheBclChecksIt() => WithDsa((dsa, _) =>
+    {
+        using var stream = new MemoryStream(Data);
+        byte[] sig = new byte[64];
+        var empty = new HashAlgorithmName("");
+
+        Assert.Equal("hashAlgorithm", Assert.Throws<ArgumentNullException>(() => dsa.VerifyData(Data, sig, default)).ParamName);
+        Assert.Equal("hashAlgorithm", Assert.Throws<ArgumentException>(() => dsa.VerifyData(Data, sig, empty)).ParamName);
+        Assert.Equal("hashAlgorithm", Assert.Throws<ArgumentNullException>(() => dsa.VerifyData(stream, sig, default)).ParamName);
+        Assert.Equal("hashAlgorithm", Assert.Throws<ArgumentException>(() => dsa.VerifyData(stream, sig, empty)).ParamName);
+    });
+
+    // The same policy lets a strong hash through on the paths that now ask about it.
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void Sha256_IsAllowed_ByThatPolicy() => WithDsa((dsa, _, session) =>
+    {
+        using var policy = session.UsePolicy(new NoSha1Policy());
+        byte[] data = Encoding.UTF8.GetBytes("strong hash");
+
+        byte[] sig = dsa.SignData(data, HashAlgorithmName.SHA256);
+        using var stream = new MemoryStream(data);
+
+        Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA256));
+        Assert.True(dsa.VerifyData(stream, sig, HashAlgorithmName.SHA256));
+    });
 }

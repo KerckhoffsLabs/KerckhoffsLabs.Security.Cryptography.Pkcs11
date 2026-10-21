@@ -134,9 +134,76 @@ public sealed class DSAPkcs11 : DSA
         if (_key.SupportsMechanism(combined.Type))
             return _key.Verify(combined, data, signature);
 
-        byte[] hash = HashData(hashAlgorithm, data);
+        byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Verify);
         var raw = new Mechanism(CKM.CKM_DSA);
         return _key.Verify(raw, hash, signature);
+    }
+
+    // The BCL routes these verification overloads through the protected HashData overrides, which are
+    // shared with the signing ones and cannot tell which direction called them. Overriding them here lets
+    // the hash be judged as a verification. The hashing and the digest verification are otherwise
+    // exactly what the base class does.
+
+    /// <inheritdoc/>
+    /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits <paramref name="hashAlgorithm"/> and <c>CKM_DSA</c> for verification.</exception>
+    public override bool VerifyData(byte[] data, int offset, int count, byte[] signature, HashAlgorithmName hashAlgorithm)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, data.Length);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, data.Length - offset);
+        ArgumentNullException.ThrowIfNull(signature);
+        ThrowIfNoHashName(hashAlgorithm);
+
+        GuardHash(hashAlgorithm, CryptoOperation.Verify);
+        return VerifySignature(base.HashData(data, offset, count, hashAlgorithm), signature);
+    }
+
+    /// <inheritdoc/>
+    /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits <paramref name="hashAlgorithm"/> and <c>CKM_DSA</c> for verification.</exception>
+    public override bool VerifyData(Stream data, byte[] signature, HashAlgorithmName hashAlgorithm)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(signature);
+        ThrowIfNoHashName(hashAlgorithm);
+
+        GuardHash(hashAlgorithm, CryptoOperation.Verify);
+        return VerifySignature(base.HashData(data, hashAlgorithm), signature);
+    }
+
+    /// <inheritdoc/>
+    protected override bool VerifyDataCore(
+        ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm, DSASignatureFormat signatureFormat)
+    {
+        GuardHash(hashAlgorithm, CryptoOperation.Verify);
+        byte[] buffer = data.ToArray();
+        return VerifySignatureCore(base.HashData(buffer, 0, buffer.Length, hashAlgorithm), signature, signatureFormat);
+    }
+
+    /// <inheritdoc/>
+    protected override bool VerifyDataCore(
+        Stream data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm, DSASignatureFormat signatureFormat)
+    {
+        GuardHash(hashAlgorithm, CryptoOperation.Verify);
+        return VerifySignatureCore(base.HashData(data, hashAlgorithm), signature, signatureFormat);
+    }
+
+    // With every verification overload above hashing on its own, the base class reaches these two only
+    // from its signing overloads (SignData, TrySignData and SignDataCore, with or without a format).
+
+    /// <inheritdoc/>
+    protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
+    {
+        GuardHash(hashAlgorithm, CryptoOperation.Sign);
+        return base.HashData(data, offset, count, hashAlgorithm);
+    }
+
+    /// <inheritdoc/>
+    protected override byte[] HashData(Stream data, HashAlgorithmName hashAlgorithm)
+    {
+        GuardHash(hashAlgorithm, CryptoOperation.Sign);
+        return base.HashData(data, hashAlgorithm);
     }
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
@@ -145,14 +212,30 @@ public sealed class DSAPkcs11 : DSA
         if (_key.SupportsMechanism(combined.Type))
             return _key.Sign(combined, data);
 
-        byte[] hash = HashData(hashAlgorithm, data);
+        byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
         var raw = new Mechanism(CKM.CKM_DSA);
         return _key.Sign(raw, hash);
     }
 
-    // No SHA-1-specific gate here: DSA is insecure as an algorithm (FIPS 186-5 disallows it), so every
-    // CKM_DSA* mechanism — raw and combined, all hashes — is gated at the session layer's crypto policy
-    // check and requires a policy that permits it. A per-hash guard would be redundant.
+    // Every path that hashes on the managed side puts the hash to the session's policy, in the direction
+    // of the operation: a combined CKM_DSA_SHA* mechanism carries its hash to the policy, but raw CKM_DSA
+    // over a managed digest does not, and a policy may permit CKM_DSA yet refuse a hash (SHA-1). The
+    // built-in policies already refuse or allow the two together; a custom one need not.
+    // CreateSignature and VerifySignature take a caller's digest and cannot know the hash, so they are
+    // outside this check, as ECDsaPkcs11's SignHash and VerifyHash are.
+    private void GuardHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
+        => _key.Session.Enforce(new HashUseRequest(hashAlgorithm, operation));
+
+    // As the BCL: a missing name is an ArgumentNullException and an empty one an ArgumentException, both
+    // naming hashAlgorithm rather than its Name.
+    private static void ThrowIfNoHashName(HashAlgorithmName hashAlgorithm)
+    {
+        if (hashAlgorithm.Name is null)
+            throw new ArgumentNullException(nameof(hashAlgorithm));
+        if (hashAlgorithm.Name.Length == 0)
+            throw new ArgumentException("The value cannot be an empty string.", nameof(hashAlgorithm));
+    }
+
     //
     // SHA-224 is deliberately absent: Pkcs11MechanismMap.DsaSign accepts it (CKM_DSA_SHA224 is a real
     // PKCS#11 mechanism), but .NET has no SHA-224 implementation through any API — no concrete type,
@@ -161,8 +244,10 @@ public sealed class DSAPkcs11 : DSA
     // mechanism itself, this managed-side fallback has no way to compute the hash, so SHA-224 falls
     // through to the NotSupportedException below rather than a hand-rolled SHA-224 (same compression
     // function as SHA-256, different IV, truncated output) that this adapter has no business owning.
-    private static byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data) =>
-        hashAlgorithm.Name switch
+    private byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data, CryptoOperation operation)
+    {
+        GuardHash(hashAlgorithm, operation);
+        return hashAlgorithm.Name switch
         {
             "SHA1" => SHA1.HashData(data),
             "SHA256" => SHA256.HashData(data),
@@ -170,6 +255,7 @@ public sealed class DSAPkcs11 : DSA
             "SHA512" => SHA512.HashData(data),
             _ => throw new NotSupportedException($"DSA does not support hash {hashAlgorithm.Name}."),
         };
+    }
 
     // -----------------------------------------------------------------------
     // Key material
