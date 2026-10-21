@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
 
 /// <summary>
-/// The same fixed-vector known-answer tests, re-run against a fifth real backend (Craton HSM). A
+/// The same fixed-vector known-answer tests, re-run against another real backend (Craton HSM). A
 /// second (third, fourth, ...) independent implementation reproducing the identical published
 /// RFC/NIST vectors is the strongest cross-backend check: a parameter/key mis-encoding the wrapper
 /// and one token happen to share would still have to be reproduced bit-for-bit by an unrelated

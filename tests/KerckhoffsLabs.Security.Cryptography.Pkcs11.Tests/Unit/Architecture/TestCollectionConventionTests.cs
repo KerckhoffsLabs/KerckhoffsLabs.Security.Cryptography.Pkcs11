@@ -32,6 +32,7 @@ public sealed class TestCollectionConventionTests
         ("_OpenCryptoki", "OpenCryptoki"),
         ("_Kryoptic", "Kryoptic"),
         ("_BouncyHsm", "BouncyHsm"),
+        ("_CratonHsm", "CratonHsm"),
     ];
 
     // -----------------------------------------------------------------------------------------
