@@ -32,6 +32,14 @@ public sealed class Pkcs11ExceptionTests
         Assert.Equal("boom", ex.Message);
     }
 
+    // An explicit message does not make the method name optional: Method is never null.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("boom")]
+    public void NewCtor_NullMethod_Throws(string? message)
+        => Assert.Equal("method", Assert.Throws<ArgumentNullException>(
+            () => new Pkcs11TokenException(CKR.CKR_DEVICE_ERROR, null!, message)).ParamName);
+
     [Fact]
     public void AuthenticationException_DerivesFromPkcs11Exception()
     {

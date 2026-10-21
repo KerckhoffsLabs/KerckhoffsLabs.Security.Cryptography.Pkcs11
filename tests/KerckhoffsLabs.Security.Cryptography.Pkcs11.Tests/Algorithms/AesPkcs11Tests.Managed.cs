@@ -136,6 +136,44 @@ public sealed class AesPkcs11_Managed
         }
     });
 
+    // Refuses every encryption and allows everything else, so the two directions of one mechanism differ.
+    private sealed class NoEncryptPolicy : ICryptoPolicy
+    {
+        public string Name => "NoEncrypt";
+        public bool AllowsOverride => false;
+        public PolicyDecision Evaluate(PolicyRequest request)
+            => request is MechanismUseRequest { Operation: CryptoOperation.Encrypt } ? PolicyDecision.Deny("no encryption") : PolicyDecision.Allow;
+    }
+
+    // The empty-input shortcut asks the policy about the direction it is skipping, not the other one.
+    [Fact]
+    public void Cbc_EmptyInput_IsJudgedForItsOwnDirection()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, new NoEncryptPolicy());
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(Key256).Encrypt().Decrypt().Build();
+        using var key = session.ImportKey(tpl);
+        using var aes = new AesPkcs11(key);
+
+        Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv16, PaddingMode.None));
+        Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16, PaddingMode.None));
+    }
+
+    // The plaintext length is known only once the token has decrypted, so a short destination is reported
+    // by the return value rather than refused up front.
+    [Fact]
+    public void TryDecryptCbc_DestinationTooSmall_ReturnsFalse() => WithImportedAes((session, aes) =>
+    {
+        using var bcl = BclAes();
+        byte[] ciphertext = bcl.EncryptCbc(new byte[20], Iv16); // 32 bytes, 20 of plaintext
+
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            Assert.False(aes.TryDecryptCbc(ciphertext, Iv16, new byte[16], out int written));
+            Assert.Equal(0, written);
+        }
+    });
+
     // === ECB: gated, and the token's output must match the BCL once unlocked ==============
 
     [Fact]

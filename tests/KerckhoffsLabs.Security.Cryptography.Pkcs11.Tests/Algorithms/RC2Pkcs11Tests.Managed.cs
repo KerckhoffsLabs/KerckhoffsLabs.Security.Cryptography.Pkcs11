@@ -101,6 +101,24 @@ public sealed class RC2Pkcs11Tests_Managed
         Assert.Equal(128, rc2.KeySize);
     }
 
+    // 128 bits is also the BCL's default, so the sizes that show the reflection are the others: every
+    // legal size (5 to 16 bytes) is taken from the token, and an illegal one leaves the default.
+    [Theory]
+    [InlineData(5, 40)]
+    [InlineData(11, 88)]
+    [InlineData(4, 128)]
+    [InlineData(17, 128)]
+    public void Ctor_ReflectsEveryLegalTokenKeySize(int keyBytes, int expectedBits)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_RC2)
+            .Label($"rc2-{Guid.NewGuid():N}").Value(new byte[keyBytes]).Encrypt().Decrypt().Build();
+        using var key = session.ImportKey(tpl);
+        using var rc2 = new RC2Pkcs11(key);
+        Assert.Equal(expectedBits, rc2.KeySize);
+    }
+
     // === Secure-defaults gate (fires before any token call — no RC2-capable host needed) ============
 
     [Fact]

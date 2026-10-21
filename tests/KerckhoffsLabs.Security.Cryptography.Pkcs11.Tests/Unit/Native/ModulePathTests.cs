@@ -339,6 +339,33 @@ public sealed class ModulePathTests
         }
     }
 
+    // The platform loader's own error is kept, as the inner exception and at the end of the message: the
+    // module may have been found but failed to load (a missing dependency).
+    [Fact]
+    public void PlatformSearchLoad_MissingModule_KeepsTheLoadersError()
+    {
+        var e = Assert.Throws<DllNotFoundException>(() => ModulePath.Load(UniqueModuleName(), resolveBareNameItself: false));
+
+        var inner = Assert.IsType<DllNotFoundException>(e.InnerException);
+        Assert.Contains(OperatingSystem.IsWindows()
+            ? "could not be loaded from this library's directory or the system's library directories (PATH excluded)."
+            : "could not be loaded from this library's directory or the system's library search.", e.Message);
+        Assert.EndsWith(" " + inner.Message, e.Message);
+    }
+
+    // The resolving load looked itself, so there is no loader error to keep.
+    [Fact]
+    public void ResolvingLoad_MissingModule_NamesWhereItLooked()
+    {
+        var e = Assert.Throws<DllNotFoundException>(() => ModulePath.Load(UniqueModuleName(), resolveBareNameItself: true));
+
+        Assert.Null(e.InnerException);
+        Assert.Contains(
+            "could not be loaded from the application's native-asset directories, the application directory, "
+            + "DYLD_LIBRARY_PATH or dyld's fallback directories.", e.Message);
+        Assert.EndsWith("pass a fully qualified path to load a module from there.", e.Message);
+    }
+
     private static Func<string, string?> Env(params (string Name, string Value)[] variables)
         => name => variables.FirstOrDefault(v => v.Name == name).Value;
 

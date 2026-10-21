@@ -121,6 +121,25 @@ public sealed unsafe class NativeStructArrayTests
         Assert.Equal(large.Select(a => (ulong)a.type), back.Select(a => (ulong)a.type));
     }
 
+    [Fact]
+    public void HeapBlock_IsFreedOnDispose()
+    {
+        int fits = NativeStructArray.StackBytes / Pkcs11Marshal.SizeOf<CK_ATTRIBUTE>();
+        CK_ATTRIBUTE[] large = [.. Enumerable.Range(0, fits + 1).Select(i => new CK_ATTRIBUTE { type = (NativeCULong)(ulong)i })];
+        Span<byte> stack = stackalloc byte[NativeStructArray.StackBytes];
+
+        var block = new NativeStructArray<CK_ATTRIBUTE>(large, nullWhenEmpty: true, stack);
+        IntPtr heap = (IntPtr)block.Pointer;
+        Assert.True(LiveAllocations.TryFind(heap, out _, out _));
+
+        block.Dispose();
+
+        // A test running alongside may be handed the freed address at once, so only a block with this one's
+        // start and size counts as still held.
+        Assert.False(LiveAllocations.TryFind(heap, out IntPtr start, out int size) && start == heap
+            && size == large.Length * Pkcs11Marshal.SizeOf<CK_ATTRIBUTE>());
+    }
+
     // The stack block held the template's value pointers and lengths; it is wiped like a heap block.
     [Fact]
     public void StackBlock_IsZeroizedOnDispose()

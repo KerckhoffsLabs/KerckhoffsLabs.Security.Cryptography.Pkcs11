@@ -156,6 +156,24 @@ public sealed class DSAPkcs11Tests_Managed
         }
     });
 
+    // The IEEE P1363 signature has a fixed size (twice the length of q), and a destination of exactly that
+    // size is enough.
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void TrySignData_DestinationOfExactlyTheSignatureSize_Succeeds() => WithDsa((dsa, _, session) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("exact destination");
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            Assert.True(dsa.TrySignData(data, new byte[256], HashAlgorithmName.SHA256, out int size));
+            byte[] destination = new byte[size];
+
+            Assert.True(dsa.TrySignData(data, destination, HashAlgorithmName.SHA256, out int written));
+
+            Assert.Equal(size, written);
+            Assert.True(dsa.VerifyData((ReadOnlySpan<byte>)data, (ReadOnlySpan<byte>)destination, HashAlgorithmName.SHA256));
+        }
+    });
+
     // Pkcs11MechanismMap.DsaSign accepts SHA224 (CKM_DSA_SHA224 exists in the spec), but this
     // adapter's own managed-fallback HashData helper has no SHA224 case — a real gap, surfaced only
     // via the fallback branch a backend without CKM_DSA_SHA224 support takes.

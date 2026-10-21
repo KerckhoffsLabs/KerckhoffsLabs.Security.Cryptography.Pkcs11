@@ -38,6 +38,32 @@ public sealed class MechanismListTests
         Assert.Equal([CKM.CKM_AES_GCM, CKM.CKM_SHA256], destination.AsSpan(0, kept).ToArray());
     }
 
+    // A destination shorter than the module's buffer keeps only what fits.
+    [Fact]
+    public void Copy_StopsAtTheEndOfTheDestination()
+    {
+        NativeCULong[] native = Native((ulong)CKM.CKM_AES_GCM, (ulong)CKM.CKM_SHA256, (ulong)CKM.CKM_SHA384);
+        var destination = new CKM[2];
+
+        int kept = MechanismList.Copy(native, returned: 3, destination);
+
+        Assert.Equal(2, kept);
+        Assert.Equal([CKM.CKM_AES_GCM, CKM.CKM_SHA256], destination);
+    }
+
+    // A count past the module's buffer reads only the entries the buffer holds.
+    [Fact]
+    public void Copy_StopsAtTheEndOfTheNativeBuffer()
+    {
+        NativeCULong[] native = Native((ulong)CKM.CKM_AES_GCM, (ulong)CKM.CKM_SHA256);
+        var destination = new CKM[3];
+
+        int kept = MechanismList.Copy(native, returned: 3, destination);
+
+        Assert.Equal(2, kept);
+        Assert.Equal([CKM.CKM_AES_GCM, CKM.CKM_SHA256], destination.AsSpan(0, kept).ToArray());
+    }
+
     [Fact(SkipUnless = nameof(NativeULongIs64Bit), Skip = "CK_ULONG is 32 bits on this platform")]
     public void Copy_KeepsValuesWiderThan32Bits_Exactly()
     {

@@ -204,6 +204,47 @@ public sealed class FipsOnlyPolicyTests
         Assert.False(Allowed(new Mechanism(CKM.CKM_HKDF_DERIVE, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)), CryptoOperation.Derive));
     }
 
+    // === Parameter-check denials cite their source and say what to use instead ===
+
+    // Keyed by name so each theory row is serializable; the mechanisms are built on demand.
+    private static readonly Dictionary<string, (Func<Mechanism> Mechanism, CryptoOperation Operation, string Reason)> ParameterDenials = new()
+    {
+        ["PqcPreHashTooShort"] = (
+            () => new Mechanism(CKM.CKM_HASH_ML_DSA, new CkmHashPqcSignParams(CKM.CKM_SHA224)), CryptoOperation.Sign,
+            "FIPS 204 §5.4 / FIPS 205 §10: HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash " +
+            "of at least 128-bit collision strength (SHA-256/384/512 or SHA3-256/384/512)."),
+        ["Pbkdf2UnlistedPrf"] = (
+            () => new Mechanism(CKM.CKM_PKCS5_PBKD2, new CkmPkcs5Pbkd2Params([1], 1, (CKP)0x99, [1])), CryptoOperation.GenerateKey,
+            "SP 800-132: 153 is not an approved PBKDF2 PRF; use an HMAC-SHA-1/224/256/384/512/512-224/512-256 PRF."),
+        ["Pbkdf2WithoutParameters"] = (
+            () => new Mechanism(CKM.CKM_PKCS5_PBKD2), CryptoOperation.GenerateKey,
+            "SP 800-132: CKM_PKCS5_PBKD2 requires CkmPkcs5Pbkd2Params naming an approved PRF (HMAC-SHA-1/224/256/384/512/512-224/512-256)."),
+        ["Sp800108UnlistedPrf"] = (
+            () => new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, CkmSp800108KdfParams.Counter(CKM.CKM_MD5_HMAC).IterationCounter().Build()), CryptoOperation.Derive,
+            "SP 800-108r1: CKM_MD5_HMAC is not an approved SP 800-108 PRF; use HMAC over an approved hash, or AES-CMAC."),
+        ["Sp800108WithoutParameters"] = (
+            () => new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF), CryptoOperation.Derive,
+            "SP 800-108r1: key derivation requires CkmSp800108KdfParams naming an approved PRF (HMAC over an approved hash, or AES-CMAC)."),
+        ["HkdfUnlistedPrf"] = (
+            () => new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_MD5)), CryptoOperation.Derive,
+            "SP 800-56C Rev.2: CKM_MD5 is not an approved HKDF PRF; use an approved hash, hash or _HMAC form."),
+        ["HkdfWithoutParameters"] = (
+            () => new Mechanism(CKM.CKM_HKDF_DERIVE), CryptoOperation.Derive,
+            "SP 800-56C Rev.2: CKM_HKDF_DERIVE / CKM_HKDF_DATA require CkmHkdfParams naming an approved PRF (an approved hash, hash or _HMAC form)."),
+    };
+
+    public static TheoryData<string> ParameterDenialKinds() => [.. ParameterDenials.Keys];
+
+    [Theory]
+    [MemberData(nameof(ParameterDenialKinds))]
+    public void ParameterDenial_CitesItsSourceAndNamesTheApprovedAlternative(string kind)
+    {
+        (Func<Mechanism> mechanism, CryptoOperation operation, string reason) = ParameterDenials[kind];
+        Mechanism mech = mechanism();
+        Assert.False(Allowed(mech, operation));
+        Assert.Equal(reason, Reason(mech, operation));
+    }
+
     [Fact]
     public void DocumentedRefusedPrf_QuotesReasonAndAlternative()
     {

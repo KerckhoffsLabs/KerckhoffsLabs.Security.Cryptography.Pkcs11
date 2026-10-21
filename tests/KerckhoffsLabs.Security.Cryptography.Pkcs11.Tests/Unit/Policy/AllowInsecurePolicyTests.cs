@@ -29,6 +29,11 @@ public sealed class AllowInsecurePolicyTests
     public void AllowsEveryRequestKind(string requestKind)
         => Assert.True(Policy.Evaluate(RequestsByKind[requestKind]()).IsAllowed);
 
+    // Allowing everything must not extend to a missing request: a null is a caller bug, not a request.
+    [Fact]
+    public void NullRequest_Throws()
+        => Assert.Equal("request", Assert.Throws<ArgumentNullException>(() => Policy.Evaluate(null!)).ParamName);
+
     [Fact]
     public void Identity()
     {

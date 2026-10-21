@@ -33,8 +33,14 @@ public sealed class PolicyCatalogueMarkdownTests
         }.ToFrozenDictionary(),
         AllowedVendorMechanisms = new Dictionary<ulong, MechanismRule>
         {
-            [0x8000_0002UL] = new(CryptoOperations.Encrypt, CryptoOperations.None, null, "Second vendor mechanism."),
+            // Legacy-only, with a described parameter check and a CRLF in its rationale.
+            [0x8000_0002UL] = new(CryptoOperations.None, CryptoOperations.Decrypt, (_, _) => PolicyDecision.Allow, "Second vendor mechanism.\r\nLegacy decrypt only.")
+            {
+                ParameterCheckDescription = "requires a 16-byte IV",
+            },
             [0x8000_0001UL] = new(CryptoOperations.Encrypt, CryptoOperations.None, null, "First vendor mechanism."),
+            // A parameter check with no description of its own.
+            [0x8000_0003UL] = new(CryptoOperations.Sign | CryptoOperations.Verify, CryptoOperations.None, (_, _) => PolicyDecision.Allow, "Third vendor mechanism."),
         }.ToFrozenDictionary(),
         AllowedHashes = new Dictionary<string, AllowedHash>(StringComparer.Ordinal)
         {
@@ -84,6 +90,7 @@ public sealed class PolicyCatalogueMarkdownTests
         DocumentedRefusedKeyAgreementKeyTypes = new Dictionary<CKK, DocumentedRefusal>
         {
             [CKK.CKK_EC_MONTGOMERY] = new("Montgomery keys are not approved.", "a CKK_EC key"),
+            [CKK.CKK_EC_EDWARDS] = new("Edwards keys do not agree keys.", null),
         }.ToFrozenDictionary(),
         DocumentedRefusedPrfs = new Dictionary<string, DocumentedRefusal>(StringComparer.Ordinal)
         {
@@ -169,6 +176,29 @@ public sealed class PolicyCatalogueMarkdownTests
     }
 
     [Fact]
+    public void Render_RendersTheVendorMechanismTable()
+    {
+        string markdown = PolicyCatalogueMarkdown.Render(BuildCatalogue(), "SecureOnly");
+        Assert.Contains(
+            "### Vendor mechanisms\n" +
+            "\n" +
+            "| Mechanism value | Operations | Legacy operations | Parameter check | Rationale |\n" +
+            "|---|---|---|---|---|\n" +
+            "| `0x80000001` | Encrypt | — | — | First vendor mechanism. |\n" +
+            "| `0x80000002` | — | Decrypt | requires a 16-byte IV | Second vendor mechanism. Legacy decrypt only. |\n" +
+            "| `0x80000003` | Sign, Verify | — | (see rationale) | Third vendor mechanism. |\n" +
+            "\n",
+            markdown);
+    }
+
+    [Fact]
+    public void Render_OmitsTheVendorMechanismTable_WhenThereAreNone()
+    {
+        Assert.Empty(CryptoPolicy.SecureOnly.Catalogue.AllowedVendorMechanisms);
+        Assert.DoesNotContain("### Vendor mechanisms", PolicyCatalogueMarkdown.Render(CryptoPolicy.SecureOnly.Catalogue, "SecureOnly"));
+    }
+
+    [Fact]
     public void Render_RendersCurveFriendlyNameAndFallsBackForUnknownOid()
     {
         string markdown = PolicyCatalogueMarkdown.Render(BuildCatalogue(), "SecureOnly");
@@ -191,6 +221,16 @@ public sealed class PolicyCatalogueMarkdownTests
         Assert.Contains("| `CKK_EC` | ECDH over a prime curve. |", markdown);
         Assert.Contains("### Key-agreement key types", markdown);
         Assert.Contains("| `CKK_EC_MONTGOMERY` | Montgomery keys are not approved. | a CKK_EC key |", markdown);
+    }
+
+    [Fact]
+    public void Render_SortsRefusedKeyAgreementKeyTypesOrdinally()
+    {
+        string markdown = PolicyCatalogueMarkdown.Render(BuildCatalogue(), "SecureOnly");
+        Assert.Contains(
+            "| `CKK_EC_EDWARDS` | Edwards keys do not agree keys. | — |\n" +
+            "| `CKK_EC_MONTGOMERY` | Montgomery keys are not approved. | a CKK_EC key |\n",
+            markdown);
     }
 
     // SecureOnly refuses no key-agreement key type it documents, so the page carries no empty table.

@@ -36,6 +36,10 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         public CKR UpdateRv = CKR.CKR_OK;          // first C_*Update return value
         public bool FirstUpdateBufferTooSmall;     // emulate a token that demands a bigger buffer first
         public CKR VerifyInitRv = CKR.CKR_OK;
+        public CKR DecryptInitRv = CKR.CKR_OK;
+        public CKR DecryptFinalProbeRv = CKR.CKR_OK, DecryptFinalRv = CKR.CKR_OK;
+        public byte[] LastBlock = [];
+        public bool Canceled { get; private set; }
         private bool _retried;
 
         private CKR Update(ReadOnlySpan<byte> input, NativeBuffer<byte> output, ref NativeCULong outputLen)
@@ -55,7 +59,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
 
         protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => CKR.CKR_OK;
         protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => DecryptInitRv;
         protected override CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => VerifyInitRv;
 
         protected override CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen)
@@ -68,7 +72,12 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         protected override CKR C_EncryptFinal(NativeCULong session, NativeBuffer<byte> lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
         { lastEncryptedPartLen = (NativeCULong)0; return CKR.CKR_OK; }
         protected override CKR C_DecryptFinal(NativeCULong session, NativeBuffer<byte> lastPart, ref NativeCULong lastPartLen)
-        { lastPartLen = (NativeCULong)0; return CKR.CKR_OK; }
+        {
+            lastPartLen = (NativeCULong)LastBlock.Length;
+            if (lastPart.IsNull) return DecryptFinalProbeRv;
+            LastBlock.CopyTo(lastPart.Span);
+            return DecryptFinalRv;
+        }
 
         protected override CKR C_DigestFinal(NativeCULong session, NativeBuffer<byte> digest, ref NativeCULong digestLen)
         {
@@ -79,7 +88,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         }
 
         protected override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => VerifyFinalRv;
-        protected override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_OK;
+        protected override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) { Canceled = true; return CKR.CKR_OK; }
     }
 
 
@@ -184,6 +193,49 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
                 data: [1, 2, 3], signature: [9, 9], out _));
+    }
+
+    // The stream overload: the decrypt half's init and final are checked like the verify half's,
+    // the final block reaches the output, and a completed operation is not cancelled on the way out.
+    private static bool DecryptVerifyStream(Pkcs11SessionCore s, byte[] input, out byte[] output)
+    {
+        using var inStream = new MemoryStream(input);
+        using var outStream = new MemoryStream();
+        bool isValid = s.DecryptVerify(HmacSha256(), new ObjectHandle(2), AesGcm(), new ObjectHandle(1),
+            inStream, outStream, signature: [9, 9], bufferLength: 2);
+        output = outStream.ToArray();
+        return isValid;
+    }
+
+    [Fact]
+    public void DecryptVerify_Stream_WritesTheFinalBlock_AndDoesNotCancel()
+    {
+        using var fake = new CombinedFake { LastBlock = [7, 8] };
+        using var s = fake.CreateSession(SessionId);
+
+        Assert.True(DecryptVerifyStream(s, [1, 2, 3], out byte[] output));
+
+        Assert.Equal(new byte[] { 1, 2, 3, 7, 8 }, output);
+        Assert.False(fake.Canceled);
+    }
+
+    [Theory]
+    [InlineData("init")]
+    [InlineData("final probe")]
+    [InlineData("final")]
+    public void DecryptVerify_Stream_DecryptError_Throws(string step)
+    {
+        using var fake = new CombinedFake { LastBlock = [7] };
+        switch (step)
+        {
+            case "init": fake.DecryptInitRv = CKR.CKR_KEY_HANDLE_INVALID; break;
+            case "final probe": fake.DecryptFinalProbeRv = CKR.CKR_KEY_HANDLE_INVALID; break;
+            default: fake.DecryptFinalRv = CKR.CKR_KEY_HANDLE_INVALID; break;
+        }
+        using var s = fake.CreateSession(SessionId);
+
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => DecryptVerifyStream(s, [1, 2, 3], out _));
+        Assert.Equal(CKR.CKR_KEY_HANDLE_INVALID, e.ReturnValue);
     }
 
     // === Insecure-mechanism gate fires on either mechanism ==================

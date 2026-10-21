@@ -51,38 +51,40 @@ public sealed class CatalogueEvaluatorTests
 
     private static readonly PolicyDecision ParamCheckDenial = PolicyDecision.Deny("param check denial");
 
-    private static PolicyCatalogue BuildCatalogue() => new()
-    {
-        AllowedMechanisms = new Dictionary<CKM, MechanismRule>
+    private static PolicyCatalogue BuildCatalogue(
+        Action<Dictionary<CKM, MechanismRule>>? editMechanisms = null,
+        Action<Dictionary<ulong, MechanismRule>>? editVendorMechanisms = null) => new()
         {
-            [AllowedMechanism] = new(CryptoOperations.Encrypt | CryptoOperations.Decrypt, CryptoOperations.None, null, "TEST-ALLOWED"),
-            [LegacyOnlyMechanism] = new(CryptoOperations.None, CryptoOperations.Verify, null, "TEST-LEGACY"),
-            [ParamCheckedMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, (_, _) => ParamCheckDenial, "TEST-PARAM"),
-            [DualMechanism] = new(CryptoOperations.Sign, CryptoOperations.None, null, "TEST-DUAL"),
-            [RsaKeyGenMechanism] = new(CryptoOperations.GenerateKeyPair, CryptoOperations.None, null, "TEST-RSA-KEYGEN"),
-            [NonRsaKeyGenMechanism] = new(CryptoOperations.GenerateKeyPair, CryptoOperations.None, null, "TEST-EC-KEYGEN"),
-        }.ToFrozenDictionary(),
-        AllowedVendorMechanisms = new Dictionary<ulong, MechanismRule>
-        {
-            [(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, null, "TEST-VENDOR"),
-        }.ToFrozenDictionary(),
-        AllowedHashes = new Dictionary<string, AllowedHash>(StringComparer.Ordinal)
-        {
-            ["SHA256"] = new(CryptoOperations.Sign | CryptoOperations.Verify, "TEST-HASH-ALLOWED"),
-        }.ToFrozenDictionary(StringComparer.Ordinal),
-        AllowedCurves = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["1.2.3.4"] = "TEST-CURVE-ALLOWED",
-        }.ToFrozenDictionary(StringComparer.Ordinal),
-        AllowedKdfs = new Dictionary<CKD, string>
-        {
-            [CKD.CKD_SHA256_KDF] = "TEST-KDF-ALLOWED",
-        }.ToFrozenDictionary(),
-        AllowedKeyAgreementKeyTypes = new Dictionary<CKK, string>
-        {
-            [CKK.CKK_EC] = "TEST-KEYTYPE-ALLOWED",
-        }.ToFrozenDictionary(),
-        Rules = new PolicyRules(
+            AllowedMechanisms = Edited(new Dictionary<CKM, MechanismRule>
+            {
+                [AllowedMechanism] = new(CryptoOperations.Encrypt | CryptoOperations.Decrypt, CryptoOperations.None, null, "TEST-ALLOWED"),
+                [LegacyOnlyMechanism] = new(CryptoOperations.None, CryptoOperations.Verify, null, "TEST-LEGACY"),
+                [ParamCheckedMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, (_, _) => ParamCheckDenial, "TEST-PARAM"),
+                [DualMechanism] = new(CryptoOperations.Sign, CryptoOperations.None, null, "TEST-DUAL"),
+                [RsaKeyGenMechanism] = new(CryptoOperations.GenerateKeyPair, CryptoOperations.None, null, "TEST-RSA-KEYGEN"),
+                [NonRsaKeyGenMechanism] = new(CryptoOperations.GenerateKeyPair, CryptoOperations.None, null, "TEST-EC-KEYGEN"),
+            }, editMechanisms).ToFrozenDictionary(),
+            AllowedVendorMechanisms = Edited(new Dictionary<ulong, MechanismRule>
+            {
+                [(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, null, "TEST-VENDOR"),
+            }, editVendorMechanisms).ToFrozenDictionary(),
+            AllowedHashes = new Dictionary<string, AllowedHash>(StringComparer.Ordinal)
+            {
+                ["SHA256"] = new(CryptoOperations.Sign | CryptoOperations.Verify, "TEST-HASH-ALLOWED"),
+            }.ToFrozenDictionary(StringComparer.Ordinal),
+            AllowedCurves = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["1.2.3.4"] = "TEST-CURVE-ALLOWED",
+            }.ToFrozenDictionary(StringComparer.Ordinal),
+            AllowedKdfs = new Dictionary<CKD, string>
+            {
+                [CKD.CKD_SHA256_KDF] = "TEST-KDF-ALLOWED",
+            }.ToFrozenDictionary(),
+            AllowedKeyAgreementKeyTypes = new Dictionary<CKK, string>
+            {
+                [CKK.CKK_EC] = "TEST-KEYTYPE-ALLOWED",
+            }.ToFrozenDictionary(),
+            Rules = new PolicyRules(
             RsaKeyGeneration: r => r.ModulusBits < 1024
                 ? PolicyDecision.Deny("RSA modulus too small")
                 : PolicyDecision.Allow,
@@ -91,37 +93,47 @@ public sealed class CatalogueEvaluatorTests
             RsaKeyGenerationRationale: "TEST-RSA-KEYGEN-RULE",
             KeyTemplateRationale: "TEST-TEMPLATE-RULE",
             KeyMaterialExportRationale: "TEST-EXPORT-RULE"),
-        DocumentedRefusedMechanisms = new Dictionary<CKM, DocumentedRefusal>
-        {
-            [DocumentedRefusedMechanism] = new("it is cryptographically broken", "SHA256"),
-            [DocumentedRefusedMechanismNoAlternative] = new("it is a broken stream cipher.", null),
-            [DualMechanism] = new("key transport is refused", null),
-        }.ToFrozenDictionary(),
-        DocumentedRefusedHashes = new Dictionary<string, DocumentedRefusal>(StringComparer.Ordinal)
-        {
-            ["MD5"] = new("broken hash", "SHA256"),
-        }.ToFrozenDictionary(StringComparer.Ordinal),
-        DocumentedRefusedCurves = new Dictionary<string, DocumentedRefusal>(StringComparer.Ordinal)
-        {
-            ["1.2.3.9"] = new("too weak", null),
-        }.ToFrozenDictionary(StringComparer.Ordinal),
-        DocumentedRefusedKdfs = new Dictionary<CKD, DocumentedRefusal>
-        {
-            [CKD.CKD_NULL] = new("applies no KDF at all", "CKD_SHA256_KDF"),
-        }.ToFrozenDictionary(),
-        DocumentedRefusedKeyAgreementKeyTypes = new Dictionary<CKK, DocumentedRefusal>
-        {
-            [CKK.CKK_EC_MONTGOMERY] = new("Montgomery keys are refused.", "a CKK_EC key"),
-        }.ToFrozenDictionary(),
-        DocumentedRefusedPrfs = FrozenDictionary<string, DocumentedRefusal>.Empty,
-        AllowedKdfPrfs = FrozenDictionary<string, FrozenSet<string>>.Empty,
-    };
+            DocumentedRefusedMechanisms = new Dictionary<CKM, DocumentedRefusal>
+            {
+                [DocumentedRefusedMechanism] = new("it is cryptographically broken", "SHA256"),
+                [DocumentedRefusedMechanismNoAlternative] = new("it is a broken stream cipher.", null),
+                [DualMechanism] = new("key transport is refused", null),
+            }.ToFrozenDictionary(),
+            DocumentedRefusedHashes = new Dictionary<string, DocumentedRefusal>(StringComparer.Ordinal)
+            {
+                ["MD5"] = new("broken hash", "SHA256"),
+            }.ToFrozenDictionary(StringComparer.Ordinal),
+            DocumentedRefusedCurves = new Dictionary<string, DocumentedRefusal>(StringComparer.Ordinal)
+            {
+                ["1.2.3.9"] = new("too weak", null),
+            }.ToFrozenDictionary(StringComparer.Ordinal),
+            DocumentedRefusedKdfs = new Dictionary<CKD, DocumentedRefusal>
+            {
+                [CKD.CKD_NULL] = new("applies no KDF at all", "CKD_SHA256_KDF"),
+            }.ToFrozenDictionary(),
+            DocumentedRefusedKeyAgreementKeyTypes = new Dictionary<CKK, DocumentedRefusal>
+            {
+                [CKK.CKK_EC_MONTGOMERY] = new("Montgomery keys are refused.", "a CKK_EC key"),
+            }.ToFrozenDictionary(),
+            DocumentedRefusedPrfs = FrozenDictionary<string, DocumentedRefusal>.Empty,
+            AllowedKdfPrfs = FrozenDictionary<string, FrozenSet<string>>.Empty,
+        };
+
+    private static Dictionary<TKey, MechanismRule> Edited<TKey>(Dictionary<TKey, MechanismRule> rules, Action<Dictionary<TKey, MechanismRule>>? edit)
+        where TKey : notnull
+    {
+        edit?.Invoke(rules);
+        return rules;
+    }
 
     // Stands in for a policy's extension hint (SecureOnly passes its WithAllowedMechanism sentence).
     private const string Hint = "TEST-HINT.";
 
     private static PolicyDecision Evaluate(PolicyRequest request, string? extensionHint = null)
         => CatalogueEvaluator.Evaluate(BuildCatalogue(), PolicyName, extensionHint, request);
+
+    private static PolicyDecision Evaluate(PolicyCatalogue catalogue, PolicyRequest request)
+        => CatalogueEvaluator.Evaluate(catalogue, PolicyName, extensionHint: null, request);
 
     // --- Mechanisms ---
 
@@ -272,6 +284,38 @@ public sealed class CatalogueEvaluatorTests
         Assert.Equal($"vendor mechanism 0x{(ulong)VendorMechanism:X} is allowed under {PolicyName} only for Encrypt; Sign is not. TEST-VENDOR", denied.Reason);
     }
 
+    // A vendor entry's parameter check runs exactly like a standard entry's: an allow-list match alone
+    // must not let the request through.
+    [Fact]
+    public void VendorMechanism_ParameterCheckDenial_Propagates()
+    {
+        PolicyCatalogue catalogue = BuildCatalogue(editVendorMechanisms: vendor =>
+            vendor[(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, (_, _) => ParamCheckDenial, "TEST-VENDOR-PARAM"));
+
+        PolicyDecision d = Evaluate(catalogue, new MechanismUseRequest(new Mechanism(VendorMechanism), CryptoOperation.Encrypt));
+        Assert.False(d.IsAllowed);
+        Assert.Equal(ParamCheckDenial.Reason, d.Reason);
+    }
+
+    [Fact]
+    public void VendorMechanism_ParameterCheck_ReceivesTheMechanismAndOperation()
+    {
+        Mechanism? seenMechanism = null;
+        CryptoOperation? seenOperation = null;
+        PolicyCatalogue catalogue = BuildCatalogue(editVendorMechanisms: vendor =>
+            vendor[(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.Decrypt, (m, op) =>
+            {
+                seenMechanism = m;
+                seenOperation = op;
+                return PolicyDecision.Allow;
+            }, "TEST-VENDOR-PARAM"));
+        var mechanism = new Mechanism(VendorMechanism);
+
+        Assert.True(Evaluate(catalogue, new MechanismUseRequest(mechanism, CryptoOperation.Decrypt)).IsAllowed);
+        Assert.Same(mechanism, seenMechanism);
+        Assert.Equal(CryptoOperation.Decrypt, seenOperation);
+    }
+
     [Fact]
     public void UnlistedVendorValue_IsDenied()
     {
@@ -316,6 +360,14 @@ public sealed class CatalogueEvaluatorTests
         PolicyDecision d = Evaluate(new HashUseRequest(new HashAlgorithmName("SHA384"), CryptoOperation.Sign));
         Assert.False(d.IsAllowed);
         Assert.Equal($"SHA384 is not on the {PolicyName} allow-list (not reviewed).", d.Reason);
+    }
+
+    [Fact]
+    public void HashWithNoName_IsDeniedAndStillNamedInTheReason()
+    {
+        PolicyDecision d = Evaluate(new HashUseRequest(default, CryptoOperation.Sign));
+        Assert.False(d.IsAllowed);
+        Assert.Equal($"(unnamed hash) is not on the {PolicyName} allow-list (not reviewed).", d.Reason);
     }
 
     // --- Curves: same two-step behaviour, plus the no-OID case ---
@@ -397,6 +449,22 @@ public sealed class CatalogueEvaluatorTests
         Assert.True(Evaluate(new RsaKeyGenerationRequest(RsaKeyGenMechanism, 2048)).IsAllowed);
     }
 
+    // An RSA key-generation mechanism on the allow list for other operations only: the operation is
+    // checked before the rules run, and the denial names both the standard and legacy operations.
+    [Fact]
+    public void RsaKeyGeneration_OnAnAllowedMechanismNotCoveringGenerateKeyPair_IsDeniedWithOperationRestrictedWording()
+    {
+        PolicyCatalogue catalogue = BuildCatalogue(editMechanisms: rules =>
+            rules[CKM.CKM_RSA_X9_31_KEY_PAIR_GEN] = new(CryptoOperations.Sign, CryptoOperations.Verify, null, "TEST-X931"));
+
+        PolicyDecision d = Evaluate(catalogue, new RsaKeyGenerationRequest(CKM.CKM_RSA_X9_31_KEY_PAIR_GEN, 4096));
+
+        Assert.False(d.IsAllowed);
+        Assert.Equal(
+            $"CKM_RSA_X9_31_KEY_PAIR_GEN is allowed under {PolicyName} only for Sign, Verify; GenerateKeyPair is not. TEST-X931",
+            d.Reason);
+    }
+
     [Fact]
     public void RsaKeyGeneration_OnAMechanismNotOnTheAllowList_IsDeniedWithoutConsultingTheRules()
         => Assert.False(Evaluate(new RsaKeyGenerationRequest(CKM.CKM_RSA_X9_31_KEY_PAIR_GEN, 4096)).IsAllowed);
@@ -410,7 +478,10 @@ public sealed class CatalogueEvaluatorTests
     {
         PolicyDecision d = Evaluate(new RsaKeyGenerationRequest(NonRsaKeyGenMechanism, 4096));
         Assert.False(d.IsAllowed);
-        Assert.Contains("not an RSA key-pair-generation mechanism", d.Reason, StringComparison.Ordinal);
+        Assert.Equal(
+            "CKM_EC_KEY_PAIR_GEN is not an RSA key-pair-generation mechanism " +
+            "(expected CKM_RSA_PKCS_KEY_PAIR_GEN or CKM_RSA_X9_31_KEY_PAIR_GEN).",
+            d.Reason);
     }
 
     [Fact]
@@ -433,5 +504,9 @@ public sealed class CatalogueEvaluatorTests
 
     [Fact]
     public void UnrecognizedRequestKind_IsDenied()
-        => Assert.False(Evaluate(new UnrecognizedPolicyRequest()).IsAllowed);
+    {
+        PolicyDecision d = Evaluate(new UnrecognizedPolicyRequest());
+        Assert.False(d.IsAllowed);
+        Assert.Equal($"{PolicyName} has no rule for UnrecognizedPolicyRequest.", d.Reason);
+    }
 }

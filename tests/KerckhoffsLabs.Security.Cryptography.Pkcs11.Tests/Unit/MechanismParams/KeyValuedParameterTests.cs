@@ -89,6 +89,91 @@ public sealed class KeyValuedParameterTests
         Assert.Equal("keygxy", e.ParamName);
     }
 
+    // === Every key field, not one per type ===================================
+
+    // Which half each field takes, whether it may be absent, and how to build its type with a given
+    // key in each field. Keyed by "Type.parameter" so each row is serializable.
+    private sealed record KeyField(KeyHandlePart Part, bool Optional, Func<Func<string, Pkcs11Key?>, object> Make);
+
+    private static readonly Dictionary<string, KeyField> KeyFields = new()
+    {
+        ["CkmX3dhInitiateParams.peerIdentity"] = new(KeyHandlePart.Public, false, X3dhInitiate),
+        ["CkmX3dhInitiateParams.peerPrekey"] = new(KeyHandlePart.Public, false, X3dhInitiate),
+        ["CkmX3dhInitiateParams.ownIdentity"] = new(KeyHandlePart.Private, false, X3dhInitiate),
+        ["CkmX3dhInitiateParams.ownEphemeral"] = new(KeyHandlePart.Private, false, X3dhInitiate),
+        ["CkmX3dhRespondParams.initiatorIdentity"] = new(KeyHandlePart.Public, false,
+            k => new CkmX3dhRespondParams(CKM.CKM_SHA256_HMAC, [0x01], [0x02], [0x03], k("initiatorIdentity")!, [0x04])),
+        ["CkmX2RatchetInitializeParams.peerPublicPrekey"] = new(KeyHandlePart.Public, false, X2RatchetInitialize),
+        ["CkmX2RatchetInitializeParams.peerPublicIdentity"] = new(KeyHandlePart.Public, false, X2RatchetInitialize),
+        ["CkmX2RatchetInitializeParams.ownPublicIdentity"] = new(KeyHandlePart.Public, false, X2RatchetInitialize),
+        ["CkmX2RatchetRespondParams.ownPrekey"] = new(KeyHandlePart.Private, false, X2RatchetRespond),
+        ["CkmX2RatchetRespondParams.initiatorIdentity"] = new(KeyHandlePart.Public, false, X2RatchetRespond),
+        ["CkmX2RatchetRespondParams.ownPublicIdentity"] = new(KeyHandlePart.Public, false, X2RatchetRespond),
+        ["CkmIke1PrfDeriveParams.keygxy"] = new(KeyHandlePart.Private, false, Ike1Prf),
+        ["CkmIke1PrfDeriveParams.prevKey"] = new(KeyHandlePart.Private, true, Ike1Prf),
+        ["CkmIke1ExtendedDeriveParams.keygxy"] = new(KeyHandlePart.Private, true,
+            k => new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, k("keygxy"), [0x01])),
+        ["CkmIke2PrfPlusDeriveParams.seedKey"] = new(KeyHandlePart.Private, true,
+            k => new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, k("seedKey"), [0x01])),
+        ["CkmIkePrfDeriveParams.newKey"] = new(KeyHandlePart.Private, true,
+            k => new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: true, [0x01], [0x02], k("newKey"))),
+        ["CkmHkdfParams.saltKey"] = new(KeyHandlePart.Private, false,
+            k => CkmHkdfParams.WithSaltKey(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, k("saltKey")!)),
+        ["Sp800108KdfBuilder.key"] = new(KeyHandlePart.Private, false,
+            k => CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC).IterationCounter().Key(k("key")!)),
+    };
+
+    private static object X3dhInitiate(Func<string, Pkcs11Key?> k) => new CkmX3dhInitiateParams(
+        CKM.CKM_SHA256_HMAC, k("peerIdentity")!, k("peerPrekey")!, [0x01], [0x02], k("ownIdentity")!, k("ownEphemeral")!);
+
+    private static object X2RatchetInitialize(Func<string, Pkcs11Key?> k) => new CkmX2RatchetInitializeParams(
+        [0x01], k("peerPublicPrekey")!, k("peerPublicIdentity")!, k("ownPublicIdentity")!,
+        encryptedHeader: false, curve: 1, CKM.CKM_AES_GCM, CKM.CKM_SHA256_HMAC);
+
+    private static object X2RatchetRespond(Func<string, Pkcs11Key?> k) => new CkmX2RatchetRespondParams(
+        [0x01], k("ownPrekey")!, k("initiatorIdentity")!, k("ownPublicIdentity")!,
+        encryptedHeader: false, curve: 1, CKM.CKM_AES_GCM, CKM.CKM_SHA256_HMAC);
+
+    private static object Ike1Prf(Func<string, Pkcs11Key?> k) => new CkmIke1PrfDeriveParams(
+        CKM.CKM_SHA256_HMAC, k("keygxy")!, k("prevKey"), [0x01], [0x02], keyNumber: 0);
+
+    public static TheoryData<string> KeyFieldNames() => [.. KeyFields.Keys];
+
+    // Every other field gets a full key pair, which has both halves.
+    private static object MakeWith(ParameterKeys keys, string row, Pkcs11Key? inTheField)
+    {
+        string field = row[(row.IndexOf('.') + 1)..];
+        return KeyFields[row].Make(name => name == field ? inTheField : keys.Pair(0x10, 0x11));
+    }
+
+    [Theory]
+    [MemberData(nameof(KeyFieldNames))]
+    public void KeyField_WithoutTheHalfItTakes_IsRefusedAtConstruction(string row)
+    {
+        using var keys = new ParameterKeys();
+        Pkcs11Key wrongHalf = KeyFields[row].Part == KeyHandlePart.Public ? keys.Secret(9) : keys.PublicOnly(9);
+
+        var e = Assert.Throws<ArgumentException>(() => MakeWith(keys, row, wrongHalf));
+
+        Assert.Equal(row[(row.IndexOf('.') + 1)..], e.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(KeyFieldNames))]
+    public void KeyField_Null_IsRefusedUnlessOptional(string row)
+    {
+        using var keys = new ParameterKeys();
+
+        if (KeyFields[row].Optional)
+        {
+            Assert.NotNull(MakeWith(keys, row, null));
+            return;
+        }
+
+        var e = Assert.Throws<ArgumentNullException>(() => MakeWith(keys, row, null));
+        Assert.Equal(row[(row.IndexOf('.') + 1)..], e.ParamName);
+    }
+
     [Fact]
     public void AbsentOptionalKeys_MarshalAsNotPresentWithNoHandle()
     {

@@ -194,8 +194,30 @@ public sealed class ObjectAttributeTests
     public void CopyValueTo_ThrowsWhenDestinationTooSmall()
     {
         using var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3, 4]);
-        byte[] tooSmall = new byte[2];
-        Assert.Throws<ArgumentException>(() => attr.CopyValueTo(tooSmall));
+        byte[] tooSmall = new byte[3];
+        var ex = Assert.Throws<ArgumentException>(() => attr.CopyValueTo(tooSmall));
+        Assert.Equal("destination", ex.ParamName);
+        Assert.StartsWith("Destination too small: needs 4 bytes, got 3.", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CopyValueTo_DestinationOfExactlyTheValueLength_IsEnough()
+    {
+        using var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3, 4]);
+        byte[] exact = new byte[4];
+        Assert.Equal(4, attr.CopyValueTo(exact));
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, exact);
+    }
+
+    [Fact]
+    public void ListConstructors_RejectNull()
+    {
+        Assert.Equal("value", Assert.Throws<ArgumentNullException>(
+            () => new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, (IReadOnlyList<ObjectAttribute>)null!)).ParamName);
+        Assert.Equal("value", Assert.Throws<ArgumentNullException>(
+            () => new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, (IReadOnlyList<ulong>)null!)).ParamName);
+        Assert.Equal("value", Assert.Throws<ArgumentNullException>(
+            () => new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, (IReadOnlyList<CKM>)null!)).ParamName);
     }
 
     // ---- Lifetime / Dispose -------------------------------------------------

@@ -106,4 +106,20 @@ public sealed class MechanismParameterScopeTests
         Assert.Null(Record.Exception(scope.Dispose));
         Assert.Equal(afterFirst, UnmanagedMemory.OutstandingAllocationCount);
     }
+
+    // A block allocated after disposal would have no owner left to free it.
+    [Fact]
+    public void EveryAllocation_AfterDispose_Throws()
+    {
+        int before = UnmanagedMemory.OutstandingAllocationCount;
+        var scope = new MechanismParameterScope();
+        scope.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => scope.Allocate(1));
+        Assert.Throws<ObjectDisposedException>(() => scope.Write([1]));
+        Assert.Throws<ObjectDisposedException>(() => scope.WriteStruct(new CK_VERSION()));
+        Assert.Throws<ObjectDisposedException>(() => scope.WriteStructArray<CK_VERSION>([new CK_VERSION()]));
+        Assert.Throws<ObjectDisposedException>(scope.ThrowIfDisposed);
+        Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
+    }
 }

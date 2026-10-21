@@ -40,16 +40,7 @@ public sealed class MLKemPkcs11Tests_Managed
         using var session = ManagedToken.OpenSession(library);
         using IDisposable? insecure = allowInsecure ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
 
-        string label = $"mlkem-{Guid.NewGuid():N}";
-        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
-            .Label(label)
-            .Attribute(CKA.CKA_ENCAPSULATE, true)
-            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)parameterSet).Build();
-        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
-            .Label(label)
-            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
-
-        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = GenerateMlKem(session, parameterSet);
         try
         {
             using var mlkem = new MLKemPkcs11(key);
@@ -60,6 +51,35 @@ public sealed class MLKemPkcs11Tests_Managed
             try { key.Destroy(); }
             catch { /* best-effort cleanup */ }
         }
+    }
+
+    private static Pkcs11Key GenerateMlKem(Pkcs11Session session, CkpMlKem parameterSet)
+    {
+        string label = $"mlkem-{Guid.NewGuid():N}";
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
+            .Label(label)
+            .Attribute(CKA.CKA_ENCAPSULATE, true)
+            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)parameterSet).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
+            .Label(label)
+            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
+
+        return session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+    }
+
+    // A ciphertext for the key, made off the token so that producing it extracts nothing.
+    private static byte[] BclCiphertextFor(MLKemPkcs11 mlkem)
+    {
+        using var bcl = MLKem.ImportEncapsulationKey(mlkem.Algorithm, mlkem.ExportEncapsulationKey());
+        bcl.Encapsulate(out byte[] ciphertext, out _);
+        return ciphertext;
+    }
+
+    private static int SecretKeyCount(Pkcs11Session session)
+    {
+        using var filter = ObjectTemplate.Empty().Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_SECRET_KEY).Build();
+        using var keys = session.FindKeys(filter);
+        return keys.Count;
     }
 
     public static TheoryData<CkpMlKem> ParameterSets =>
@@ -149,39 +169,95 @@ public sealed class MLKemPkcs11Tests_Managed
             Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Encapsulate(out _, out _));
         });
 
+    // Refuses reading key material off the token and allows everything else.
+    private sealed class NoExportPolicy : ICryptoPolicy
+    {
+        public List<PolicyRequest> Seen { get; } = [];
+        public string Name => "NoExport";
+        public bool AllowsOverride => false;
+        public PolicyDecision Evaluate(PolicyRequest request)
+        {
+            Seen.Add(request);
+            return request is KeyMaterialExportRequest ? PolicyDecision.Deny("no export") : PolicyDecision.Allow;
+        }
+    }
+
+    // The default policy also refuses the extractable shared-secret template, which would hide a missing
+    // export check. A policy that accepts the template but refuses plaintext secrets must still stop both
+    // operations, before the token creates the secret.
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void SharedSecretExport_IsCheckedOnItsOwn_BeforeTheToken()
+    {
+        var policy = new NoExportPolicy();
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, policy);
+        using var key = GenerateMlKem(session, CkpMlKem.CKP_ML_KEM_768);
+        using var mlkem = new MLKemPkcs11(key);
+        byte[] ciphertext = BclCiphertextFor(mlkem);
+        policy.Seen.Clear();
+
+        var encapsulate = Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Encapsulate(out _, out _));
+        var decapsulate = Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Decapsulate(ciphertext));
+
+        Assert.Equal(KeyMaterialExportKind.KemSharedSecret, Assert.IsType<KeyMaterialExportRequest>(encapsulate.Request).Kind);
+        Assert.Equal(KeyMaterialExportKind.KemSharedSecret, Assert.IsType<KeyMaterialExportRequest>(decapsulate.Request).Kind);
+        Assert.Empty(policy.Seen.OfType<KeyTemplateRequest>());
+        Assert.Equal(0, SecretKeyCount(session));
+    }
+
+    // The shared secret is created on the token as an extractable object only so its value can be read;
+    // once read it must not stay there.
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void EncapsulateAndDecapsulate_LeaveNoSharedSecretOnTheToken() =>
+        WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (session, mlkem) =>
+        {
+            byte[] ciphertext = BclCiphertextFor(mlkem);
+
+            mlkem.Encapsulate(out _, out _);
+            Assert.Equal(0, SecretKeyCount(session));
+
+            mlkem.Decapsulate(ciphertext);
+            Assert.Equal(0, SecretKeyCount(session));
+        });
+
     // === Extract-and-destroy cleanup failures =============================
 
     // The extract-and-destroy path creates a transient, extractable shared-secret object on the
     // token, reads its bytes, then destroys it. If C_DestroyObject fails, that extractable copy
     // lingers on-token — the adapter must surface the failure (not swallow it) and must not hand
     // back a shared secret alongside a failed cleanup.
-    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
-    public void Encapsulate_WhenDestroyFails_SurfacesPkcs11Exception()
+    [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WhenDestroyFails_SurfacesPkcs11Exception_AndHandsBackNoSecret(bool encapsulate)
     {
         var token = new ManagedSoftToken();
         using var library = token.Load();
         using var session = ManagedToken.OpenSession(library);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
-        string label = $"mlkem-{Guid.NewGuid():N}";
-        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
-            .Label(label)
-            .Attribute(CKA.CKA_ENCAPSULATE, true)
-            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768).Build();
-        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
-            .Label(label)
-            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
-
-        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = GenerateMlKem(session, CkpMlKem.CKP_ML_KEM_768);
         try
         {
             using var mlkem = new MLKemPkcs11(key);
+            byte[] ciphertext = new byte[mlkem.Algorithm.CiphertextSizeInBytes];
+            byte[] sharedSecret = new byte[mlkem.Algorithm.SharedSecretSizeInBytes];
+            if (!encapsulate)
+                ciphertext = BclCiphertextFor(mlkem);
 
             // Make every C_DestroyObject report failure so the shared-secret object cannot be removed.
             token.DestroyObjectResultOverride = CKR.CKR_FUNCTION_FAILED;
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mlkem.Encapsulate(out _, out _));
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            {
+                if (encapsulate)
+                    mlkem.Encapsulate(ciphertext, sharedSecret);
+                else
+                    mlkem.Decapsulate(ciphertext, sharedSecret);
+            });
             Assert.Equal(CKR.CKR_FUNCTION_FAILED, ex.ReturnValue);
+            Assert.Contains("may remain on-token", ex.Message, StringComparison.Ordinal);
+            Assert.All(sharedSecret, b => Assert.Equal(0, b));
         }
         finally
         {

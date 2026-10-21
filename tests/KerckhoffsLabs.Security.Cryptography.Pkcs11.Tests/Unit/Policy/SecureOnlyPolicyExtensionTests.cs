@@ -98,6 +98,34 @@ public sealed class SecureOnlyPolicyExtensionTests
         Assert.False(withStandard.Catalogue.AllowedVendorMechanisms.ContainsKey((ulong)CKM.CKM_DES_CBC));
     }
 
+    // CKM_VENDOR_DEFINED itself is the first vendor value (Mechanism.IsVendorDefined uses >=).
+    [Fact]
+    public void Routing_TreatsCkmVendorDefinedItselfAsVendor()
+    {
+        SecureOnlyPolicy extended = CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_VENDOR_DEFINED, [CryptoOperation.Sign], Reason);
+
+        Assert.True(new Mechanism(CKM.CKM_VENDOR_DEFINED).IsVendorDefined);
+        Assert.True(extended.Catalogue.AllowedVendorMechanisms.ContainsKey((ulong)CKM.CKM_VENDOR_DEFINED));
+        Assert.False(extended.Catalogue.AllowedMechanisms.ContainsKey(CKM.CKM_VENDOR_DEFINED));
+        Assert.True(Allowed(extended, CKM.CKM_VENDOR_DEFINED, CryptoOperation.Sign));
+    }
+
+    // === Duplicate operations ===================================================
+
+    // The operations are a set: listing one twice approves it once, and never cancels it out.
+    [Fact]
+    public void RepeatedOperation_IsApprovedOnce()
+    {
+        SecureOnlyPolicy extended = CryptoPolicy.SecureOnly.WithAllowedMechanism(
+            VendorMechanism, [CryptoOperation.Sign, CryptoOperation.Sign, CryptoOperation.Verify, CryptoOperation.Sign], Reason);
+
+        Assert.True(Allowed(extended, new Mechanism(VendorMechanism), CryptoOperation.Sign));
+        Assert.True(Allowed(extended, new Mechanism(VendorMechanism), CryptoOperation.Verify));
+        Assert.Equal(
+            CryptoOperations.Sign | CryptoOperations.Verify,
+            extended.Catalogue.AllowedVendorMechanisms[(ulong)VendorMechanism].Operations);
+    }
+
     // === Documented-refused mechanisms accepted ===============================
 
     [Fact]
@@ -270,8 +298,10 @@ public sealed class SecureOnlyPolicyExtensionTests
     {
         Assert.Throws<ArgumentException>(() =>
             CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_DES_CBC, [(CryptoOperation)32], Reason));
-        Assert.Throws<ArgumentException>(() =>
+        ArgumentException e = Assert.Throws<ArgumentException>(() =>
             CryptoPolicy.SecureOnly.WithAllowedMechanism(VendorMechanism, [CryptoOperation.Decrypt, (CryptoOperation)(-1)], Reason));
+        Assert.Equal("operations", e.ParamName);
+        Assert.StartsWith("-1 is not a defined CryptoOperation.", e.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -288,8 +318,10 @@ public sealed class SecureOnlyPolicyExtensionTests
     {
         Assert.Throws<ArgumentException>(() =>
             CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_DES_CBC, [], Reason));
-        Assert.Throws<ArgumentException>(() =>
+        ArgumentException e = Assert.Throws<ArgumentException>(() =>
             CryptoPolicy.SecureOnly.WithAllowedMechanism(VendorMechanism, [], Reason));
+        Assert.Equal("operations", e.ParamName);
+        Assert.StartsWith("At least one operation must be approved.", e.Message, StringComparison.Ordinal);
     }
 
     // ArgumentException.ThrowIfNullOrWhiteSpace (the pattern PolicyDecision.Deny already uses) throws the

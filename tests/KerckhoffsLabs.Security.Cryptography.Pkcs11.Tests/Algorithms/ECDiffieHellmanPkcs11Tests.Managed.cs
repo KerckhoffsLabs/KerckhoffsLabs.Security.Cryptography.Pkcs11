@@ -150,6 +150,20 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobKey, aliceKey);
     });
 
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void DeriveKeyFromHmac_WithPrependAppend_AgreesWithBcl() => WithEcdh("P-256", alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+        byte[] hmacKey = [0xAA, 0xBB, 0xCC, 0xDD];
+        byte[] prepend = [1, 2, 3];
+        byte[] append = [9, 8, 7, 6];
+
+        byte[] aliceKey = alice.DeriveKeyFromHmac(bob.PublicKey, HashAlgorithmName.SHA256, hmacKey, prepend, append);
+        byte[] bobKey = bob.DeriveKeyFromHmac(alice.PublicKey, HashAlgorithmName.SHA256, hmacKey, prepend, append);
+
+        Assert.Equal(bobKey, aliceKey);
+    });
+
     [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("P-256")]
     [InlineData("P-384")]
@@ -415,6 +429,17 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         var ex = Assert.Throws<ArgumentException>(
             () => alice.DeriveKeyFromHash(bob.PublicKey, default, null, null));
         Assert.Equal("hashAlgorithm", ex.ParamName);
+    });
+
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void DeriveKeyFromHmac_ArgumentErrors_NameTheParameter() => WithEcdh("P-256", alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+
+        Assert.Equal("otherPartyPublicKey", Assert.Throws<ArgumentNullException>(
+            () => alice.DeriveKeyFromHmac(null!, HashAlgorithmName.SHA256, null, null, null)).ParamName);
+        Assert.Equal("hashAlgorithm", Assert.Throws<ArgumentException>(
+            () => alice.DeriveKeyFromHmac(bob.PublicKey, default, null, null, null)).ParamName);
     });
 
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]

@@ -52,6 +52,23 @@ public sealed class Pkcs11MechanismMapTests
         Assert.Equal(expectedSalt, pssParams.SaltLength);
     }
 
+    // Only a negative length asks for the default: 0 is a legal PSS salt (RFC 8017 §9.1), and an explicit
+    // length is passed through as given.
+    [Theory]
+    [InlineData("SHA1")]
+    [InlineData("SHA224")]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void RsaPss_ExplicitSalt_IsKept_IncludingZero(string hashName)
+    {
+        foreach (int salt in (int[])[0, 10])
+        {
+            var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: salt);
+            Assert.Equal(salt, Assert.IsType<CkmRsaPkcsPssParams>(mech.Parameters).SaltLength);
+        }
+    }
+
     [Theory]
     [InlineData("SHA1", CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1)]
     [InlineData("SHA224", CKM.CKM_SHA224, CKG.CKG_MGF1_SHA224)]
