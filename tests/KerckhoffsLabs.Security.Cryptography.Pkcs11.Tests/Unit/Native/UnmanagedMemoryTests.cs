@@ -119,6 +119,17 @@ public sealed class UnmanagedMemoryTests
         });
     }
 
+    // Empty buffers, so that without the guards the copy would reach Marshal.Copy instead of faulting:
+    // the parameter named tells the guard's throw from whatever the copy does with a NULL address.
+    [Fact]
+    public void NullPointer_IsRefusedByTheGuard_EvenForAnEmptyCopy()
+    {
+        Assert.Equal("memory", Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Write(IntPtr.Zero, Array.Empty<byte>())).ParamName);
+        Assert.Equal("memory", Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Write(IntPtr.Zero, ReadOnlySpan<byte>.Empty)).ParamName);
+        Assert.Equal("memory", Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Read(IntPtr.Zero, 0)).ParamName);
+        Assert.Equal("memory", Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Read(IntPtr.Zero, Array.Empty<byte>())).ParamName);
+    }
+
     [Fact]
     public void Read_NegativeSize_Throws()
     {

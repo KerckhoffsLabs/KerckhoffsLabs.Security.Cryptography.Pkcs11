@@ -272,6 +272,54 @@ public sealed class VendorParameterWriterTests
         Assert.Equal((ulong)a.ParameterLen, (ulong)b.ParameterLen);
     }
 
+    // A struct that ends on a one-byte field: naturally aligned it is padded up to a multiple of its
+    // widest member, packed it stops right after the byte. Every other case here ends on a word.
+    [Fact]
+    public void TrailingByte_IsPaddedLikeIke1PrfDeriveParams()
+    {
+        var real = new CK_IKE1_PRF_DERIVE_PARAMS
+        {
+            PrfMechanism = CKM.CKM_SHA256_HMAC.ToCULong(),
+            HasPrevKey = 1,
+            Keygxy = (NativeCULong)0x11,
+            PrevKey = (NativeCULong)0x22,
+            CkyILen = (NativeCULong)0,
+            CkyRLen = (NativeCULong)0,
+            KeyNumber = 0x7E,
+        };
+
+        Assert.Equal(
+            RealBytes(in real),
+            WrittenBytes(w => w
+                .CkULong((ulong)CKM.CKM_SHA256_HMAC)
+                .Byte(1)
+                .CkULong(0x11)
+                .CkULong(0x22)
+                .NullPointer()
+                .CkULong(0)
+                .NullPointer()
+                .CkULong(0)
+                .Byte(0x7E)));
+    }
+
+    [Fact]
+    public void InlineBytes_NegativeLength_Throws()
+    {
+        using var scope = new MechanismParameterScope();
+        var p = new Described(w => w.InlineBytes([], -1));
+
+        Assert.Equal("length", Assert.Throws<ArgumentOutOfRangeException>(() => p.BuildMarshalable(scope)).ParamName);
+    }
+
+    [Fact]
+    public void Key_Null_Throws()
+    {
+        using var scope = new MechanismParameterScope();
+        var p = new Described(w => w.Key(null!));
+
+        Assert.Equal("key", Assert.Throws<ArgumentNullException>(() => p.BuildMarshalable(scope)).ParamName);
+    }
+
     [Fact]
     public void InlineBytes_LongerThanTheField_Throws()
     {

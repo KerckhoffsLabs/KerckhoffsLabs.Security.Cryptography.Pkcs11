@@ -479,6 +479,62 @@ public sealed class SecureOnlyPolicyTests
         Assert.False(Allowed(new Mechanism(CKM.CKM_HKDF_DERIVE, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)), CryptoOperation.Derive));
     }
 
+    // === Parameter-check denials say what to use instead ======================
+
+    // Keyed by name so each theory row is serializable; the requests are built on demand.
+    private static readonly Dictionary<string, (Func<PolicyRequest> Request, string Reason)> ParameterDenials = new()
+    {
+        ["OaepWithoutParameters"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_RSA_PKCS_OAEP), CryptoOperation.Encrypt),
+            "CKM_RSA_PKCS_OAEP requires CkmRsaPkcsOaepParams naming SHA-256 or stronger; without them the token chooses the hash (typically SHA-1)."),
+        ["OaepSha224"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA224, CKG.CKG_MGF1_SHA224)), CryptoOperation.Encrypt),
+            "SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware; use CKM_SHA256 or stronger as the OAEP hash."),
+        ["OaepUnlistedHash"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_MD5, CKG.CKG_MGF1_SHA256)), CryptoOperation.Encrypt),
+            "CKM_MD5 is not an allowed OAEP hash; use CKM_SHA256 or stronger."),
+        ["HashedPssWithWrongParameters"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)), CryptoOperation.Sign),
+            "RSA-PSS parameters must be CkmRsaPkcsPssParams."),
+        ["PqcPreHashTooShort"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_HASH_ML_DSA, new CkmHashPqcSignParams(CKM.CKM_SHA224)), CryptoOperation.Sign),
+            "HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 256 bits (SHA-256/384/512, SHA-512/256 or SHA3-256/384/512)."),
+        ["Pbkdf2UnlistedPrf"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_PKCS5_PBKD2, new CkmPkcs5Pbkd2Params([1], 1, (CKP)0x99, [1])), CryptoOperation.GenerateKey),
+            "153 is not an allowed PBKDF2 PRF; use CKP_PKCS5_PBKD2_HMAC_SHA256 or stronger."),
+        ["Pbkdf2WithoutParameters"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_PKCS5_PBKD2), CryptoOperation.GenerateKey),
+            "CKM_PKCS5_PBKD2 requires CkmPkcs5Pbkd2Params naming an allowed PRF (CKP_PKCS5_PBKD2_HMAC_SHA256 or stronger)."),
+        ["Sp800108UnlistedPrf"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, CkmSp800108KdfParams.Counter(CKM.CKM_SHA256).IterationCounter().Build()), CryptoOperation.Derive),
+            "CKM_SHA256 is not an allowed SP 800-108 PRF; use CKM_SHA256_HMAC or stronger, or CKM_AES_CMAC."),
+        ["Sp800108WithoutParameters"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF), CryptoOperation.Derive),
+            "SP 800-108 key derivation requires CkmSp800108KdfParams naming an allowed PRF (CKM_SHA256_HMAC or stronger, or CKM_AES_CMAC)."),
+        ["HkdfUnlistedPrf"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA_1)), CryptoOperation.Derive),
+            "CKM_SHA_1 is not an allowed HKDF PRF; use CKM_SHA256 or stronger, hash or _HMAC form."),
+        ["HkdfWithoutParameters"] = (
+            () => new MechanismUseRequest(new Mechanism(CKM.CKM_HKDF_DERIVE), CryptoOperation.Derive),
+            "CKM_HKDF_DERIVE / CKM_HKDF_DATA require CkmHkdfParams naming an allowed PRF (CKM_SHA256 or stronger, hash or _HMAC form)."),
+        ["KeyMaterialExport"] = (
+            () => new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput),
+            "Reading the KdfOutput off the token violates the non-extractable-by-default posture. " +
+            "Keep the secret on the token (Pkcs11Key.EncapsulateKey / DecapsulateKey / Derive to a sensitive key)."),
+    };
+
+    public static TheoryData<string> ParameterDenialKinds() => [.. ParameterDenials.Keys];
+
+    [Theory]
+    [MemberData(nameof(ParameterDenialKinds))]
+    public void ParameterDenial_NamesTheAllowedAlternative(string kind)
+    {
+        (Func<PolicyRequest> request, string reason) = ParameterDenials[kind];
+        PolicyDecision d = Policy.Evaluate(request());
+        Assert.False(d.IsAllowed);
+        Assert.Equal(reason, d.Reason);
+    }
+
     [Fact]
     public void DocumentedRefusedPrf_QuotesReasonAndAlternative()
     {

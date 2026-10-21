@@ -40,4 +40,12 @@ public sealed class LowLevelPkcs11LibraryCoreTests
         Assert.Contains("KerckhoffsLabs.Runtime.InteropServices", ex.Message);
         Assert.Contains("RuntimeIdentifier", ex.Message);
     }
+
+    // A missing path is the caller's mistake, named as such, before anything reaches the loader.
+    [Fact]
+    public void Constructor_NullOrEmptyPath_Throws()
+    {
+        Assert.Equal("libraryPath", Assert.Throws<ArgumentNullException>(() => new LowLevelPkcs11Library((string)null!)).ParamName);
+        Assert.Equal("libraryPath", Assert.Throws<ArgumentException>(() => new LowLevelPkcs11Library("")).ParamName);
+    }
 }

@@ -1,5 +1,7 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 
@@ -10,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 /// and <see cref="CryptoPolicyViolationException.Mechanism"/>), and the message-only overload used
 /// for policy-independent refusals.
 /// </summary>
-#pragma warning disable KLPKCS11009 // broken or deprecated mechanism, used deliberately to build a policy request
+#pragma warning disable KLPKCS11009, KLPKCS11010 // broken or deprecated mechanism and hash, used deliberately to build policy requests
 public sealed class CryptoPolicyViolationExceptionTests
 {
     [Fact]
@@ -64,6 +66,52 @@ public sealed class CryptoPolicyViolationExceptionTests
         Assert.Equal("SecureOnly policy refused vendor mechanism 0x80001234 for Sign: Not reviewed.", ex.Message);
     }
 
+    // Keyed by name so each theory row is serializable; the requests are built on demand.
+    private static readonly Dictionary<string, (Func<PolicyRequest> Request, string Description)> DescribedRequests = new()
+    {
+        ["Hash"] = (() => new HashUseRequest(HashAlgorithmName.SHA1, CryptoOperation.Sign), "hash SHA1 for Sign"),
+        ["RsaKeyGeneration"] = (() => new RsaKeyGenerationRequest(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, 1024), "RSA-1024 key generation (CKM_RSA_PKCS_KEY_PAIR_GEN)"),
+        ["EcKeyGeneration"] = (() => new EcKeyGenerationRequest(Pkcs11ECCurve.NamedCurves.NistP256), $"EC key generation on {Pkcs11ECCurve.NamedCurves.NistP256}"),
+        ["KeyTemplate"] = (() => new KeyTemplateRequest(null, []), "key template"),
+        ["KeyTemplateWithClass"] = (() => new KeyTemplateRequest(CKO.CKO_SECRET_KEY, []), "key template (CKO_SECRET_KEY)"),
+        ["KeyAgreementKdf"] = (() => new KeyAgreementKdfRequest(CKM.CKM_ECDH1_DERIVE, CKD.CKD_NULL), "CKM_ECDH1_DERIVE with CKD_NULL"),
+        ["KeyAgreementKdfIntoDerivationOnlySecret"] = (
+            () => new KeyAgreementKdfRequest(CKM.CKM_ECDH1_DERIVE, CKD.CKD_NULL) { ResultIsDerivationOnlySecret = true },
+            "CKM_ECDH1_DERIVE with CKD_NULL into a derivation-only secret"),
+        ["KeyAgreementKey"] = (() => new KeyAgreementKeyRequest(CKM.CKM_ECDH1_DERIVE, CKK.CKK_EC_MONTGOMERY), "CKM_ECDH1_DERIVE with a CKK_EC_MONTGOMERY key"),
+        ["KeyMaterialExport"] = (() => new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput), "export of KdfOutput"),
+    };
+
+    public static TheoryData<string> DescribedRequestKinds() => [.. DescribedRequests.Keys];
+
+    // The description is what a caller (and the session's denial log line) sees of the refused request.
+    [Theory]
+    [MemberData(nameof(DescribedRequestKinds))]
+    public void PolicyConstructor_DescribesEveryRequestKind(string kind)
+    {
+        (Func<PolicyRequest> request, string description) = DescribedRequests[kind];
+
+        var ex = new CryptoPolicyViolationException("SecureOnly", request(), "Refused.");
+
+        Assert.Equal($"SecureOnly policy refused {description}: Refused.", ex.Message);
+    }
+
+    // The template's attribute values (a key value here) must never reach the message or the log line.
+    [Fact]
+    public void PolicyConstructor_NeverDescribesKeyTemplateAttributeValues()
+    {
+        const string secret = "00112233445566778899AABBCCDDEEFF";
+        var request = new KeyTemplateRequest(CKO.CKO_SECRET_KEY,
+        [
+            new ObjectAttribute(CKA.CKA_VALUE, Convert.FromHexString(secret)),
+            new ObjectAttribute(CKA.CKA_LABEL, "label-" + secret),
+        ]);
+
+        var ex = new CryptoPolicyViolationException("SecureOnly", request, "Refused.");
+
+        Assert.Equal("SecureOnly policy refused key template (CKO_SECRET_KEY): Refused.", ex.Message);
+    }
+
     [Fact]
     public void PolicyConstructor_RejectsNullArguments()
     {
@@ -86,4 +134,4 @@ public sealed class CryptoPolicyViolationExceptionTests
         Assert.Null(ex.Mechanism);
     }
 }
-#pragma warning restore KLPKCS11009
+#pragma warning restore KLPKCS11009, KLPKCS11010

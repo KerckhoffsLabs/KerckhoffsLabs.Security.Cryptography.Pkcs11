@@ -3,6 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
@@ -27,6 +28,8 @@ public sealed class Pkcs11SessionCoreV32Tests
         public ulong SharedId = 50, UnwrappedId = 60;
         public ulong ValidationFlags = 1;
         public int? WrapSecondLen;
+        public CKR? WrapProbeRv;
+        public List<CKA> UnwrapTemplateTypes = [];
         public bool EncapsProbeBufferTooSmall;
 
         public CKR EncapsRv = CKR.CKR_OK, DecapsRv = CKR.CKR_OK, WrapAuthRv = CKR.CKR_OK,
@@ -55,7 +58,7 @@ public sealed class Pkcs11SessionCoreV32Tests
         protected override CKR C_WrapKeyAuthenticated(NativeCULong session, CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, NativeBuffer<byte> wrappedKey, ref NativeCULong wrappedKeyLen)
         {
             CapturedAad = associatedData.ToArray();
-            if (wrappedKey.IsNull) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapAuthRv; }
+            if (wrappedKey.IsNull) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapProbeRv ?? WrapAuthRv; }
             int n = WrapSecondLen ?? Wrapped.Length;
             Wrapped.AsSpan(0, Math.Min(n, wrappedKey.Span.Length)).CopyTo(wrappedKey.Span);
             wrappedKeyLen = (NativeCULong)n;
@@ -63,7 +66,12 @@ public sealed class Pkcs11SessionCoreV32Tests
         }
 
         protected override CKR C_UnwrapKeyAuthenticated(NativeCULong session, CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, CK_ATTRIBUTE[] template, ReadOnlySpan<byte> associatedData, ref NativeCULong key)
-        { CapturedAad = associatedData.ToArray(); key = (NativeCULong)UnwrappedId; return UnwrapAuthRv; }
+        {
+            CapturedAad = associatedData.ToArray();
+            UnwrapTemplateTypes = [.. template.Select(a => (CKA)(ulong)a.type)];
+            key = (NativeCULong)UnwrappedId;
+            return UnwrapAuthRv;
+        }
 
         protected override CKR C_VerifySignatureInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature) => VerifySigInitRv;
         protected override CKR C_VerifySignature(NativeCULong session, ReadOnlySpan<byte> data) => VerifySigRv;
@@ -164,6 +172,26 @@ public sealed class Pkcs11SessionCoreV32Tests
         Assert.ThrowsAny<Pkcs11Exception>(() => s.WrapKeyAuthenticated(mech, new ObjectHandle(1), new ObjectHandle(2), []));
     }
 
+    // The length probe may answer CKR_BUFFER_TOO_SMALL with the length set (PKCS#11 v3.2 §5.2).
+    [Fact]
+    public void WrapKeyAuthenticated_ProbeBufferTooSmall_StillSucceeds()
+    {
+        using var fake = new V32Fake { Wrapped = [4, 5], WrapProbeRv = CKR.CKR_BUFFER_TOO_SMALL };
+        using var s = fake.CreateSession(SessionId);
+        Assert.Equal(new byte[] { 4, 5 }, s.WrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), new ObjectHandle(1), new ObjectHandle(2), []));
+    }
+
+    [Fact]
+    public void WrapKeyAuthenticated_ProbeOk_SecondCallError_Throws()
+    {
+        using var fake = new V32Fake { WrapProbeRv = CKR.CKR_OK, WrapAuthRv = CKR.CKR_KEY_UNEXTRACTABLE };
+        using var s = fake.CreateSession(SessionId);
+
+        var e = Assert.ThrowsAny<Pkcs11Exception>(
+            () => s.WrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), new ObjectHandle(1), new ObjectHandle(2), []));
+        Assert.Equal(CKR.CKR_KEY_UNEXTRACTABLE, e.ReturnValue);
+    }
+
     // === UnwrapKeyAuthenticated =============================================
 
     [Fact]
@@ -177,6 +205,43 @@ public sealed class Pkcs11SessionCoreV32Tests
 
         Assert.Equal(0x99UL, h.ObjectId);
         Assert.Equal(new byte[] { 0xCC }, fake.CapturedAad);
+    }
+
+    // The caller's attributes reach the token first, followed by the secure defaults it left out.
+    [Fact]
+    public void UnwrapKeyAuthenticated_SendsTheCallersTemplateThenTheSecureDefaults()
+    {
+        using var fake = new V32Fake();
+        using var s = fake.CreateSession(SessionId);
+        using var label = new ObjectAttribute(CKA.CKA_LABEL, "unwrapped");
+        using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+
+        s.UnwrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), new ObjectHandle(1), [1, 2, 3], [], [label, cls]);
+
+        Assert.Equal([CKA.CKA_LABEL, CKA.CKA_CLASS], fake.UnwrapTemplateTypes[..2]);
+        Assert.Contains(CKA.CKA_SENSITIVE, fake.UnwrapTemplateTypes[2..]);
+        Assert.Contains(CKA.CKA_EXTRACTABLE, fake.UnwrapTemplateTypes[2..]);
+    }
+
+    [Fact]
+    public void UnwrapKeyAuthenticated_NullArguments_Throw()
+    {
+        using var fake = new V32Fake();
+        using var s = fake.CreateSession(SessionId);
+
+        Assert.Equal("mechanism", Assert.Throws<ArgumentNullException>(
+            () => s.UnwrapKeyAuthenticated(null!, new ObjectHandle(1), [1], [], [])).ParamName);
+        Assert.Equal("unwrappedKeyTemplate", Assert.Throws<ArgumentNullException>(
+            () => s.UnwrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), new ObjectHandle(1), [1], [], null!)).ParamName);
+    }
+
+    [Fact]
+    public void DecapsulateKey_NullTemplate_Throws()
+    {
+        using var fake = new V32Fake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.Equal("sharedKeyTemplate", Assert.Throws<ArgumentNullException>(
+            () => s.DecapsulateKey(new Mechanism(CKM.CKM_ML_KEM), new ObjectHandle(1), [1], null!)).ParamName);
     }
 
     [Fact]
@@ -263,6 +328,23 @@ public sealed class Pkcs11SessionCoreV32Tests
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input));
+    }
+
+    [Fact]
+    public void VerifySignature_Stream_BufferOfOneByte_IsAccepted_AndZeroRefused()
+    {
+        using var fake = new V32Fake();
+        using var s = fake.CreateSession(SessionId);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
+        using var twoBytes = new MemoryStream([1, 2]);
+        using var oneByte = new MemoryStream([1]);
+
+        Assert.True(s.VerifySignature(mech, new ObjectHandle(1), [9], twoBytes, bufferLength: 1));
+        Assert.Equal(2, fake.VerifyUpdateCalls);
+        Assert.Equal("bufferLength", Assert.Throws<ArgumentException>(
+            () => s.VerifySignature(mech, new ObjectHandle(1), [9], oneByte, bufferLength: 0)).ParamName);
+        Assert.Equal("inputStream", Assert.Throws<ArgumentNullException>(
+            () => s.VerifySignature(mech, new ObjectHandle(1), [9], (Stream)null!)).ParamName);
     }
 
     // === GetSessionValidationFlags ==========================================

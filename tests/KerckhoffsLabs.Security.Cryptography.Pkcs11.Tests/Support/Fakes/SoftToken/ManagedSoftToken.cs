@@ -130,6 +130,11 @@ internal sealed partial class ManagedSoftToken : FakeModule
     protected override CKR C_CreateObject(NativeCULong session, CK_ATTRIBUTE[] template, ref NativeCULong objectId)
     {
         var attrs = ReadTemplate(template);
+        // A token reports CKA_VALUE_LEN for a secret key it was handed the value of, as it does for one it
+        // generated; adapters read the key size from it.
+        if (attrs.TryGetValue((ulong)CKA.CKA_CLASS, out var cls) && ToUlong(cls) == (ulong)CKO.CKO_SECRET_KEY
+            && attrs.TryGetValue((ulong)CKA.CKA_VALUE, out var value) && !attrs.ContainsKey((ulong)CKA.CKA_VALUE_LEN))
+            attrs[(ulong)CKA.CKA_VALUE_LEN] = UlongAttr((ulong)value.Length);
         ulong handle = Store(attrs);
         RegisterImportedAsymKey(handle, attrs); // reconstructs a live BCL DSA for CKK_DSA imports
         objectId = (NativeCULong)handle;

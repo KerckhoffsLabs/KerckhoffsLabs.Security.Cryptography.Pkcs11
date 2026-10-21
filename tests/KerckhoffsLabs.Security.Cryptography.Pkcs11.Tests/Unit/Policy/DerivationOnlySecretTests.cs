@@ -36,15 +36,34 @@ public sealed class DerivationOnlySecretTests
     [InlineData(CKA.CKA_UNWRAP)]
     public void AUsageAllowed_DoesNotMatch(CKA usage) => Assert.False(Matches(DerivationOnly().Attribute(usage, true)));
 
-    // An omitted usage attribute takes the token's default, which may be true. The builder always
-    // writes every usage attribute, so the omission is made by hand.
+    // An omitted usage attribute takes the token's default, which may be true; an omitted class, key
+    // type or CKA_DERIVE leaves the object undescribed. The builder always writes every one of them, so
+    // the omission is made by hand.
     [Theory]
+    [InlineData(CKA.CKA_CLASS)]
+    [InlineData(CKA.CKA_KEY_TYPE)]
+    [InlineData(CKA.CKA_DERIVE)]
     [InlineData(CKA.CKA_ENCRYPT)]
+    [InlineData(CKA.CKA_DECRYPT)]
+    [InlineData(CKA.CKA_SIGN)]
+    [InlineData(CKA.CKA_VERIFY)]
+    [InlineData(CKA.CKA_WRAP)]
     [InlineData(CKA.CKA_UNWRAP)]
-    public void AUsageOmitted_DoesNotMatch(CKA usage)
+    public void ARequiredAttributeOmitted_DoesNotMatch(CKA required)
     {
         using ObjectTemplate template = DerivationOnly().Build();
-        Assert.False(Pkcs11SessionCore.IsDerivationOnlySecret([.. template.Attributes.Where(a => a.Type != usage)]));
+        Assert.False(Pkcs11SessionCore.IsDerivationOnlySecret([.. template.Attributes.Where(a => a.Type != required)]));
+    }
+
+    // The session's secure defaults fill these in (CKA_SENSITIVE=true, CKA_EXTRACTABLE=false), so
+    // leaving them out still describes a derivation-only secret.
+    [Theory]
+    [InlineData(CKA.CKA_SENSITIVE)]
+    [InlineData(CKA.CKA_EXTRACTABLE)]
+    public void SensitiveOrExtractableOmitted_StillMatches(CKA omitted)
+    {
+        using ObjectTemplate template = DerivationOnly().Build();
+        Assert.True(Pkcs11SessionCore.IsDerivationOnlySecret([.. template.Attributes.Where(a => a.Type != omitted)]));
     }
 
     [Fact]

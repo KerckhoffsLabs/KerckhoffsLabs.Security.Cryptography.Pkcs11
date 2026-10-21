@@ -309,6 +309,107 @@ public sealed class ObjectTemplateTests
         Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SERIAL_NUMBER);
     }
 
+    // === Default values, not just presence ===================================
+
+    private static bool BoolOf(ObjectTemplate template, CKA type)
+        => template.Attributes.Single(a => a.Type == type).GetValueAsBool();
+
+    private static ulong UlongOf(ObjectTemplate template, CKA type)
+        => template.Attributes.Single(a => a.Type == type).GetValueAsUlong();
+
+    // PKCS#11 defaults an omitted capability to CK_TRUE, so every role the builder presets must be
+    // false: a key gets only the roles its caller asks for.
+    [Fact]
+    public void SecretKey_DefaultsAreSensitiveNonExtractableAndRoleless()
+    {
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Build();
+
+        Assert.Equal((ulong)CKO.CKO_SECRET_KEY, UlongOf(template, CKA.CKA_CLASS));
+        Assert.Equal((ulong)CKK.CKK_AES, UlongOf(template, CKA.CKA_KEY_TYPE));
+        Assert.True(BoolOf(template, CKA.CKA_SENSITIVE));
+        Assert.False(BoolOf(template, CKA.CKA_EXTRACTABLE));
+        foreach (CKA role in (CKA[])[CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_SIGN, CKA.CKA_VERIFY, CKA.CKA_WRAP, CKA.CKA_UNWRAP, CKA.CKA_DERIVE])
+            Assert.False(BoolOf(template, role), $"{role} must default to false");
+    }
+
+    [Fact]
+    public void PrivateKey_DefaultsArePrivateSensitiveNonExtractableAndRoleless()
+    {
+        using var template = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA).Build();
+
+        Assert.Equal((ulong)CKO.CKO_PRIVATE_KEY, UlongOf(template, CKA.CKA_CLASS));
+        Assert.Equal((ulong)CKK.CKK_RSA, UlongOf(template, CKA.CKA_KEY_TYPE));
+        Assert.True(BoolOf(template, CKA.CKA_PRIVATE));
+        Assert.True(BoolOf(template, CKA.CKA_SENSITIVE));
+        Assert.False(BoolOf(template, CKA.CKA_EXTRACTABLE));
+        foreach (CKA role in (CKA[])[CKA.CKA_SIGN, CKA.CKA_SIGN_RECOVER, CKA.CKA_DECRYPT, CKA.CKA_UNWRAP, CKA.CKA_DERIVE])
+            Assert.False(BoolOf(template, role), $"{role} must default to false");
+    }
+
+    [Fact]
+    public void PublicKey_DefaultsAreRoleless()
+    {
+        using var template = ObjectTemplate.ForPublicKey(CKK.CKK_EC).Build();
+
+        Assert.Equal((ulong)CKO.CKO_PUBLIC_KEY, UlongOf(template, CKA.CKA_CLASS));
+        Assert.Equal((ulong)CKK.CKK_EC, UlongOf(template, CKA.CKA_KEY_TYPE));
+        foreach (CKA role in (CKA[])[CKA.CKA_VERIFY, CKA.CKA_VERIFY_RECOVER, CKA.CKA_ENCRYPT, CKA.CKA_WRAP, CKA.CKA_DERIVE])
+            Assert.False(BoolOf(template, role), $"{role} must default to false");
+    }
+
+    [Fact]
+    public void SecretKey_ExtractableAndNonExtractable_SetTheValueTheySay()
+    {
+        using var extractable = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Extractable().Build();
+        using var nonExtractable = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Extractable().NonExtractable().Build();
+
+        Assert.True(BoolOf(extractable, CKA.CKA_EXTRACTABLE));
+        Assert.False(BoolOf(nonExtractable, CKA.CKA_EXTRACTABLE));
+    }
+
+    [Fact]
+    public void PrivateKey_ExtractableAndNonExtractable_SetTheValueTheySay()
+    {
+        using var extractable = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Extractable().Build();
+        using var nonExtractable = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Extractable().NonExtractable().Build();
+
+        Assert.True(BoolOf(extractable, CKA.CKA_EXTRACTABLE));
+        Assert.False(BoolOf(nonExtractable, CKA.CKA_EXTRACTABLE));
+    }
+
+    // === Builder lifetime ====================================================
+
+    [Fact]
+    public void Build_Twice_SaysToStartANewBuilder()
+    {
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES);
+        using ObjectTemplate first = builder.Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.Build());
+        Assert.Equal("Builder has already produced an ObjectTemplate. Start a new builder.", ex.Message);
+    }
+
+    [Fact]
+    public void NestedTemplate_AfterBuild_Throws()
+    {
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES);
+        using ObjectTemplate first = builder.Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.WrapTemplate(t => t.Sensitive()));
+        Assert.Equal("Builder has already produced an ObjectTemplate. Start a new builder.", ex.Message);
+    }
+
+    [Fact]
+    public void Builder_AfterDispose_Throws()
+    {
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES);
+        builder.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => builder.WrapTemplate(t => t.Sensitive()));
+        Assert.Throws<ObjectDisposedException>(() => builder.Label("k"));
+        Assert.Throws<ObjectDisposedException>(() => builder.Build());
+    }
+
     [Fact]
     public void Dispose_Works()
     {

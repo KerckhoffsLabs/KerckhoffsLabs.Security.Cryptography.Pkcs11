@@ -130,6 +130,20 @@ public sealed class MLDsaPkcs11Tests_Managed
         // ArgumentException would fire; both derive from ArgumentException.
         Assert.ThrowsAny<ArgumentException>(() => mldsa.SignData(new byte[4], new byte[256])));
 
+    // FIPS 204 allows a context of up to 255 bytes, inclusive.
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void SignVerifyData_With255ByteContext_RoundTrips() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_44, mldsa =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("longest-context message");
+        byte[] context = [.. Enumerable.Range(0, 255).Select(i => (byte)i)];
+
+        byte[] sig = mldsa.SignData(data, context);
+
+        Assert.True(mldsa.VerifyData(data, sig, context));
+        using var bcl = MLDsa.ImportMLDsaPublicKey(MLDsaAlgorithm.MLDsa44, mldsa.ExportMLDsaPublicKey());
+        Assert.True(bcl.VerifyData(data, sig, context));
+    });
+
     // === External-mu / pre-hash — unsupported on PKCS#11 v3.2 =============
     //
     // HashML-DSA pre-hash (SignPreHash/VerifyPreHash) is intentionally not tested: the BCL's

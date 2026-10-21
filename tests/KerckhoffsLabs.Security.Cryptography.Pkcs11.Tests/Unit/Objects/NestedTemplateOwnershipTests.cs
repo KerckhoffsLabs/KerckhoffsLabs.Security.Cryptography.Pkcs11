@@ -1,4 +1,6 @@
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Objects;
@@ -187,5 +189,79 @@ public sealed class NestedTemplateOwnershipTests
 
         Assert.Single(wrap.GetValueAsAttributeArray());
         Assert.Equal(3, unwrap.GetValueAsAttributeArray().Length);
+    }
+    // Every member array and value, at every level, lies inside the parent's single block: a block
+    // sized too small would have the copy run past its end.
+    [Fact]
+    public void NestedArray_EveryLevelLiesInsideTheParentsBlock()
+    {
+        using var label = new ObjectAttribute(CKA.CKA_LABEL, "a label longer than one pointer");
+        using var id = new ObjectAttribute(CKA.CKA_ID, [1, 2, 3]);
+        using var sensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var deepest = new ObjectAttribute(CKA.CKA_DERIVE_TEMPLATE, [label, id]);
+        using var middle = new ObjectAttribute(CKA.CKA_UNWRAP_TEMPLATE, [deepest, sensitive]);
+        using var outer = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [middle]);
+
+        CK_ATTRIBUTE root = outer.CkAttribute;
+        Assert.True(LiveAllocations.TryFind(root.value, out IntPtr start, out int size));
+        Assert.Equal(root.value, start);
+
+        int checkedValues = AssertInside(root, start, size);
+
+        Assert.Equal(6, checkedValues); // 3 arrays and 3 values
+        ObjectAttribute deep = outer.GetValueAsAttributeArray().Single().GetValueAsAttributeArray()[0];
+        Assert.Equal("a label longer than one pointer", deep.GetValueAsAttributeArray()[0].GetValueAsString());
+    }
+
+    private static int AssertInside(CK_ATTRIBUTE attribute, IntPtr start, int size)
+    {
+        int length = (int)(ulong)attribute.valueLen;
+        long offset = attribute.value.ToInt64() - start.ToInt64();
+        Assert.InRange(offset, 0, size - length);
+        int count = 1;
+        if ((CKA)(ulong)attribute.type is CKA.CKA_WRAP_TEMPLATE or CKA.CKA_UNWRAP_TEMPLATE or CKA.CKA_DERIVE_TEMPLATE)
+        {
+            int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
+            for (int i = 0; i < length / stride; i++)
+                count += AssertInside(UnmanagedMemory.Read<CK_ATTRIBUTE>(IntPtr.Add(attribute.value, i * stride)), start, size);
+        }
+        return count;
+    }
+
+    // Four levels of arrays below the outermost are allowed; a fifth is refused.
+    [Fact]
+    public void NestingDeeperThanFourLevels_IsRefused()
+    {
+        using var leaf = new ObjectAttribute(CKA.CKA_LABEL, "leaf");
+        using var level1 = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [leaf]);
+        using var level2 = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [level1]);
+        using var level3 = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [level2]);
+        using var level4 = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [level3]);
+        using var level5 = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [level4]);
+
+        var ex = Assert.Throws<ArgumentException>(() => new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [level5]));
+        Assert.StartsWith("Attribute arrays nested more than 4 deep.", ex.Message, StringComparison.Ordinal);
+    }
+
+    // A member that carries no value (unavailable, or a length with no buffer, as a size query
+    // leaves it) is copied without its pointer, which is never followed.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MemberWithoutAValue_IsCopiedWithoutItsPointer(bool unavailable)
+    {
+        var raw = new CK_ATTRIBUTE
+        {
+            type = (NativeCULong)(ulong)CKA.CKA_VALUE,
+            value = unavailable ? new IntPtr(0x10) : IntPtr.Zero, // never dereferenced
+            valueLen = unavailable ? NativeCULong.MaxValue : (NativeCULong)16UL,
+        };
+        using var member = new ObjectAttribute(raw, ownsValue: false);
+
+        using var parent = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [member]);
+
+        CK_ATTRIBUTE copied = parent.GetValueAsAttributeArray().Single().CkAttribute;
+        Assert.Equal(IntPtr.Zero, copied.value);
+        Assert.Equal(raw.valueLen, copied.valueLen);
     }
 }

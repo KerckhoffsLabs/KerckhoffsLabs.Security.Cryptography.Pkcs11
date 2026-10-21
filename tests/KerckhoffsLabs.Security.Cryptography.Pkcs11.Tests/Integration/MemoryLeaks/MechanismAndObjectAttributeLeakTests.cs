@@ -69,6 +69,20 @@ public sealed class MechanismAndObjectAttributeLeakTests
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
 
+    // A builder disposed before Build still owns its attributes, a CKA_VALUE with key bytes among
+    // them, and releases (and so zeroizes) every one.
+    [Fact]
+    public void TemplateBuilder_DisposedBeforeBuild_ReleasesItsAttributes()
+    {
+        int baseline = UnmanagedMemory.OutstandingAllocationCount;
+
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Value(new byte[32]).Label("unbuilt");
+        Assert.True(UnmanagedMemory.OutstandingAllocationCount > baseline);
+        builder.Dispose();
+
+        Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
+    }
+
     [Fact]
     public void ObjectAttribute_NoLeak_BoolValue()
     {

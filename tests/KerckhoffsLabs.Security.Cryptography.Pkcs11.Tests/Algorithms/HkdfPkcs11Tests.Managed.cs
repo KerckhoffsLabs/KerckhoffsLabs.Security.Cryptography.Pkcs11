@@ -300,7 +300,27 @@ public sealed class HkdfPkcs11Tests_Managed
         Assert.Equal("ikm", Assert.Throws<ArgumentException>(() => HkdfPkcs11.ExtractKey(Sha256, aes)).ParamName);
         Assert.Equal("prk", Assert.Throws<ArgumentException>(() => HkdfPkcs11.Expand(Sha256, aes, 32)).ParamName);
         Assert.Equal("prk", Assert.Throws<ArgumentException>(() => HkdfPkcs11.ExpandKey(Sha256, aes, template)).ParamName);
+        Assert.Equal("ikm", Assert.Throws<ArgumentException>(() => HkdfPkcs11.DeriveKey(Sha256, aes, new byte[32], Salt, Info)).ParamName);
+        Assert.Equal("ikm", Assert.Throws<ArgumentException>(() => HkdfPkcs11.Extract(Sha256, aes, Salt, new byte[32])).ParamName);
+        Assert.Equal("prk", Assert.Throws<ArgumentException>(() => HkdfPkcs11.Expand(Sha256, aes, new byte[32], Info)).ParamName);
     }
+
+    // RFC 5869 allows exactly 255 · HashLen bytes of output keying material.
+    [Fact]
+    public void LongestOutput_IsAccepted_AndMatchesBcl() => WithIkm((_, ikm) =>
+    {
+        const int longest = 255 * 32;
+        byte[] expected = HKDF.DeriveKey(Sha256, Ikm, longest, Salt, Info);
+
+        Assert.Equal(expected, HkdfPkcs11.DeriveKey(Sha256, ikm, longest, Salt, Info));
+
+        byte[] span = new byte[longest];
+        HkdfPkcs11.DeriveKey(Sha256, ikm, span, Salt, Info);
+        Assert.Equal(expected, span);
+
+        using Pkcs11Key prk = HkdfPkcs11.ExtractKey(Sha256, ikm, Salt);
+        Assert.Equal(expected, HkdfPkcs11.Expand(Sha256, prk, longest, Info));
+    });
 
     [Fact]
     public void AnHkdfKeyType_IsAccepted()

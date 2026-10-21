@@ -223,4 +223,31 @@ public sealed class Sp800108KdfTests
             foreach (var a in templateB) a.Dispose();
         }
     }
+
+    // Feedback mode marshals its own top-level struct, so the derived-key array is found through it.
+    [Fact]
+    public void FeedbackMode_AbsorbOutput_ReadsTheHandlesTheTokenWrote()
+    {
+        using var valueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, 16UL);
+        var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC)
+            .IterationCounter().ByteArray([1]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys)
+            .WithIV([0xA0, 0xA1])
+            .AddDerivedKey([valueLen])
+            .Build();
+
+        using var scope = new MechanismParameterScope();
+        Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+        var s = block.Read<CK_SP800_108_FEEDBACK_KDF_PARAMS>();
+        Assert.Equal(1UL, (ulong)s.AdditionalDerivedKeys);
+
+        WriteHandle(UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr).Key, 0x333);
+        p.AbsorbOutput(block);
+
+        Assert.Equal([0x333], p.RawAdditionalDerivedKeyHandles);
+    }
+
+    [Fact]
+    public void AddDerivedKey_Null_Throws()
+        => Assert.Equal("template", Assert.Throws<ArgumentNullException>(
+            () => CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC).AddDerivedKey(null!)).ParamName);
 }

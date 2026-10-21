@@ -35,6 +35,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         public CKR VerifyFinalRv = CKR.CKR_OK;
         public byte[] RecoveredData = [0xAB, 0xCD, 0xEF];
         public CKR VerifyRecoverRv = CKR.CKR_OK;
+        public CKR VerifyRecoverProbeRv = CKR.CKR_OK;
         public CKR DigestKeyRv = CKR.CKR_OK;
         public CKR VerifySignatureInitRv = CKR.CKR_OK;
         public CKR VerifySignatureUpdateRv = CKR.CKR_OK;
@@ -96,7 +97,7 @@ public sealed class Pkcs11SessionCoreStreamTests
 
         protected override CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, NativeBuffer<byte> data, ref NativeCULong dataLen)
         {
-            if (data.IsNull) { dataLen = (NativeCULong)RecoveredData.Length; return CKR.CKR_OK; }
+            if (data.IsNull) { dataLen = (NativeCULong)RecoveredData.Length; return VerifyRecoverProbeRv; }
             RecoveredData.AsSpan(0, RecoveredData.Length).CopyTo(data.Span);
             dataLen = (NativeCULong)RecoveredData.Length;
             return VerifyRecoverRv;
@@ -355,6 +356,80 @@ public sealed class Pkcs11SessionCoreStreamTests
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out _));
+    }
+
+    [Fact]
+    public void VerifyRecover_Ok_DoesNotCancelTheCompletedOperation()
+    {
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
+
+        Assert.True(s.VerifyRecover(Pss(), new ObjectHandle(1), [9, 9], out _));
+        Assert.False(fake.Canceled);
+    }
+
+    [Fact]
+    public void VerifyRecover_InitError_Throws()
+    {
+        using var fake = new StreamFake { InitRv = CKR.CKR_KEY_HANDLE_INVALID };
+        using var s = fake.CreateSession(SessionId);
+
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifyRecover(Pss(), new ObjectHandle(1), [9, 9], out _));
+        Assert.Equal(CKR.CKR_KEY_HANDLE_INVALID, e.ReturnValue);
+    }
+
+    // The length probe is a real call: an error there is not a "signature invalid".
+    [Fact]
+    public void VerifyRecover_LengthProbeError_Throws()
+    {
+        using var fake = new StreamFake { VerifyRecoverProbeRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
+
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifyRecover(Pss(), new ObjectHandle(1), [9, 9], out _));
+        Assert.Equal(CKR.CKR_DEVICE_ERROR, e.ReturnValue);
+    }
+
+    [Fact]
+    public void VerifyRecover_NullSignature_Throws()
+    {
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.Equal("signature", Assert.Throws<ArgumentNullException>(
+            () => s.VerifyRecover(Pss(), new ObjectHandle(1), null!, out _)).ParamName);
+    }
+
+    [Fact]
+    public void Verify_Stream_InitError_Throws()
+    {
+        using var fake = new StreamFake { InitRv = CKR.CKR_KEY_HANDLE_INVALID };
+        using var s = fake.CreateSession(SessionId);
+        using var input = new MemoryStream([1]);
+
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => s.Verify(Pss(), new ObjectHandle(1), input, [9], 16));
+        Assert.Equal(CKR.CKR_KEY_HANDLE_INVALID, e.ReturnValue);
+    }
+
+    [Fact]
+    public void Verify_Stream_Ok_DoesNotCancelTheCompletedOperation()
+    {
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
+        using var input = new MemoryStream([1, 2, 3]);
+
+        Assert.True(s.Verify(Pss(), new ObjectHandle(1), input, [9], 2));
+        Assert.False(fake.Canceled);
+    }
+
+    [Fact]
+    public void Verify_Stream_NullArguments_Throw()
+    {
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
+        using var input = new MemoryStream([1]);
+        Assert.Equal("inputStream", Assert.Throws<ArgumentNullException>(
+            () => s.Verify(Pss(), new ObjectHandle(1), (Stream)null!, [9])).ParamName);
+        Assert.Equal("signature", Assert.Throws<ArgumentNullException>(
+            () => s.Verify(Pss(), new ObjectHandle(1), input, null!)).ParamName);
     }
 
     // === DigestKey ===========================================================

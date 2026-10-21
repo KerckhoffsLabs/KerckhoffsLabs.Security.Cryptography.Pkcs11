@@ -140,6 +140,19 @@ public sealed class ECDsaPkcs11Tests_Managed
         Assert.Equal(0, written);
     });
 
+    // A P-256 signature in the IEEE P1363 format is exactly 64 bytes, so a 64-byte destination is enough.
+    [Fact]
+    public void TrySignData_DestinationOfExactlyTheSignatureSize_Succeeds() => WithEcDsa("P-256", (ec, hash) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("exact destination");
+        byte[] destination = new byte[64];
+
+        Assert.True(ec.TrySignData(data, destination, hash, out int written));
+
+        Assert.Equal(64, written);
+        Assert.True(ec.VerifyData(data, destination, hash));
+    });
+
     // A signature with a flipped byte must not verify (signature authenticity, not just message).
     [Theory]
     [InlineData("P-256")]
@@ -301,6 +314,26 @@ public sealed class ECDsaPkcs11Tests_Managed
         using var stream = new MemoryStream(LegacyData);
         var sign = Assert.Throws<ArgumentException>(() => ec.SignData(stream, empty));
         Assert.Equal("hashAlgorithm", sign.ParamName);
+    });
+
+    // Argument errors come first, as the BCL reports them. SHA-1 is refused by the default policy, so a
+    // check that did not run would surface as a policy refusal instead.
+    [Fact]
+    public void OverriddenOverloads_ArgumentErrors_AreReportedBeforeThePolicy() => WithEcDsa("P-256", (_, ec) =>
+    {
+        byte[] data = new byte[8];
+        byte[] sig = new byte[64];
+        var sha1 = HashAlgorithmName.SHA1;
+
+#pragma warning disable KLPKCS11010 // SHA-1 only makes the policy refuse what gets past the argument checks
+        Assert.Equal("data", Assert.Throws<ArgumentNullException>(() => ec.VerifyData(null!, 0, 0, sig, sha1)).ParamName);
+        Assert.Equal("offset", Assert.Throws<ArgumentOutOfRangeException>(() => ec.VerifyData(data, -1, 0, sig, sha1)).ParamName);
+        Assert.Equal("offset", Assert.Throws<ArgumentOutOfRangeException>(() => ec.VerifyData(data, 9, 0, sig, sha1)).ParamName);
+        Assert.Equal("count", Assert.Throws<ArgumentOutOfRangeException>(() => ec.VerifyData(data, 0, -1, sig, sha1)).ParamName);
+        Assert.Equal("count", Assert.Throws<ArgumentOutOfRangeException>(() => ec.VerifyData(data, 4, 5, sig, sha1)).ParamName);
+        Assert.Equal("signature", Assert.Throws<ArgumentNullException>(() => ec.VerifyData(data, 0, 8, null!, sha1)).ParamName);
+        Assert.Equal("data", Assert.Throws<ArgumentNullException>(() => ec.SignData((Stream)null!, sha1)).ParamName);
+#pragma warning restore KLPKCS11010
     });
 
     // === Sign/verify hash — raw ECDSA, no on-token hashing ==================

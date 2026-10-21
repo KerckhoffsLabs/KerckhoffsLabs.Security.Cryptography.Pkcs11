@@ -79,6 +79,43 @@ public sealed class EcPointEncodingTests
     public void TryDecode_NotAnOctetString_ReturnsFalse()
         => Assert.False(EcPointEncoding.TryDecode([0x03, 0x01, 0x04], out _, out _));
 
+    // An OCTET STRING that holds a point header but no whole coordinate pair.
+    [Theory]
+    [InlineData(new byte[] { 0x04, 0x01, 0x04 })]             // header only
+    [InlineData(new byte[] { 0x04, 0x02, 0x04, 0x00 })]       // odd number of coordinate bytes
+    [InlineData(new byte[] { 0x04, 0x03, 0x02, 0x00, 0x00 })] // compressed
+    public void TryDecode_NoCoordinatePair_ReturnsFalse(byte[] ecPoint)
+    {
+        Assert.False(EcPointEncoding.TryDecode(ecPoint, out byte[] x, out byte[] y));
+        Assert.Empty(x);
+        Assert.Empty(y);
+    }
+
+    [Fact]
+    public void TryParsePublicKey_NullArguments_Throw()
+    {
+        byte[] ecParams = Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams();
+        Assert.Equal("ecPoint", Assert.Throws<ArgumentNullException>(() => EcPointEncoding.TryParsePublicKey(null!, ecParams)).ParamName);
+        Assert.Equal("ecParams", Assert.Throws<ArgumentNullException>(() => EcPointEncoding.TryParsePublicKey(EcPoint(32), null!)).ParamName);
+    }
+
+    [Fact]
+    public void TryGetCoordinateLength_Null_Throws()
+        => Assert.Equal("ecPoint", Assert.Throws<ArgumentNullException>(() => EcPointEncoding.TryGetCoordinateLength(null!, out _)).ParamName);
+
+    // The shortest well-formed points: one byte per coordinate.
+    [Theory]
+    [InlineData(new byte[] { 0x04, 0xAA, 0xBB })]
+    [InlineData(new byte[] { 0x02, 0xAA })]
+    [InlineData(new byte[] { 0x03, 0xAA })]
+    public void TryGetCoordinateLength_SingleByteCoordinates(byte[] bare)
+    {
+        Assert.True(EcPointEncoding.TryGetCoordinateLength(bare, out int bareLength));
+        Assert.Equal(1, bareLength);
+        Assert.True(EcPointEncoding.TryGetCoordinateLength(DerOctetString(bare), out int wrappedLength));
+        Assert.Equal(1, wrappedLength);
+    }
+
     // 128-byte coordinates make a 257-byte point, past the old encoder's one-byte long-form length.
     [Fact]
     public void Encode_PointOver255Bytes_UsesTwoByteLength()
