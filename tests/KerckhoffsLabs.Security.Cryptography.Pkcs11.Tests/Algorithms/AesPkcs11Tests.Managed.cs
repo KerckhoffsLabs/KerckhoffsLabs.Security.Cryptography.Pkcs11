@@ -235,9 +235,31 @@ public sealed class AesPkcs11_Managed
         Assert.Throws<NotSupportedException>(
             () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 64)));
 
+    // === Key size: the token key's, which cannot be changed ================================
+
+    // KeySize is the token key's CKA_VALUE_LEN, and LegalKeySizes that size alone, so setting another
+    // size fails rather than changing what is reported for an unchanged key.
+    [Theory]
+    [InlineData(16, 128, 256)]
+    [InlineData(32, 256, 128)]
+    public void KeySize_IsTheTokenKeys_AndCannotBeChanged(int keyBytes, int bits, int otherBits)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(new byte[keyBytes]).Encrypt().Decrypt().Build();
+        using var key = session.ImportKey(tpl);
+        using var aes = new AesPkcs11(key);
+
+        Assert.Equal(bits, aes.KeySize);
+        KeySizes legal = Assert.Single(aes.LegalKeySizes);
+        Assert.Equal((bits, bits, 0), (legal.MinSize, legal.MaxSize, legal.SkipSize));
+
+        Assert.Throws<CryptographicException>(() => aes.KeySize = otherBits);
+        aes.KeySize = bits;
+        Assert.Equal(bits, aes.KeySize);
+    }
+
     // === IV generation ====================================================================
-    // (KeySize reflection is covered by the SoftHSM suite; the managed token reports a fixed AES key
-    // length and doesn't model CKA_VALUE_LEN per imported key, so it isn't asserted here.)
 
     [Fact]
     public void GenerateIV_ProducesBlockSizedIv() => WithImportedAes((ws, aes) =>

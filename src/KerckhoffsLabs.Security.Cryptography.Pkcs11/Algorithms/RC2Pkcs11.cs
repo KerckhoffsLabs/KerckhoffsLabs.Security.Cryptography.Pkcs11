@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
@@ -66,32 +65,16 @@ public sealed class RC2Pkcs11 : RC2
             throw new ArgumentException($"Expected an RC2 key (CKK_RC2), got {key.KeyType}.", nameof(key));
         _key = key;
 
-        // Reflect the token key's real size (CKA_VALUE_LEN, not sensitive) when it is a legal RC2 size,
-        // so EffectiveKeySize defaults sensibly. Otherwise keep the base default (128).
-        int? bits = TryReadKeySizeBits(key);
-        if (bits is int b)
-            KeySizeValue = b;
+        // The token key's size, and only that size, when the token reports a legal RC2 one (the BCL's
+        // 40 to 128 bits, 5 to 16 bytes), so EffectiveKeySize defaults to it; otherwise the base default
+        // (128) and the RC2 range stay. EffectiveKeySize is still set within RC2's own range, up to KeySize.
+        if (SecretKeySize.TryReadBits(key, bytes => bytes is >= 5 and <= 16) is int bits)
+        {
+            KeySizeValue = bits;
+            LegalKeySizesValue = SecretKeySize.Only(bits);
+        }
     }
 
-    private static int? TryReadKeySizeBits(Pkcs11Key key)
-    {
-        try
-        {
-            var attrs = key.GetAttributeValue(CKA.CKA_VALUE_LEN);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-            {
-                int bytes = (int)attrs[0].GetValueAsUlong();
-                // BCL RC2 legal key sizes are 40–128 bits in 8-bit steps (5–16 bytes).
-                if (bytes is >= 5 and <= 16)
-                    return bytes * 8;
-            }
-        }
-        catch (Pkcs11Exception)
-        {
-            // Token doesn't expose CKA_VALUE_LEN — fall back to the base default.
-        }
-        return null;
-    }
 
     /// <inheritdoc/>
     protected override bool TryEncryptCbcCore(

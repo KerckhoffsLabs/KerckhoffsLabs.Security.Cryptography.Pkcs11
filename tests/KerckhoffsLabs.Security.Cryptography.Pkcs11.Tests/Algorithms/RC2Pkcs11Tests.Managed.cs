@@ -119,6 +119,26 @@ public sealed class RC2Pkcs11Tests_Managed
         Assert.Equal(expectedBits, rc2.KeySize);
     }
 
+    // A size the token reports is the only legal one, so setting another fails rather than changing what
+    // is reported for an unchanged key; the effective size can still be lowered within RC2's range.
+    [Fact]
+    public void KeySize_IsTheTokenKeys_AndCannotBeChanged()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_RC2)
+            .Label($"rc2-{Guid.NewGuid():N}").Value(new byte[8]).Encrypt().Decrypt().Build();
+        using var key = session.ImportKey(tpl);
+        using var rc2 = new RC2Pkcs11(key);
+
+        Assert.Equal(64, Assert.Single(rc2.LegalKeySizes).MaxSize);
+        Assert.Throws<CryptographicException>(() => rc2.KeySize = 128);
+
+        rc2.EffectiveKeySize = 40;
+        Assert.Equal(40, rc2.EffectiveKeySize);
+        Assert.Equal(64, rc2.KeySize);
+    }
+
     // === Secure-defaults gate (fires before any token call — no RC2-capable host needed) ============
 
     [Fact]

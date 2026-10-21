@@ -282,11 +282,26 @@ public sealed class TripleDESPkcs11Tests_Managed
     });
 
     // === Two-key (CKK_DES2, 128-bit) 3DES ==============================================
-    // No KeySize test here: TripleDESPkcs11.KeySize reads CKA_VALUE_LEN, which a spec-correct token
-    // rejects on C_CreateObject (import) and never derives afterward from CKA_VALUE alone — confirmed
-    // against real SoftHSM2 (CKR_ATTRIBUTE_TYPE_INVALID when supplied, unreadable when omitted). The
-    // 24-byte case's KeySize test only ever passed by coincidence: 192 is also TripleDES's base-class
-    // default.
+
+    // A spec-correct token gives DES-family keys no CKA_VALUE_LEN (SoftHSM2 refuses it on import and
+    // reports none), so the size comes from the key type. LegalKeySizes is that size alone, so setting
+    // another fails rather than changing what is reported for an unchanged key.
+    [Fact]
+    public void KeySize_IsFixedByTheKeyType_AndCannotBeChanged()
+    {
+        WithImportedDes2((_, des2) =>
+        {
+            Assert.Equal(128, des2.KeySize);
+            Assert.Equal(128, Assert.Single(des2.LegalKeySizes).MaxSize);
+            Assert.Throws<CryptographicException>(() => des2.KeySize = 192);
+        });
+        WithImportedDes3((_, des3) =>
+        {
+            Assert.Equal(192, des3.KeySize);
+            Assert.Equal(192, Assert.Single(des3.LegalKeySizes).MinSize);
+            Assert.Throws<CryptographicException>(() => des3.KeySize = 128);
+        });
+    }
 
     // Fixed known-answer vector: two-key (2TDEA) 3DES-CBC, key Key128, plaintext "Now is t" + 8 zero
     // bytes (two 8-byte blocks, no padding). The BCL's own TripleDES cannot be used as the oracle here —
