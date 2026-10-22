@@ -9,6 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// PKCS#11 AES key. AesCcm is sealed in the BCL so this is a wrapper, not a subclass.
 /// Method shapes mirror the BCL.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "Mirrors AesCcm's byte[] and span Encrypt/Decrypt overloads one-for-one; arrays bind to the byte[] overload and spans to the span one, so no call site is ambiguous.")]
 public sealed class AesCcmPkcs11 : IDisposable
 {
     /// <summary>Nonce sizes (in bytes) supported by AES-CCM; mirrors <see cref="System.Security.Cryptography.AesCcm.NonceByteSizes"/>.</summary>
@@ -22,7 +23,7 @@ public sealed class AesCcmPkcs11 : IDisposable
     private readonly Pkcs11Key _key;
     private bool _disposed;
 
-    /// <summary>The authentication-tag size, in bytes, that every <see cref="Encrypt"/> writes and every <see cref="Decrypt"/> requires.</summary>
+    /// <summary>The authentication-tag size, in bytes, that every <c>Encrypt</c> writes and every <c>Decrypt</c> requires.</summary>
     public int TagSizeInBytes { get; }
 
     /// <summary>
@@ -34,7 +35,7 @@ public sealed class AesCcmPkcs11 : IDisposable
     /// The tag size is fixed here, a deliberate departure from <see cref="System.Security.Cryptography.AesCcm"/>,
     /// which takes it from the tag each call is handed. This follows
     /// <see cref="System.Security.Cryptography.AesGcm"/>, which fixes it at construction since SYSLIB0053.
-    /// Otherwise <see cref="Decrypt"/> would verify whatever length it received, and an attacker who
+    /// Otherwise <c>Decrypt</c> would verify whatever length it received, and an attacker who
     /// controls the ciphertext could submit a forged 4-byte tag, checked at 32 bits instead of 128.
     /// Cutting a genuine tag short does not help: CCM binds the tag length into the MAC.
     /// </remarks>
@@ -72,6 +73,18 @@ public sealed class AesCcmPkcs11 : IDisposable
     {
         AeadSizes.RequireLegal(NonceByteSizes, nonce.Length, "Nonce length", nameof(nonce));
         AeadSizes.RequireTagSize(tag, TagSizeInBytes);
+    }
+
+    /// <inheritdoc cref="Encrypt(ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, Span{byte}, ReadOnlySpan{byte})"/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="nonce"/>, <paramref name="plaintext"/>, <paramref name="ciphertext"/> or <paramref name="tag"/> is <see langword="null"/>.</exception>
+    public void Encrypt(byte[] nonce, byte[] plaintext, byte[] ciphertext, byte[] tag, byte[]? associatedData = null)
+    {
+        ArgumentNullException.ThrowIfNull(nonce);
+        ArgumentNullException.ThrowIfNull(plaintext);
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(tag);
+
+        Encrypt((ReadOnlySpan<byte>)nonce, plaintext, ciphertext, tag, associatedData);
     }
 
     /// <summary>
@@ -124,6 +137,18 @@ public sealed class AesCcmPkcs11 : IDisposable
                 $"AES-CCM encrypt returned {result.Length} bytes; expected {plaintext.Length + tag.Length}.");
         result.AsSpan(0, plaintext.Length).CopyTo(ciphertext);
         result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
+    }
+
+    /// <inheritdoc cref="Decrypt(ReadOnlySpan{byte}, ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, ReadOnlySpan{byte})"/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="nonce"/>, <paramref name="ciphertext"/>, <paramref name="tag"/> or <paramref name="plaintext"/> is <see langword="null"/>.</exception>
+    public void Decrypt(byte[] nonce, byte[] ciphertext, byte[] tag, byte[] plaintext, byte[]? associatedData = null)
+    {
+        ArgumentNullException.ThrowIfNull(nonce);
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(tag);
+        ArgumentNullException.ThrowIfNull(plaintext);
+
+        Decrypt((ReadOnlySpan<byte>)nonce, ciphertext, tag, plaintext, associatedData);
     }
 
     /// <summary>

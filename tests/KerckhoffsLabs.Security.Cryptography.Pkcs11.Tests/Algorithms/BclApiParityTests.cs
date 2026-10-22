@@ -66,9 +66,6 @@ public sealed class BclApiParityTests
     private const string TokenKey = "Takes the token key (Pkcs11Key) instead of key bytes, which never leave the token.";
     private const string IsSupportedPerToken =
         "Support depends on the token, not the platform: Pkcs11Key.SupportsMechanism answers it for the mechanism.";
-    private const string ByteArrayAead =
-        "The byte[] overload is missing. Arrays bind to the span overload instead, so a null array is taken as empty: a null " +
-        "plaintext and ciphertext encrypt nothing without error, where the BCL throws ArgumentNullException.";
     private const string CcmTagSizePerCall =
         "AesCcm takes the tag size from each call's tag; AesCcmPkcs11's only constructor fixes it, and refuses a tag of " +
         "another legal size.";
@@ -101,8 +98,8 @@ public sealed class BclApiParityTests
                 Same("Void Encrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"),
             ["Void Decrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"] =
                 Same("Void Decrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"),
-            ["Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = new Gap(ByteArrayAead),
-            ["Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = new Gap(ByteArrayAead),
+            ["Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = Same("Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"),
+            ["Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = Same("Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"),
             ["Void Dispose()"] = Same("Void Dispose()"),
             ["static Boolean IsSupported { get; }"] = new Deviation(IsSupportedPerToken),
             ["static KeySizes NonceByteSizes { get; }"] = Same("static KeySizes NonceByteSizes { get; }"),
@@ -116,8 +113,8 @@ public sealed class BclApiParityTests
                 Same("Void Encrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"),
             ["Void Decrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"] =
                 Same("Void Decrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"),
-            ["Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = new Gap(ByteArrayAead),
-            ["Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = new Gap(ByteArrayAead),
+            ["Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = Same("Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"),
+            ["Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = Same("Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"),
             ["Void Dispose()"] = Same("Void Dispose()"),
             ["static Boolean IsSupported { get; }"] = new Deviation(IsSupportedPerToken),
             ["static KeySizes NonceByteSizes { get; }"] = Same("static KeySizes NonceByteSizes { get; }"),
@@ -131,8 +128,8 @@ public sealed class BclApiParityTests
                 Same("Void Encrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"),
             ["Void Decrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"] =
                 Same("Void Decrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"),
-            ["Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = new Gap(ByteArrayAead),
-            ["Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = new Gap(ByteArrayAead),
+            ["Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = Same("Void Encrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"),
+            ["Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"] = Same("Void Decrypt(Byte[], Byte[], Byte[], Byte[], Byte[])"),
             ["Void Dispose()"] = Same("Void Dispose()"),
             ["static Boolean IsSupported { get; }"] = new Deviation(IsSupportedPerToken),
         },

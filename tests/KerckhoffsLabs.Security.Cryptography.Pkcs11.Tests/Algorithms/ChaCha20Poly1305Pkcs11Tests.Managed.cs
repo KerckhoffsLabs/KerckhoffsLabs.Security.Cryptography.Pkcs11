@@ -111,9 +111,9 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         WithImportedChaCha(key, chacha =>
         {
             byte[] tag = new byte[16];
-            chacha.Encrypt(nonce, [], [], tag, aad);
+            chacha.Encrypt(nonce, Array.Empty<byte>(), Array.Empty<byte>(), tag, aad);
             Assert.Equal(bclTag, tag); // tag authenticates the AAD over an empty message
-            chacha.Decrypt(nonce, [], tag, [], aad); // must not throw
+            chacha.Decrypt(nonce, Array.Empty<byte>(), tag, Array.Empty<byte>(), aad); // must not throw
         });
     }
 
@@ -293,6 +293,16 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         Assert.Throws<ObjectDisposedException>(() =>
             chacha.Decrypt(new byte[12], new byte[8], new byte[16], new byte[8]));
     });
+
+    [Fact(SkipUnless = nameof(ChaCha20Poly1305.IsSupported), SkipType = typeof(ChaCha20Poly1305), Skip = "Requires " + nameof(ChaCha20Poly1305.IsSupported))]
+    public void ByteArrayOverloads_NullArguments_FailAsBcl() => WithAnyChaCha(ChaCha20Poly1305Pkcs11TestCases.AssertNullArgumentsFailAsBcl);
+
+    [Fact(SkipUnless = nameof(ChaCha20Poly1305.IsSupported), SkipType = typeof(ChaCha20Poly1305), Skip = "Requires " + nameof(ChaCha20Poly1305.IsSupported))]
+    public void ByteArrayOverloads_MatchBcl()
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        WithImportedChaCha(key, chacha => ChaCha20Poly1305Pkcs11TestCases.AssertArrayOverloadsMatchBcl(chacha, key));
+    }
 
     /// <summary>
     /// A failed tag check clears the plaintext destination before throwing, as the BCL does, so a

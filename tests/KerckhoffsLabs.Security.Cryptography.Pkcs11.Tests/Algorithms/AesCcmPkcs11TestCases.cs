@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -228,9 +229,9 @@ internal static class AesCcmPkcs11TestCases
             byte[] aad = Encoding.UTF8.GetBytes("aad-only authentication");
             byte[] tag = new byte[16];
 
-            ccm.Encrypt(nonce, [], [], tag, aad);
+            ccm.Encrypt(nonce, Array.Empty<byte>(), Array.Empty<byte>(), tag, aad);
             // The tag authenticates the AAD even with empty plaintext; the matching-AAD decrypt must succeed.
-            Assert.Null(Record.Exception(() => ccm.Decrypt(nonce, [], tag, [], aad)));
+            Assert.Null(Record.Exception(() => ccm.Decrypt(nonce, Array.Empty<byte>(), tag, Array.Empty<byte>(), aad)));
         });
     }
 
@@ -305,6 +306,41 @@ internal static class AesCcmPkcs11TestCases
             byte[] dest = new byte[plaintext.Length];
             AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_CCM, () => ccm.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
+    }
+
+    // === byte[] overloads: validated and computed as the BCL's ============
+
+    internal static void Assert_ByteArrayOverloads_NullArguments_FailAsBcl(IPkcs11Backend backend) =>
+        WithCcm(backend, AssertNullArgumentsFailAsBcl);
+
+    internal static void Assert_ByteArrayOverloads_MatchBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        WithImportedCcm(backend, key, ccm => AssertArrayOverloadsMatchBcl(ccm, key));
+    }
+
+    private static void SkipUnlessBclCcm()
+    {
+        if (!AesCcm.IsSupported)
+            Assert.Skip("The platform has no AesCcm to compare against.");
+    }
+
+    // Shared with the managed-token suite, which builds its AesCcmPkcs11 without a backend.
+    internal static void AssertNullArgumentsFailAsBcl(AesCcmPkcs11 ccm)
+    {
+        SkipUnlessBclCcm();
+        using var bcl = new AesCcm(RandomNumberGenerator.GetBytes(32));
+        AeadTestSupport.AssertNullArgumentsFailAsBcl([12, 8, 8, 16], bcl.Encrypt, (n, a, b, c, ad) => ccm.Encrypt(n, a, b, c, ad));
+        AeadTestSupport.AssertNullArgumentsFailAsBcl([12, 8, 16, 8], bcl.Decrypt, (n, a, b, c, ad) => ccm.Decrypt(n, a, b, c, ad));
+    }
+
+    internal static void AssertArrayOverloadsMatchBcl(AesCcmPkcs11 ccm, byte[] key)
+    {
+        SkipUnlessBclCcm();
+        using var bcl = new AesCcm(key);
+        AeadTestSupport.AssertArrayOverloadsMatchBcl(12, 16, bcl.Encrypt,
+            (n, a, b, c, ad) => ccm.Encrypt(n, a, b, c, ad), (n, a, b, c, ad) => ccm.Decrypt(n, a, b, c, ad));
     }
 
     // Known-answer test: expected bytes pinned from the BCL AesCcm primitive (NIST SP 800-38C semantics)

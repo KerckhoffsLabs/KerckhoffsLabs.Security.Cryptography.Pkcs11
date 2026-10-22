@@ -46,6 +46,16 @@ public sealed class AesGcmPkcs11Tests_Nss(NssBackendFixture backend)
     public void Decrypt_AfterDispose_Throws() => AesGcmPkcs11TestCases.Assert_Decrypt_AfterDispose_Throws(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void ByteArrayOverloads_NullArguments_FailAsBcl() => AesGcmPkcs11TestCases.Assert_ByteArrayOverloads_NullArguments_FailAsBcl(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void ByteArrayOverloads_MatchBcl()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_ByteArrayOverloads_MatchBcl(_backend);
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void EncryptDecrypt_RoundTrips_WithAad()
     {
         _backend.RequireAesGcm();

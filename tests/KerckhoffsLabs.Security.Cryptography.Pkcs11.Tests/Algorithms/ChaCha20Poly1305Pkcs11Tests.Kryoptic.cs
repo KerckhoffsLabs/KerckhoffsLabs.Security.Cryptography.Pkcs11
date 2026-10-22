@@ -44,6 +44,12 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Kryoptic(KryopticBackendFixture 
     public void Decrypt_AfterDispose_Throws() => ChaCha20Poly1305Pkcs11TestCases.Assert_Decrypt_AfterDispose_Throws(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void ByteArrayOverloads_NullArguments_FailAsBcl() => ChaCha20Poly1305Pkcs11TestCases.Assert_ByteArrayOverloads_NullArguments_FailAsBcl(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void ByteArrayOverloads_MatchBcl() => ChaCha20Poly1305Pkcs11TestCases.Assert_ByteArrayOverloads_MatchBcl(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void EncryptDecrypt_RoundTrips_WithAad() => ChaCha20Poly1305Pkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_WithAad(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
