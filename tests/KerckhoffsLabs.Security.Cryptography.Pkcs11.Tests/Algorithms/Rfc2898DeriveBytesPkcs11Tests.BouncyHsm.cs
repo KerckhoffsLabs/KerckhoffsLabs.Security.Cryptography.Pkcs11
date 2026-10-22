@@ -87,6 +87,15 @@ public sealed class Rfc2898DeriveBytesPkcs11Tests_BouncyHsm(BouncyHsmBackendFixt
     public void StaticPbkdf2_UnsupportedHash_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_UnsupportedHash_Throws(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void StaticPbkdf2_CharPassword_MatchesStringOverloadAndBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_CharPassword_MatchesStringOverloadAndBcl(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void StaticPbkdf2_UnpairedSurrogate_ThrowsLikeBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_UnpairedSurrogate_ThrowsLikeBcl(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void StaticPbkdf2_CharPassword_ArgumentErrors_MatchBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_CharPassword_ArgumentErrors_MatchBcl(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Pbkdf2Key_UnderSecureOnly_MatchesBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_UnderSecureOnly_MatchesBcl(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]

@@ -76,8 +76,6 @@ public sealed class BclApiParityTests
         "The string and ReadOnlySpan<char> label and context overloads, which the BCL encodes as UTF-8, are missing.";
     private const string KdfStaticKeyBytes = "Takes the key as bytes; derive through an instance over the token key.";
     private const string Pbkdf2Session = "Takes the session that runs PBKDF2 (CKM_PKCS5_PBKD2) as its first argument.";
-    private const string Pbkdf2CharPassword =
-        "The ReadOnlySpan<char> password overload, which the BCL encodes as UTF-8, is missing; the string overload exists.";
     private const string ObsoleteDefaults =
         "Obsolete (SYSLIB0060), and defaults to SHA-1 and 1000 iterations; the adapter takes the hash and the iteration count explicitly.";
     private const string ObsoleteRandomSalt =
@@ -194,8 +192,10 @@ public sealed class BclApiParityTests
                 As("static Byte[] Pbkdf2(Pkcs11Session, String, Byte[], Int32, HashAlgorithmName, Int32)", Pbkdf2Session),
             ["static Void Pbkdf2(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, Int32, HashAlgorithmName)"] =
                 As("static Void Pbkdf2(Pkcs11Session, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, Int32, HashAlgorithmName)", Pbkdf2Session),
-            ["static Byte[] Pbkdf2(ReadOnlySpan<Char>, ReadOnlySpan<Byte>, Int32, HashAlgorithmName, Int32)"] = new Gap(Pbkdf2CharPassword),
-            ["static Void Pbkdf2(ReadOnlySpan<Char>, ReadOnlySpan<Byte>, Span<Byte>, Int32, HashAlgorithmName)"] = new Gap(Pbkdf2CharPassword),
+            ["static Byte[] Pbkdf2(ReadOnlySpan<Char>, ReadOnlySpan<Byte>, Int32, HashAlgorithmName, Int32)"] =
+                As("static Byte[] Pbkdf2(Pkcs11Session, ReadOnlySpan<Char>, ReadOnlySpan<Byte>, Int32, HashAlgorithmName, Int32)", Pbkdf2Session),
+            ["static Void Pbkdf2(ReadOnlySpan<Char>, ReadOnlySpan<Byte>, Span<Byte>, Int32, HashAlgorithmName)"] =
+                As("static Void Pbkdf2(Pkcs11Session, ReadOnlySpan<Char>, ReadOnlySpan<Byte>, Span<Byte>, Int32, HashAlgorithmName)", Pbkdf2Session),
         },
         [nameof(Pkcs11CertificateExtensions)] = new(StringComparer.Ordinal)
         {
