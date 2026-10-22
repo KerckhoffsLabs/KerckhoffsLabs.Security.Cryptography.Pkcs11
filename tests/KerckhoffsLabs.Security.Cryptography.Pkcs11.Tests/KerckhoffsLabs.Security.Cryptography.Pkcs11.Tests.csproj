@@ -40,6 +40,8 @@
       Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="true" />
+    <!-- The code fixes, exercised through an in-memory workspace (BclStaticThroughAdapterAnalyzerTests). -->
+    <ProjectReference Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.CodeFixes\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.CodeFixes.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,6 +50,9 @@
     <PackageReference Include="coverlet.MTP" Version="10.1.0" />
     <PackageReference Include="xunit.v3" Version="4.0.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <!-- The compiler and workspace the analyzer tests compile snippets and apply code fixes with;
+         the analyzer projects reference them privately, so the tests need their own. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>
