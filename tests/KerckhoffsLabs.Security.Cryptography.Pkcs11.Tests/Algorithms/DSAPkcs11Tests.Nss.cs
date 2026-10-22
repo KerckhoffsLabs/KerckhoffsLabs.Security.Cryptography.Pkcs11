@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
@@ -45,6 +46,14 @@ public sealed class DSAPkcs11Tests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void CreateSignature_VerifySignature_OverHash_RoundTrips() => DSAPkcs11TestCases.Assert_CreateSignature_VerifySignature_OverHash_RoundTrips(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence)]
+    public void VerifyWithSignatureFormat_AcceptsBothFormats_AndRejectsTampering(DSASignatureFormat format) => DSAPkcs11TestCases.Assert_VerifyWithSignatureFormat_AcceptsBothFormats_AndRejectsTampering(_backend, format);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void VerifyWithSignatureFormat_MalformedSignature_ReturnsFalse() => DSAPkcs11TestCases.Assert_VerifyWithSignatureFormat_MalformedSignature_ReturnsFalse(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void ExportParameters_ReturnsProvidedDomain() => DSAPkcs11TestCases.Assert_ExportParameters_ReturnsProvidedDomain(_backend);

@@ -20,13 +20,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// token hashes and signs in one <c>C_Sign</c> call; if the token lacks the combined mechanism it
 /// falls back to hashing on the managed side and signing the digest with raw <c>CKM_DSA</c>. Both
 /// produce IEEE P1363 (r‖s) signatures, matching the BCL default — the base class converts to the
-/// DER format on request via the <c>DSASignatureFormat</c> overloads.
+/// DER format on request via the <c>DSASignatureFormat</c> overloads. Verification with a
+/// <c>DSASignatureFormat</c> converts a DER signature to r‖s here, sizing it from the key's
+/// <c>CKA_SUBPRIME</c>, and verifies it with raw <c>CKM_DSA</c>.
 /// </para>
 /// <para>
 /// Note: NIST FIPS 186-5 (2023) disallows DSA for signature generation; this adapter is for interop
 /// with existing DSA keys. Private-key parameter export is refused (PKCS#11 keys are non-extractable);
 /// <see cref="ExportParameters(bool)"/> with <see langword="false"/> reads the domain parameters and public value
 /// (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) from the public handle.
+/// </para>
+/// <para>
+/// <see cref="DSA.GetMaxSignatureSize(DSASignatureFormat)"/> is not virtual and reads q through
+/// <see cref="ExportParameters(bool)"/>, so like it, it needs the key's public-key object: on a key
+/// with only a private-key object it throws <see cref="Pkcs11Exception"/>
+/// (<see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/>), although that key can sign. The public value Y is not
+/// on the private-key object, whose <c>CKA_VALUE</c> is the private value, and <c>DSAParameters</c>
+/// without Y is not a public key. A P1363 signature is twice the length of <c>CKA_SUBPRIME</c>, which
+/// <see cref="Pkcs11Key.GetAttributeValue"/> reads from either object.
 /// </para>
 /// </remarks>
 [Obsolete("DSA is disallowed for signature generation by NIST FIPS 186-5 (2023) and is removed from modern " +
@@ -37,6 +48,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 public sealed class DSAPkcs11 : DSA
 {
     private readonly Pkcs11Key _key;
+
+    // q's length in bytes, read from the token on first use; 0 until then.
+    private int _subprimeLength;
 
     /// <summary>
     /// Wraps a PKCS#11 DSA key as a BCL <see cref="DSA"/> instance. Does not take ownership —
@@ -96,13 +110,107 @@ public sealed class DSAPkcs11 : DSA
     /// <inheritdoc/>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> or <paramref name="rgbSignature"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown when <c>CKA_SUBPRIME</c> cannot be read to check the signature's length; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifySignature(byte[] rgbHash, byte[] rgbSignature)
     {
         ArgumentNullException.ThrowIfNull(rgbHash);
         ArgumentNullException.ThrowIfNull(rgbSignature);
         var mech = new Mechanism(CKM.CKM_DSA);
-        return _key.Verify(mech, rgbHash, rgbSignature);
+        return VerifyIeeeP1363(mech, rgbHash, rgbSignature);
+    }
+
+    // Every verification with a DSASignatureFormat ends here. The base class sizes q through
+    // ExportParameters(false) inside a catch of CryptographicException, which would turn a token error
+    // (Pkcs11Exception) into false without ever reaching C_Verify; this reads q's length from CKA_SUBPRIME
+    // and lets the token's errors through.
+
+    /// <inheritdoc/>
+    /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown when <c>CKA_SUBPRIME</c> cannot be read to size the signature; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
+    protected override bool VerifySignatureCore(
+        ReadOnlySpan<byte> hash, ReadOnlySpan<byte> signature, DSASignatureFormat signatureFormat)
+    {
+        var mech = new Mechanism(CKM.CKM_DSA);
+        switch (signatureFormat)
+        {
+            case DSASignatureFormat.IeeeP1363FixedFieldConcatenation:
+                return VerifyIeeeP1363(mech, hash, signature);
+            case DSASignatureFormat.Rfc3279DerSequence:
+                // A malformed signature does not verify, as for the BCL's own conversion.
+                byte[]? ieee = DerToIeeeP1363(signature, SubprimeLength);
+                return ieee is not null && _key.Verify(mech, hash, ieee);
+            default:
+                // The public overloads reject an unknown format before reaching here; as DSAOpenSsl.
+                throw new CryptographicException($"Unknown signature format '{signatureFormat}'.");
+        }
+    }
+
+    // An r‖s signature is twice q's length, and one of another length does not verify, as for the BCL's own
+    // DSA. It is not passed to the token, which may not say so: NSS answers it with CKR_ARGUMENTS_BAD. The
+    // session's policy is still asked first, as the token path asks it.
+    private bool VerifyIeeeP1363(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
+    {
+        if (signature.Length == 2 * SubprimeLength)
+            return _key.Verify(mechanism, data, signature);
+
+        _key.Session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
+        return false;
+    }
+
+    // q's length in bytes, as ExportParameters(false) reports it, but from CKA_SUBPRIME alone: both halves
+    // of the key carry it, where the public value ExportParameters also reads is only on the public-key object.
+    // Read once: a key object's domain parameters cannot be modified.
+    private int SubprimeLength
+    {
+        get
+        {
+            if (_subprimeLength == 0)
+            {
+                using var subprime = _key.GetAttributeValue(CKA.CKA_SUBPRIME);
+                if (subprime[0].CannotBeRead)
+                    throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                        "DSAPkcs11 (CKA_SUBPRIME not readable)");
+                _subprimeLength = TrimLeadingZeros(subprime[0].GetValueAsByteArray()).Length;
+            }
+            return _subprimeLength;
+        }
+    }
+
+    // RFC 3279 Dss-Sig-Value { r, s } to r‖s, each left-padded to fieldLength; null when the encoding is
+    // malformed or a value does not fit, where the BCL's conversion throws and its caller returns false.
+    private static byte[]? DerToIeeeP1363(ReadOnlySpan<byte> signature, int fieldLength)
+    {
+        try
+        {
+            var reader = new AsnReader(signature.ToArray(), AsnEncodingRules.DER);
+            AsnReader sequence = reader.ReadSequence();
+            reader.ThrowIfNotEmpty();
+            ReadOnlySpan<byte> r = sequence.ReadIntegerBytes().Span;
+            ReadOnlySpan<byte> s = sequence.ReadIntegerBytes().Span;
+            sequence.ThrowIfNotEmpty();
+
+            byte[] ieee = new byte[2 * fieldLength];
+            return TryCopyField(r, ieee.AsSpan(0, fieldLength)) && TryCopyField(s, ieee.AsSpan(fieldLength))
+                ? ieee
+                : null;
+        }
+        catch (AsnContentException)
+        {
+            return null;
+        }
+    }
+
+    // A DER INTEGER is one byte longer than the field only for the zero that keeps a set high bit positive.
+    private static bool TryCopyField(ReadOnlySpan<byte> field, Span<byte> destination)
+    {
+        if (field.Length > destination.Length)
+        {
+            if (field.Length != destination.Length + 1 || field is not [0, > 0x7F, ..])
+                return false;
+            field = field[1..];
+        }
+        field.CopyTo(destination[(destination.Length - field.Length)..]);
+        return true;
     }
 
     // -----------------------------------------------------------------------
@@ -126,17 +234,17 @@ public sealed class DSAPkcs11 : DSA
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown when <c>CKA_SUBPRIME</c> cannot be read to check the signature's length; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.DsaSign(hashAlgorithm);
         if (_key.SupportsMechanism(combined.Type))
-            return _key.Verify(combined, data, signature);
+            return VerifyIeeeP1363(combined, data, signature);
 
         byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Verify);
         var raw = new Mechanism(CKM.CKM_DSA);
-        return _key.Verify(raw, hash, signature);
+        return VerifyIeeeP1363(raw, hash, signature);
     }
 
     // The BCL routes these verification overloads through the protected HashData overrides, which are
