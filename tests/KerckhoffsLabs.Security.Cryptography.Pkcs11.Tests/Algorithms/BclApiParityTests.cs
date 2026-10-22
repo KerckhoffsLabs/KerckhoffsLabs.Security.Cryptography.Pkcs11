@@ -82,7 +82,6 @@ public sealed class BclApiParityTests
         "Obsolete (SYSLIB0060), and generates the salt; the adapter takes the salt, the hash and the iteration count explicitly.";
     private const string TokenCertificate =
         "Extends the token certificate (Pkcs11Certificate), whose private key is found on the token by CKA_ID.";
-    private const string CertificateGetterMissing = "No counterpart, although the library has an adapter for such a key.";
     private const string CopyWithPrivateKey =
         "Attaches a managed key to a certificate; a token certificate and its key are already paired on the token by CKA_ID.";
 
@@ -203,11 +202,16 @@ public sealed class BclApiParityTests
                 As("static RSA GetRSAPrivateKey(Pkcs11Certificate)", TokenCertificate),
             ["ECDsaCertificateExtensions.static ECDsa GetECDsaPrivateKey(X509Certificate2)"] =
                 As("static ECDsa GetECDsaPrivateKey(Pkcs11Certificate)", TokenCertificate),
-            ["DSACertificateExtensions.static DSA GetDSAPrivateKey(X509Certificate2)"] = new Gap(CertificateGetterMissing + " (DSAPkcs11)"),
-            ["X509Certificate2.ECDiffieHellman GetECDiffieHellmanPrivateKey()"] = new Gap(CertificateGetterMissing + " (ECDiffieHellmanPkcs11)"),
-            ["X509Certificate2.MLDsa GetMLDsaPrivateKey()"] = new Gap(CertificateGetterMissing + " (MLDsaPkcs11)"),
-            ["X509Certificate2.MLKem GetMLKemPrivateKey()"] = new Gap(CertificateGetterMissing + " (MLKemPkcs11)"),
-            ["X509Certificate2.SlhDsa GetSlhDsaPrivateKey()"] = new Gap(CertificateGetterMissing + " (SlhDsaPkcs11)"),
+            ["DSACertificateExtensions.static DSA GetDSAPrivateKey(X509Certificate2)"] =
+                As("static DSA GetDSAPrivateKey(Pkcs11Certificate)", TokenCertificate),
+            ["X509Certificate2.ECDiffieHellman GetECDiffieHellmanPrivateKey()"] =
+                As("static ECDiffieHellman GetECDiffieHellmanPrivateKey(Pkcs11Certificate)", TokenCertificate),
+            ["X509Certificate2.MLDsa GetMLDsaPrivateKey()"] =
+                As("static MLDsa GetMLDsaPrivateKey(Pkcs11Certificate)", TokenCertificate),
+            ["X509Certificate2.MLKem GetMLKemPrivateKey()"] =
+                As("static MLKem GetMLKemPrivateKey(Pkcs11Certificate)", TokenCertificate),
+            ["X509Certificate2.SlhDsa GetSlhDsaPrivateKey()"] =
+                As("static SlhDsa GetSlhDsaPrivateKey(Pkcs11Certificate)", TokenCertificate),
             ["X509Certificate2.CompositeMLDsa GetCompositeMLDsaPrivateKey()"] =
                 new Deviation("PKCS#11 defines no composite ML-DSA mechanism, and the library has no adapter for it."),
             ["X509Certificate2.AsymmetricAlgorithm PrivateKey { get; set; }"] = new Deviation("Obsolete (SYSLIB0028)."),

@@ -25,6 +25,13 @@ internal static class Oids
         internal const string Dsa = "1.2.840.10040.4.1";
     }
 
+    /// <summary>X.509 certificate extension OIDs (<c>extnID</c>).</summary>
+    internal static class Extensions
+    {
+        /// <summary><c>id-ce-keyUsage</c> (RFC 5280 §4.2.1.3).</summary>
+        internal const string KeyUsage = "2.5.29.15";
+    }
+
     /// <summary>
     /// Hash <c>AlgorithmIdentifier</c> OIDs: the <c>digestAlgorithm</c> of a PKCS#1 v1.5 <c>DigestInfo</c>
     /// (RFC 8017 Appendix B.1).

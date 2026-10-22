@@ -44,4 +44,18 @@ internal static class PostQuantumParameterSets
         },
         _ => null,
     };
+
+    /// <summary>The key type whose parameter sets include the <c>SubjectPublicKeyInfo</c> algorithm <paramref name="oid"/>, or <see langword="null"/> when it is none of them.</summary>
+    internal static CKK? KeyTypeOf(string? oid) => oid switch
+    {
+        Oids.PostQuantum.MlDsa44 or Oids.PostQuantum.MlDsa65 or Oids.PostQuantum.MlDsa87 => CKK.CKK_ML_DSA,
+        Oids.PostQuantum.SlhDsaSha2_128s or Oids.PostQuantum.SlhDsaSha2_128f
+            or Oids.PostQuantum.SlhDsaSha2_192s or Oids.PostQuantum.SlhDsaSha2_192f
+            or Oids.PostQuantum.SlhDsaSha2_256s or Oids.PostQuantum.SlhDsaSha2_256f
+            or Oids.PostQuantum.SlhDsaShake128s or Oids.PostQuantum.SlhDsaShake128f
+            or Oids.PostQuantum.SlhDsaShake192s or Oids.PostQuantum.SlhDsaShake192f
+            or Oids.PostQuantum.SlhDsaShake256s or Oids.PostQuantum.SlhDsaShake256f => CKK.CKK_SLH_DSA,
+        Oids.PostQuantum.MlKem512 or Oids.PostQuantum.MlKem768 or Oids.PostQuantum.MlKem1024 => CKK.CKK_ML_KEM,
+        _ => null,
+    };
 }
