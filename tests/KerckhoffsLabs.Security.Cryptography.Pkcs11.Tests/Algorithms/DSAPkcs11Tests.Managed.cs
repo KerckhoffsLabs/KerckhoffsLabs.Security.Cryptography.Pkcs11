@@ -455,7 +455,8 @@ public sealed class DSAPkcs11Tests_Managed
     //
     // The base VerifySignatureCore read q through ExportParameters(false) inside a catch of
     // CryptographicException, so any Pkcs11Exception from that read became false and C_Verify was never
-    // called. The adapter's override reads only CKA_SUBPRIME, and only for DER.
+    // called. The adapter's override reads only CKA_SUBPRIME: to size a DER signature's conversion, and to
+    // check an r‖s signature's length, on every verification path, with a format or without.
 
     private const DSASignatureFormat P1363 = DSASignatureFormat.IeeeP1363FixedFieldConcatenation;
 
@@ -522,21 +523,59 @@ public sealed class DSAPkcs11Tests_Managed
         }
     });
 
-    // Both formats need q: DER to size the conversion, P1363 to check the signature's length.
+    // Both formats need q: DER to size the conversion, P1363 to check the signature's length. A failed read
+    // is the token's error.
     [Theory]
-    [InlineData(CKR.CKR_DEVICE_ERROR, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
-    [InlineData(CKR.CKR_DEVICE_ERROR, DSASignatureFormat.Rfc3279DerSequence)]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence)]
+    public void FormattedVerify_SubprimeReadFails_ThrowsTheTokensError(DSASignatureFormat format)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_DEVICE_ERROR, null), CryptoPolicy.AllowInsecure, publicOnly: true);
+        using var dsa = new DSAPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], SignatureIn(format), format));
+        Assert.Equal(CKR.CKR_DEVICE_ERROR, ex.ReturnValue);
+    }
+
+    // An attribute that cannot be read may be sensitive or missing, which the token does not tell apart for
+    // one attribute among several, so no return code is claimed for it.
+    [Theory]
     [InlineData(CKR.CKR_ATTRIBUTE_SENSITIVE, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
     [InlineData(CKR.CKR_ATTRIBUTE_SENSITIVE, DSASignatureFormat.Rfc3279DerSequence)]
-    public void FormattedVerify_SubprimeUnreadable_ThrowsPkcs11Exception(CKR rv, DSASignatureFormat format)
+    [InlineData(CKR.CKR_ATTRIBUTE_TYPE_INVALID, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(CKR.CKR_ATTRIBUTE_TYPE_INVALID, DSASignatureFormat.Rfc3279DerSequence)]
+    public void FormattedVerify_SubprimeUnreadable_ThrowsPkcs11AttributeException(CKR rv, DSASignatureFormat format)
     {
         using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (rv, null), CryptoPolicy.AllowInsecure, publicOnly: true);
         using var dsa = new DSAPkcs11(key);
-        byte[] sig = format == Der ? DSAPkcs11TestCases.DerSignature([0x01], [0x02]) : new byte[64];
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], sig, format));
-        Assert.Equal(rv, ex.ReturnValue);
+        var ex = Assert.Throws<Pkcs11AttributeException>(() => dsa.VerifySignature(new byte[32], SignatureIn(format), format));
+        Assert.Equal(CKA.CKA_SUBPRIME, ex.Attribute);
     }
+
+    // A q of zero is no key's: the token's malformed key is an error, not every signature failing to verify.
+    [Theory]
+    [InlineData(new byte[0])]
+    [InlineData(new byte[] { 0x00, 0x00 })]
+    public void Verify_SubprimeIsZero_ThrowsAttributeValueInvalid(byte[] subprime)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_OK, subprime), CryptoPolicy.AllowInsecure, publicOnly: true);
+        using var dsa = new DSAPkcs11(key);
+
+        foreach (Func<bool> verify in (Func<bool>[])
+            [
+                () => dsa.VerifySignature(new byte[32], new byte[2]),
+                () => dsa.VerifySignature(new byte[32], new byte[2], P1363),
+                () => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der),
+            ])
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => verify());
+            Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, ex.ReturnValue);
+        }
+    }
+
+    private static byte[] SignatureIn(DSASignatureFormat format) =>
+        format == Der ? DSAPkcs11TestCases.DerSignature([0x01], [0x02]) : new byte[64];
 
     // === An r‖s signature of the wrong length does not verify, and never reaches the token =========
     //
@@ -583,6 +622,47 @@ public sealed class DSAPkcs11Tests_Managed
         using var dsa = new DSAPkcs11(key);
 
         Assert.Throws<CryptoPolicyViolationException>(() => dsa.VerifySignature(new byte[32], new byte[3]));
+    }
+
+    // The policy is asked before the token is read, so a refused mechanism is refused as such, even when the
+    // read would fail.
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void Verify_GatedByDefault_ThrowsBeforeReadingTheToken(string call)
+    {
+        int reads = 0;
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ =>
+        {
+            reads++;
+            return (CKR.CKR_DEVICE_ERROR, null);
+        }, CryptoPolicy.SecureOnly, publicOnly: true);
+        using var dsa = new DSAPkcs11(key);
+        reads = 0; // The constructor reads the key's size.
+
+        Assert.Throws<CryptoPolicyViolationException>(() => HashVerifies[call](dsa, new byte[2]));
+        Assert.Throws<CryptoPolicyViolationException>(() => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der));
+        Assert.Equal(0, reads);
+    }
+
+    // A key with no public-key object cannot verify, and says so whatever the signature: its length or
+    // encoding does not turn that error into false.
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void Verify_NoPublicKeyObject_ThrowsWhateverTheSignature(string call)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_OK, [0x05]), CryptoPolicy.AllowInsecure);
+        using var dsa = new DSAPkcs11(key);
+
+        foreach (byte[] signature in (byte[][])[[], new byte[1], new byte[2], new byte[3]])
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => HashVerifies[call](dsa, signature));
+            Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+        }
+        foreach (byte[] signature in (byte[][])[[0x30, 0x00], [0x04], DSAPkcs11TestCases.DerSignature([0x01], [0x02])])
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], signature, Der));
+            Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+        }
     }
 
     [Fact]
