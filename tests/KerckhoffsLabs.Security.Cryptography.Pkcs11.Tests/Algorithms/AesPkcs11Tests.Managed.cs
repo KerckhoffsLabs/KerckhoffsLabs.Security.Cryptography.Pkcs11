@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
 /// AesPkcs11 over the in-process <c>ManagedSoftToken</c> (a BCL-backed PKCS#11 fake), mirroring the
-/// SoftHSM behavior set without any native module. The token performs CBC / CBC-PAD / ECB via the BCL,
+/// SoftHSM behavior set without any native module. The token performs CBC / CBC-PAD / ECB / CFB via the BCL,
 /// so the adapter's output is cross-checked against <see cref="Aes"/> for the same imported key — a true
 /// known-answer assertion that a non-extractable SoftHSM key cannot give. CBC and ECB are unauthenticated
 /// and gated by the secure-defaults policy: each throws <see cref="CryptoPolicyViolationException"/> outside
@@ -183,6 +183,11 @@ public sealed class AesPkcs11_Managed
         var token = new ManagedSoftToken { AdvertisesAesKeyWrapKwp = advertisesKwp };
         if (kwpFlags is { } flags)
             token.AesKeyWrapKwpFlags = flags;
+        WithToken(token, body);
+    }
+
+    private static void WithToken(ManagedSoftToken token, Action<ManagedSoftToken, Pkcs11Session, AesPkcs11> body)
+    {
         using var library = token.Load();
         using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(Key256).Encrypt().Decrypt().Build();
@@ -300,7 +305,7 @@ public sealed class AesPkcs11_Managed
             Assert.Throws<NotSupportedException>(() => aes.EncryptEcb(new byte[16], PaddingMode.PKCS7));
     });
 
-    // === CFB: gated; the managed token does not implement CFB, so the token call itself fails ===
+    // === CFB: gated, and the token's output must match the BCL once unlocked ===================
 
     [Fact]
     public void Cfb_GatedByDefault_Throws() => WithImportedAes((ws, aes) =>
@@ -312,14 +317,61 @@ public sealed class AesPkcs11_Managed
     {
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
-            // The managed token does not implement CFB, so the token call may fail — but the
-            // secure-defaults gate must NOT fire once the AllowInsecure policy is used.
+            // The secure-defaults gate must NOT fire once the AllowInsecure policy is used.
             Exception? ex = Record.Exception(
                 () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128));
             Assert.False(ex is CryptoPolicyViolationException,
                 $"Gate should be bypassed; got {ex?.GetType().Name ?? "no exception"}.");
         }
     });
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(128)]
+    public void Cfb_OneShots_MatchBclAtEveryLength(int feedbackSizeInBits) => WithImportedAes((session, aes) =>
+    {
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            AesPkcs11TestCases.AssertCfbOneShotsMatchBcl(aes, feedbackSizeInBits, 0, 1, 15, 16, 17, 32);
+    });
+
+    // The managed token, like CKM_AES_CFB128 on a real one, accepts a partial final segment: the adapter
+    // refuses it as the BCL does, before C_EncryptInit.
+    [Fact]
+    public void Cfb128_PartialSegment_ThrowsLikeBcl_BeforeTheToken() => WithKwpToken(advertisesKwp: true, (token, session, aes) =>
+    {
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            int initsBefore = token.EncryptInitCallCount;
+            AesPkcs11TestCases.AssertCfbOneShotsMatchBcl(aes, 128, 1, 15, 17, 31);
+            Assert.Equal(initsBefore, token.EncryptInitCallCount);
+            Assert.Throws<CryptographicException>(() => aes.DecryptCfb(new byte[17], Iv16, PaddingMode.None, 128));
+        }
+    });
+
+    // A token that leaves a single-part CFB C_Encrypt's output length as the caller passed it, the buffer's
+    // size (opencryptoki does), still gives the BCL's output: CFB's output is as long as its input.
+    [Theory]
+    [InlineData(8)]
+    [InlineData(128)]
+    public void Cfb_TokenReportsTheBufferSize_MatchesBcl(int feedbackSizeInBits) =>
+        WithToken(new ManagedSoftToken { ReportedCfbLength = (buffer, _) => buffer }, (_, session, aes) =>
+        {
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+                AesPkcs11TestCases.AssertCfbOneShotsMatchBcl(aes, feedbackSizeInBits, 0, 1, 15, 16, 17, 32);
+        });
+
+    // A token reporting less CFB output than input gave no CFB result.
+    [Fact]
+    public void Cfb_TokenReportsShortOutput_Throws() =>
+        WithToken(new ManagedSoftToken { ReportedCfbLength = (_, output) => output - 1 }, (_, session, aes) =>
+        {
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            {
+                byte[] destination = new byte[16];
+                Assert.Throws<CryptographicException>(() => aes.TryEncryptCfb(new byte[16], Iv16, destination, out int written, PaddingMode.None, 128));
+                Assert.Throws<CryptographicException>(() => aes.TryDecryptCfb(new byte[16], Iv16, destination, out int written, PaddingMode.None, 128));
+            }
+        });
 
     [Fact]
     public void Cfb_NonNonePadding_Throws() => WithImportedAes((ws, aes) =>

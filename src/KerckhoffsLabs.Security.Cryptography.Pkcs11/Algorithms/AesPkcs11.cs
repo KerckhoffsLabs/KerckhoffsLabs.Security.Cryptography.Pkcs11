@@ -31,8 +31,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// (→ <c>CKM_AES_CBC</c>, block-aligned input).</item>
 /// <item>ECB — <c>EncryptEcb</c> / <c>DecryptEcb</c> with <see cref="PaddingMode.None"/> (→ <c>CKM_AES_ECB</c>).</item>
 /// <item>CFB — <c>EncryptCfb</c> / <c>DecryptCfb</c> with feedback size 128 (→ <c>CKM_AES_CFB128</c>) or
-/// 8 (→ <c>CKM_AES_CFB8</c>), <see cref="PaddingMode.None"/>. Requires a token that implements CFB
-/// (SoftHSM does not).</item>
+/// 8 (→ <c>CKM_AES_CFB8</c>), <see cref="PaddingMode.None"/>, input a whole number of feedback-size
+/// segments (as the BCL requires; a partial CFB128 segment throws <see cref="CryptographicException"/>).
+/// Requires a token that implements CFB (SoftHSM does not).</item>
 /// </list>
 /// Empty input that yields empty output (any decryption, or unpadded encryption) is a no-op returned
 /// without touching the token; empty plaintext with PKCS7 must emit a padding block, so it is sent to
@@ -97,12 +98,12 @@ public sealed class AesPkcs11 : Aes
     /// <inheritdoc/>
     protected override bool TryEncryptCfbCore(
         ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> iv, Span<byte> destination, PaddingMode paddingMode, int feedbackSizeInBits, out int bytesWritten)
-        => RunBlock(CfbMechanism(iv, paddingMode, feedbackSizeInBits), encrypt: true, plaintext, destination, out bytesWritten);
+        => RunBlock(CfbMechanism(iv, paddingMode, feedbackSizeInBits, plaintext.Length), encrypt: true, plaintext, destination, out bytesWritten);
 
     /// <inheritdoc/>
     protected override bool TryDecryptCfbCore(
         ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> iv, Span<byte> destination, PaddingMode paddingMode, int feedbackSizeInBits, out int bytesWritten)
-        => RunBlock(CfbMechanism(iv, paddingMode, feedbackSizeInBits), encrypt: false, ciphertext, destination, out bytesWritten);
+        => RunBlock(CfbMechanism(iv, paddingMode, feedbackSizeInBits, ciphertext.Length), encrypt: false, ciphertext, destination, out bytesWritten);
 
     // -----------------------------------------------------------------------
     // Key wrap with padding (RFC 5649): one CKM_AES_KEY_WRAP_KWP operation on the token
@@ -188,13 +189,23 @@ public sealed class AesPkcs11 : Aes
         byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);
         try
         {
-            if (output.Length > destination.Length)
+            int length = output.Length;
+            if (mechanism.Type is CKM.CKM_AES_CFB8 or CKM.CKM_AES_CFB128)
+            {
+                // CFB's output is exactly as long as its input. Some tokens (opencryptoki) leave the output
+                // length of a single-part CFB C_Encrypt as the caller passed it, the size of the buffer, so a
+                // longer reported length counts only the input's; a shorter one is an output CFB cannot give.
+                if (length < input.Length)
+                    throw new CryptographicException($"The token returned {length} bytes of CFB output for {input.Length} bytes of input.");
+                length = input.Length;
+            }
+            if (length > destination.Length)
             {
                 bytesWritten = 0;
                 return false;
             }
-            output.CopyTo(destination);
-            bytesWritten = output.Length;
+            output.AsSpan(0, length).CopyTo(destination);
+            bytesWritten = length;
             return true;
         }
         finally
@@ -222,17 +233,24 @@ public sealed class AesPkcs11 : Aes
             "Pre-pad the input, or use CBC with PKCS7."),
     };
 
-    private static Mechanism CfbMechanism(ReadOnlySpan<byte> iv, PaddingMode paddingMode, int feedbackSizeInBits)
+    private static Mechanism CfbMechanism(ReadOnlySpan<byte> iv, PaddingMode paddingMode, int feedbackSizeInBits, int inputLength)
     {
         if (paddingMode != PaddingMode.None)
             throw new NotSupportedException("AesPkcs11 CFB is a stream mode and supports only PaddingMode.None.");
-        return feedbackSizeInBits switch
+        Mechanism mechanism = feedbackSizeInBits switch
         {
             128 => new Mechanism(CKM.CKM_AES_CFB128, iv),
             8 => new Mechanism(CKM.CKM_AES_CFB8, iv),
             _ => throw new NotSupportedException(
                 $"AesPkcs11 CFB supports feedback size 128 (CKM_AES_CFB128) or 8 (CKM_AES_CFB8); got {feedbackSizeInBits} bits."),
         };
+
+        // CKM_AES_CFB128 takes any length and ends in a partial segment; the BCL refuses unpadded input
+        // that is not a whole number of feedback-size segments, so this does too, before the token sees it.
+        if (inputLength % (feedbackSizeInBits / 8) != 0)
+            throw new CryptographicException(
+                $"The input data is not a complete block: CFB{feedbackSizeInBits} without padding takes a whole number of {feedbackSizeInBits / 8}-byte segments; got {inputLength} bytes.");
+        return mechanism;
     }
 
     /// <summary>Generates a random initialization vector (16 bytes) for CBC mode.</summary>

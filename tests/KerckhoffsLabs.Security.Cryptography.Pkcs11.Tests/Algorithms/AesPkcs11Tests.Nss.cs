@@ -26,6 +26,14 @@ public sealed class AesPkcs11Tests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Cfb_NonNonePadding_Throws() => AesPkcs11TestCases.Assert_Cfb_NonNonePadding_Throws(_backend);
 
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [InlineData(8)]
+    [InlineData(128)]
+    public void Cfb_OneShots_MatchBclAtEveryLength(int feedbackSizeInBits) => AesPkcs11TestCases.Assert_Cfb_OneShots_MatchBclAtEveryLength(_backend, feedbackSizeInBits);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void Cfb128_PartialSegment_ThrowsLikeBcl() => AesPkcs11TestCases.Assert_Cfb128_PartialSegment_ThrowsLikeBcl(_backend);
+
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void EncryptCbc_UnsupportedPadding_Throws() => AesPkcs11TestCases.Assert_EncryptCbc_UnsupportedPadding_Throws(_backend);
 
