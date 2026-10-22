@@ -74,4 +74,21 @@ public sealed class AesCcmPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture ba
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Encrypt_KnownAnswer_MatchesReferenceVector() => AesCcmPkcs11TestCases.Assert_Encrypt_KnownAnswer_MatchesReferenceVector(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void FixedTagSize_TagOfAnotherLegalSize_Throws() => AesCcmPkcs11TestCases.Assert_FixedTagSize_TagOfAnotherLegalSize_Throws(_backend);
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [InlineData(2)]
+    [InlineData(5)]
+    [InlineData(18)]
+    public void PerCallTagSize_IllegalTagLength_Throws(int t) => AesCcmPkcs11TestCases.Assert_PerCallTagSize_IllegalTagLength_Throws(_backend, t);
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(12)]
+    [InlineData(14)]
+    [InlineData(16)]
+    public void PerCallTagSize_MatchesBcl_AndRoundTrips(int t) => AesCcmPkcs11TestCases.Assert_PerCallTagSize_MatchesBcl_AndRoundTrips(_backend, t);
 }
