@@ -22,6 +22,10 @@ public sealed class AesCcmPkcs11ArgumentTests
         Assert.Throws<ArgumentNullException>(() => new AesCcmPkcs11(key: null!, 16));
 
     [Fact]
+    public void Ctor_PerCallTagSize_NullKey_Throws() =>
+        Assert.Throws<ArgumentNullException>("key", () => new AesCcmPkcs11(key: null!));
+
+    [Fact]
     public void NonceByteSizes_MirrorsBcl()
     {
         var actual = AesCcmPkcs11.NonceByteSizes;

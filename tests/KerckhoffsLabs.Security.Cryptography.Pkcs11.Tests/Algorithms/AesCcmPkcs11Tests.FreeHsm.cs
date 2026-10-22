@@ -87,4 +87,21 @@ public sealed class AesCcmPkcs11Tests_FreeHsm(FreeHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void EncryptDecrypt_LargeAad_MatchesBcl() => AesCcmPkcs11TestCases.Assert_EncryptDecrypt_LargeAad_MatchesBcl(_backend);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void FixedTagSize_TagOfAnotherLegalSize_Throws() => AesCcmPkcs11TestCases.Assert_FixedTagSize_TagOfAnotherLegalSize_Throws(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [InlineData(2)]
+    [InlineData(5)]
+    [InlineData(18)]
+    public void PerCallTagSize_IllegalTagLength_Throws(int t) => AesCcmPkcs11TestCases.Assert_PerCallTagSize_IllegalTagLength_Throws(_backend, t);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(12)]
+    [InlineData(14)]
+    [InlineData(16)]
+    public void PerCallTagSize_MatchesBcl_AndRoundTrips(int t) => AesCcmPkcs11TestCases.Assert_PerCallTagSize_MatchesBcl_AndRoundTrips(_backend, t);
 }

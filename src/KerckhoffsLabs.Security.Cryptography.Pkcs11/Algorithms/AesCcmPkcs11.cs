@@ -22,8 +22,30 @@ public sealed class AesCcmPkcs11 : IDisposable
     private readonly Pkcs11Key _key;
     private bool _disposed;
 
-    /// <summary>The authentication-tag size, in bytes, that every <see cref="Encrypt"/> writes and every <see cref="Decrypt"/> requires.</summary>
-    public int TagSizeInBytes { get; }
+    /// <summary>
+    /// The authentication-tag size, in bytes, that every <see cref="Encrypt"/> writes and every <see cref="Decrypt"/> requires,
+    /// or <see langword="null"/> if the instance was created without one: each call then takes the size from its tag,
+    /// which must be a size in <see cref="TagByteSizes"/>.
+    /// </summary>
+    public int? TagSizeInBytes { get; }
+
+    /// <summary>
+    /// Wraps a PKCS#11 AES key as an <see cref="System.Security.Cryptography.AesCcm"/>-shaped
+    /// AEAD provider that, like <see cref="System.Security.Cryptography.AesCcm"/>, takes the tag size
+    /// from the tag each <see cref="Encrypt"/> and <see cref="Decrypt"/> call is handed. Does not take
+    /// ownership — disposing this provider does not dispose <paramref name="key"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Decrypt"/> then verifies a tag of whatever legal length it receives, so an attacker who
+    /// controls the ciphertext can submit a forged tag of the shortest length the policy allows: 8 bytes
+    /// (64 bits) under <c>CryptoPolicy.SecureOnly</c> (the default) or <c>CryptoPolicy.FipsOnly</c>, 4 bytes
+    /// otherwise. Prefer <see cref="AesCcmPkcs11(Pkcs11Key, int)"/> to decrypt untrusted input.
+    /// </remarks>
+    /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
+    /// is <see cref="CKK.CKK_AES"/>.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an AES key.</exception>
+    public AesCcmPkcs11(Pkcs11Key key) => _key = RequireAesKey(key);
 
     /// <summary>
     /// Wraps a PKCS#11 AES key as an <see cref="System.Security.Cryptography.AesCcm"/>-shaped
@@ -31,12 +53,12 @@ public sealed class AesCcmPkcs11 : IDisposable
     /// <paramref name="key"/>.
     /// </summary>
     /// <remarks>
-    /// The tag size is fixed here, a deliberate departure from <see cref="System.Security.Cryptography.AesCcm"/>,
-    /// which takes it from the tag each call is handed. This follows
-    /// <see cref="System.Security.Cryptography.AesGcm"/>, which fixes it at construction since SYSLIB0053.
-    /// Otherwise <see cref="Decrypt"/> would verify whatever length it received, and an attacker who
-    /// controls the ciphertext could submit a forged 4-byte tag, checked at 32 bits instead of 128.
-    /// Cutting a genuine tag short does not help: CCM binds the tag length into the MAC.
+    /// The tag size is fixed here, where <see cref="System.Security.Cryptography.AesCcm"/> takes it from
+    /// the tag each call is handed. This follows <see cref="System.Security.Cryptography.AesGcm"/>, which
+    /// fixes it at construction since SYSLIB0053. Otherwise <see cref="Decrypt"/> would verify whatever
+    /// length it received, and an attacker who controls the ciphertext could submit a forged 4-byte tag,
+    /// checked at 32 bits instead of 128. Cutting a genuine tag short does not help: CCM binds the tag
+    /// length into the MAC. <see cref="AesCcmPkcs11(Pkcs11Key)"/> takes the size per call, as AesCcm does.
     /// </remarks>
     /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
     /// is <see cref="CKK.CKK_AES"/>.</param>
@@ -48,13 +70,17 @@ public sealed class AesCcmPkcs11 : IDisposable
     /// <paramref name="tagSizeInBytes"/> is not a size in <see cref="TagByteSizes"/>.</exception>
     public AesCcmPkcs11(Pkcs11Key key, int tagSizeInBytes)
     {
+        _key = RequireAesKey(key);
+        TagSizeInBytes = AeadSizes.RequireLegal(TagByteSizes, tagSizeInBytes, "Tag size", nameof(tagSizeInBytes));
+    }
+
+    private static Pkcs11Key RequireAesKey(Pkcs11Key key)
+    {
         ArgumentNullException.ThrowIfNull(key);
         if (key.KeyType != CKK.CKK_AES)
             throw new ArgumentException(
                 $"Expected an AES key, got {key.KeyType}.", nameof(key));
-
-        TagSizeInBytes = AeadSizes.RequireLegal(TagByteSizes, tagSizeInBytes, "Tag size", nameof(tagSizeInBytes));
-        _key = key;
+        return key;
     }
 
     /// <summary>
@@ -71,7 +97,7 @@ public sealed class AesCcmPkcs11 : IDisposable
     private void ValidateNonceAndTag(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
     {
         AeadSizes.RequireLegal(NonceByteSizes, nonce.Length, "Nonce length", nameof(nonce));
-        AeadSizes.RequireTagSize(tag, TagSizeInBytes);
+        AeadSizes.RequireTagSize(tag, TagSizeInBytes, TagByteSizes);
     }
 
     /// <summary>

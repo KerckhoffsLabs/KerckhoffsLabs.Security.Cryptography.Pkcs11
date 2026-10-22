@@ -37,4 +37,16 @@ internal static class AeadSizes
                 $"Tag length must be {tagSizeInBytes} bytes, the size this instance was created with; got {tag.Length}.",
                 nameof(tag));
     }
+
+    /// <summary>
+    /// Throws an <see cref="ArgumentException"/> for <paramref name="tag"/> unless it is exactly
+    /// <paramref name="tagSizeInBytes"/> long or, when the adapter fixed no size, one of <paramref name="legal"/>.
+    /// </summary>
+    public static void RequireTagSize(ReadOnlySpan<byte> tag, int? tagSizeInBytes, KeySizes legal)
+    {
+        if (tagSizeInBytes is int size)
+            RequireTagSize(tag, size);
+        else
+            RequireLegal(legal, tag.Length, "Tag length", nameof(tag));
+    }
 }

@@ -32,15 +32,16 @@ public sealed class AesCcmPkcs11Tests_Managed
     }
 
     // Imports a known AES key by value and runs the body with an AesCcmPkcs11 over it (session key).
+    // A null tag size takes the constructor that reads the size from each call's tag.
     private static void WithImportedCcm(
-        byte[] key, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16, ICryptoPolicy? policy = null)
+        byte[] key, Action<AesCcmPkcs11> body, int? tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library, policy);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("ccm").Value(key).Encrypt().Decrypt().Build();
         using var key1 = session.ImportKey(tpl);
-        using var ccm = new AesCcmPkcs11(key1, tagSizeInBytes);
+        using var ccm = tagSizeInBytes is int size ? new AesCcmPkcs11(key1, size) : new AesCcmPkcs11(key1);
         body(ccm);
     }
 
@@ -332,6 +333,115 @@ public sealed class AesCcmPkcs11Tests_Managed
             ccm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[8]));
         Assert.Equal("tag", ex.ParamName);
     });
+
+    // === Tag size taken from each call ====================================
+
+    [Fact]
+    public void TagSizeInBytes_IsNull_WithoutFixedSize() =>
+        WithImportedCcm(RandomNumberGenerator.GetBytes(32), ccm => Assert.Null(ccm.TagSizeInBytes), tagSizeInBytes: null);
+
+    /// <summary>
+    /// Like <see cref="AesCcm"/>, one instance writes and verifies a tag of whatever legal size each call
+    /// hands it, and computes the same bytes as the BCL for each.
+    /// </summary>
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
+    public void PerCallTagSize_OneInstance_MatchesBcl_AtEveryTagSize()
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        byte[] nonce = Iota(12);
+        byte[] aad = Iota(13);
+        byte[] pt = Iota(24);
+        using var bcl = new AesCcm(key);
+
+        // AllowInsecure: the default SecureOnly refuses the 4- and 6-byte sizes.
+        WithImportedCcm(key, ccm =>
+        {
+            for (int tagLen = AesCcm.TagByteSizes.MinSize; tagLen <= AesCcm.TagByteSizes.MaxSize; tagLen += AesCcm.TagByteSizes.SkipSize)
+            {
+                byte[] bclCt = new byte[pt.Length];
+                byte[] bclTag = new byte[tagLen];
+                bcl.Encrypt(nonce, pt, bclCt, bclTag, aad);
+
+                byte[] ct = new byte[pt.Length];
+                byte[] tag = new byte[tagLen];
+                ccm.Encrypt(nonce, pt, ct, tag, aad);
+                Assert.Equal(bclCt, ct);
+                Assert.Equal(bclTag, tag);
+
+                byte[] dec = new byte[pt.Length];
+                ccm.Decrypt(nonce, bclCt, bclTag, dec, aad);
+                Assert.Equal(pt, dec);
+            }
+        }, tagSizeInBytes: null, CryptoPolicy.AllowInsecure);
+    }
+
+    // A tag of one size does not verify as a tag of another: CCM binds the tag length into the MAC.
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
+    public void PerCallTagSize_TruncatedTag_DoesNotVerify() => WithImportedCcm(RandomNumberGenerator.GetBytes(32), ccm =>
+    {
+        byte[] nonce = Iota(12);
+        byte[] pt = Iota(24);
+        byte[] ct = new byte[pt.Length];
+        byte[] tag = new byte[16];
+        ccm.Encrypt(nonce, pt, ct, tag);
+
+        AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag.AsSpan(..8), new byte[pt.Length]));
+    }, tagSizeInBytes: null);
+
+    // Under the default SecureOnly, a forged tag cannot be checked at fewer than 64 bits.
+    [Fact]
+    public void PerCallTagSize_Decrypt_MacShorterThan64Bits_IsRefusedUnderSecureOnly() => WithImportedCcm(RandomNumberGenerator.GetBytes(32), ccm =>
+    {
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            ccm.Decrypt(Iota(12), Iota(8), new byte[4], new byte[8]));
+        Assert.Equal(CKM.CKM_AES_CCM, ex.Mechanism);
+    }, tagSizeInBytes: null);
+
+    private static void AssertSameFailureAsBcl(Action bcl, Action adapter)
+    {
+        Exception expected = Assert.ThrowsAny<Exception>(bcl);
+        Exception actual = Assert.ThrowsAny<Exception>(adapter);
+        Assert.Equal(expected.GetType(), actual.GetType());
+        Assert.Equal((expected as ArgumentException)?.ParamName, (actual as ArgumentException)?.ParamName);
+    }
+
+    [Theory(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
+    [InlineData(0)]
+    [InlineData(2)]   // below MinSize (4)
+    [InlineData(5)]   // violates SkipSize (2)
+    [InlineData(15)]
+    [InlineData(18)]  // above MaxSize (16)
+    public void PerCallTagSize_IllegalTagLength_FailsAsBcl(int tagLength)
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        using var bcl = new AesCcm(key);
+        WithImportedCcm(key, ccm =>
+        {
+            AssertSameFailureAsBcl(
+                () => bcl.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]),
+                () => ccm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
+            AssertSameFailureAsBcl(
+                () => bcl.Decrypt(new byte[12], new byte[8], new byte[tagLength], new byte[8]),
+                () => ccm.Decrypt(new byte[12], new byte[8], new byte[tagLength], new byte[8]));
+            // Validation order: a bad nonce is reported before a bad tag, as AesCcm does.
+            AssertSameFailureAsBcl(
+                () => bcl.Encrypt(new byte[6], new byte[8], new byte[8], new byte[tagLength]),
+                () => ccm.Encrypt(new byte[6], new byte[8], new byte[8], new byte[tagLength]));
+        }, tagSizeInBytes: null);
+    }
+
+    [Fact]
+    public void Ctor_PerCallTagSize_NonAesKey_Throws()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label("gen").ValueLen(32).Sign().Build();
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+
+        var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+    }
 
     [Fact]
     public void Ctor_NonAesKey_Throws()
