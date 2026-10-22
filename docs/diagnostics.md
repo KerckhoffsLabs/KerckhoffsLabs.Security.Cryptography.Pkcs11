@@ -217,6 +217,40 @@ written against older headers still compiles, but each is `[Obsolete]` and point
 Each pair has one value, so the module sees no difference: replacing the name changes nothing at run
 time. The CAST mechanisms keep their [KLPKCS11009](#KLPKCS11009) warning under either name.
 
+<a id="KLPKCS11014"></a>
+### KLPKCS11014 — BCL key factory or capability check reached through an adapter type
+
+Every adapter derives from its BCL algorithm type (`MLDsaPkcs11 : MLDsa`, `AesPkcs11 : Aes`,
+`RSAPkcs11 : RSA` …), and C# lets a static member of the base be called through the derived name.
+Those calls compile, read like token operations, and are not:
+
+| Written | Actually calls | What happens |
+|---------|----------------|--------------|
+| `MLDsaPkcs11.GenerateKey(MLDsaAlgorithm.MLDsa65)` | `MLDsa.GenerateKey` | an exportable software key in process memory |
+| `MLKemPkcs11.ImportFromPem(pem)`, `MLDsaPkcs11.ImportPkcs8PrivateKey(…)` … | `MLKem.ImportFromPem` … | the key is loaded into process memory, not onto the token |
+| `AesPkcs11.Create()`, `RSAPkcs11.Create(3072)`, `SHA256Pkcs11.Create()` … | `Aes.Create` … | a plain software object that never touches the token |
+| `MLKemPkcs11.IsSupported`, `MLDsaPkcs11.IsSupported` … | `MLKem.IsSupported` … | whether the *operating system* supports the algorithm, not the token |
+
+The rule covers `GenerateKey`, every `Import*`, `Create` and `IsSupported` reached through any type of
+this library that derives from a `System.Security.Cryptography` type, so a new adapter is covered
+automatically. To get a token key, generate or open it through `Pkcs11Session` and wrap it in the
+adapter (`new MLDsaPkcs11(key)`); to ask the token, use `Pkcs11Slot.GetMechanismList()` or
+`Pkcs11Key.SupportsMechanism(…)`. If the software object is what you want, name the BCL type: the
+code fix rewrites `MLDsaPkcs11.GenerateKey(…)` to `MLDsa.GenerateKey(…)` and adds the `using` if
+needed. An alias (`using Signer = …MLDsaPkcs11;`) is reported the same way. `using static MLDsaPkcs11;`
+cannot cause this: it imports only the members a type declares itself, never inherited ones.
+
+<a id="KLPKCS11015"></a>
+### KLPKCS11015 — BCL static helper reached through an adapter type
+
+The same inheritance route for the other inherited statics, which compute the same value whichever
+name you call them by: `SHA256Pkcs11.HashData(data)`, `TryHashData`, `HashDataAsync`,
+`AesPkcs11.GetKeyWrapPaddedLength(…)`, `TripleDESPkcs11.IsWeakKey(…)`. Nothing is wrong with the
+result, but the hash is computed in software, not on the token, which matters if your design requires
+every digest to stay inside the token's boundary. Reported at **Info** level; the code fix names the
+BCL type (`SHA256.HashData(data)`). To hash on the token, use an instance:
+`using var sha = new SHA256Pkcs11(session); sha.ComputeHash(data)`.
+
 ## Runtime-only gates
 
 Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early

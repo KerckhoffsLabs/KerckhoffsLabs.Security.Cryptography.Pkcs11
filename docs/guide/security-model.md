@@ -13,7 +13,7 @@ The high-level API is **secure by default**:
   `CryptographicException`) **before any call reaches the token**.
 - Keys the library generates are **sensitive and non-extractable**, and each is granted **one role**.
 - Insecure choices visible at compile time are reported by `[Obsolete]` attributes and analyzers
-  (`KLPKCS11001`–`KLPKCS11012`), so most mistakes surface in the build, not in production.
+  (`KLPKCS11001`–`KLPKCS11015`), so most mistakes surface in the build, not in production.
 - Secrets that pass through the library — PINs, passwords, key bytes, plaintext — are held in buffers
   that are zeroed when released.
 
@@ -63,7 +63,7 @@ fact that the token did so. Choose a token whose enforcement you trust for the k
 | Control | Where it is enforced |
 |---|---|
 | Crypto policy check before every operation | `Pkcs11Session` (the policy chosen at open, or a scoped `Pkcs11Session.UsePolicy` lease); `CryptoPolicy.Recommended`, `CryptoPolicy.NistApproved` |
-| Build-time warnings for insecure choices | `[Obsolete]` on legacy adapters, weak curves and the PBKDF2 constructors with weak defaults (`KLPKCS11001`–`KLPKCS11007`, `KLPKCS11011`); analyzers for insecure values (`KLPKCS11008`–`KLPKCS11010`); a warning at every key-material export opt-in (`KLPKCS11012`) |
+| Build-time warnings for insecure choices | `[Obsolete]` on legacy adapters, weak curves and the PBKDF2 constructors with weak defaults (`KLPKCS11001`–`KLPKCS11007`, `KLPKCS11011`); analyzers for insecure values (`KLPKCS11008`–`KLPKCS11010`); a warning at every key-material export opt-in (`KLPKCS11012`); a warning when a BCL key factory, import or capability check is reached through an adapter type, which would run in software rather than on the token (`KLPKCS11014`, `KLPKCS11015` for static helpers) |
 | Sensitive, non-extractable keys by default | `Pkcs11Session.GenerateAesKey`, `GenerateRsaSigningKeyPair`, … ; `SecretKeyTemplateBuilder` and `PrivateKeyTemplateBuilder` defaults |
 | One role per generated key | the `Pkcs11Session` key-generation helpers ([Key role separation](#key-role-separation)) |
 | Capability attributes default to `false` | `SecretKeyTemplateBuilder`, `PublicKeyTemplateBuilder`, `PrivateKeyTemplateBuilder` |
@@ -158,7 +158,7 @@ specific objection to. Refusals it documents include unauthenticated symmetric m
 broken/legacy ciphers (DES/3DES, RC2, RC4, SEED, CAST, Blowfish, SKIPJACK), broken hashes
 (MD2/MD5/SHA-1/RIPEMD), PKCS#1 v1.5 *encryption* and raw RSA (`CKM_RSA_PKCS`, `CKM_RSA_X_509`),
 sub-128-bit EC curves, SHA-1 KDF PRFs, and AES-GCM tags under 96 bits or AES-CCM MACs under 64 bits. Where
-the insecure choice is visible at compile time, [diagnostics](../diagnostics.md) (`KLPKCS11001`–`KLPKCS11012`)
+the insecure choice is visible at compile time, [diagnostics](../diagnostics.md) (`KLPKCS11001`–`KLPKCS11015`)
 surface it as a build warning too.
 
 When `Recommended` refuses something you need, there are two remedies:

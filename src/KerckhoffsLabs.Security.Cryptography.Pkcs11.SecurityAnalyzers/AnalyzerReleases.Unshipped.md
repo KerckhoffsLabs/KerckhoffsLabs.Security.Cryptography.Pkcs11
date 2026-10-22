@@ -9,3 +9,5 @@ KLPKCS11008 | Security | Warning | InsecureRsaPaddingAnalyzer, https://kerckhoff
 KLPKCS11009 | Security | Warning | InsecureMechanismAnalyzer, https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11009
 KLPKCS11010 | Security | Warning | BrokenHashAnalyzer, https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11010
 KLPKCS11012 | Security | Warning | KeyMaterialExportOptInAnalyzer, https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11012
+KLPKCS11014 | Security | Warning | BclStaticThroughAdapterAnalyzer, https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11014
+KLPKCS11015 | Security | Info | BclStaticThroughAdapterAnalyzer, https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11015

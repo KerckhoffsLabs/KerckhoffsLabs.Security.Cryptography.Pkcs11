@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot;IsAotCompatible">
+  <!--
+    Code fixes for the security analyzers. A separate assembly because a code fix needs the
+    Workspaces layer, which the command-line compiler does not load: an analyzer assembly that
+    referenced it would fail RS1038. The library packs this assembly next to the analyzers under
+    analyzers/dotnet/cs, where only the IDE picks up its fix providers.
+  -->
+  <Import Project="..\RoslynComponent.props" />
+
+  <ItemGroup>
+    <!-- Same version cap as Microsoft.CodeAnalysis.CSharp in RoslynComponent.props (CS9057). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" PrivateAssets="all" />
+    <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj" />
+  </ItemGroup>
+</Project>
