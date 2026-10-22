@@ -129,22 +129,28 @@ const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKZ.CKZ_DATA_SPECIFIED 
 const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKZ.CKZ_SALT_SPECIFIED = 1 -> ulong
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.AesCcmPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key, int tagSizeInBytes) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Decrypt(byte[]! nonce, byte[]! ciphertext, byte[]! tag, byte[]! plaintext, byte[]? associatedData = null) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Decrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> ciphertext, System.ReadOnlySpan<byte> tag, System.Span<byte> plaintext, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Dispose() -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Encrypt(byte[]! nonce, byte[]! plaintext, byte[]! ciphertext, byte[]! tag, byte[]? associatedData = null) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Encrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> plaintext, System.Span<byte> ciphertext, System.Span<byte> tag, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.TagSizeInBytes.get -> int
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.AesGcmPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key, int tagSizeInBytes) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.Decrypt(byte[]! nonce, byte[]! ciphertext, byte[]! tag, byte[]! plaintext, byte[]? associatedData = null) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.Decrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> ciphertext, System.ReadOnlySpan<byte> tag, System.Span<byte> plaintext, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.Dispose() -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.Encrypt(byte[]! nonce, byte[]! plaintext, byte[]! ciphertext, byte[]! tag, byte[]? associatedData = null) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.Encrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> plaintext, System.Span<byte> ciphertext, System.Span<byte> tag, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.TagSizeInBytes.get -> int
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesPkcs11
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesPkcs11.AesPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ChaCha20Poly1305Pkcs11
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ChaCha20Poly1305Pkcs11.ChaCha20Poly1305Pkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ChaCha20Poly1305Pkcs11.Decrypt(byte[]! nonce, byte[]! ciphertext, byte[]! tag, byte[]! plaintext, byte[]? associatedData = null) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ChaCha20Poly1305Pkcs11.Decrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> ciphertext, System.ReadOnlySpan<byte> tag, System.Span<byte> plaintext, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ChaCha20Poly1305Pkcs11.Dispose() -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ChaCha20Poly1305Pkcs11.Encrypt(byte[]! nonce, byte[]! plaintext, byte[]! ciphertext, byte[]! tag, byte[]? associatedData = null) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.ChaCha20Poly1305Pkcs11.Encrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> plaintext, System.Span<byte> ciphertext, System.Span<byte> tag, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DESPkcs11
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DESPkcs11.DESPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key) -> void

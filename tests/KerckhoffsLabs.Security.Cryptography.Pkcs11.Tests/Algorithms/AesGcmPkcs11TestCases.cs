@@ -288,6 +288,32 @@ internal static class AesGcmPkcs11TestCases
             AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_GCM, () => gcm.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
 
+    // === byte[] overloads: validated and computed as the BCL's ============
+
+    internal static void Assert_ByteArrayOverloads_NullArguments_FailAsBcl(IPkcs11Backend backend) =>
+        WithGcm(backend, AssertNullArgumentsFailAsBcl);
+
+    internal static void Assert_ByteArrayOverloads_MatchBcl(IPkcs11Backend backend)
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        WithImportedGcm(backend, key, gcm => AssertArrayOverloadsMatchBcl(gcm, key));
+    }
+
+    // Shared with the managed-token suite, which builds its AesGcmPkcs11 without a backend.
+    internal static void AssertNullArgumentsFailAsBcl(AesGcmPkcs11 gcm)
+    {
+        using var bcl = new AesGcm(RandomNumberGenerator.GetBytes(32), 16);
+        AeadTestSupport.AssertNullArgumentsFailAsBcl([12, 8, 8, 16], bcl.Encrypt, (n, a, b, c, ad) => gcm.Encrypt(n, a, b, c, ad));
+        AeadTestSupport.AssertNullArgumentsFailAsBcl([12, 8, 16, 8], bcl.Decrypt, (n, a, b, c, ad) => gcm.Decrypt(n, a, b, c, ad));
+    }
+
+    internal static void AssertArrayOverloadsMatchBcl(AesGcmPkcs11 gcm, byte[] key)
+    {
+        using var bcl = new AesGcm(key, 16);
+        AeadTestSupport.AssertArrayOverloadsMatchBcl(12, 16, bcl.Encrypt,
+            (n, a, b, c, ad) => gcm.Encrypt(n, a, b, c, ad), (n, a, b, c, ad) => gcm.Decrypt(n, a, b, c, ad));
+    }
+
     // === Known-answer test ================================================
 
     // McGrew & Viega AES-GCM test case 16 (256-bit key, 96-bit IV, with AAD): exercises encrypt/decrypt
