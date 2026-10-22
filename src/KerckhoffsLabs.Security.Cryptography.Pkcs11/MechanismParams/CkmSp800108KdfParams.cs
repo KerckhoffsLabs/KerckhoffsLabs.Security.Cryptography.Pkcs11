@@ -64,14 +64,23 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <c>[i]32 || Label || 0x00 || Context || [L]32</c> (big-endian, L = sum of derived key lengths) —
     /// the same construction as <see cref="System.Security.Cryptography.SP800108HmacCounterKdf"/>.
     /// </summary>
-    public static CkmSp800108KdfParams CounterModeHmac(CKM prfType, ReadOnlySpan<byte> label, ReadOnlySpan<byte> context) =>
-        Counter(prfType)
-            .IterationCounter(widthInBits: 32, littleEndian: false)
-            .ByteArray(label)
-            .ByteArray([0x00])
-            .ByteArray(context)
+    /// <remarks>
+    /// An empty <paramref name="label"/> or <paramref name="context"/> is left out of the data params
+    /// rather than sent as a zero-length <c>CK_SP800_108_BYTE_ARRAY</c>, which some tokens refuse with
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c>. It contributes no bytes either way, so the PRF input is the same.
+    /// </remarks>
+    public static CkmSp800108KdfParams CounterModeHmac(CKM prfType, ReadOnlySpan<byte> label, ReadOnlySpan<byte> context)
+    {
+        var builder = Counter(prfType).IterationCounter(widthInBits: 32, littleEndian: false);
+        if (!label.IsEmpty)
+            builder.ByteArray(label);
+        builder.ByteArray([0x00]);
+        if (!context.IsEmpty)
+            builder.ByteArray(context);
+        return builder
             .DkmLength(Sp800108DkmLengthMethod.SumOfKeys, widthInBits: 32, littleEndian: false)
             .Build();
+    }
 
     internal CkmSp800108KdfParams(Sp800108KdfBuilder builder)
     {

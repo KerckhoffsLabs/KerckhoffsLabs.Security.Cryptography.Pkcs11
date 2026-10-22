@@ -73,22 +73,35 @@ public sealed class Sp800108CounterKdfParamsTests
         Assert.Equal(32UL, (ulong)dkmFormat.WidthInBits);
     }
 
-    [Fact]
-    public void EmptyLabelAndContext_StillEmitsFiveParamsWithSeparator()
+    // An empty label or context is left out: some tokens (Kryoptic) refuse a zero-length
+    // CK_SP800_108_BYTE_ARRAY, and it adds no bytes to the PRF input.
+    [Theory]
+    [InlineData("", "ctx", new[] { IterationVariable, ByteArray, ByteArray, DkmLength })]
+    [InlineData("lbl", "", new[] { IterationVariable, ByteArray, ByteArray, DkmLength })]
+    [InlineData("", "", new[] { IterationVariable, ByteArray, DkmLength })]
+    public void EmptyLabelOrContext_IsLeftOut_SeparatorKept(string label, string context, ulong[] expectedTypes)
     {
-        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA384_HMAC, label: default, context: default);
+        var p = CkmSp800108KdfParams.CounterModeHmac(
+            CKM.CKM_SHA384_HMAC, Encoding.UTF8.GetBytes(label), Encoding.UTF8.GetBytes(context));
         using var scope = new MechanismParameterScope();
         var kdf = p.BuildMarshalable(scope).Read<CK_SP800_108_KDF_PARAMS>();
-        Assert.Equal(5UL, (ulong)kdf.NumberOfDataParams);
+        Assert.Equal((ulong)expectedTypes.Length, (ulong)kdf.NumberOfDataParams);
 
         int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
-        CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(kdf.DataParams, i * elem));
+        var byteArrays = new List<byte[]>();
+        for (int i = 0; i < expectedTypes.Length; i++)
+        {
+            var param = UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(kdf.DataParams, i * elem));
+            Assert.Equal(expectedTypes[i], (ulong)param.Type);
+            if ((ulong)param.Type == ByteArray)
+            {
+                Assert.NotEqual(0UL, (ulong)param.ValueLen);
+                Assert.NotEqual(IntPtr.Zero, param.Value);
+                byteArrays.Add(UnmanagedMemory.Read(param.Value, (int)param.ValueLen));
+            }
+        }
 
-        // Empty label / context: zero length, NULL value; the 0x00 separator is still present.
-        Assert.Equal(0UL, (ulong)Param(1).ValueLen);
-        Assert.Equal(IntPtr.Zero, Param(1).Value);
-        Assert.Equal(1UL, (ulong)Param(2).ValueLen);
-        Assert.Equal(0UL, (ulong)Param(3).ValueLen);
-        Assert.Equal(IntPtr.Zero, Param(3).Value);
+        // The byte arrays still concatenate to Label || 0x00 || Context.
+        Assert.Equal(Encoding.UTF8.GetBytes(label + "\0" + context), byteArrays.SelectMany(b => b).ToArray());
     }
 }

@@ -200,6 +200,9 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkc
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.DeriveKey(System.ReadOnlySpan<byte> label, System.ReadOnlySpan<byte> context, int derivedKeyLengthInBytes) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.DeriveKey(System.ReadOnlySpan<byte> label, System.ReadOnlySpan<byte> context, KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! template) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.DeriveKey(System.ReadOnlySpan<byte> label, System.ReadOnlySpan<byte> context, System.Span<byte> destination) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.DeriveKey(System.ReadOnlySpan<char> label, System.ReadOnlySpan<char> context, int derivedKeyLengthInBytes) -> byte[]!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.DeriveKey(System.ReadOnlySpan<char> label, System.ReadOnlySpan<char> context, System.Span<byte> destination) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.DeriveKey(string! label, string! context, int derivedKeyLengthInBytes) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.Dispose() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.SP800108HmacCounterKdfPkcs11.SP800108HmacCounterKdfPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key, System.Security.Cryptography.HashAlgorithmName hashAlgorithm) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.TripleDESPkcs11

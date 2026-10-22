@@ -157,12 +157,12 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     public void DeriveKey_EmptyLabelAndContext_MatchesBcl() => WithImportedKdf((_, kdf) =>
     {
         const int length = 32;
-        // Typed empty span disambiguates DeriveBytes' byte[] vs ReadOnlySpan<byte> overloads.
+        // Typed empty span disambiguates the byte[], ReadOnlySpan<byte> and ReadOnlySpan<char> overloads.
         ReadOnlySpan<byte> empty = [];
         byte[] expected = SP800108HmacCounterKdf.DeriveBytes(
             KeyBytes, HashAlgorithmName.SHA256, empty, empty, length);
 
-        byte[] actual = kdf.DeriveKey([], [], length);
+        byte[] actual = kdf.DeriveKey(empty, empty, length);
 
         Assert.Equal(expected, actual);
     });
@@ -192,6 +192,10 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
             derived.Destroy();
         }
     });
+
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void DeriveKey_CharOverloads_MatchBcl() =>
+        WithImportedKdf((_, kdf) => SP800108HmacCounterKdfPkcs11TestCases.AssertCharOverloadsMatchBcl(kdf));
 
     // === No-op / boundary behavior (matches the BCL) =====================================
 
@@ -255,6 +259,10 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         var ex = Assert.Throws<ArgumentNullException>(() => kdf.DeriveKey(Label, null!, 16));
         Assert.Equal("context", ex.ParamName);
     });
+
+    [Fact]
+    public void DeriveKey_CharOverloads_ArgumentErrors_MatchBcl() =>
+        WithImportedKdf((_, kdf) => SP800108HmacCounterKdfPkcs11TestCases.AssertCharOverloadArgumentErrorsMatchBcl(kdf));
 
     [Fact]
     public void DeriveKey_OnToken_NullTemplate_Throws() => WithImportedKdf((_, kdf) =>
