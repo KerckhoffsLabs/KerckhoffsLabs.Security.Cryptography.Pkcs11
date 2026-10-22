@@ -137,7 +137,7 @@ public sealed class DSAPkcs11 : DSA
                 return VerifyIeeeP1363(mech, hash, signature);
             case DSASignatureFormat.Rfc3279DerSequence:
                 // A malformed signature does not verify, as for the BCL's own conversion.
-                byte[]? ieee = DerToIeeeP1363(signature, SubprimeLength);
+                byte[]? ieee = DerToIeeeP1363(signature, GetSubprimeLength());
                 return ieee is not null && _key.Verify(mech, hash, ieee);
             default:
                 // The public overloads reject an unknown format before reaching here; as DSAOpenSsl.
@@ -150,7 +150,7 @@ public sealed class DSAPkcs11 : DSA
     // session's policy is still asked first, as the token path asks it.
     private bool VerifyIeeeP1363(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
-        if (signature.Length == 2 * SubprimeLength)
+        if (signature.Length == 2 * GetSubprimeLength())
             return _key.Verify(mechanism, data, signature);
 
         _key.Session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
@@ -160,20 +160,17 @@ public sealed class DSAPkcs11 : DSA
     // q's length in bytes, as ExportParameters(false) reports it, but from CKA_SUBPRIME alone: both halves
     // of the key carry it, where the public value ExportParameters also reads is only on the public-key object.
     // Read once: a key object's domain parameters cannot be modified.
-    private int SubprimeLength
+    private int GetSubprimeLength()
     {
-        get
+        if (_subprimeLength == 0)
         {
-            if (_subprimeLength == 0)
-            {
-                using var subprime = _key.GetAttributeValue(CKA.CKA_SUBPRIME);
-                if (subprime[0].CannotBeRead)
-                    throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                        "DSAPkcs11 (CKA_SUBPRIME not readable)");
-                _subprimeLength = TrimLeadingZeros(subprime[0].GetValueAsByteArray()).Length;
-            }
-            return _subprimeLength;
+            using var subprime = _key.GetAttributeValue(CKA.CKA_SUBPRIME);
+            if (subprime[0].CannotBeRead)
+                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                    "DSAPkcs11 (CKA_SUBPRIME not readable)");
+            _subprimeLength = TrimLeadingZeros(subprime[0].GetValueAsByteArray()).Length;
         }
+        return _subprimeLength;
     }
 
     // RFC 3279 Dss-Sig-Value { r, s } to r‖s, each left-padded to fieldLength; null when the encoding is

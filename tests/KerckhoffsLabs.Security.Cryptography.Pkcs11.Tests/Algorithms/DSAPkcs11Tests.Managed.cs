@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -465,7 +465,11 @@ public sealed class DSAPkcs11Tests_Managed
         ["VerifyData(byte[])"] = (d, data, sig, f) => d.VerifyData(data, sig, HashAlgorithmName.SHA256, f),
         ["VerifyData(byte[], offset, count)"] = (d, data, sig, f) => d.VerifyData(data, 0, data.Length, sig, HashAlgorithmName.SHA256, f),
         ["VerifyData(span)"] = (d, data, sig, f) => d.VerifyData(data.AsSpan(), sig.AsSpan(), HashAlgorithmName.SHA256, f),
-        ["VerifyData(Stream)"] = (d, data, sig, f) => d.VerifyData(new MemoryStream(data), sig, HashAlgorithmName.SHA256, f),
+        ["VerifyData(Stream)"] = (d, data, sig, f) =>
+        {
+            using var stream = new MemoryStream(data);
+            return d.VerifyData(stream, sig, HashAlgorithmName.SHA256, f);
+        },
         ["VerifySignature(byte[])"] = (d, data, sig, f) => d.VerifySignature(SHA256.HashData(data), sig, f),
         ["VerifySignature(span)"] = (d, data, sig, f) => d.VerifySignature(SHA256.HashData(data).AsSpan(), sig.AsSpan(), f),
     };
@@ -614,9 +618,13 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.Throws<CryptographicException>(() => CallVerifySignatureCore(dsa, hash, new byte[64], unknown));
     });
 
-    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "VerifySignatureCore")]
-    private static extern bool CallVerifySignatureCore(
+    private delegate bool VerifySignatureCoreCall(
         DSAPkcs11 dsa, ReadOnlySpan<byte> hash, ReadOnlySpan<byte> signature, DSASignatureFormat signatureFormat);
+
+    // An open-instance delegate over the protected override: MethodInfo.Invoke cannot pass a span.
+    private static readonly VerifySignatureCoreCall CallVerifySignatureCore = typeof(DSAPkcs11)
+        .GetMethod("VerifySignatureCore", BindingFlags.Instance | BindingFlags.NonPublic)!
+        .CreateDelegate<VerifySignatureCoreCall>();
 
     // GetMaxSignatureSize is not virtual and reads q through ExportParameters(false), as the class remarks
     // say: it works with the public-key object and throws without it, although that key can sign.
