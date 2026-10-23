@@ -562,16 +562,14 @@ public sealed class DSAPkcs11Tests_Managed
         using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_OK, subprime), CryptoPolicy.AllowInsecure, publicOnly: true);
         using var dsa = new DSAPkcs11(key);
 
-        foreach (Func<bool> verify in (Func<bool>[])
-            [
-                () => dsa.VerifySignature(new byte[32], new byte[2]),
-                () => dsa.VerifySignature(new byte[32], new byte[2], P1363),
-                () => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der),
-            ])
-        {
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => verify());
-            Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, ex.ReturnValue);
-        }
+        Func<bool>[] verifies =
+        [
+            () => dsa.VerifySignature(new byte[32], new byte[2]),
+            () => dsa.VerifySignature(new byte[32], new byte[2], P1363),
+            () => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der),
+        ];
+        Assert.All(verifies, verify =>
+            Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, Assert.ThrowsAny<Pkcs11Exception>(() => verify()).ReturnValue));
     }
 
     private static byte[] SignatureIn(DSASignatureFormat format) =>
