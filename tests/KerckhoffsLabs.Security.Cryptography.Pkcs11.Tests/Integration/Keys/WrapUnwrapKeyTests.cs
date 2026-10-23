@@ -138,7 +138,14 @@ internal static class WrapUnwrapKeyTestCases
     /// openCryptoki accepted the two attributes in an unwrap template from 10f48c5 but overwrote them with
     /// CKA_SENSITIVE = FALSE and CKA_EXTRACTABLE = TRUE until 2345b3c7, so this case failed there.
     /// </remarks>
-    internal static void Assert_Unwrap_AppliesSecureDefaults(IPkcs11Backend backend, CKM wrapMechanism)
+    /// <param name="backend">The backend under test.</param>
+    /// <param name="wrapMechanism">The AES key-wrap mechanism.</param>
+    /// <param name="unextractableCode">
+    /// What <c>C_WrapKey</c> answers for the non-extractable key: <see cref="CKR.CKR_KEY_UNEXTRACTABLE"/>, as
+    /// PKCS#11 has it, unless the backend is known to answer otherwise.
+    /// </param>
+    internal static void Assert_Unwrap_AppliesSecureDefaults(IPkcs11Backend backend, CKM wrapMechanism,
+        CKR unextractableCode = CKR.CKR_KEY_UNEXTRACTABLE)
     {
         WithWrappedAesKey(backend, wrapMechanism, (session, kek, wrapped) =>
         {
@@ -161,7 +168,7 @@ internal static class WrapUnwrapKeyTestCases
                 using var value = session.GetAttributeValue(unwrapped, [CKA.CKA_VALUE]);
                 Assert.True(value[0].CannotBeRead, "a sensitive key's CKA_VALUE must not be readable");
                 var refused = Assert.ThrowsAny<Pkcs11Exception>(() => session.WrapKey(wrapMech, kek, unwrapped));
-                Assert.Equal(CKR.CKR_KEY_UNEXTRACTABLE, refused.ReturnValue);
+                Assert.Equal(unextractableCode, refused.ReturnValue);
             }
             finally { session.DestroyObject(unwrapped); }
         });

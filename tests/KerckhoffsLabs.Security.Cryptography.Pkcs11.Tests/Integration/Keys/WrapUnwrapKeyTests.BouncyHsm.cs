@@ -31,7 +31,10 @@ public sealed class WrapUnwrapKeyTests_BouncyHsm(BouncyHsmBackendFixture backend
     public void Unwrap_AppliesSecureDefaults(CKM wrapMechanism)
     {
         _backend.RequireMechanism(wrapMechanism);
-        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism);
+        // BouncyHsm refuses to wrap a key whose CKA_EXTRACTABLE is FALSE with CKR_KEY_NOT_WRAPPABLE
+        // (WrapKeyHandler.CheckExtractable), where PKCS#11 has CKR_KEY_UNEXTRACTABLE. The key still
+        // does not leave the token; pinned, so a fix upstream fails here and the default can take over.
+        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism, CKR.CKR_KEY_NOT_WRAPPABLE);
     }
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
