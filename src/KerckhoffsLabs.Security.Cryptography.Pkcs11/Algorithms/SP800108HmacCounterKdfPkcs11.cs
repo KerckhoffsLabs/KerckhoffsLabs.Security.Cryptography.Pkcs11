@@ -229,7 +229,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 
     // The UTF-8 bytes of a char label or context: in the caller's stack buffer when they fit, otherwise
     // in an array rented from the shared pool. Dispose zeroes them and returns the array.
-    private readonly ref struct Utf8Text
+    private readonly ref struct Utf8Text : IDisposable
     {
         private readonly byte[]? _rented;
         private readonly Span<byte> _buffer;
@@ -237,9 +237,8 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
         internal Utf8Text(ReadOnlySpan<char> text, Span<byte> stackBuffer)
         {
             int maxLength = StrictUtf8.GetMaxByteCount(text.Length);
-            Span<byte> buffer = maxLength <= stackBuffer.Length
-                ? stackBuffer
-                : (_rented = ArrayPool<byte>.Shared.Rent(maxLength));
+            _rented = maxLength <= stackBuffer.Length ? null : ArrayPool<byte>.Shared.Rent(maxLength);
+            Span<byte> buffer = _rented is null ? stackBuffer : _rented;
             _buffer = buffer[..StrictUtf8.GetBytes(text, buffer)];
         }
 
