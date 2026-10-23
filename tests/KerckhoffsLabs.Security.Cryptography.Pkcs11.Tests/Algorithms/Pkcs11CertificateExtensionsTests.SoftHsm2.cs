@@ -2,6 +2,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+// The DSA cases are [Obsolete] as GetDSAPrivateKey is (DSA is disallowed by FIPS 186-5); running them is deliberate.
+#pragma warning disable KLPKCS11006
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary><see cref="Pkcs11CertificateExtensions"/> over SoftHsm — thin wrapper over <see cref="Pkcs11CertificateExtensionsTestCases"/>.</summary>

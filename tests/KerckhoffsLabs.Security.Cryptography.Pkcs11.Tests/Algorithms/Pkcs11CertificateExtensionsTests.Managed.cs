@@ -126,61 +126,56 @@ public sealed class Pkcs11CertificateExtensions_Managed
     {
         Pkcs11Certificate certificate = null!;
 
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetRSAPrivateKey()).ParamName);
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetECDsaPrivateKey()).ParamName);
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetDSAPrivateKey()).ParamName);
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetECDiffieHellmanPrivateKey()).ParamName);
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetMLDsaPrivateKey()).ParamName);
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetMLKemPrivateKey()).ParamName);
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetSlhDsaPrivateKey()).ParamName);
+        Assert.All(Pkcs11CertificateExtensionsTestCases.Getters, getter =>
+            Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => getter.Get(certificate)).ParamName));
     }
 
     // === The other getters, shared with the real backends =================
 
     [Fact]
-    public void GetDSAPrivateKey_SignsForTheCertificate() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetDSAPrivateKey_SignsForTheCertificate(session, AllMechanisms));
+    public void GetDSAPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetDSAPrivateKey_SignsForTheCertificate);
 
     [Fact]
-    public void GetDSAPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetDSAPrivateKey_ReturnsNull_WithoutAKeyOnTheToken(session, AllMechanisms));
+    public void GetDSAPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetDSAPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
 
     [Fact]
-    public void GetECDiffieHellmanPrivateKey_AgreesWithTheCertificate() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetECDiffieHellmanPrivateKey_AgreesWithTheCertificate(session, AllMechanisms));
+    public void GetECDiffieHellmanPrivateKey_AgreesWithTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetECDiffieHellmanPrivateKey_AgreesWithTheCertificate);
 
     [Fact]
-    public void GetECDiffieHellmanPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetECDiffieHellmanPrivateKey_ReturnsNull_WithoutAKeyOnTheToken(session, AllMechanisms));
+    public void GetECDiffieHellmanPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetECDiffieHellmanPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
 
     [Fact]
-    public void EcGetters_FollowTheKeyUsage() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_FollowTheKeyUsage(session, AllMechanisms));
+    public void EcGetters_FollowTheKeyUsage() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_FollowTheKeyUsage);
 
     [Fact]
-    public void EcGetters_RefuseAKeyOfAnotherType() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseAKeyOfAnotherType(session, AllMechanisms));
+    public void EcGetters_RefuseAKeyOfAnotherType() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseAKeyOfAnotherType);
 
     [Fact]
-    public void EcGetters_RefuseAKeyOnAnotherCurve() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseAKeyOnAnotherCurve(session, AllMechanisms));
+    public void EcGetters_RefuseAKeyOnAnotherCurve() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseAKeyOnAnotherCurve);
 
     [Fact]
-    public void EcGetters_RefuseExplicitCurveParameters() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseExplicitCurveParameters(session, AllMechanisms));
+    public void EcGetters_RefuseExplicitCurveParameters() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseExplicitCurveParameters);
 
     [Fact]
-    public void GetMLDsaPrivateKey_SignsForTheCertificate() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_SignsForTheCertificate(session, AllMechanisms));
+    public void GetMLDsaPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_SignsForTheCertificate);
 
     [Fact]
-    public void GetMLDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken(session, AllMechanisms));
+    public void GetMLDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
 
     [Fact]
-    public void GetMLDsaPrivateKey_RefusesAKeyOfAnotherParameterSet() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_RefusesAKeyOfAnotherParameterSet(session, AllMechanisms));
+    public void GetMLDsaPrivateKey_RefusesAKeyOfAnotherParameterSet() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_RefusesAKeyOfAnotherParameterSet);
 
     [Fact]
-    public void GetMLKemPrivateKey_DecapsulatesForTheCertificate() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetMLKemPrivateKey_DecapsulatesForTheCertificate(session, AllMechanisms));
+    public void GetMLKemPrivateKey_DecapsulatesForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLKemPrivateKey_DecapsulatesForTheCertificate);
 
     [Fact]
-    public void GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken(session, AllMechanisms));
+    public void GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
 
     [Fact]
-    public void GetSlhDsaPrivateKey_SignsForTheCertificate() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_SignsForTheCertificate(session, AllMechanisms));
+    public void GetSlhDsaPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_SignsForTheCertificate);
 
     [Fact]
-    public void GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(session => Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken(session, AllMechanisms));
+    public void GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
 
     // === Pairing checks no token object reaches =========================
 
@@ -237,6 +232,9 @@ public sealed class Pkcs11CertificateExtensions_Managed
     // The managed token implements every mechanism the shared cases use and advertises no list to probe;
     // the ML-DSA, ML-KEM and SLH-DSA cases still skip where the BCL lacks them.
     private static bool AllMechanisms(CKM mechanism) => true;
+
+    private static void WithSession(Action<Pkcs11Session, Func<CKM, bool>> body) =>
+        WithSession(session => body(session, AllMechanisms));
 
     private static void WithSession(Action<Pkcs11Session> body)
     {

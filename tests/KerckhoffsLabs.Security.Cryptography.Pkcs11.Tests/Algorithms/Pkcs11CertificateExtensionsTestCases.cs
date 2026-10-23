@@ -40,26 +40,27 @@ internal static class Pkcs11CertificateExtensionsTestCases
             dsa.ExportParameters(includePrivateParameters: false);
             return true;
         }
-        catch (Exception)
+        catch (Exception e) when (e is PlatformNotSupportedException or CryptographicException)
         {
             return false;
         }
     }
 
     // Every getter by the name of its algorithm, to check that only the expected ones answer.
-    private static readonly (string Name, Func<Pkcs11Certificate, IDisposable?> Get)[] Getters =
+    internal static readonly (string Name, Func<Pkcs11Certificate, IDisposable?> Get)[] Getters =
     [
-        ("RSA", c => c.GetRSAPrivateKey()),
-        ("ECDsa", c => c.GetECDsaPrivateKey()),
-        ("DSA", c => c.GetDSAPrivateKey()),
-        ("ECDiffieHellman", c => c.GetECDiffieHellmanPrivateKey()),
-        ("MLDsa", c => c.GetMLDsaPrivateKey()),
-        ("MLKem", c => c.GetMLKemPrivateKey()),
-        ("SlhDsa", c => c.GetSlhDsaPrivateKey()),
+        ("RSA", Pkcs11CertificateExtensions.GetRSAPrivateKey),
+        ("ECDsa", Pkcs11CertificateExtensions.GetECDsaPrivateKey),
+        ("DSA", Pkcs11CertificateExtensions.GetDSAPrivateKey),
+        ("ECDiffieHellman", Pkcs11CertificateExtensions.GetECDiffieHellmanPrivateKey),
+        ("MLDsa", Pkcs11CertificateExtensions.GetMLDsaPrivateKey),
+        ("MLKem", Pkcs11CertificateExtensions.GetMLKemPrivateKey),
+        ("SlhDsa", Pkcs11CertificateExtensions.GetSlhDsaPrivateKey),
     ];
 
     // === DSA ======================================================================================
 
+    [Obsolete("Exercises the obsolete GetDSAPrivateKey.", DiagnosticId = DiagnosticIds.Dsa)]
     internal static void Assert_GetDSAPrivateKey_SignsForTheCertificate(Pkcs11Session session, Func<CKM, bool> supports)
     {
         RequireDsa(supports);
@@ -80,6 +81,7 @@ internal static class Pkcs11CertificateExtensionsTestCases
         Assert.True(publicKey.VerifyData(Data, signature, HashAlgorithmName.SHA256));
     }
 
+    [Obsolete("Exercises the obsolete GetDSAPrivateKey.", DiagnosticId = DiagnosticIds.Dsa)]
     internal static void Assert_GetDSAPrivateKey_ReturnsNull_WithoutAKeyOnTheToken(Pkcs11Session session, Func<CKM, bool> supports)
     {
         RequireDsa(supports);
