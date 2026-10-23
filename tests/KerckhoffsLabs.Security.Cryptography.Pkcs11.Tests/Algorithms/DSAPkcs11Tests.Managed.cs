@@ -680,6 +680,42 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.Equal(afterFirst, reads);
     }
 
+    // Once q's length is read, a signature of the wrong length is decided without the token, but a disposed
+    // key or a closed session still throws rather than answering false.
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void P1363Verify_SignatureOfTheWrongLength_KeyDisposed_Throws(string call)
+    {
+        using var key = OneByteSubprimeKey(() => { });
+        using var dsa = new DSAPkcs11(key);
+        Assert.False(HashVerifies[call](dsa, new byte[3]));
+
+        key.Key.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => HashVerifies[call](dsa, new byte[3]));
+    }
+
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void P1363Verify_SignatureOfTheWrongLength_SessionClosed_Throws(string call)
+    {
+        using var key = OneByteSubprimeKey(() => { });
+        using var dsa = new DSAPkcs11(key);
+        Assert.False(HashVerifies[call](dsa, new byte[3]));
+
+        key.Key.Session.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => HashVerifies[call](dsa, new byte[3]));
+    }
+
+    // The shared cases build DER from a token's r‖s halves, which start with a zero byte about once in 256.
+    [Fact]
+    public void DerSignature_HalvesWithLeadingZeros_AreEncodedMinimally()
+    {
+        Assert.Equal(Convert.FromHexString("300702010502020085"), DSAPkcs11TestCases.DerSignature([0x00, 0x05], [0x00, 0x00, 0x85]));
+        Assert.Equal(Convert.FromHexString("3006020100020100"), DSAPkcs11TestCases.DerSignature([0x00, 0x00], [0x00]));
+    }
+
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void FormattedVerify_UnknownFormat_ThrowsAsTheBclDoes() => WithDsa((dsa, bcl) =>
     {

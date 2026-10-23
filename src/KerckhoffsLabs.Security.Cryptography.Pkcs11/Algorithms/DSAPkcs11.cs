@@ -49,8 +49,9 @@ public sealed class DSAPkcs11 : DSA
 {
     private readonly Pkcs11Key _key;
 
-    // q's length in bytes, read from the token on first use; null until then.
-    private int? _subprimeLength;
+    // q's length in bytes, read from the token on first use; 0 until then, which no key's q is. A plain int,
+    // so a thread that reads it while another first writes it sees either 0 or the whole length.
+    private int _subprimeLength;
 
     /// <summary>
     /// Wraps a PKCS#11 DSA key as a BCL <see cref="DSA"/> instance. Does not take ownership —
@@ -174,7 +175,8 @@ public sealed class DSAPkcs11 : DSA
     // public value ExportParameters also reads. Read once: a key object's domain parameters cannot be modified.
     private int GetSubprimeLength()
     {
-        if (_subprimeLength is { } length)
+        int length = Volatile.Read(ref _subprimeLength);
+        if (length != 0)
             return length;
 
         using var subprime = _key.GetAttributeValue(CKA.CKA_SUBPRIME);
@@ -184,7 +186,7 @@ public sealed class DSAPkcs11 : DSA
         byte[] q = TrimLeadingZeros(subprime[0].GetValueAsByteArray());
         if (q is [] or [0])
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "DSAPkcs11 (CKA_SUBPRIME is zero)");
-        _subprimeLength = q.Length;
+        Volatile.Write(ref _subprimeLength, q.Length);
         return q.Length;
     }
 

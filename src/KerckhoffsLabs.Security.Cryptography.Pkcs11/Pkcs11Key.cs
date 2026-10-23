@@ -273,7 +273,15 @@ public sealed partial class Pkcs11Key : IDisposable
     /// Whether the key has a public-key object on the token, looking up a pending companion first. Lets a
     /// layer above the handles tell that verification cannot use the token.
     /// </summary>
-    internal bool HasPublicKeyObject => !PublicHandle.IsInvalid;
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    internal bool HasPublicKeyObject
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return !PublicHandle.IsInvalid;
+        }
+    }
 
     /// <summary>
     /// Searches for the missing half of the pair, once, the first time it is needed.

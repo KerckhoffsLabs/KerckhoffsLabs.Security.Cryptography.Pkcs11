@@ -294,10 +294,19 @@ internal static class DSAPkcs11TestCases
         var writer = new AsnWriter(AsnEncodingRules.DER);
         using (writer.PushSequence())
         {
-            writer.WriteIntegerUnsigned(r);
-            writer.WriteIntegerUnsigned(s);
+            writer.WriteIntegerUnsigned(Minimal(r));
+            writer.WriteIntegerUnsigned(Minimal(s));
         }
         return writer.Encode();
+
+        // An r‖s half is q's width, so about one in 256 starts with a zero byte, which WriteIntegerUnsigned
+        // refuses as redundant.
+        static ReadOnlySpan<byte> Minimal(ReadOnlySpan<byte> value)
+        {
+            while (value is [0, _, ..])
+                value = value[1..];
+            return value;
+        }
     }
 
     internal static void Assert_ExportParameters_ReturnsProvidedDomain(IPkcs11Backend backend) =>
