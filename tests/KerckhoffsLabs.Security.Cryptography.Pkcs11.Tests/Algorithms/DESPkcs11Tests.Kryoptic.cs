@@ -42,5 +42,8 @@ public sealed class DESPkcs11Tests_Kryoptic(KryopticBackendFixture backend)
     public void Cbc_EmptyInput_MatchesBcl() => DESPkcs11TestCases.Assert_Cbc_EmptyInput_MatchesBcl(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable() => DESPkcs11TestCases.Assert_DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ManagedKeyAndStreamingSurface_NotSupported() => DESPkcs11TestCases.Assert_ManagedKeyAndStreamingSurface_NotSupported(_backend);
 }

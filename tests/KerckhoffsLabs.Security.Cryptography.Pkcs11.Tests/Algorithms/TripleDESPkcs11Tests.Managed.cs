@@ -179,6 +179,16 @@ public sealed class TripleDESPkcs11Tests_Managed
     });
 
     // Reverse direction: ciphertext produced by the BCL must decrypt on the token.
+    // The managed token unpads CKM_*_CBC_PAD with the BCL, so it refuses what the BCL refuses; the shared
+    // case pins the same paddings on every real backend.
+    [Fact]
+    public void DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable() => WithImportedDes3((session, des3) =>
+    {
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var bcl = BclDes3();
+        CbcPaddingTestSupport.AssertRefusesBadPadding_SessionReusable(des3, bcl, Iv8);
+    });
+
     [Fact]
     public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedDes3((session, des3) =>
     {

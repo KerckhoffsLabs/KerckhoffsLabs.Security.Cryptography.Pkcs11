@@ -1797,7 +1797,7 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S
-- **Location:** `.gitmodules:1-16`; the actual pins are `vendor/softhsmv2` = `c26ef0a` (239 commits past the `2.6.1` tag), `vendor/opencryptoki` = `627d2751` (10 commits past `v3.27.0`), `vendor/nss` = `NSS_3_126_RTM`, `vendor/pkcs11-mock` = `v2.0.0`; the misstatement is at `.github/workflows/ci.yml:225`
+- **Location:** `.gitmodules:1-16`; the actual pins are `vendor/softhsmv2` = `c26ef0a` (239 commits past the `2.6.1` tag), `vendor/opencryptoki` = `1cf36153` (390 commits past `v3.27.0`, no newer release), `vendor/nss` = `NSS_3_126_RTM`, `vendor/pkcs11-mock` = `v2.0.0`; the misstatement is at `.github/workflows/ci.yml:225`
 - **Problem:** Two of the four backends are pinned to mid-development upstream commits rather than releases, so the "three independent real backends" evidence rests partly on unreleased upstream code — and the `ci.yml` comment misstates the opencryptoki pin as the v3.27.0 release. Submodule SHAs also feed the native-artifact cache key (`ci.yml:170`), so a bump silently changes what the whole matrix tests. There is no `CODEOWNERS` and no `gitsubmodule` entry for dependency automation, so a submodule bump arrives as an opaque one-line SHA diff.
 - **Proposed action:** Move each submodule to a tagged release where possible, or add a short `vendor/README.md` recording why each non-tag pin was chosen and what it fixes; correct the `ci.yml:225` comment; and add `.github/CODEOWNERS` covering `vendor/`, `.github/workflows/`, `build/` and `Directory.Build.props` so infrastructure and pin changes always require an owner's review.
 - **Breaks public API?** No

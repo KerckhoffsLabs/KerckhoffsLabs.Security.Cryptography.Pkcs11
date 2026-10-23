@@ -22,11 +22,29 @@ public sealed class WrapUnwrapKeyTests_OpenCryptoki(OpenCryptokiBackendFixture b
         WrapUnwrapKeyTestCases.Assert_AesKeyWrap_RoundTrip(_backend, wrapMechanism);
     }
 
-    // The secure-defaults unwrap cases (Unwrap_AppliesSecureDefaults /
-    // Unwrap_ExplicitExtractable_RequiresAllowInsecure) are not ported here: opencryptoki's C_UnwrapKey
-    // rejects the minimal-usage unwrap template they use (CLASS/KEY_TYPE/TOKEN + injected
-    // SENSITIVE/EXTRACTABLE) with CKR_ATTRIBUTE_READ_ONLY, where SoftHSM accepts it. Those cases verify
-    // the library's secure-default *injection* (backend-independent logic), which stays covered on
-    // SoftHSM and the managed mock (UnwrapSecureDefaultsTests.Pkcs11Mock). The real wrap/unwrap data
-    // path on opencryptoki is exercised by AesKeyWrap_RoundTrip above.
+    // v3.27.0 refused CKA_SENSITIVE / CKA_EXTRACTABLE in an unwrap template with
+    // CKR_ATTRIBUTE_READ_ONLY, so these two cases could not run here. 10f48c5 accepted them, but the
+    // unwrap still overwrote them with CKA_SENSITIVE = FALSE and CKA_EXTRACTABLE = TRUE, which
+    // Unwrap_AppliesSecureDefaults caught; 2345b3c7 honours them. The vendored commit includes both.
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void Unwrap_AppliesSecureDefaults(CKM wrapMechanism)
+    {
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism);
+    }
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void Unwrap_ExplicitExtractable_IsAllowed(CKM wrapMechanism)
+    {
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend, wrapMechanism);
+    }
 }
