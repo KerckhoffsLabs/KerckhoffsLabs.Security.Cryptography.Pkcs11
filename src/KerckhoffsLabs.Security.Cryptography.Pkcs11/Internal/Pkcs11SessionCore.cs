@@ -219,9 +219,6 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <exception cref="CryptoPolicyViolationException">The policy refused the request.</exception>
     internal void Enforce(PolicyRequest request)
     {
-        // A caller that decides without the token after asking (DSAPkcs11's length check) must not
-        // answer on a closed session, so this refuses one as IsPermitted does.
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ICryptoPolicy policy = _effectivePolicy;
         PolicyDecision decision = policy.Evaluate(request);
         if (decision.IsAllowed)

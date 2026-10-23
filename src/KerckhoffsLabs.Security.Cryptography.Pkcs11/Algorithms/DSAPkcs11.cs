@@ -49,8 +49,8 @@ public sealed class DSAPkcs11 : DSA
 {
     private readonly Pkcs11Key _key;
 
-    // q's length in bytes, read from the token on first use; 0 until then, which no key's q is. A plain int,
-    // so a thread that reads it while another first writes it sees either 0 or the whole length.
+    // q's length in bytes, read from the token on first use; 0 until then, which no key's q is. Read and
+    // written with Volatile, so a thread racing the first write sees either 0 or the whole length.
     private int _subprimeLength;
 
     /// <summary>
@@ -180,9 +180,8 @@ public sealed class DSAPkcs11 : DSA
             return length;
 
         using var subprime = _key.GetAttributeValue(CKA.CKA_SUBPRIME);
-        // CannotBeRead covers both a sensitive attribute and one the object lacks, so no return code is named.
-        if (subprime[0].CannotBeRead)
-            throw new Pkcs11AttributeException(CKA.CKA_SUBPRIME);
+        // An unreadable value throws Pkcs11AttributeException, which names no return code: the token's -1
+        // length covers both a sensitive attribute and one the object lacks.
         byte[] q = TrimLeadingZeros(subprime[0].GetValueAsByteArray());
         if (q is [] or [0])
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "DSAPkcs11 (CKA_SUBPRIME is zero)");
