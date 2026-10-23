@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </para>
 /// <para>
 /// It differs from <see cref="SecurePin"/> where a password differs from a PIN: it may be empty, which
-/// PBKDF2 accepts, and text is encoded the way <see cref="Rfc2898DeriveBytes"/> encodes it
+/// PBKDF2 accepts, and text is encoded the way the <see cref="Rfc2898DeriveBytes"/> constructors encode it
 /// (<see cref="Encoding.UTF8"/>, where an unpaired surrogate becomes U+FFFD), so the same password
 /// derives the same key on the token as in the BCL.
 /// </para>
@@ -44,9 +44,16 @@ public sealed class SecurePassword : IDisposable
     /// </remarks>
     /// <param name="password">The password characters. May be empty.</param>
     public SecurePassword(ReadOnlySpan<char> password)
+        : this(password, Encoding.UTF8)
     {
-        _buffer = GC.AllocateArray<byte>(Encoding.UTF8.GetByteCount(password), pinned: true);
-        Encoding.UTF8.GetBytes(password, _buffer);
+    }
+
+    // Encodes with encoding, whose fallback decides what an unpaired surrogate becomes: a throwing
+    // encoding throws while counting, before the buffer exists.
+    internal SecurePassword(ReadOnlySpan<char> password, Encoding encoding)
+    {
+        _buffer = GC.AllocateArray<byte>(encoding.GetByteCount(password), pinned: true);
+        encoding.GetBytes(password, _buffer);
     }
 
     /// <summary>Initializes a new <see cref="SecurePassword"/> from a string, encoded as UTF-8.</summary>

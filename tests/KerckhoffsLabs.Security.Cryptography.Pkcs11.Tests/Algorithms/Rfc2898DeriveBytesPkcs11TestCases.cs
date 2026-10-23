@@ -253,6 +253,99 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
         Assert.Throws<NotSupportedException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Password, Salt, Iterations, HashAlgorithmName.MD5, 32));
     }
 
+    // === Static Pbkdf2 from password characters ===========================================
+
+    // ASCII, non-ASCII (two- to four-byte UTF-8, including a surrogate pair) and empty.
+    private static readonly string[] CharPasswords = ["passwordPASSWORDpassword", "pässwörd-口令-\U0001F511", ""];
+
+    // A lone high surrogate has no UTF-8 encoding.
+    private const string UnpairedSurrogate = "pass\uD800word";
+
+    internal static void Assert_StaticPbkdf2_CharPassword_MatchesStringOverloadAndBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+        foreach (string password in CharPasswords)
+        {
+            byte[] expected = Rfc2898DeriveBytes.Pbkdf2(password.AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, 32);
+
+            byte[] destination = new byte[32];
+            Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password.AsSpan(), Salt, destination, Iterations, HashAlgorithmName.SHA256);
+            Assert.Equal(expected, destination);
+            Assert.Equal(expected, Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password.AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, 32));
+            Assert.Equal(expected, Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password, Salt, Iterations, HashAlgorithmName.SHA256, 32));
+        }
+    }
+
+    // Refused while encoding, before the policy or the token is asked, so this holds on every backend.
+    internal static void Assert_StaticPbkdf2_UnpairedSurrogate_ThrowsLikeBcl(IPkcs11Backend backend)
+    {
+        using var session = OpenSession(backend);
+        byte[] destination = new byte[32];
+
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2(UnpairedSurrogate.AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, 32),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, UnpairedSurrogate.AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, 32));
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2(UnpairedSurrogate.AsSpan(), Salt, destination, Iterations, HashAlgorithmName.SHA256),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, UnpairedSurrogate.AsSpan(), Salt, destination, Iterations, HashAlgorithmName.SHA256));
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2(UnpairedSurrogate, Salt, Iterations, HashAlgorithmName.SHA256, 32),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, UnpairedSurrogate, Salt, Iterations, HashAlgorithmName.SHA256, 32));
+
+        // Nothing to derive: the password is never encoded, so neither throws.
+        Assert.Empty(Rfc2898DeriveBytes.Pbkdf2(UnpairedSurrogate.AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, 0));
+        Assert.Empty(Rfc2898DeriveBytesPkcs11.Pbkdf2(session, UnpairedSurrogate.AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, 0));
+        Rfc2898DeriveBytesPkcs11.Pbkdf2(session, UnpairedSurrogate.AsSpan(), Salt, Span<byte>.Empty, Iterations, HashAlgorithmName.SHA256);
+    }
+
+    internal static void Assert_StaticPbkdf2_CharPassword_ArgumentErrors_MatchBcl(IPkcs11Backend backend)
+    {
+        using var session = OpenSession(backend);
+        byte[] destination = new byte[32];
+
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2("password".AsSpan(), Salt, 0, HashAlgorithmName.SHA256, 32),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, 0, HashAlgorithmName.SHA256, 32));
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2("password".AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, -1),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, -1));
+        // Both bad: the BCL reports the output length first for a character password.
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2("password".AsSpan(), Salt, 0, HashAlgorithmName.SHA256, -1),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, 0, HashAlgorithmName.SHA256, -1));
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2("password", Salt, 0, HashAlgorithmName.SHA256, -1),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password", Salt, 0, HashAlgorithmName.SHA256, -1));
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2("password".AsSpan(), Salt, destination, 0, HashAlgorithmName.SHA256),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, destination, 0, HashAlgorithmName.SHA256));
+        // The iteration count is checked even when there is nothing to derive.
+        AssertSameFailureAsBcl(
+            () => Rfc2898DeriveBytes.Pbkdf2("password".AsSpan(), Salt, Span<byte>.Empty, -1, HashAlgorithmName.SHA256),
+            () => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, Span<byte>.Empty, -1, HashAlgorithmName.SHA256));
+
+        // A string password still binds to the string overload, whose null check names it.
+        var ex = Assert.Throws<ArgumentNullException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, (string)null!, Salt, Iterations, HashAlgorithmName.SHA256, 32));
+        Assert.Equal("password", ex.ParamName);
+
+        // As the byte overloads: the session is the adapter's own argument, and an unsupported PRF is NotSupportedException.
+        Assert.Throws<ArgumentNullException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(null!, "password".AsSpan(), Salt, Iterations, HashAlgorithmName.SHA256, 32));
+        Assert.Throws<ArgumentNullException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(null!, "password".AsSpan(), Salt, destination, Iterations, HashAlgorithmName.SHA256));
+        Assert.Throws<NotSupportedException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, Iterations, HashAlgorithmName.MD5, 32));
+        Assert.Throws<NotSupportedException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, destination, Iterations, HashAlgorithmName.MD5));
+    }
+
+    private static void AssertSameFailureAsBcl(Action bcl, Action adapter)
+    {
+        Exception expected = Assert.ThrowsAny<Exception>(bcl);
+        Exception actual = Assert.ThrowsAny<Exception>(adapter);
+        Assert.Equal(expected.GetType(), actual.GetType());
+        Assert.Equal((expected as ArgumentException)?.ParamName, (actual as ArgumentException)?.ParamName);
+    }
+
     // === Pbkdf2Key (on-token result, no export) ===========================================
 
     // No UsePolicy lease anywhere below: keeping the derived key on the token is what makes PBKDF2

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
@@ -52,6 +53,10 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     private const string ConstructorsObsoleteMessage =
         "The constructors on Rfc2898DeriveBytesPkcs11 are obsolete. Use the static Pbkdf2 method instead, " +
         "or Pbkdf2Key to keep the derived key on the token.";
+
+    // The BCL's static Pbkdf2 refuses a password with an unpaired surrogate, where its constructors
+    // (and SecurePassword) substitute U+FFFD.
+    private static readonly UTF8Encoding ThrowingUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     private readonly Pkcs11Session _session;
     // The only copy of the password this instance keeps, borrowed by every derivation's parameters.
@@ -226,12 +231,33 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
 
     /// <summary>One-shot PBKDF2 from a UTF-8 password. Mirrors <see cref="Rfc2898DeriveBytes.Pbkdf2(string, byte[], int, HashAlgorithmName, int)"/>.</summary>
     /// <inheritdoc cref="Pbkdf2(Pkcs11Session, byte[], byte[], int, HashAlgorithmName, int)"/>
+    /// <exception cref="EncoderFallbackException">Thrown if <paramref name="password"/> contains an unpaired surrogate, which has no UTF-8 encoding.</exception>
     public static byte[] Pbkdf2(Pkcs11Session session, string password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(salt);
-        using var secure = new SecurePassword(password);
-        return Pbkdf2Core(session, secure, salt, iterations, hashAlgorithm, outputLength);
+        return Pbkdf2(session, password.AsSpan(), salt, iterations, hashAlgorithm, outputLength);
+    }
+
+    /// <summary>
+    /// One-shot PBKDF2 from password characters, encoded as UTF-8. Mirrors
+    /// <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{char}, ReadOnlySpan{byte}, int, HashAlgorithmName, int)"/>.
+    /// </summary>
+    /// <remarks>
+    /// The characters are encoded straight into a pinned buffer that is zeroed before this returns, so
+    /// no string holds the password; zero your own character buffer yourself.
+    /// </remarks>
+    /// <inheritdoc cref="Pbkdf2(Pkcs11Session, byte[], byte[], int, HashAlgorithmName, int)"/>
+    /// <exception cref="EncoderFallbackException">Thrown if <paramref name="password"/> contains an unpaired surrogate, which has no UTF-8 encoding.</exception>
+    public static byte[] Pbkdf2(Pkcs11Session session, ReadOnlySpan<char> password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        // The BCL checks the output length first here, unlike in its byte overloads.
+        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
+        byte[] derived = new byte[outputLength];
+        Pbkdf2(session, password, salt, derived, iterations, hashAlgorithm);
+        return derived;
     }
 
     /// <summary>One-shot PBKDF2. Mirrors <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{byte}, ReadOnlySpan{byte}, int, HashAlgorithmName, int)"/>.</summary>
@@ -264,21 +290,34 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         if (destination.IsEmpty)
             return;
         CKP prf = PrfForHash(hashAlgorithm);
-        byte[] derived;
-        using (var secure = new SecurePassword(password))
-            derived = DeriveExtractable(session, secure, salt, iterations, prf, destination.Length);
-        try
-        {
-            derived.CopyTo(destination);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(derived);
-        }
+        using var secure = new SecurePassword(password);
+        DeriveInto(session, secure, salt, iterations, prf, destination);
     }
 
-    // The byte[]-returning one-shots once each has its password in a SecurePassword; the one place
-    // their arguments are checked.
+    /// <summary>
+    /// One-shot PBKDF2 from password characters, encoded as UTF-8, into a caller-supplied buffer. Mirrors
+    /// <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{char}, ReadOnlySpan{byte}, Span{byte}, int, HashAlgorithmName)"/>.
+    /// </summary>
+    /// <remarks>
+    /// The characters are encoded straight into a pinned buffer that is zeroed before this returns, so
+    /// no string holds the password; zero your own character buffer yourself. An empty
+    /// <paramref name="destination"/> returns before the password is encoded, as in the BCL.
+    /// </remarks>
+    /// <inheritdoc cref="Pbkdf2(Pkcs11Session, ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, int, HashAlgorithmName)"/>
+    /// <exception cref="EncoderFallbackException">Thrown if <paramref name="password"/> contains an unpaired surrogate, which has no UTF-8 encoding.</exception>
+    public static void Pbkdf2(Pkcs11Session session, ReadOnlySpan<char> password, ReadOnlySpan<byte> salt, Span<byte> destination, int iterations, HashAlgorithmName hashAlgorithm)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
+        if (destination.IsEmpty)
+            return;
+        CKP prf = PrfForHash(hashAlgorithm);
+        using var secure = new SecurePassword(password, ThrowingUtf8);
+        DeriveInto(session, secure, salt, iterations, prf, destination);
+    }
+
+    // The byte-password, byte[]-returning one-shots once each has its password in a SecurePassword;
+    // the one place their arguments are checked.
     private static byte[] Pbkdf2Core(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -369,6 +408,19 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
 
         return DeriveAndRead(session, new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), length);
+    }
+
+    private static void DeriveInto(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, Span<byte> destination)
+    {
+        byte[] derived = DeriveExtractable(session, password, salt, iterations, prf, destination.Length);
+        try
+        {
+            derived.CopyTo(destination);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(derived);
+        }
     }
 
     private static byte[] DeriveAndRead(Pkcs11Session session, Mechanism mechanism, int length)

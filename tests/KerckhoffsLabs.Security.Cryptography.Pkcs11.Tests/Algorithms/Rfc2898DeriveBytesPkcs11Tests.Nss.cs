@@ -86,6 +86,15 @@ public sealed class Rfc2898DeriveBytesPkcs11Tests_Nss(NssBackendFixture backend)
     public void StaticPbkdf2_UnsupportedHash_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_UnsupportedHash_Throws(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void StaticPbkdf2_CharPassword_MatchesStringOverloadAndBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_CharPassword_MatchesStringOverloadAndBcl(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void StaticPbkdf2_UnpairedSurrogate_ThrowsLikeBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_UnpairedSurrogate_ThrowsLikeBcl(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void StaticPbkdf2_CharPassword_ArgumentErrors_MatchBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_CharPassword_ArgumentErrors_MatchBcl(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Pbkdf2Key_UnderSecureOnly_MatchesBcl()
     {
         _backend.RequireAesGcm(); // the case checks the derived key with AES-GCM

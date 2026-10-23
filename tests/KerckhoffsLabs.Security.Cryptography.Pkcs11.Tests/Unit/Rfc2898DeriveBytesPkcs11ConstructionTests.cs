@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -90,6 +91,51 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     public void EmptyPassword_IsAccepted() =>
         Assert.Empty(PasswordSentBy(w => new Rfc2898DeriveBytesPkcs11(w, "", Salt, 1000, HashAlgorithmName.SHA256)));
 
+    // === The one-shots from password characters encode as the BCL does ===========
+
+    private static byte[] PasswordSentByOneShot(Action<Pkcs11Session> derive)
+    {
+        var policy = new PasswordCapturingPolicy();
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, policy);
+
+        var ex = Assert.IsType<Pkcs11Exception>(Record.Exception(() => derive(session)), exactMatch: false);
+        Assert.Equal(CKR.CKR_MECHANISM_INVALID, ex.ReturnValue);
+        return Assert.Single(policy.Passwords);
+    }
+
+    [Theory]
+    [InlineData("password")]
+    [InlineData("pässwörd-口令-\U0001F511")]
+    [InlineData("")]
+    public void CharOneShots_SendTheUtf8Password_AsTheStringOneShotDoes(string password)
+    {
+        byte[] expected = Encoding.UTF8.GetBytes(password);
+
+        Assert.Equal(expected, PasswordSentByOneShot(s => Rfc2898DeriveBytesPkcs11.Pbkdf2(s, password.AsSpan(), Salt, 1000, HashAlgorithmName.SHA256, 16)));
+        Assert.Equal(expected, PasswordSentByOneShot(s => Rfc2898DeriveBytesPkcs11.Pbkdf2(s, password.AsSpan(), Salt, new byte[16], 1000, HashAlgorithmName.SHA256)));
+        Assert.Equal(expected, PasswordSentByOneShot(s => Rfc2898DeriveBytesPkcs11.Pbkdf2(s, password, Salt, 1000, HashAlgorithmName.SHA256, 16)));
+    }
+
+    [Fact]
+    public void CharOneShots_UnpairedSurrogate_ThrowsBeforeAnythingIsSent()
+    {
+        var policy = new PasswordCapturingPolicy();
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, policy);
+        const string password = "pass\uD800word";
+
+        Assert.Throws<EncoderFallbackException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password.AsSpan(), Salt, 1000, HashAlgorithmName.SHA256, 16));
+        Assert.Throws<EncoderFallbackException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password.AsSpan(), Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
+        Assert.Throws<EncoderFallbackException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password, Salt, 1000, HashAlgorithmName.SHA256, 16));
+        Assert.Empty(policy.Parameters);
+
+        // The constructors keep the BCL constructors' encoding, which substitutes U+FFFD.
+        using var kdf = new Rfc2898DeriveBytesPkcs11(session, password, Salt, 1000, HashAlgorithmName.SHA256);
+        Assert.ThrowsAny<Pkcs11Exception>(() => kdf.GetBytes(16));
+        Assert.Equal(Encoding.UTF8.GetBytes(password), Assert.Single(policy.Passwords));
+    }
+
     [Fact]
     public void InvalidArguments_AreRejected()
     {
@@ -157,6 +203,8 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
 
         Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password", Salt, 1000, HashAlgorithmName.SHA256, 16));
         Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password"u8, Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, 1000, HashAlgorithmName.SHA256, 16));
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password".AsSpan(), Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
         Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(session, "password"u8, Salt, 1000, HashAlgorithmName.SHA256, template));
 
         using (var password = new SecurePassword("password"))
@@ -165,7 +213,7 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
             Assert.True(StillMarshals(policy.Parameters[^1])); // borrowed from the caller, who has not disposed it yet
         }
 
-        Assert.Equal(4, policy.Parameters.Count);
+        Assert.Equal(6, policy.Parameters.Count);
         Assert.All(policy.Parameters, p => Assert.False(StillMarshals(p)));
         Assert.All(policy.Passwords, p => Assert.Equal("password"u8.ToArray(), p));
     }
