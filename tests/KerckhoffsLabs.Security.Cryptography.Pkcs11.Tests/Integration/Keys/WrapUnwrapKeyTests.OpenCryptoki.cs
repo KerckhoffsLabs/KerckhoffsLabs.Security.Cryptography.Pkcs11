@@ -23,9 +23,9 @@ public sealed class WrapUnwrapKeyTests_OpenCryptoki(OpenCryptokiBackendFixture b
     }
 
     // v3.27.0 refused CKA_SENSITIVE / CKA_EXTRACTABLE in an unwrap template with
-    // CKR_ATTRIBUTE_READ_ONLY, so these two cases could not run here. Fixed upstream by 10f48c5
-    // ("Allow CKA_EXTRACTABLE and CKA_SENSITIVE to be set during unwrap"), which the vendored commit
-    // includes.
+    // CKR_ATTRIBUTE_READ_ONLY, so these two cases could not run here. 10f48c5 accepted them, but the
+    // unwrap still overwrote them with CKA_SENSITIVE = FALSE and CKA_EXTRACTABLE = TRUE, which
+    // Unwrap_AppliesSecureDefaults caught; 2345b3c7 honours them. The vendored commit includes both.
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [InlineData(CKM.CKM_AES_KEY_WRAP)]
     [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
