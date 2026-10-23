@@ -43,8 +43,8 @@ public sealed class KnownAnswerTests_CratonHsm(CratonHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(CratonHsmAvailable), Skip = "Requires " + nameof(CratonHsmAvailable))]
     public void AesKeyWrap_Kat() => KnownAnswerTestCases.Assert_AesKeyWrap_Kat(_backend);
 
-    [Fact(SkipUnless = nameof(CratonHsmAvailable), Skip = "Requires " + nameof(CratonHsmAvailable))]
-    public void RsaOaep_Kat() => KnownAnswerTestCases.Assert_RsaOaep_Kat(_backend);
+    // No RsaOaep_Kat: its vector is OAEP with SHA-1, which Craton HSM refuses (parse_oaep_hash,
+    // src/pkcs11_abi/functions.rs); C_Decrypt under the imported key answers CKR_KEY_HANDLE_INVALID first.
 
     [Fact(SkipUnless = nameof(CratonHsmAvailable), Skip = "Requires " + nameof(CratonHsmAvailable))]
     public void RsaPss_Kat() => KnownAnswerTestCases.Assert_RsaPss_Kat(_backend);

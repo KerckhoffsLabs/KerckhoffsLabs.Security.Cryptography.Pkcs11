@@ -33,7 +33,10 @@ public sealed class WrapUnwrapKeyTests_CratonHsm(CratonHsmBackendFixture backend
     public void Unwrap_AppliesSecureDefaults(CKM wrapMechanism)
     {
         _backend.RequireMechanism(wrapMechanism);
-        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism);
+        // Craton HSM refuses to wrap a key whose CKA_EXTRACTABLE is FALSE with CKR_KEY_FUNCTION_NOT_PERMITTED
+        // (C_WrapKey, src/pkcs11_abi/functions.rs), where PKCS#11 has CKR_KEY_UNEXTRACTABLE. The key still
+        // does not leave the token; pinned, so a fix upstream fails here and the default can take over.
+        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED);
     }
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]

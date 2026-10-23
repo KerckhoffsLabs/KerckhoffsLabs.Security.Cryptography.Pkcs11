@@ -12,7 +12,7 @@ public sealed class EncryptRsaOaepLabelTests_CratonHsm(CratonHsmBackendFixture b
     public void OaepWithLabel_RoundTrips() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepWithLabel_RoundTrips(_backend);
 
-    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void OaepWithWrongLabel_FailsToDecrypt() =>
-        EncryptRsaOaepLabelTestCases.Assert_OaepWithWrongLabel_FailsToDecrypt(_backend);
+    // No OaepWithWrongLabel_FailsToDecrypt: Craton HSM reads only hashAlg from CK_RSA_PKCS_OAEP_PARAMS
+    // (parse_oaep_hash, src/pkcs11_abi/functions.rs) and ignores the label, so a ciphertext decrypts under
+    // any label. The round trip above passes for the same reason, not because the label is honoured.
 }
