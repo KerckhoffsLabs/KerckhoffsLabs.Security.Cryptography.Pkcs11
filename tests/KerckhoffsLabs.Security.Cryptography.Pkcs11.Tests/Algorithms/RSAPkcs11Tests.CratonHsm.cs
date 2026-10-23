@@ -104,4 +104,11 @@ public sealed class RSAPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void SignData_Pss_VerifiesUnderBclFromExportedPublicKey() => RSAPkcs11TestCases.Assert_SignData_Pss_VerifiesUnderBclFromExportedPublicKey(_backend);
+
+    // No SignHash_Pss_InteropsWithSignDataAndBcl: Craton HSM lists raw CKM_RSA_PKCS_PSS for sign and verify, but
+    // refuses it with CKR_MECHANISM_PARAM_INVALID whatever the parameters (pss_mechanism_to_hash, src/crypto/sign.rs),
+    // so it signs over the data only, through the CKM_SHA*_RSA_PKCS_PSS mechanisms.
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData() => RSAPkcs11TestCases.Assert_SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(_backend);
 }
