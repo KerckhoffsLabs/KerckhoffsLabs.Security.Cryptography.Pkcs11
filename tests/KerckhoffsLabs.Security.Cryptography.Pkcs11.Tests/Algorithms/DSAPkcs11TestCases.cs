@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -218,6 +219,95 @@ internal static class DSAPkcs11TestCases
             Assert.True(dsa.VerifySignature(hash, sig));
             Assert.Equal(2 * Q.Length, sig.Length); // P1363 r‖s, each q-sized
         });
+
+    // Every verification overload that takes a DSASignatureFormat ends in the adapter's VerifySignatureCore:
+    // P1363 goes to the token as is, DER is converted to r‖s first.
+    internal static void Assert_VerifyWithSignatureFormat_AcceptsBothFormats_AndRejectsTampering(IPkcs11Backend backend, DSASignatureFormat format) =>
+        WithDsa(backend, dsa =>
+        {
+            var sha256 = HashAlgorithmName.SHA256;
+            byte[] data = Encoding.UTF8.GetBytes($"dsa verify in {format}");
+            byte[] hash = SHA256.HashData(data);
+            byte[] sig = dsa.SignData(data, sha256, format);
+
+            Assert.True(dsa.VerifyData(data, sig, sha256, format));
+            Assert.True(dsa.VerifyData(data, 0, data.Length, sig, sha256, format));
+            Assert.True(dsa.VerifyData((ReadOnlySpan<byte>)data, sig, sha256, format));
+            using (var stream = new MemoryStream(data))
+                Assert.True(dsa.VerifyData(stream, sig, sha256, format));
+            Assert.True(dsa.VerifySignature(hash, sig, format));
+            Assert.True(dsa.VerifySignature((ReadOnlySpan<byte>)hash, sig, format));
+
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+            Assert.False(dsa.VerifyData(tampered, sig, sha256, format));
+
+            // The last byte is s's last in either format, so the DER encoding stays well formed.
+            byte[] badSig = [.. sig];
+            badSig[^1] ^= 0xFF;
+            Assert.False(dsa.VerifyData(data, badSig, sha256, format));
+        });
+
+    // A malformed DER signature, or one whose r does not fit q, does not verify, as for the BCL; nor does an
+    // r‖s signature of the wrong length, on any verification path, which tokens report in different ways
+    // (CKR_SIGNATURE_LEN_RANGE; NSS: CKR_ARGUMENTS_BAD) and the adapter therefore checks itself.
+    internal static void Assert_VerifyWithSignatureFormat_MalformedSignature_ReturnsFalse(IPkcs11Backend backend) =>
+        WithDsa(backend, dsa =>
+        {
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("malformed signatures"));
+            byte[] ieee = dsa.CreateSignature(hash);
+            byte[] der = DerSignature(ieee[..Q.Length], ieee[Q.Length..]);
+            Assert.True(dsa.VerifySignature(hash, der, DSASignatureFormat.Rfc3279DerSequence));
+
+            byte[] r = ieee[..Q.Length];
+            byte[] s = ieee[Q.Length..];
+            byte[][] notVerifying =
+            [
+                [],
+                der[..^1],
+                [.. der, 0x00],
+                [0x04, .. der[1..]],
+                // r one and two bytes longer than q, without the zero that only a set high bit needs.
+                DerSignature([0x01, .. r], s),
+                DerSignature([0x01, 0x01, .. r], s),
+                // Well formed, but another r: shorter than q, and with its high bit set.
+                DerSignature([0x05], s),
+                DerSignature([(byte)(r[0] >= 0x80 ? r[0] ^ 0x01 : 0x80), .. r[1..]], s),
+            ];
+            foreach (byte[] signature in notVerifying)
+                Assert.False(dsa.VerifySignature(hash, signature, DSASignatureFormat.Rfc3279DerSequence));
+
+            Assert.False(dsa.VerifySignature(hash, ieee[..^1], DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+            Assert.False(dsa.VerifySignature(hash, (byte[])[.. ieee, 0x00], DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+            Assert.False(dsa.VerifySignature(hash, ieee[..^1]));
+            Assert.False(dsa.VerifySignature(hash, (byte[])[.. ieee, 0x00]));
+
+            byte[] data = Encoding.UTF8.GetBytes("a signature of the wrong length");
+            byte[] sig = dsa.SignData(data, HashAlgorithmName.SHA256);
+            Assert.False(dsa.VerifyData(data.AsSpan(), sig.AsSpan(0, sig.Length - 1), HashAlgorithmName.SHA256));
+            Assert.False(dsa.VerifyData(data, (byte[])[.. sig, 0x00], HashAlgorithmName.SHA256));
+        });
+
+    // Dss-Sig-Value { r, s } over the given big-endian values, taken as unsigned.
+    internal static byte[] DerSignature(byte[] r, byte[] s)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteIntegerUnsigned(Minimal(r));
+            writer.WriteIntegerUnsigned(Minimal(s));
+        }
+        return writer.Encode();
+
+        // An r‖s half is q's width, so about one in 256 starts with a zero byte, which WriteIntegerUnsigned
+        // refuses as redundant.
+        static ReadOnlySpan<byte> Minimal(ReadOnlySpan<byte> value)
+        {
+            while (value is [0, _, ..])
+                value = value[1..];
+            return value;
+        }
+    }
 
     internal static void Assert_ExportParameters_ReturnsProvidedDomain(IPkcs11Backend backend) =>
         WithDsa(backend, dsa =>

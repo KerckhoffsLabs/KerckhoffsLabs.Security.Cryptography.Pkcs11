@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -48,7 +49,8 @@ public sealed class DSAPkcs11Tests_Managed
     private static void WithDsa(Action<DSAPkcs11, DSA> body)
         => WithDsa((dsa, bcl, _) => body(dsa, bcl));
 
-    private static void WithDsa(Action<DSAPkcs11, DSA, Pkcs11Session> body)
+    // With publicObject false only the private half is imported: a key that can sign but has no public value.
+    private static void WithDsa(Action<DSAPkcs11, DSA, Pkcs11Session> body, bool publicObject = true)
     {
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
@@ -60,12 +62,15 @@ public sealed class DSAPkcs11Tests_Managed
         byte[] id = Guid.NewGuid().ToByteArray();
 
         // Import the public half first, then the private half (which discovers its companion by CKA_ID).
-        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_DSA)
-            .Label(label).Id(id)
-            .Attribute(CKA.CKA_PRIME, full.P!).Attribute(CKA.CKA_SUBPRIME, full.Q!)
-            .Attribute(CKA.CKA_BASE, full.G!).Attribute(CKA.CKA_VALUE, full.Y!)
-            .Verify().Build();
-        _ = session.ImportKey(pubTpl);
+        if (publicObject)
+        {
+            using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_DSA)
+                .Label(label).Id(id)
+                .Attribute(CKA.CKA_PRIME, full.P!).Attribute(CKA.CKA_SUBPRIME, full.Q!)
+                .Attribute(CKA.CKA_BASE, full.G!).Attribute(CKA.CKA_VALUE, full.Y!)
+                .Verify().Build();
+            _ = session.ImportKey(pubTpl);
+        }
 
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_DSA)
             .Label(label).Id(id)
@@ -445,6 +450,328 @@ public sealed class DSAPkcs11Tests_Managed
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.ExportParameters(includePrivateParameters: false));
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
     }
+
+    // === Verification with a DSASignatureFormat: token errors propagate ======================
+    //
+    // The base VerifySignatureCore read q through ExportParameters(false) inside a catch of
+    // CryptographicException, so any Pkcs11Exception from that read became false and C_Verify was never
+    // called. The adapter's override reads only CKA_SUBPRIME: to size a DER signature's conversion, and to
+    // check an r‖s signature's length, on every verification path, with a format or without.
+
+    private const DSASignatureFormat P1363 = DSASignatureFormat.IeeeP1363FixedFieldConcatenation;
+
+    // Each formatted verification entry point, over the data or its SHA-256 hash.
+    private static readonly Dictionary<string, Func<DSAPkcs11, byte[], byte[], DSASignatureFormat, bool>> FormattedVerifies = new()
+    {
+        ["VerifyData(byte[])"] = (d, data, sig, f) => d.VerifyData(data, sig, HashAlgorithmName.SHA256, f),
+        ["VerifyData(byte[], offset, count)"] = (d, data, sig, f) => d.VerifyData(data, 0, data.Length, sig, HashAlgorithmName.SHA256, f),
+        ["VerifyData(span)"] = (d, data, sig, f) => d.VerifyData(data.AsSpan(), sig.AsSpan(), HashAlgorithmName.SHA256, f),
+        ["VerifyData(Stream)"] = (d, data, sig, f) =>
+        {
+            using var stream = new MemoryStream(data);
+            return d.VerifyData(stream, sig, HashAlgorithmName.SHA256, f);
+        },
+        ["VerifySignature(byte[])"] = (d, data, sig, f) => d.VerifySignature(SHA256.HashData(data), sig, f),
+        ["VerifySignature(span)"] = (d, data, sig, f) => d.VerifySignature(SHA256.HashData(data).AsSpan(), sig.AsSpan(), f),
+    };
+
+    public static TheoryData<string, DSASignatureFormat> FormattedVerifyCases()
+    {
+        var cases = new TheoryData<string, DSASignatureFormat>();
+        foreach (string name in FormattedVerifies.Keys)
+        {
+            cases.Add(name, P1363);
+            cases.Add(name, Der);
+        }
+        return cases;
+    }
+
+    // A key with no public-key object cannot verify: the token's error must reach the caller rather than
+    // read as an invalid signature.
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    [MemberData(nameof(FormattedVerifyCases))]
+    public void FormattedVerify_NoPublicKeyObject_ThrowsTheTokensError(string call, DSASignatureFormat format) => WithDsa((dsa, bcl, session) =>
+    {
+        byte[] sig = bcl.SignData(Data, HashAlgorithmName.SHA256, format);
+        using var policy = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => FormattedVerifies[call](dsa, Data, sig, format));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+    }, publicObject: false);
+
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    [MemberData(nameof(FormattedVerifyCases))]
+    public void FormattedVerify_BclSignature_VerifiesOnToken_AndTamperedDoesNot(string call, DSASignatureFormat format) => WithDsa((dsa, bcl, session) =>
+    {
+        byte[] sig = bcl.SignData(Data, HashAlgorithmName.SHA256, format);
+        byte[] badSig = [.. sig];
+        badSig[^1] ^= 0xFF;
+        using var policy = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+        Assert.True(FormattedVerifies[call](dsa, Data, sig, format));
+        Assert.False(FormattedVerifies[call](dsa, Data, badSig, format));
+    });
+
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void FormattedVerify_GatedByDefault_Throws() => WithDsa((dsa, bcl) =>
+    {
+        foreach (DSASignatureFormat format in (DSASignatureFormat[])[P1363, Der])
+        {
+            byte[] sig = bcl.SignData(Data, HashAlgorithmName.SHA256, format);
+            Assert.Throws<CryptoPolicyViolationException>(
+                () => dsa.VerifySignature(SHA256.HashData(Data), sig, format));
+        }
+    });
+
+    // Both formats need q: DER to size the conversion, P1363 to check the signature's length. A failed read
+    // is the token's error.
+    [Theory]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence)]
+    public void FormattedVerify_SubprimeReadFails_ThrowsTheTokensError(DSASignatureFormat format)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_DEVICE_ERROR, null), CryptoPolicy.AllowInsecure, publicOnly: true);
+        using var dsa = new DSAPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], SignatureIn(format), format));
+        Assert.Equal(CKR.CKR_DEVICE_ERROR, ex.ReturnValue);
+    }
+
+    // q is read as ExportParameters(false) reads it, so an unreadable one fails as that does.
+    [Theory]
+    [InlineData(CKR.CKR_ATTRIBUTE_SENSITIVE, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(CKR.CKR_ATTRIBUTE_SENSITIVE, DSASignatureFormat.Rfc3279DerSequence)]
+    [InlineData(CKR.CKR_ATTRIBUTE_TYPE_INVALID, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(CKR.CKR_ATTRIBUTE_TYPE_INVALID, DSASignatureFormat.Rfc3279DerSequence)]
+    public void FormattedVerify_SubprimeUnreadable_ThrowsAsExportParametersDoes(CKR rv, DSASignatureFormat format)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, ca => ca == CKA.CKA_SUBPRIME ? (rv, null) : (CKR.CKR_OK, [0x07]),
+            CryptoPolicy.AllowInsecure, publicOnly: true);
+        using var dsa = new DSAPkcs11(key);
+
+        var expected = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.ExportParameters(false));
+        var actual = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], SignatureIn(format), format));
+        Assert.Equal(expected.ReturnValue, actual.ReturnValue);
+    }
+
+    // A q of zero is no key's: the token's malformed key is an error, not every signature failing to verify.
+    [Theory]
+    [InlineData(new byte[] { 0x00 })]
+    [InlineData(new byte[] { 0x00, 0x00 })]
+    public void Verify_SubprimeIsZero_ThrowsAttributeValueInvalid(byte[] subprime)
+    {
+        using var key = DsaKey(subprime);
+        using var dsa = new DSAPkcs11(key);
+
+        Func<bool>[] verifies =
+        [
+            () => dsa.VerifySignature(new byte[32], new byte[2]),
+            () => dsa.VerifySignature(new byte[32], new byte[2], P1363),
+            () => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der),
+        ];
+        Assert.All(verifies, verify =>
+            Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, Assert.ThrowsAny<Pkcs11Exception>(() => verify()).ReturnValue));
+    }
+
+    private static byte[] SignatureIn(DSASignatureFormat format) =>
+        format == Der ? DSAPkcs11TestCases.DerSignature([0x01], [0x02]) : new byte[64];
+
+    // A DSA key whose q is `q`, with the one-byte p, g and y that ExportParameters(false) also reads.
+    // Its module refuses C_VerifyInit, so reaching the token throws.
+    private static FakeKey DsaKey(byte[] q, ICryptoPolicy? policy = null, Action<CKA>? onRead = null) =>
+        FakeKeys.Create(CKK.CKK_DSA, ca =>
+        {
+            onRead?.Invoke(ca);
+            return ca switch
+            {
+                CKA.CKA_SUBPRIME => (CKR.CKR_OK, q),
+                CKA.CKA_PRIME or CKA.CKA_BASE or CKA.CKA_VALUE => (CKR.CKR_OK, [0x07]),
+                _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+            };
+        }, policy ?? CryptoPolicy.AllowInsecure, publicOnly: true);
+
+    // === An r‖s signature of the wrong length does not verify, and never reaches the token =========
+    //
+    // NSS answers one with CKR_ARGUMENTS_BAD rather than a verdict. The fake key's q is one byte long, so an
+    // r‖s signature is two.
+
+    private static FakeKey OneByteSubprimeKey(ICryptoPolicy? policy = null) => DsaKey([0x05], policy);
+
+    private static readonly Dictionary<string, Func<DSAPkcs11, byte[], bool>> HashVerifies = new()
+    {
+        ["VerifySignature(byte[])"] = (d, sig) => d.VerifySignature(new byte[32], sig),
+        ["VerifySignature(byte[], P1363)"] = (d, sig) => d.VerifySignature(new byte[32], sig, P1363),
+        ["VerifySignature(span, P1363)"] = (d, sig) => d.VerifySignature(new byte[32].AsSpan(), sig.AsSpan(), P1363),
+        ["VerifyData(byte[], P1363)"] = (d, sig) => d.VerifyData(new byte[3], sig, HashAlgorithmName.SHA256, P1363),
+    };
+
+    public static TheoryData<string> HashVerifyNames() => [.. HashVerifies.Keys];
+
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void P1363Verify_SignatureOfTheWrongLength_ReturnsFalse_WithoutTheToken(string call)
+    {
+        using var key = OneByteSubprimeKey();
+        using var dsa = new DSAPkcs11(key);
+
+        Assert.False(HashVerifies[call](dsa, new byte[1]));
+        Assert.False(HashVerifies[call](dsa, new byte[3]));
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => HashVerifies[call](dsa, new byte[2]));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
+    }
+
+    // The policy still refuses DSA before the length decides anything.
+    [Fact]
+    public void P1363Verify_SignatureOfTheWrongLength_GatedByDefault_Throws()
+    {
+        using var key = OneByteSubprimeKey(CryptoPolicy.SecureOnly);
+        using var dsa = new DSAPkcs11(key);
+
+        Assert.Throws<CryptoPolicyViolationException>(() => dsa.VerifySignature(new byte[32], new byte[3]));
+    }
+
+    // The policy is asked before the token is read, so a refused mechanism is refused as such, even when the
+    // read would fail.
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void Verify_GatedByDefault_ThrowsBeforeReadingTheToken(string call)
+    {
+        int reads = 0;
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ =>
+        {
+            reads++;
+            return (CKR.CKR_DEVICE_ERROR, null);
+        }, CryptoPolicy.SecureOnly, publicOnly: true);
+        using var dsa = new DSAPkcs11(key);
+        reads = 0; // The constructor reads the key's size.
+
+        Assert.Throws<CryptoPolicyViolationException>(() => HashVerifies[call](dsa, new byte[2]));
+        Assert.Throws<CryptoPolicyViolationException>(() => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der));
+        Assert.Equal(0, reads);
+    }
+
+    // A key with no public-key object cannot verify, and says so whatever the signature: its length or
+    // encoding does not turn that error into false.
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void Verify_NoPublicKeyObject_ThrowsWhateverTheSignature(string call)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_OK, [0x05]), CryptoPolicy.AllowInsecure);
+        using var dsa = new DSAPkcs11(key);
+
+        foreach (byte[] signature in (byte[][])[[], new byte[1], new byte[2], new byte[3]])
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => HashVerifies[call](dsa, signature));
+            Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+        }
+        foreach (byte[] signature in (byte[][])[[0x30, 0x00], [0x04], DSAPkcs11TestCases.DerSignature([0x01], [0x02])])
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], signature, Der));
+            Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+        }
+    }
+
+    // q is read once to size signatures. One answered false without the token reads it again, to confirm that
+    // the key could have verified it.
+    [Fact]
+    public void SubprimeLength_IsReadOnce_ExceptToConfirmAFalse()
+    {
+        int reads = 0;
+        using var key = DsaKey([0x05], onRead: ca => reads += ca == CKA.CKA_SUBPRIME ? 1 : 0);
+        using var dsa = new DSAPkcs11(key);
+        reads = 0; // The constructor reads the key's size.
+
+        Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], new byte[2]));
+        // C_GetAttributeValue may be called twice for one read (its length, then its value).
+        int perRead = reads;
+        Assert.NotEqual(0, perRead);
+        Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], new byte[2], P1363));
+        Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der));
+        Assert.Equal(perRead, reads);
+
+        Assert.False(dsa.VerifySignature(new byte[32], new byte[3]));
+        Assert.False(dsa.VerifySignature(new byte[32], (byte[])[0x30, 0x00], Der));
+        Assert.Equal(3 * perRead, reads);
+    }
+
+    // Once q's length is read, a signature of the wrong length is decided without the token, but a disposed
+    // key or a closed session still throws rather than answering false.
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void P1363Verify_SignatureOfTheWrongLength_KeyDisposed_Throws(string call)
+    {
+        using var key = OneByteSubprimeKey();
+        using var dsa = new DSAPkcs11(key);
+        Assert.False(HashVerifies[call](dsa, new byte[3]));
+
+        key.Key.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => HashVerifies[call](dsa, new byte[3]));
+    }
+
+    [Theory]
+    [MemberData(nameof(HashVerifyNames))]
+    public void P1363Verify_SignatureOfTheWrongLength_SessionClosed_Throws(string call)
+    {
+        using var key = OneByteSubprimeKey();
+        using var dsa = new DSAPkcs11(key);
+        Assert.False(HashVerifies[call](dsa, new byte[3]));
+
+        key.Key.Session.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => HashVerifies[call](dsa, new byte[3]));
+    }
+
+    // The shared cases build DER from a token's r‖s halves, which start with a zero byte about once in 256.
+    [Fact]
+    public void DerSignature_HalvesWithLeadingZeros_AreEncodedMinimally()
+    {
+        Assert.Equal(Convert.FromHexString("300702010502020085"), DSAPkcs11TestCases.DerSignature([0x00, 0x05], [0x00, 0x00, 0x85]));
+        Assert.Equal(Convert.FromHexString("3006020100020100"), DSAPkcs11TestCases.DerSignature([0x00, 0x00], [0x00]));
+    }
+
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void FormattedVerify_UnknownFormat_ThrowsAsTheBclDoes() => WithDsa((dsa, bcl) =>
+    {
+        const DSASignatureFormat unknown = (DSASignatureFormat)99;
+        byte[] hash = SHA256.HashData(Data);
+
+        var expected = Assert.Throws<ArgumentOutOfRangeException>(() => bcl.VerifySignature(hash, new byte[64], unknown));
+        var actual = Assert.Throws<ArgumentOutOfRangeException>(() => dsa.VerifySignature(hash, new byte[64], unknown));
+        Assert.Equal(expected.ParamName, actual.ParamName);
+        actual = Assert.Throws<ArgumentOutOfRangeException>(() => dsa.VerifyData(Data, new byte[64], HashAlgorithmName.SHA256, unknown));
+        Assert.Equal(expected.ParamName, actual.ParamName);
+
+        // Unreachable through the public overloads, which check first; the Core refuses it as DSAOpenSsl's does.
+        Assert.Throws<CryptographicException>(() => CallVerifySignatureCore(dsa, hash, new byte[64], unknown));
+    });
+
+    private delegate bool VerifySignatureCoreCall(
+        DSAPkcs11 dsa, ReadOnlySpan<byte> hash, ReadOnlySpan<byte> signature, DSASignatureFormat signatureFormat);
+
+    // An open-instance delegate over the protected override: MethodInfo.Invoke cannot pass a span.
+    private static readonly VerifySignatureCoreCall CallVerifySignatureCore = typeof(DSAPkcs11)
+        .GetMethod("VerifySignatureCore", BindingFlags.Instance | BindingFlags.NonPublic)!
+        .CreateDelegate<VerifySignatureCoreCall>();
+
+    // GetMaxSignatureSize is not virtual and reads q through ExportParameters(false), as the class remarks
+    // say: it works with the public-key object and throws without it, although that key can sign.
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void GetMaxSignatureSize_WithPublicKeyObject_IsSizedFromQ() => WithDsa((dsa, bcl) =>
+    {
+        Assert.Equal(bcl.GetMaxSignatureSize(P1363), dsa.GetMaxSignatureSize(P1363));
+        Assert.Equal(bcl.GetMaxSignatureSize(Der), dsa.GetMaxSignatureSize(Der));
+    });
+
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void GetMaxSignatureSize_NoPublicKeyObject_ThrowsPkcs11Exception() => WithDsa((dsa, _, session) =>
+    {
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            Assert.NotEmpty(dsa.CreateSignature(SHA256.HashData(Data)));
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.GetMaxSignatureSize(P1363));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+    }, publicObject: false);
 
     // === The hash is put to the policy on every path that hashes on the managed side ==========
 

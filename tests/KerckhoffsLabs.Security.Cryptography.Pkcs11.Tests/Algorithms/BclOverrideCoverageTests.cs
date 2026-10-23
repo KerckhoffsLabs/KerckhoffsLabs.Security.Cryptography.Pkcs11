@@ -79,6 +79,10 @@ public sealed class BclOverrideCoverageTests
         "Signs or verifies with CreateSignature or VerifySignature, which the adapter overrides; the formats are converted around them.";
     private const string DsaHashThroughOverride =
         "Hashes through the HashData override, which puts the hash to the session's policy.";
+    private const string DsaVerifyThroughCore =
+        "Ends in VerifySignatureCore, through the VerifyDataCore overrides where it hashes; the adapter overrides it to verify with CKM_DSA on the token, converting a DER signature to r‖s sized from CKA_SUBPRIME, so a token error propagates rather than reading as false.";
+    private const string DsaMaxSignatureSizeNeedsPublicObject =
+        "Reads q's length through ExportParameters(false), so it needs the public-key object for Y as that does, and throws Pkcs11Exception on a private-only key; not virtual, and documented in the adapter's remarks.";
     private const string RsaThroughSignHash =
         "Goes to SignHash or VerifyHash over byte arrays, which the adapter overrides; the base only copies around the call.";
     private const string RsaHashUnreached =
@@ -186,6 +190,7 @@ public sealed class BclOverrideCoverageTests
         ["DSA.CreateSignature(Byte[], DSASignatureFormat)"] = DsaThroughCreateSignature,
         ["DSA.CreateSignatureCore(ReadOnlySpan<Byte>, DSASignatureFormat)"] = DsaThroughCreateSignature,
         ["DSA.FromXmlString(String)"] = ImportRefused,
+        ["DSA.GetMaxSignatureSize(DSASignatureFormat)"] = DsaMaxSignatureSizeNeedsPublicObject,
         ["DSA.ImportEncryptedPkcs8PrivateKey(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, out Int32)"] = ImportRefused,
         ["DSA.ImportEncryptedPkcs8PrivateKey(ReadOnlySpan<Char>, ReadOnlySpan<Byte>, out Int32)"] = ImportRefused,
         ["DSA.ImportFromEncryptedPem(ReadOnlySpan<Char>, ReadOnlySpan<Byte>)"] = ImportRefused,
@@ -213,7 +218,13 @@ public sealed class BclOverrideCoverageTests
         ["DSA.TrySignData(ReadOnlySpan<Byte>, Span<Byte>, HashAlgorithmName, DSASignatureFormat, out Int32)"] = DsaThroughCreateSignature,
         ["DSA.TrySignDataCore(ReadOnlySpan<Byte>, Span<Byte>, HashAlgorithmName, DSASignatureFormat, out Int32)"] = DsaThroughCreateSignature,
         ["DSA.VerifyData(Byte[], Byte[], HashAlgorithmName)"] = ForwardsToOverride,
+        ["DSA.VerifyData(Byte[], Byte[], HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyThroughCore,
+        ["DSA.VerifyData(Byte[], Int32, Int32, Byte[], HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyThroughCore,
+        ["DSA.VerifyData(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyThroughCore,
+        ["DSA.VerifyData(Stream, Byte[], HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyThroughCore,
+        ["DSA.VerifySignature(Byte[], Byte[], DSASignatureFormat)"] = DsaVerifyThroughCore,
         ["DSA.VerifySignature(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>)"] = DsaThroughCreateSignature,
+        ["DSA.VerifySignature(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, DSASignatureFormat)"] = DsaVerifyThroughCore,
         ["ECAlgorithm.ExportECPrivateKey()"] = PrivateExportRefused,
         ["ECAlgorithm.ExportECPrivateKeyPem()"] = PrivateExportRefused,
         ["ECAlgorithm.ImportECPrivateKey(ReadOnlySpan<Byte>, out Int32)"] = ImportRefused,
@@ -654,10 +665,6 @@ public sealed class BclOverrideCoverageTests
 
     // A member whose base implementation is wrong for its adapter is listed here with what goes wrong, until it
     // is fixed.
-    private const string DsaVerifyFormatSwallowsTokenErrors =
-        "VerifySignatureCore, which every verification with a DSASignatureFormat ends in, reads q's length through ExportParameters(false) inside catch (CryptographicException): a Pkcs11Exception from that read (no public-key object, closed session, removed token) becomes false instead of propagating, and C_Verify is never called.";
-    private const string DsaMaxSignatureSizeNeedsPublicObject =
-        "Reads q's length through ExportParameters(false), which needs the public-key object for Y: on a private-only DSA key, which can sign, it throws Pkcs11Exception.";
     private const string AesCfbPartialSegment =
         "AesPkcs11's CFB Core passes PaddingMode.None input that is not a whole number of feedback-size segments to CKM_AES_CFB128, which accepts it, where the BCL throws CryptographicException; the base leaves that check to the Core.";
     private const string UnwrapLeftInPool =
@@ -667,14 +674,6 @@ public sealed class BclOverrideCoverageTests
     {
         ["Aes.DecryptKeyWrapPadded(Byte[])"] = UnwrapLeftInPool,
         ["Aes.DecryptKeyWrapPadded(ReadOnlySpan<Byte>)"] = UnwrapLeftInPool,
-        ["DSA.GetMaxSignatureSize(DSASignatureFormat)"] = DsaMaxSignatureSizeNeedsPublicObject,
-        ["DSA.VerifyData(Byte[], Byte[], HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyFormatSwallowsTokenErrors,
-        ["DSA.VerifyData(Byte[], Int32, Int32, Byte[], HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyFormatSwallowsTokenErrors,
-        ["DSA.VerifyData(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyFormatSwallowsTokenErrors,
-        ["DSA.VerifyData(Stream, Byte[], HashAlgorithmName, DSASignatureFormat)"] = DsaVerifyFormatSwallowsTokenErrors,
-        ["DSA.VerifySignature(Byte[], Byte[], DSASignatureFormat)"] = DsaVerifyFormatSwallowsTokenErrors,
-        ["DSA.VerifySignature(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, DSASignatureFormat)"] = DsaVerifyFormatSwallowsTokenErrors,
-        ["DSA.VerifySignatureCore(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, DSASignatureFormat)"] = DsaVerifyFormatSwallowsTokenErrors,
         ["SymmetricAlgorithm.DecryptCfb(Byte[], Byte[], PaddingMode, Int32)"] = AesCfbPartialSegment,
         ["SymmetricAlgorithm.DecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, PaddingMode, Int32)"] = AesCfbPartialSegment,
         ["SymmetricAlgorithm.DecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, Int32)"] = AesCfbPartialSegment,
