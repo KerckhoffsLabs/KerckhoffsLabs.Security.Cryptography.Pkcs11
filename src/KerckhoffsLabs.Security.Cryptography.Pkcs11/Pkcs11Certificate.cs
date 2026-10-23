@@ -54,8 +54,9 @@ public sealed class Pkcs11Certificate : IDisposable
     /// </summary>
     /// <remarks>
     /// Named like <c>X509Certificate2.GetRSAPrivateKey()</c>, which likewise returns <see langword="null"/>
-    /// when there is no private key. BCL-shaped convenience wrappers <c>GetRSAPrivateKey()</c> /
-    /// <c>GetECDsaPrivateKey()</c> (mirroring <c>X509Certificate2</c>) live in the
+    /// when there is no private key. BCL-shaped convenience wrappers <c>GetRSAPrivateKey()</c>,
+    /// <c>GetECDsaPrivateKey()</c> and the other private-key getters (mirroring <c>X509Certificate2</c> and its
+    /// certificate extensions) live in the
     /// <c>KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms</c> namespace as extension methods.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>

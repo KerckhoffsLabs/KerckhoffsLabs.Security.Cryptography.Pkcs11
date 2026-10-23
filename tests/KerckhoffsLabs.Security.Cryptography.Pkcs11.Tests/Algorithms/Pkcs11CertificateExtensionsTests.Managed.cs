@@ -2,9 +2,15 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
+
+// GetDSAPrivateKey is [Obsolete] (DSA is disallowed by FIPS 186-5); calling it here is deliberate.
+#pragma warning disable KLPKCS11006
+// The ML-DSA, ML-KEM and SLH-DSA certificate getters are evaluation-only APIs, as in the BCL (SYSLIB5006).
+#pragma warning disable SYSLIB5006
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -120,11 +126,115 @@ public sealed class Pkcs11CertificateExtensions_Managed
     {
         Pkcs11Certificate certificate = null!;
 
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetRSAPrivateKey()).ParamName);
-        Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => certificate.GetECDsaPrivateKey()).ParamName);
+        Assert.All(Pkcs11CertificateExtensionsTestCases.Getters, getter =>
+            Assert.Equal("certificate", Assert.Throws<ArgumentNullException>(() => getter.Get(certificate)).ParamName));
+    }
+
+    // === The other getters, shared with the real backends =================
+
+    [Fact]
+    public void GetDSAPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetDSAPrivateKey_SignsForTheCertificate);
+
+    [Fact]
+    public void GetDSAPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetDSAPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
+
+    [Fact]
+    public void GetECDiffieHellmanPrivateKey_AgreesWithTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetECDiffieHellmanPrivateKey_AgreesWithTheCertificate);
+
+    [Fact]
+    public void GetECDiffieHellmanPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetECDiffieHellmanPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
+
+    [Fact]
+    public void EcGetters_FollowTheKeyUsage() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_FollowTheKeyUsage);
+
+    [Fact]
+    public void EcGetters_RefuseAKeyOfAnotherType() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseAKeyOfAnotherType);
+
+    [Fact]
+    public void EcGetters_RefuseAKeyOnAnotherCurve() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseAKeyOnAnotherCurve);
+
+    [Fact]
+    public void EcGetters_RefuseExplicitCurveParameters() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_EcGetters_RefuseExplicitCurveParameters);
+
+    [Fact]
+    public void GetMLDsaPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_SignsForTheCertificate);
+
+    [Fact]
+    public void GetMLDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
+
+    [Fact]
+    public void GetMLDsaPrivateKey_RefusesAKeyOfAnotherParameterSet() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLDsaPrivateKey_RefusesAKeyOfAnotherParameterSet);
+
+    [Fact]
+    public void GetMLKemPrivateKey_DecapsulatesForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLKemPrivateKey_DecapsulatesForTheCertificate);
+
+    [Fact]
+    public void GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
+
+    [Fact]
+    public void GetSlhDsaPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_SignsForTheCertificate);
+
+    [Fact]
+    public void GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
+
+    // === Pairing checks no token object reaches =========================
+
+    private static readonly PublicKey NamedP256 = NewNamedP256();
+
+    private static PublicKey NewNamedP256()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        return new PublicKey(ecdsa);
+    }
+
+    [Fact]
+    public void IsKeyFor_RefusesAnEcKey_WhoseCurveCannotBeRead()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_EC, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+        Assert.False(Pkcs11CertificateExtensions.IsKeyFor(key, CKK.CKK_EC, NamedP256));
+    }
+
+    [Fact]
+    public void IsKeyFor_RefusesAnEcKey_WithExplicitCurveParameters()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_EC, _ => (CKR.CKR_OK, (byte[])[0x30, 0x00]));
+        Assert.False(Pkcs11CertificateExtensions.IsKeyFor(key, CKK.CKK_EC, NamedP256));
+    }
+
+    [Fact]
+    public void IsKeyFor_RefusesAnEcCertificate_WithoutCurveParameters()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_EC, _ => (CKR.CKR_OK, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()));
+        var withoutParameters = new PublicKey(NamedP256.Oid, null, NamedP256.EncodedKeyValue);
+
+        Assert.True(Pkcs11CertificateExtensions.IsKeyFor(key, CKK.CKK_EC, NamedP256));
+        Assert.False(Pkcs11CertificateExtensions.IsKeyFor(key, CKK.CKK_EC, withoutParameters));
+    }
+
+    private static readonly PublicKey MlDsa65 = new(new Oid("2.16.840.1.101.3.4.3.18"), null, new AsnEncodedData([0x00]));
+
+    [Fact]
+    public void IsKeyFor_RefusesAPostQuantumKey_WhoseParameterSetCannotBeRead()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+        Assert.False(Pkcs11CertificateExtensions.IsKeyFor(key, CKK.CKK_ML_DSA, MlDsa65));
+    }
+
+    [Fact]
+    public void IsKeyFor_RefusesAPostQuantumKey_OfAnUnknownParameterSet()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_OK, BitConverter.GetBytes((ulong)0xFF)[..UnmanagedMemory.NativeULongSize]));
+        Assert.False(Pkcs11CertificateExtensions.IsKeyFor(key, CKK.CKK_ML_DSA, MlDsa65));
     }
 
     // === Helpers =========================================================
+
+    // The managed token implements every mechanism the shared cases use and advertises no list to probe;
+    // the ML-DSA, ML-KEM and SLH-DSA cases still skip where the BCL lacks them.
+    private static bool AllMechanisms(CKM mechanism) => true;
+
+    private static void WithSession(Action<Pkcs11Session, Func<CKM, bool>> body) =>
+        WithSession(session => body(session, AllMechanisms));
 
     private static void WithSession(Action<Pkcs11Session> body)
     {
