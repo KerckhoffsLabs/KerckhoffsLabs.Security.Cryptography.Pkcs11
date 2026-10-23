@@ -26,6 +26,14 @@ public sealed class AesPkcs11Tests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Cfb_NonNonePadding_Throws() => AesPkcs11TestCases.Assert_Cfb_NonNonePadding_Throws(_backend);
 
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData(8)]
+    [InlineData(128)]
+    public void Cfb_OneShots_MatchBclAtEveryLength(int feedbackSizeInBits) => AesPkcs11TestCases.Assert_Cfb_OneShots_MatchBclAtEveryLength(_backend, feedbackSizeInBits);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void Cfb128_PartialSegment_ThrowsLikeBcl() => AesPkcs11TestCases.Assert_Cfb128_PartialSegment_ThrowsLikeBcl(_backend);
+
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void EncryptCbc_UnsupportedPadding_Throws() => AesPkcs11TestCases.Assert_EncryptCbc_UnsupportedPadding_Throws(_backend);
 

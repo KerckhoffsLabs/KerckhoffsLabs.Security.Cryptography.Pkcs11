@@ -130,6 +130,87 @@ internal static class AesPkcs11TestCases
             Assert.Throws<NotSupportedException>(
                 () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.PKCS7, feedbackSizeInBits: 128)));
 
+    // The eight CFB one-shots without padding, each returning what it wrote. Four of them (the Try pair and
+    // the destination pair) and both array DecryptCfb overloads leave the length check to the Core.
+    private static readonly (string Name, Func<SymmetricAlgorithm, byte[], int, byte[]> Run)[] CfbOneShots =
+    [
+        ("EncryptCfb(byte[])", (alg, input, bits) => alg.EncryptCfb(input, Iv16, PaddingMode.None, bits)),
+        ("EncryptCfb(ReadOnlySpan)", (alg, input, bits) => alg.EncryptCfb((ReadOnlySpan<byte>)input, Iv16, PaddingMode.None, bits)),
+        ("EncryptCfb(destination)", (alg, input, bits) =>
+        {
+            byte[] destination = new byte[input.Length];
+            return destination[..alg.EncryptCfb(input, Iv16, destination, PaddingMode.None, bits)];
+        }),
+        ("TryEncryptCfb", (alg, input, bits) =>
+        {
+            byte[] destination = new byte[input.Length];
+            Assert.True(alg.TryEncryptCfb(input, Iv16, destination, out int written, PaddingMode.None, bits));
+            return destination[..written];
+        }),
+        ("DecryptCfb(byte[])", (alg, input, bits) => alg.DecryptCfb(input, Iv16, PaddingMode.None, bits)),
+        ("DecryptCfb(ReadOnlySpan)", (alg, input, bits) => alg.DecryptCfb((ReadOnlySpan<byte>)input, Iv16, PaddingMode.None, bits)),
+        ("DecryptCfb(destination)", (alg, input, bits) =>
+        {
+            byte[] destination = new byte[input.Length];
+            return destination[..alg.DecryptCfb(input, Iv16, destination, PaddingMode.None, bits)];
+        }),
+        ("TryDecryptCfb", (alg, input, bits) =>
+        {
+            byte[] destination = new byte[input.Length];
+            Assert.True(alg.TryDecryptCfb(input, Iv16, destination, out int written, PaddingMode.None, bits));
+            return destination[..written];
+        }),
+    ];
+
+    // The output in hex, or what a one-shot refuses its input with: an ArgumentException from the base's
+    // checks, or a CryptographicException (Pkcs11Exception among them) from the Core or the token. Anything
+    // else is a failure of the case itself, and propagates.
+    private static string CfbOutcome(Func<byte[]> run)
+    {
+        try { return Convert.ToHexString(run()); }
+        catch (Exception ex) when (ex is ArgumentException or CryptographicException)
+        {
+            return $"{ex.GetType().Name} (ParamName {(ex as ArgumentException)?.ParamName})";
+        }
+    }
+
+    // Runs every CFB one-shot on the adapter and on the BCL for each input length and asserts the same
+    // output, or the same exception type and ParamName. The caller permits CFB under the session's policy.
+    internal static void AssertCfbOneShotsMatchBcl(AesPkcs11 aes, int feedbackSizeInBits, params int[] lengths)
+    {
+        using var bcl = BclAes();
+        string[] mismatches =
+        [
+            .. from length in lengths
+               let input = Enumerable.Range(1, length).Select(i => (byte)i).ToArray()
+               from oneShot in CfbOneShots
+               let expected = CfbOutcome(() => oneShot.Run(bcl, input, feedbackSizeInBits))
+               let actual = CfbOutcome(() => oneShot.Run(aes, input, feedbackSizeInBits))
+               where expected != actual
+               select $"{oneShot.Name}, CFB{feedbackSizeInBits}, {length} bytes: BCL {expected}, AesPkcs11 {actual}",
+        ];
+        Assert.True(mismatches.Length == 0, string.Join("\n", mismatches));
+    }
+
+    internal static void Assert_Cfb_OneShots_MatchBclAtEveryLength(IPkcs11Backend backend, int feedbackSizeInBits)
+    {
+        backend.RequireMechanisms(feedbackSizeInBits == 8 ? CKM.CKM_AES_CFB8 : CKM.CKM_AES_CFB128);
+        WithImportedAes(backend, (session, aes) =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            AssertCfbOneShotsMatchBcl(aes, feedbackSizeInBits, 0, 1, 15, 16, 17, 32);
+        });
+    }
+
+    // Unpadded CFB128 input that is not a whole number of 16-byte segments is refused before the token, so
+    // this runs on a token without CFB too.
+    internal static void Assert_Cfb128_PartialSegment_ThrowsLikeBcl(IPkcs11Backend backend) =>
+        WithImportedAes(backend, (session, aes) =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            AssertCfbOneShotsMatchBcl(aes, 128, 1, 15, 17, 31);
+        });
+
     internal static void Assert_EncryptCbc_UnsupportedPadding_Throws(IPkcs11Backend backend) =>
         WithImportedAes(backend, (_, aes) =>
             Assert.Throws<NotSupportedException>(() => aes.EncryptCbc(new byte[16], Iv16, PaddingMode.Zeros)));

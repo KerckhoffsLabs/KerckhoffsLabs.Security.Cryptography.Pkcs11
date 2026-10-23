@@ -8,7 +8,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 // Symmetric family: single-part C_EncryptInit/C_Encrypt (+ Decrypt) over the BCL — block ciphers
-// (AES/DES/3DES/RC2, CBC/ECB) and AEAD (AES-GCM/CCM, ChaCha20-Poly1305). Because the token implements
+// (AES/DES/3DES/RC2, CBC/ECB; AES CFB8/CFB128) and AEAD (AES-GCM/CCM, ChaCha20-Poly1305). Because the token implements
 // no message-API function, the AEAD adapters take their v2.40 single-part path where the output
 // is ciphertext ‖ tag — which is exactly what this produces/consumes.
 internal sealed partial class ManagedSoftToken
@@ -30,6 +30,11 @@ internal sealed partial class ManagedSoftToken
 
     /// <summary>Number of times <c>C_EncryptInit</c> has been invoked. Lets tests prove a path never reached the token.</summary>
     public int EncryptInitCallCount { get; private set; }
+
+    /// <summary>The output length a successful single-part CFB <c>C_Encrypt</c> / <c>C_Decrypt</c> reports,
+    /// from the caller's buffer size and the output's length; null reports the output's length. Lets tests
+    /// act as a token that leaves the length as the caller passed it (opencryptoki does).</summary>
+    public Func<int, int, int>? ReportedCfbLength { get; set; }
 
     protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         => IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
@@ -129,7 +134,9 @@ internal sealed partial class ManagedSoftToken
         if (output.Length < result.Length) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
         result.AsSpan(0, result.Length).CopyTo(output);
-        outputLen = (NativeCULong)(ulong)result.Length;
+        outputLen = (NativeCULong)(ulong)(op.Mechanism is (ulong)CKM.CKM_AES_CFB8 or (ulong)CKM.CKM_AES_CFB128 && ReportedCfbLength is { } report
+            ? report(output.Length, result.Length)
+            : result.Length);
         _ops.Remove(session); // single-shot operation complete
         return CKR.CKR_OK;
     }
@@ -137,7 +144,7 @@ internal sealed partial class ManagedSoftToken
     private static byte[]? ReadPtr(IntPtr ptr, int len)
         => ptr != IntPtr.Zero && len > 0 ? UnmanagedMemory.Read(ptr, len) : null;
 
-    // === Block ciphers (AES/DES/3DES/RC2 CBC/ECB) ========================
+    // === Block ciphers (AES/DES/3DES/RC2 CBC/ECB, AES CFB) ===============
 
     private static byte[] BlockTransform(SymOp op, byte[] data, bool encrypt)
     {
@@ -149,6 +156,8 @@ internal sealed partial class ManagedSoftToken
             aes.Key = op.Key;
             return encrypt ? aes.EncryptKeyWrapPadded(data) : aes.DecryptKeyWrapPadded(data);
         }
+        if (mech is CKM.CKM_AES_CFB8 or CKM.CKM_AES_CFB128)
+            return CfbTransform(op, data, encrypt, mech == CKM.CKM_AES_CFB8 ? 8 : 128);
         using SymmetricAlgorithm alg = CreateBlockCipher(mech);
         var (mode, padding) = MapBlockMode(mech);
         alg.Key = op.Key;
@@ -161,6 +170,23 @@ internal sealed partial class ManagedSoftToken
 
         using ICryptoTransform t = encrypt ? alg.CreateEncryptor() : alg.CreateDecryptor();
         return t.TransformFinalBlock(data, 0, data.Length);
+    }
+
+    // PKCS#11 CFB takes any length, where the BCL's one-shot takes whole feedback-size segments: a partial
+    // final CFB128 segment is zero-filled to a whole one and the output cut back to the input's length. Each
+    // output byte depends only on the input before it and the byte itself, so the fill changes nothing kept.
+    private static byte[] CfbTransform(SymOp op, byte[] data, bool encrypt, int feedbackSizeInBits)
+    {
+        using var aes = Aes.Create();
+        aes.Key = op.Key;
+        byte[] iv = op.Iv ?? throw new CryptographicException("CFB requires an IV.");
+        int segment = feedbackSizeInBits / 8;
+        byte[] whole = new byte[(data.Length + segment - 1) / segment * segment];
+        data.CopyTo(whole, 0);
+        byte[] result = encrypt
+            ? aes.EncryptCfb(whole, iv, PaddingMode.None, feedbackSizeInBits)
+            : aes.DecryptCfb(whole, iv, PaddingMode.None, feedbackSizeInBits);
+        return result[..data.Length];
     }
 
     private static SymmetricAlgorithm CreateBlockCipher(CKM mech) => mech switch

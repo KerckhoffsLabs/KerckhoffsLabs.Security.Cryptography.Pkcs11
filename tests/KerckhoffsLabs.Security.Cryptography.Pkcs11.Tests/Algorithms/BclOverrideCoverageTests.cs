@@ -98,7 +98,7 @@ public sealed class BclOverrideCoverageTests
     private const string BlockThroughCore =
         "Checks the padding mode and IV size, then ends in the ECB or CBC TryEncrypt or TryDecrypt Core override, which runs the operation on the token under the session's policy and returns false with bytesWritten 0 when the result does not fit.";
     private const string CfbThroughCore =
-        "Checks the padding mode, IV, feedback size and input length, then ends in the CFB Core, which AesPkcs11 overrides to run CKM_AES_CFB8 or CKM_AES_CFB128 on the token and the other adapters inherit to throw NotSupportedException.";
+        "Checks the padding mode, IV and feedback size, and the array-returning EncryptCfb the input length, then ends in the CFB Core, which AesPkcs11 overrides to refuse unpadded input that is not a whole number of feedback-size segments, with the BCL's CryptographicException, and run CKM_AES_CFB8 or CKM_AES_CFB128 on the token, and the other adapters inherit to throw NotSupportedException.";
     private const string KeyWrapThroughCore =
         "Checks the lengths and that the buffers do not overlap, then ends in EncryptKeyWrapPaddedCore or DecryptKeyWrapPaddedCore, which the adapter overrides to run on the token.";
     private const string LengthArithmetic =
@@ -617,6 +617,9 @@ public sealed class BclOverrideCoverageTests
         ["SymmetricAlgorithm.DecryptCbc(Byte[], Byte[], PaddingMode)"] = BlockThroughCore,
         ["SymmetricAlgorithm.DecryptCbc(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, PaddingMode)"] = BlockThroughCore,
         ["SymmetricAlgorithm.DecryptCbc(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode)"] = BlockThroughCore,
+        ["SymmetricAlgorithm.DecryptCfb(Byte[], Byte[], PaddingMode, Int32)"] = CfbThroughCore,
+        ["SymmetricAlgorithm.DecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, PaddingMode, Int32)"] = CfbThroughCore,
+        ["SymmetricAlgorithm.DecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, Int32)"] = CfbThroughCore,
         ["SymmetricAlgorithm.DecryptEcb(Byte[], PaddingMode)"] = BlockThroughCore,
         ["SymmetricAlgorithm.DecryptEcb(ReadOnlySpan<Byte>, PaddingMode)"] = BlockThroughCore,
         ["SymmetricAlgorithm.DecryptEcb(ReadOnlySpan<Byte>, Span<Byte>, PaddingMode)"] = BlockThroughCore,
@@ -627,6 +630,7 @@ public sealed class BclOverrideCoverageTests
         ["SymmetricAlgorithm.EncryptCbc(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode)"] = BlockThroughCore,
         ["SymmetricAlgorithm.EncryptCfb(Byte[], Byte[], PaddingMode, Int32)"] = CfbThroughCore,
         ["SymmetricAlgorithm.EncryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, PaddingMode, Int32)"] = CfbThroughCore,
+        ["SymmetricAlgorithm.EncryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, Int32)"] = CfbThroughCore,
         ["SymmetricAlgorithm.EncryptEcb(Byte[], PaddingMode)"] = BlockThroughCore,
         ["SymmetricAlgorithm.EncryptEcb(ReadOnlySpan<Byte>, PaddingMode)"] = BlockThroughCore,
         ["SymmetricAlgorithm.EncryptEcb(ReadOnlySpan<Byte>, Span<Byte>, PaddingMode)"] = BlockThroughCore,
@@ -636,9 +640,11 @@ public sealed class BclOverrideCoverageTests
         ["SymmetricAlgorithm.SetKey(ReadOnlySpan<Byte>)"] = NoRawKey,
         ["SymmetricAlgorithm.SetKeyCore(ReadOnlySpan<Byte>)"] = NoRawKey,
         ["SymmetricAlgorithm.TryDecryptCbc(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, out Int32, PaddingMode)"] = BlockThroughCore,
+        ["SymmetricAlgorithm.TryDecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, out Int32, PaddingMode, Int32)"] = CfbThroughCore,
         ["SymmetricAlgorithm.TryDecryptCfbCore(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, Int32, out Int32)"] = NoCfb,
         ["SymmetricAlgorithm.TryDecryptEcb(ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, out Int32)"] = BlockThroughCore,
         ["SymmetricAlgorithm.TryEncryptCbc(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, out Int32, PaddingMode)"] = BlockThroughCore,
+        ["SymmetricAlgorithm.TryEncryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, out Int32, PaddingMode, Int32)"] = CfbThroughCore,
         ["SymmetricAlgorithm.TryEncryptCfbCore(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, Int32, out Int32)"] = NoCfb,
         ["SymmetricAlgorithm.TryEncryptEcb(ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, out Int32)"] = BlockThroughCore,
         ["SymmetricAlgorithm.ValidKeySize(Int32)"] = KeySizePinned,
@@ -665,8 +671,6 @@ public sealed class BclOverrideCoverageTests
 
     // A member whose base implementation is wrong for its adapter is listed here with what goes wrong, until it
     // is fixed.
-    private const string AesCfbPartialSegment =
-        "AesPkcs11's CFB Core passes PaddingMode.None input that is not a whole number of feedback-size segments to CKM_AES_CFB128, which accepts it, where the BCL throws CryptographicException; the base leaves that check to the Core.";
     private const string UnwrapLeftInPool =
         "Unwraps into a buffer rented from ArrayPool<byte>.Shared and returns it without zeroing it, so the unwrapped key stays in the shared pool; the BCL does this for every Aes and the method is not virtual. The overloads that write to the caller's destination leave nothing behind.";
 
@@ -674,12 +678,6 @@ public sealed class BclOverrideCoverageTests
     {
         ["Aes.DecryptKeyWrapPadded(Byte[])"] = UnwrapLeftInPool,
         ["Aes.DecryptKeyWrapPadded(ReadOnlySpan<Byte>)"] = UnwrapLeftInPool,
-        ["SymmetricAlgorithm.DecryptCfb(Byte[], Byte[], PaddingMode, Int32)"] = AesCfbPartialSegment,
-        ["SymmetricAlgorithm.DecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, PaddingMode, Int32)"] = AesCfbPartialSegment,
-        ["SymmetricAlgorithm.DecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, Int32)"] = AesCfbPartialSegment,
-        ["SymmetricAlgorithm.EncryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, PaddingMode, Int32)"] = AesCfbPartialSegment,
-        ["SymmetricAlgorithm.TryDecryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, out Int32, PaddingMode, Int32)"] = AesCfbPartialSegment,
-        ["SymmetricAlgorithm.TryEncryptCfb(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, out Int32, PaddingMode, Int32)"] = AesCfbPartialSegment,
     };
 
     [Theory]
