@@ -124,6 +124,90 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
             Assert.Throws<ObjectDisposedException>(() => kdf.DeriveKey(Label, Context, 16));
         });
 
+    // === Char label and context overloads (encoded as UTF-8, as the BCL does) =======================
+
+    // 2-, 3- and 4-byte UTF-8 sequences, so a wrong encoding shows, and a string long enough to take
+    // the pooled-buffer path instead of the stack buffer.
+    private const string CharLabel = "kdf-label-\u00e9\u20ac\U0001F600";
+    private static readonly string LongCharContext = new('\u00e7', 200);
+    private const string LoneSurrogate = "kdf-\uD800";
+
+    // The argument cases throw before any token call, so they run on every backend.
+    internal static void Assert_DeriveKey_CharOverloads_ArgumentErrors_MatchBcl(IPkcs11Backend backend) =>
+        WithImportedKdf(backend, (_, kdf) => AssertCharOverloadArgumentErrorsMatchBcl(kdf));
+
+    internal static void Assert_DeriveKey_CharOverloads_MatchBcl(IPkcs11Backend backend) =>
+        WithImportedKdf(backend, (_, kdf) =>
+        {
+            backend.RequireMechanism(CKM.CKM_SP800_108_COUNTER_KDF);
+            AssertCharOverloadsMatchBcl(kdf);
+        });
+
+    // The bodies of the two cases above, for the managed-token tests that build their own KDF. The KDF
+    // must be HMAC-SHA256 over KeyBytes.
+    internal static void AssertCharOverloadsMatchBcl(SP800108HmacCounterKdfPkcs11 kdf)
+    {
+        const int length = 40; // spans two HMAC-SHA256 PRF blocks (32 bytes each)
+        using var bcl = new SP800108HmacCounterKdf(KeyBytes, HashAlgorithmName.SHA256);
+        (string Label, string Context)[] inputs =
+            [
+                (CharLabel, "kdf-context"), (CharLabel, LongCharContext), (LongCharContext, CharLabel),
+                ("", "kdf-context"), (CharLabel, ""), ("", ""),
+            ];
+        foreach (var (label, context) in inputs)
+        {
+            byte[] expected = bcl.DeriveKey(label, context, length);
+            Assert.Equal(expected, kdf.DeriveKey(Encoding.UTF8.GetBytes(label), Encoding.UTF8.GetBytes(context), length));
+
+            Assert.Equal(expected, kdf.DeriveKey(label, context, length));
+            Assert.Equal(expected, kdf.DeriveKey(label.AsSpan(), context.AsSpan(), length));
+            byte[] destination = new byte[length];
+            kdf.DeriveKey(label.AsSpan(), context.AsSpan(), destination);
+            Assert.Equal(expected, destination);
+        }
+    }
+
+    internal static void AssertCharOverloadArgumentErrorsMatchBcl(SP800108HmacCounterKdfPkcs11 kdf)
+    {
+        using var bcl = new SP800108HmacCounterKdf(KeyBytes, HashAlgorithmName.SHA256);
+        const string ok = "kdf";
+
+        AssertSameFailureAsBcl(() => bcl.DeriveKey((string)null!, ok, 16), () => kdf.DeriveKey((string)null!, ok, 16));
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(ok, (string)null!, 16), () => kdf.DeriveKey(ok, (string)null!, 16));
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(ok, ok, -1), () => kdf.DeriveKey(ok, ok, -1));
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(ok.AsSpan(), ok.AsSpan(), -1), () => kdf.DeriveKey(ok.AsSpan(), ok.AsSpan(), -1));
+
+        // An unpaired surrogate is refused, not replaced with U+FFFD, in the label or the context.
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(LoneSurrogate, ok, 16), () => kdf.DeriveKey(LoneSurrogate, ok, 16));
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(ok, LoneSurrogate, 16), () => kdf.DeriveKey(ok, LoneSurrogate, 16));
+        AssertSameFailureAsBcl(
+            () => bcl.DeriveKey(LoneSurrogate.AsSpan(), ok.AsSpan(), 16), () => kdf.DeriveKey(LoneSurrogate.AsSpan(), ok.AsSpan(), 16));
+        AssertSameFailureAsBcl(
+            () => bcl.DeriveKey(ok.AsSpan(), LoneSurrogate.AsSpan(), new byte[16]), () => kdf.DeriveKey(ok.AsSpan(), LoneSurrogate.AsSpan(), new byte[16]));
+        Assert.Throws<EncoderFallbackException>(() => kdf.DeriveKey(LoneSurrogate, ok, 16));
+
+        // Validation order: null, then length, then the text.
+        AssertSameFailureAsBcl(() => bcl.DeriveKey((string)null!, LoneSurrogate, -1), () => kdf.DeriveKey((string)null!, LoneSurrogate, -1));
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(LoneSurrogate, ok, -1), () => kdf.DeriveKey(LoneSurrogate, ok, -1));
+
+        // Zero length is a no-op (no token call), as for the byte overloads.
+        Assert.Empty(kdf.DeriveKey(ok, ok, 0));
+        kdf.DeriveKey(ok.AsSpan(), ok.AsSpan(), Span<byte>.Empty);
+
+        bcl.Dispose();
+        kdf.Dispose();
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(ok, ok, 16), () => kdf.DeriveKey(ok, ok, 16));
+        AssertSameFailureAsBcl(() => bcl.DeriveKey(ok.AsSpan(), ok.AsSpan(), new byte[16]), () => kdf.DeriveKey(ok.AsSpan(), ok.AsSpan(), new byte[16]));
+    }
+
+    private static void AssertSameFailureAsBcl(Action bcl, Action adapter)
+    {
+        Exception expected = Assert.ThrowsAny<Exception>(bcl);
+        Exception actual = Assert.ThrowsAny<Exception>(adapter);
+        Assert.Equal(expected.GetType(), actual.GetType());
+        Assert.Equal((expected as ArgumentException)?.ParamName, (actual as ArgumentException)?.ParamName);
+    }
+
     // === Known-answer derivations (require token SP800-108 support) =================================
 
     internal static void Assert_DeriveKey_MatchesBcl(IPkcs11Backend backend) =>

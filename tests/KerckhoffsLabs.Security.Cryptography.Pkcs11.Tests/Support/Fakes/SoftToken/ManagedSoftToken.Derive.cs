@@ -71,13 +71,16 @@ internal sealed partial class ManagedSoftToken
     }
 
     // CKM_SP800_108_COUNTER_KDF: the adapter emits the data-param sequence
-    // [0]=counter, [1]=label, [2]=0x00 separator, [3]=context, [4]=[L]. We pull label/context and run
-    // the same NIST counter-mode KDF via the BCL.
+    // counter, label, 0x00 separator, context, [L], leaving out an empty label or context. We take
+    // the byte arrays either side of the separator as label/context and run the same NIST
+    // counter-mode KDF via the BCL.
     //
     // Additional derived keys (PKCS#11 v3.0 §2.42) are not independently re-derived -- they share
     // one continuous derived-key-material stream with the primary key, sliced sequentially in
     // request order. Each sibling's own template supplies its CKA_VALUE_LEN and object attributes;
     // its handle is written into the CK_DERIVED_KEY slot the token would fill.
+    private const ulong SP800108ByteArray = 4; // CK_SP800_108_BYTE_ARRAY
+
     private byte[] DeriveSp800108(byte[] baseKey, ref CK_MECHANISM mech, int valueLen)
     {
         var p = UnmanagedMemory.Read<CK_SP800_108_KDF_PARAMS>(mech.Parameter);
@@ -85,8 +88,15 @@ internal sealed partial class ManagedSoftToken
         int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
         CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(p.DataParams, i * elem));
 
-        byte[] label = n > 1 ? PrfBytes(Param(1)) : [];
-        byte[] context = n > 3 ? PrfBytes(Param(3)) : [];
+        List<byte[]> byteArrays = [];
+        for (int i = 0; i < n; i++)
+        {
+            if ((ulong)Param(i).Type == SP800108ByteArray)
+                byteArrays.Add(PrfBytes(Param(i)));
+        }
+        int separator = byteArrays.FindIndex(static b => b is [0x00]);
+        byte[] label = separator > 0 ? byteArrays[separator - 1] : [];
+        byte[] context = separator >= 0 && separator + 1 < byteArrays.Count ? byteArrays[separator + 1] : [];
         HashAlgorithmName prf = PrfHash((CKM)(ulong)p.PrfType);
 
         int additionalCount = (int)p.AdditionalDerivedKeys;

@@ -30,5 +30,11 @@ public sealed class SP800108HmacCounterKdfPkcs11Tests_OpenCryptoki(OpenCryptokiB
     public void DeriveKey_DestinationSpan_MatchesBcl() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_DestinationSpan_MatchesBcl(_backend);
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void DeriveKey_CharOverloads_ArgumentErrors_MatchBcl() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_CharOverloads_ArgumentErrors_MatchBcl(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void DeriveKey_CharOverloads_MatchBcl() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_CharOverloads_MatchBcl(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void DeriveKey_OnToken_ReturnsNonExtractableKey() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_OnToken_ReturnsNonExtractableKey(_backend);
 }

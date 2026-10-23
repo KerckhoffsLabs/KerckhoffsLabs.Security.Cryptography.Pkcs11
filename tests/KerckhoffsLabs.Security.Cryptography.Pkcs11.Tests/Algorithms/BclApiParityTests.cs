@@ -72,8 +72,6 @@ public sealed class BclApiParityTests
     private const string CcmTagSizePerCall =
         "AesCcm takes the tag size from each call's tag; AesCcmPkcs11's only constructor fixes it, and refuses a tag of " +
         "another legal size.";
-    private const string KdfCharOverloads =
-        "The string and ReadOnlySpan<char> label and context overloads, which the BCL encodes as UTF-8, are missing.";
     private const string KdfStaticKeyBytes = "Takes the key as bytes; derive through an instance over the token key.";
     private const string Pbkdf2Session = "Takes the session that runs PBKDF2 (CKM_PKCS5_PBKD2) as its first argument.";
     private const string ObsoleteDefaults =
@@ -155,9 +153,9 @@ public sealed class BclApiParityTests
             ["Byte[] DeriveKey(Byte[], Byte[], Int32)"] = Same("Byte[] DeriveKey(Byte[], Byte[], Int32)"),
             ["Byte[] DeriveKey(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Int32)"] = Same("Byte[] DeriveKey(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Int32)"),
             ["Void DeriveKey(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>)"] = Same("Void DeriveKey(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>)"),
-            ["Byte[] DeriveKey(String, String, Int32)"] = new Gap(KdfCharOverloads),
-            ["Byte[] DeriveKey(ReadOnlySpan<Char>, ReadOnlySpan<Char>, Int32)"] = new Gap(KdfCharOverloads),
-            ["Void DeriveKey(ReadOnlySpan<Char>, ReadOnlySpan<Char>, Span<Byte>)"] = new Gap(KdfCharOverloads),
+            ["Byte[] DeriveKey(String, String, Int32)"] = Same("Byte[] DeriveKey(String, String, Int32)"),
+            ["Byte[] DeriveKey(ReadOnlySpan<Char>, ReadOnlySpan<Char>, Int32)"] = Same("Byte[] DeriveKey(ReadOnlySpan<Char>, ReadOnlySpan<Char>, Int32)"),
+            ["Void DeriveKey(ReadOnlySpan<Char>, ReadOnlySpan<Char>, Span<Byte>)"] = Same("Void DeriveKey(ReadOnlySpan<Char>, ReadOnlySpan<Char>, Span<Byte>)"),
             ["Void Dispose()"] = Same("Void Dispose()"),
             ["static Byte[] DeriveBytes(Byte[], HashAlgorithmName, Byte[], Byte[], Int32)"] = new Deviation(KdfStaticKeyBytes),
             ["static Byte[] DeriveBytes(Byte[], HashAlgorithmName, String, String, Int32)"] = new Deviation(KdfStaticKeyBytes),

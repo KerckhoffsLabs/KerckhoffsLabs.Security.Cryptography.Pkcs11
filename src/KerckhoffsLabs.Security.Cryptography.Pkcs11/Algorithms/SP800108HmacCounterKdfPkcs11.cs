@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
@@ -43,6 +45,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </remarks>
 public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 {
+    // Char labels and contexts are encoded as the BCL encodes them: strict UTF-8, so a lone surrogate
+    // throws EncoderFallbackException instead of deriving from U+FFFD, in a stack buffer up to this size.
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private const int CharToBytesStackBufferSize = 256;
+
     private readonly Pkcs11Key _key;
     private readonly CKM _prf;
     private bool _disposed;
@@ -137,6 +144,62 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     }
 
     /// <summary>
+    /// Derives <paramref name="derivedKeyLengthInBytes"/> bytes of keying material, with
+    /// <paramref name="label"/> and <paramref name="context"/> encoded as UTF-8. Mirrors
+    /// <see cref="SP800108HmacCounterKdf.DeriveKey(ReadOnlySpan{char}, ReadOnlySpan{char}, int)"/>.
+    /// </summary>
+    /// <remarks>For another encoding, encode the label and context yourself and call an overload that takes bytes.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
+    /// <exception cref="EncoderFallbackException">Thrown if <paramref name="label"/> or <paramref name="context"/> contains text that cannot be converted to UTF-8 (an unpaired surrogate).</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    public byte[] DeriveKey(ReadOnlySpan<char> label, ReadOnlySpan<char> context, int derivedKeyLengthInBytes)
+    {
+        // The length is checked before the text is encoded, as the BCL does.
+        ArgumentOutOfRangeException.ThrowIfNegative(derivedKeyLengthInBytes);
+        using var labelData = new Utf8Text(label, stackalloc byte[CharToBytesStackBufferSize]);
+        using var contextData = new Utf8Text(context, stackalloc byte[CharToBytesStackBufferSize]);
+        return DeriveKey(labelData.Bytes, contextData.Bytes, derivedKeyLengthInBytes);
+    }
+
+    /// <summary>
+    /// Derives keying material into <paramref name="destination"/>, with <paramref name="label"/> and
+    /// <paramref name="context"/> encoded as UTF-8. Mirrors
+    /// <see cref="SP800108HmacCounterKdf.DeriveKey(ReadOnlySpan{char}, ReadOnlySpan{char}, Span{byte})"/>.
+    /// </summary>
+    /// <remarks>For another encoding, encode the label and context yourself and call an overload that takes bytes.</remarks>
+    /// <exception cref="EncoderFallbackException">Thrown if <paramref name="label"/> or <paramref name="context"/> contains text that cannot be converted to UTF-8 (an unpaired surrogate).</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    public void DeriveKey(ReadOnlySpan<char> label, ReadOnlySpan<char> context, Span<byte> destination)
+    {
+        using var labelData = new Utf8Text(label, stackalloc byte[CharToBytesStackBufferSize]);
+        using var contextData = new Utf8Text(context, stackalloc byte[CharToBytesStackBufferSize]);
+        DeriveKey(labelData.Bytes, contextData.Bytes, destination);
+    }
+
+    /// <summary>
+    /// Derives <paramref name="derivedKeyLengthInBytes"/> bytes of keying material, with
+    /// <paramref name="label"/> and <paramref name="context"/> encoded as UTF-8. Mirrors
+    /// <see cref="SP800108HmacCounterKdf.DeriveKey(string, string, int)"/>.
+    /// </summary>
+    /// <remarks>For another encoding, encode the label and context yourself and call an overload that takes bytes.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> or <paramref name="context"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
+    /// <exception cref="EncoderFallbackException">Thrown if <paramref name="label"/> or <paramref name="context"/> contains text that cannot be converted to UTF-8 (an unpaired surrogate).</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    public byte[] DeriveKey(string label, string context, int derivedKeyLengthInBytes)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        ArgumentNullException.ThrowIfNull(context);
+        return DeriveKey(label.AsSpan(), context.AsSpan(), derivedKeyLengthInBytes);
+    }
+
+    /// <summary>
     /// Derives a sub-key that stays on the token (or wherever <paramref name="template"/> places it),
     /// returning its <see cref="Pkcs11Key"/> handle rather than raw bytes. Use this to keep derived
     /// key material non-extractable.
@@ -162,6 +225,31 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     {
         var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
         return DerivedKeyMaterial.DeriveAndRead(_key, new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p), length);
+    }
+
+    // The UTF-8 bytes of a char label or context: in the caller's stack buffer when they fit, otherwise
+    // in an array rented from the shared pool. Dispose zeroes them and returns the array.
+    private readonly ref struct Utf8Text : IDisposable
+    {
+        private readonly byte[]? _rented;
+        private readonly Span<byte> _buffer;
+
+        internal Utf8Text(ReadOnlySpan<char> text, Span<byte> stackBuffer)
+        {
+            int maxLength = StrictUtf8.GetMaxByteCount(text.Length);
+            _rented = maxLength <= stackBuffer.Length ? null : ArrayPool<byte>.Shared.Rent(maxLength);
+            Span<byte> buffer = _rented is null ? stackBuffer : _rented;
+            _buffer = buffer[..StrictUtf8.GetBytes(text, buffer)];
+        }
+
+        internal ReadOnlySpan<byte> Bytes => _buffer;
+
+        public void Dispose()
+        {
+            CryptographicOperations.ZeroMemory(_buffer);
+            if (_rented is not null)
+                ArrayPool<byte>.Shared.Return(_rented);
+        }
     }
 
     /// <summary>
