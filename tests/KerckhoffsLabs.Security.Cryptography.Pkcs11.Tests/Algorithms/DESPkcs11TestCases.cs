@@ -191,6 +191,21 @@ internal static class DESPkcs11TestCases
             Assert.Empty(des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8, PaddingMode.None));
         });
 
+    // A ciphertext whose padding is wrong, or that is not a whole number of blocks, is refused with a
+    // CryptographicException as in the BCL, and the session still decrypts afterwards (see
+    // CbcPaddingTestSupport.BadlyPaddedBlocks for the paddings tried).
+    internal static void Assert_DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_DES_CBC, CKM.CKM_DES_CBC_PAD);
+        WithImportedDes(backend, (session, des) =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            OrSkipIfTokenLacksDes(() => des.EncryptCbc(new byte[8], Iv8));
+            using var bcl = BclDes();
+            CbcPaddingTestSupport.AssertRefusesBadPadding_SessionReusable(des, bcl, Iv8);
+        });
+    }
+
     internal static void Assert_ManagedKeyAndStreamingSurface_NotSupported(IPkcs11Backend backend) =>
         WithImportedDes(backend, (_, des) =>
         {

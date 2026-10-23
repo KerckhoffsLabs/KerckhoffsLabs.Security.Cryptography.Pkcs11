@@ -221,6 +221,21 @@ internal static class TripleDESPkcs11TestCases
             Assert.Empty(des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8, PaddingMode.None));
         });
 
+    // A ciphertext whose padding is wrong, or that is not a whole number of blocks, is refused with a
+    // CryptographicException as in the BCL, and the session still decrypts afterwards (see
+    // CbcPaddingTestSupport.BadlyPaddedBlocks for the paddings tried).
+    internal static void Assert_DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_DES3_CBC, CKM.CKM_DES3_CBC_PAD);
+        WithImportedDes3(backend, (session, des3) =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(new byte[8], Iv8));
+            using var bcl = BclDes3();
+            CbcPaddingTestSupport.AssertRefusesBadPadding_SessionReusable(des3, bcl, Iv8);
+        });
+    }
+
     internal static void Assert_ManagedKeyAndStreamingSurface_NotSupported(IPkcs11Backend backend) =>
         WithImportedDes3(backend, (_, des3) =>
         {

@@ -105,6 +105,16 @@ public sealed class AesPkcs11_Managed
     });
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
+    // The managed token unpads CKM_*_CBC_PAD with the BCL, so it refuses what the BCL refuses; the shared
+    // case pins the same paddings on every real backend.
+    [Fact]
+    public void DecryptCbc_InvalidPaddingOrPartialBlock_Throws_SessionReusable() => WithImportedAes((session, aes) =>
+    {
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var bcl = BclAes();
+        CbcPaddingTestSupport.AssertRefusesBadPadding_SessionReusable(aes, bcl, Iv16);
+    });
+
     [Fact]
     public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedAes((session, aes) =>
     {

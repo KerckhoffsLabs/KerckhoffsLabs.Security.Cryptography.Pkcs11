@@ -1,5 +1,6 @@
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -128,8 +129,15 @@ internal static class WrapUnwrapKeyTestCases
         }
     }
 
-    /// <summary>unwrapping without CKA_SENSITIVE / CKA_EXTRACTABLE must yield a sensitive,
-    /// non-extractable key.</summary>
+    /// <summary>
+    /// Unwrapping without CKA_SENSITIVE / CKA_EXTRACTABLE must yield a sensitive, non-extractable key: the
+    /// flags read back as the library set them, and the token acts on them, refusing to reveal the value or
+    /// wrap it out.
+    /// </summary>
+    /// <remarks>
+    /// openCryptoki accepted the two attributes in an unwrap template from 10f48c5 but overwrote them with
+    /// CKA_SENSITIVE = FALSE and CKA_EXTRACTABLE = TRUE until 2345b3c7, so this case failed there.
+    /// </remarks>
     internal static void Assert_Unwrap_AppliesSecureDefaults(IPkcs11Backend backend, CKM wrapMechanism)
     {
         WithWrappedAesKey(backend, wrapMechanism, (session, kek, wrapped) =>
@@ -149,6 +157,11 @@ internal static class WrapUnwrapKeyTestCases
                     "unwrapped key should default to CKA_SENSITIVE=true");
                 Assert.False(read.First(a => a.Type == CKA.CKA_EXTRACTABLE).GetValueAsBool(),
                     "unwrapped key should default to CKA_EXTRACTABLE=false");
+
+                using var value = session.GetAttributeValue(unwrapped, [CKA.CKA_VALUE]);
+                Assert.True(value[0].CannotBeRead, "a sensitive key's CKA_VALUE must not be readable");
+                var refused = Assert.ThrowsAny<Pkcs11Exception>(() => session.WrapKey(wrapMech, kek, unwrapped));
+                Assert.Equal(CKR.CKR_KEY_UNEXTRACTABLE, refused.ReturnValue);
             }
             finally { session.DestroyObject(unwrapped); }
         });
@@ -156,7 +169,8 @@ internal static class WrapUnwrapKeyTestCases
 
     /// <summary>
     /// An explicit <c>CKA_EXTRACTABLE=true</c> is permitted without opting in, and the resulting key
-    /// really is extractable.
+    /// really is extractable: it wraps again to the bytes it was unwrapped from, every AES key wrap being
+    /// deterministic.
     /// </summary>
     /// <remarks>
     /// It used to be refused. Requiring an "insecure" opt-in to unwrap into a wrappable key described
@@ -180,6 +194,7 @@ internal static class WrapUnwrapKeyTestCases
                 {
                     using var read = session.GetAttributeValue(unwrapped, [CKA.CKA_EXTRACTABLE]);
                     Assert.True(read.First(a => a.Type == CKA.CKA_EXTRACTABLE).GetValueAsBool());
+                    Assert.Equal(wrapped, session.WrapKey(wrapMech, kek, unwrapped));
                 }
                 finally { session.DestroyObject(unwrapped); }
             }
