@@ -128,11 +128,12 @@ const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKF.CKF_WRITE_PROTECTED
 const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKZ.CKZ_DATA_SPECIFIED = 1 -> ulong
 const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKZ.CKZ_SALT_SPECIFIED = 1 -> ulong
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.AesCcmPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.AesCcmPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key, int tagSizeInBytes) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Decrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> ciphertext, System.ReadOnlySpan<byte> tag, System.Span<byte> plaintext, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Dispose() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.Encrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> plaintext, System.Span<byte> ciphertext, System.Span<byte> tag, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.TagSizeInBytes.get -> int
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11.TagSizeInBytes.get -> int?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.AesGcmPkcs11(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key! key, int tagSizeInBytes) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesGcmPkcs11.Decrypt(System.ReadOnlySpan<byte> nonce, System.ReadOnlySpan<byte> ciphertext, System.ReadOnlySpan<byte> tag, System.Span<byte> plaintext, System.ReadOnlySpan<byte> associatedData = default(System.ReadOnlySpan<byte>)) -> void
