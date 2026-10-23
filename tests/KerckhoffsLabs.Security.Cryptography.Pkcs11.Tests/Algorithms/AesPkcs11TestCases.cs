@@ -162,10 +162,16 @@ internal static class AesPkcs11TestCases
         }),
     ];
 
+    // The output in hex, or what a one-shot refuses its input with: an ArgumentException from the base's
+    // checks, or a CryptographicException (Pkcs11Exception among them) from the Core or the token. Anything
+    // else is a failure of the case itself, and propagates.
     private static string CfbOutcome(Func<byte[]> run)
     {
         try { return Convert.ToHexString(run()); }
-        catch (Exception ex) { return $"{ex.GetType().Name} (ParamName {(ex as ArgumentException)?.ParamName})"; }
+        catch (Exception ex) when (ex is ArgumentException or CryptographicException)
+        {
+            return $"{ex.GetType().Name} (ParamName {(ex as ArgumentException)?.ParamName})";
+        }
     }
 
     // Runs every CFB one-shot on the adapter and on the BCL for each input length and asserts the same
