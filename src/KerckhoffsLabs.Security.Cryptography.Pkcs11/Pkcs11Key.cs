@@ -270,23 +270,6 @@ public sealed partial class Pkcs11Key : IDisposable
     }
 
     /// <summary>
-    /// Whether the key has a public-key object on the token, looking up a pending companion first. Lets a
-    /// layer above the handles tell that verification cannot use the token.
-    /// </summary>
-    /// <exception cref="ObjectDisposedException">Thrown if the key or its session has been disposed.</exception>
-    internal bool HasPublicKeyObject
-    {
-        get
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            // Under the session's lease, which refuses a closed session: a caller that goes on to decide
-            // without the token (DSAPkcs11's length check) must not answer on one.
-            using var _ = _session.Core.AcquireExclusive();
-            return !PublicHandle.IsInvalid;
-        }
-    }
-
-    /// <summary>
     /// Searches for the missing half of the pair, once, the first time it is needed.
     /// </summary>
     /// <remarks>

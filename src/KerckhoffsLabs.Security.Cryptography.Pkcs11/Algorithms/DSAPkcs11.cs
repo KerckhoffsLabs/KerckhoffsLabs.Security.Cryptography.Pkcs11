@@ -49,8 +49,8 @@ public sealed class DSAPkcs11 : DSA
 {
     private readonly Pkcs11Key _key;
 
-    // q's length in bytes, read from the token on first use; 0 until then, which no key's q is. Read and
-    // written with Volatile, so a thread racing the first write sees either 0 or the whole length.
+    // q's length in bytes, read from the public-key object on first use; 0 until then, which no key's q is.
+    // Read and written with Volatile, so a thread racing the first write sees either 0 or the whole length.
     private int _subprimeLength;
 
     /// <summary>
@@ -111,8 +111,7 @@ public sealed class DSAPkcs11 : DSA
     /// <inheritdoc/>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> or <paramref name="rgbSignature"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
-    /// <exception cref="Pkcs11AttributeException">Thrown when <c>CKA_SUBPRIME</c> cannot be read to check the signature's length.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no public-key object; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when <c>CKA_SUBPRIME</c> is zero; otherwise propagated from reading it or from the underlying <c>C_Verify</c> call.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no public-key object; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when its q is zero; otherwise propagated from reading the public key, as <see cref="ExportParameters(bool)"/> does, or from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifySignature(byte[] rgbHash, byte[] rgbSignature)
     {
         ArgumentNullException.ThrowIfNull(rgbHash);
@@ -123,13 +122,12 @@ public sealed class DSAPkcs11 : DSA
 
     // Every verification with a DSASignatureFormat ends here. The base class sizes q through
     // ExportParameters(false) inside a catch of CryptographicException, which would turn a token error
-    // (Pkcs11Exception) into false without ever reaching C_Verify; this reads q's length from CKA_SUBPRIME
-    // and lets the token's errors through.
+    // (Pkcs11Exception) into false without ever reaching C_Verify; this reads q the same way and lets the
+    // token's errors through.
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
-    /// <exception cref="Pkcs11AttributeException">Thrown when <c>CKA_SUBPRIME</c> cannot be read to size the signature.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no public-key object; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when <c>CKA_SUBPRIME</c> is zero; otherwise propagated from reading it or from the underlying <c>C_Verify</c> call.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no public-key object; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when its q is zero; otherwise propagated from reading the public key, as <see cref="ExportParameters(bool)"/> does, or from the underlying <c>C_Verify</c> call.</exception>
     protected override bool VerifySignatureCore(
         ReadOnlySpan<byte> hash, ReadOnlySpan<byte> signature, DSASignatureFormat signatureFormat)
     {
@@ -140,9 +138,9 @@ public sealed class DSAPkcs11 : DSA
                 return VerifyIeeeP1363(mech, hash, signature);
             case DSASignatureFormat.Rfc3279DerSequence:
                 // A malformed signature does not verify, as for the BCL's own conversion.
-                EnsureCanVerify(mech);
+                _key.Session.Enforce(new MechanismUseRequest(mech, CryptoOperation.Verify));
                 byte[]? ieee = DerToIeeeP1363(signature, GetSubprimeLength());
-                return ieee is not null && _key.Verify(mech, hash, ieee);
+                return ieee is not null ? _key.Verify(mech, hash, ieee) : DoesNotVerify();
             default:
                 // The public overloads reject an unknown format before reaching here; as DSAOpenSsl.
                 throw new CryptographicException($"Unknown signature format '{signatureFormat}'.");
@@ -151,40 +149,38 @@ public sealed class DSAPkcs11 : DSA
 
     // An r‖s signature is twice q's length, and one of another length does not verify, as for the BCL's own
     // DSA. It is not passed to the token, which may not say so: NSS answers it with CKR_ARGUMENTS_BAD rather
-    // than a verdict, which the session core rightly does not take as one.
+    // than a verdict, which the session core rightly does not take as one. The session's policy is asked
+    // first, as the token path asks it, so a refused mechanism is refused before the token is read.
     private bool VerifyIeeeP1363(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
-        EnsureCanVerify(mechanism);
-        return signature.Length == 2 * GetSubprimeLength() && _key.Verify(mechanism, data, signature);
-    }
-
-    // Before the signature is looked at, the two things that make a verification fail regardless of it. The
-    // session's policy is asked first, as the token path asks it, so a refused mechanism is refused before
-    // the token is read. Then the public-key object: without it the key cannot verify (Pkcs11Key has no
-    // managed DSA fallback), and saying so here keeps a signature's length or encoding from choosing between
-    // that error and false.
-    private void EnsureCanVerify(Mechanism mechanism)
-    {
         _key.Session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
-        if (!_key.HasPublicKeyObject)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "DSAPkcs11 verify (no public-key object)");
+        return signature.Length == 2 * GetSubprimeLength() ? _key.Verify(mechanism, data, signature) : DoesNotVerify();
     }
 
-    // q's length in bytes, as ExportParameters(false) reports it, but from CKA_SUBPRIME alone, without the
-    // public value ExportParameters also reads. Read once: a key object's domain parameters cannot be modified.
+    // A signature answered without C_Verify. q is read from the public-key object again first, so a key that
+    // could not have verified it throws as the token path would: one without a public-key object, a disposed
+    // one, or one whose session has closed. Otherwise the signature, not the key, would choose between that
+    // error and false.
+    private bool DoesNotVerify()
+    {
+        ReadSubprimeLength();
+        return false;
+    }
+
+    // q's length in bytes, read once: a key object's domain parameters cannot be modified.
     private int GetSubprimeLength()
     {
         int length = Volatile.Read(ref _subprimeLength);
-        if (length != 0)
-            return length;
+        return length != 0 ? length : ReadSubprimeLength();
+    }
 
-        using var subprime = _key.GetAttributeValue(CKA.CKA_SUBPRIME);
-        // An unreadable value throws Pkcs11AttributeException, which names no return code: the token's -1
-        // length covers both a sensitive attribute and one the object lacks.
-        byte[] q = TrimLeadingZeros(subprime[0].GetValueAsByteArray());
+    // q's length in bytes as ExportParameters(false) reports it, from the public-key object: a key without
+    // one throws CKR_OBJECT_HANDLE_INVALID, as Pkcs11Key.Verify does, since DSA has no managed fallback.
+    private int ReadSubprimeLength()
+    {
+        byte[] q = ExportParameters(includePrivateParameters: false).Q!;
         if (q is [] or [0])
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "DSAPkcs11 (CKA_SUBPRIME is zero)");
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "DSAPkcs11 (q is zero)");
         Volatile.Write(ref _subprimeLength, q.Length);
         return q.Length;
     }
@@ -250,8 +246,7 @@ public sealed class DSAPkcs11 : DSA
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
-    /// <exception cref="Pkcs11AttributeException">Thrown when <c>CKA_SUBPRIME</c> cannot be read to check the signature's length.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no public-key object; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when <c>CKA_SUBPRIME</c> is zero; otherwise propagated from reading it or from the underlying <c>C_Verify</c> call.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no public-key object; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when its q is zero; otherwise propagated from reading the public key, as <see cref="ExportParameters(bool)"/> does, or from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm)
     {

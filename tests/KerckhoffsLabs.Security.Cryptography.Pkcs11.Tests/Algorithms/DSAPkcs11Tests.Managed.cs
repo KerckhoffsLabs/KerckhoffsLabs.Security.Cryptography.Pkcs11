@@ -537,29 +537,30 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.Equal(CKR.CKR_DEVICE_ERROR, ex.ReturnValue);
     }
 
-    // An attribute that cannot be read may be sensitive or missing, which the token does not tell apart for
-    // one attribute among several, so no return code is claimed for it.
+    // q is read as ExportParameters(false) reads it, so an unreadable one fails as that does.
     [Theory]
     [InlineData(CKR.CKR_ATTRIBUTE_SENSITIVE, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
     [InlineData(CKR.CKR_ATTRIBUTE_SENSITIVE, DSASignatureFormat.Rfc3279DerSequence)]
     [InlineData(CKR.CKR_ATTRIBUTE_TYPE_INVALID, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
     [InlineData(CKR.CKR_ATTRIBUTE_TYPE_INVALID, DSASignatureFormat.Rfc3279DerSequence)]
-    public void FormattedVerify_SubprimeUnreadable_ThrowsPkcs11AttributeException(CKR rv, DSASignatureFormat format)
+    public void FormattedVerify_SubprimeUnreadable_ThrowsAsExportParametersDoes(CKR rv, DSASignatureFormat format)
     {
-        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (rv, null), CryptoPolicy.AllowInsecure, publicOnly: true);
+        using var key = FakeKeys.Create(CKK.CKK_DSA, ca => ca == CKA.CKA_SUBPRIME ? (rv, null) : (CKR.CKR_OK, [0x07]),
+            CryptoPolicy.AllowInsecure, publicOnly: true);
         using var dsa = new DSAPkcs11(key);
 
-        var ex = Assert.Throws<Pkcs11AttributeException>(() => dsa.VerifySignature(new byte[32], SignatureIn(format), format));
-        Assert.Equal(CKA.CKA_SUBPRIME, ex.Attribute);
+        var expected = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.ExportParameters(false));
+        var actual = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], SignatureIn(format), format));
+        Assert.Equal(expected.ReturnValue, actual.ReturnValue);
     }
 
     // A q of zero is no key's: the token's malformed key is an error, not every signature failing to verify.
     [Theory]
-    [InlineData(new byte[0])]
+    [InlineData(new byte[] { 0x00 })]
     [InlineData(new byte[] { 0x00, 0x00 })]
     public void Verify_SubprimeIsZero_ThrowsAttributeValueInvalid(byte[] subprime)
     {
-        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_OK, subprime), CryptoPolicy.AllowInsecure, publicOnly: true);
+        using var key = DsaKey(subprime);
         using var dsa = new DSAPkcs11(key);
 
         Func<bool>[] verifies =
@@ -575,19 +576,26 @@ public sealed class DSAPkcs11Tests_Managed
     private static byte[] SignatureIn(DSASignatureFormat format) =>
         format == Der ? DSAPkcs11TestCases.DerSignature([0x01], [0x02]) : new byte[64];
 
+    // A DSA key whose q is `q`, with the one-byte p, g and y that ExportParameters(false) also reads.
+    // Its module refuses C_VerifyInit, so reaching the token throws.
+    private static FakeKey DsaKey(byte[] q, ICryptoPolicy? policy = null, Action<CKA>? onRead = null) =>
+        FakeKeys.Create(CKK.CKK_DSA, ca =>
+        {
+            onRead?.Invoke(ca);
+            return ca switch
+            {
+                CKA.CKA_SUBPRIME => (CKR.CKR_OK, q),
+                CKA.CKA_PRIME or CKA.CKA_BASE or CKA.CKA_VALUE => (CKR.CKR_OK, [0x07]),
+                _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+            };
+        }, policy ?? CryptoPolicy.AllowInsecure, publicOnly: true);
+
     // === An r‖s signature of the wrong length does not verify, and never reaches the token =========
     //
     // NSS answers one with CKR_ARGUMENTS_BAD rather than a verdict. The fake key's q is one byte long, so an
-    // r‖s signature is two; its module refuses C_VerifyInit, so reaching the token throws.
+    // r‖s signature is two.
 
-    private static FakeKey OneByteSubprimeKey(Action onSubprimeRead, ICryptoPolicy? policy = null) =>
-        FakeKeys.Create(CKK.CKK_DSA, ca =>
-        {
-            if (ca != CKA.CKA_SUBPRIME)
-                return (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null);
-            onSubprimeRead();
-            return (CKR.CKR_OK, [0x05]);
-        }, policy ?? CryptoPolicy.AllowInsecure, publicOnly: true);
+    private static FakeKey OneByteSubprimeKey(ICryptoPolicy? policy = null) => DsaKey([0x05], policy);
 
     private static readonly Dictionary<string, Func<DSAPkcs11, byte[], bool>> HashVerifies = new()
     {
@@ -603,7 +611,7 @@ public sealed class DSAPkcs11Tests_Managed
     [MemberData(nameof(HashVerifyNames))]
     public void P1363Verify_SignatureOfTheWrongLength_ReturnsFalse_WithoutTheToken(string call)
     {
-        using var key = OneByteSubprimeKey(() => { });
+        using var key = OneByteSubprimeKey();
         using var dsa = new DSAPkcs11(key);
 
         Assert.False(HashVerifies[call](dsa, new byte[1]));
@@ -616,7 +624,7 @@ public sealed class DSAPkcs11Tests_Managed
     [Fact]
     public void P1363Verify_SignatureOfTheWrongLength_GatedByDefault_Throws()
     {
-        using var key = OneByteSubprimeKey(() => { }, CryptoPolicy.SecureOnly);
+        using var key = OneByteSubprimeKey(CryptoPolicy.SecureOnly);
         using var dsa = new DSAPkcs11(key);
 
         Assert.Throws<CryptoPolicyViolationException>(() => dsa.VerifySignature(new byte[32], new byte[3]));
@@ -663,21 +671,27 @@ public sealed class DSAPkcs11Tests_Managed
         }
     }
 
+    // q is read once to size signatures. One answered false without the token reads it again, to confirm that
+    // the key could have verified it.
     [Fact]
-    public void SubprimeLength_IsReadOnce()
+    public void SubprimeLength_IsReadOnce_ExceptToConfirmAFalse()
     {
         int reads = 0;
-        using var key = OneByteSubprimeKey(() => reads++);
+        using var key = DsaKey([0x05], onRead: ca => reads += ca == CKA.CKA_SUBPRIME ? 1 : 0);
         using var dsa = new DSAPkcs11(key);
+        reads = 0; // The constructor reads the key's size.
+
+        Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], new byte[2]));
+        // C_GetAttributeValue may be called twice for one read (its length, then its value).
+        int perRead = reads;
+        Assert.NotEqual(0, perRead);
+        Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], new byte[2], P1363));
+        Assert.ThrowsAny<Pkcs11Exception>(() => dsa.VerifySignature(new byte[32], SignatureIn(Der), Der));
+        Assert.Equal(perRead, reads);
 
         Assert.False(dsa.VerifySignature(new byte[32], new byte[3]));
-        int afterFirst = reads;
-        Assert.False(dsa.VerifySignature(new byte[32], new byte[3], P1363));
         Assert.False(dsa.VerifySignature(new byte[32], (byte[])[0x30, 0x00], Der));
-
-        // C_GetAttributeValue may be called twice for one read (its length, then its value).
-        Assert.NotEqual(0, afterFirst);
-        Assert.Equal(afterFirst, reads);
+        Assert.Equal(3 * perRead, reads);
     }
 
     // Once q's length is read, a signature of the wrong length is decided without the token, but a disposed
@@ -686,7 +700,7 @@ public sealed class DSAPkcs11Tests_Managed
     [MemberData(nameof(HashVerifyNames))]
     public void P1363Verify_SignatureOfTheWrongLength_KeyDisposed_Throws(string call)
     {
-        using var key = OneByteSubprimeKey(() => { });
+        using var key = OneByteSubprimeKey();
         using var dsa = new DSAPkcs11(key);
         Assert.False(HashVerifies[call](dsa, new byte[3]));
 
@@ -699,7 +713,7 @@ public sealed class DSAPkcs11Tests_Managed
     [MemberData(nameof(HashVerifyNames))]
     public void P1363Verify_SignatureOfTheWrongLength_SessionClosed_Throws(string call)
     {
-        using var key = OneByteSubprimeKey(() => { });
+        using var key = OneByteSubprimeKey();
         using var dsa = new DSAPkcs11(key);
         Assert.False(HashVerifies[call](dsa, new byte[3]));
 
