@@ -206,6 +206,110 @@ internal static class ECDsaPkcs11TestCases
                 ec.TrySignData(Encoding.UTF8.GetBytes("x"), new byte[256], new HashAlgorithmName("SHA224"), out int _)));
     }
 
+    private static bool BclSupports(HashAlgorithmName hash) => hash.Name switch
+    {
+        "SHA3-256" => SHA3_256.IsSupported,
+        "SHA3-384" => SHA3_384.IsSupported,
+        "SHA3-512" => SHA3_512.IsSupported,
+        _ => throw new ArgumentOutOfRangeException(nameof(hash), hash.Name, "Not a SHA-3 hash."),
+    };
+
+    // TrySignData and VerifyData(span) sign and verify with the combined CKM_ECDSA_SHA3_* where the token
+    // has it, or hash with the BCL's SHA-3 before raw CKM_ECDSA; the byte[] overloads always hash with the
+    // BCL's. Returns whether the BCL has the hash, which the byte[] overloads need.
+    private static bool RequireSha3(IPkcs11Backend backend, HashAlgorithmName hash)
+    {
+        bool bcl = BclSupports(hash);
+        if (!bcl && !backend.Supports(Pkcs11MechanismMap.EcdsaSign(hash).Type))
+            Assert.Skip($"Neither the token's combined ECDSA mechanism nor the host BCL has {hash.Name}.");
+        return bcl;
+    }
+
+    // SHA-3 signs and verifies through every overload that takes a hash name, and they all agree: each one's
+    // P1363 signature verifies through the others, and under the BCL from the exported public key.
+    internal static void Assert_Sha3_SignVerifyData_EveryOverload_RoundTrips(IPkcs11Backend backend, string hashName)
+    {
+        var hash = new HashAlgorithmName(hashName);
+        bool bcl = RequireSha3(backend, hash);
+        WithEcDsa(backend, "P-256", ec =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes($"ecdsa over {hashName}");
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+
+            byte[] destination = new byte[256];
+            Assert.True(ec.TrySignData(data, destination, hash, out int written));
+            List<byte[]> signatures = [destination[..written]];
+            if (bcl)
+                signatures.AddRange([ec.SignData(data, hash), ec.SignData(data, 0, data.Length, hash)]);
+
+            using var bclEc = bcl ? ECDsa.Create(ec.ExportParameters(includePrivateParameters: false)) : null;
+            foreach (byte[] sig in signatures)
+            {
+                Assert.True(ec.VerifyData(data.AsSpan(), sig, hash));
+                Assert.False(ec.VerifyData(tampered.AsSpan(), sig, hash));
+                if (bclEc is null)
+                    continue;
+                Assert.True(ec.VerifyData(data, sig, hash));
+                Assert.False(ec.VerifyData(tampered, sig, hash));
+                Assert.True(bclEc.VerifyData(data, sig, hash, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+            }
+        });
+    }
+
+    // ecdsa_secp256r1_sha3_256_test.json from C2SP/wycheproof, tcId 2 ("valid"): a DER signature over "Msg"
+    // under a fixed P-256 public key.
+    private static readonly byte[] WycheproofEcPoint = Convert.FromHexString(
+        "04410404AAEC73635726F213FB8A9E64DA3B8632E41495A944D0045B522EBA7240FAD587D9315798AAA3A5BA01775787CED05EAAF7B4E09FC81D6D1AA546E8365D525D");
+    private static readonly byte[] WycheproofMessage = Convert.FromHexString("4D7367");
+    private static readonly byte[] WycheproofDerSignature = Convert.FromHexString(
+        "3044022010228BEAF773CAEFF22A94602E9EFF1923DCC51B277F64B482EA63218C350B0D02202104C8343F8970A28C9EB221A63C857EF385E758EACCC5F7D2AE975553A1534B");
+
+    // The vector verifies through VerifyData(span) as r‖s, and, where the BCL has SHA3-256, through the byte[]
+    // overload as r‖s and as DER; a tampered message or signature does not.
+    internal static void Assert_Sha3_256_WycheproofVector_Verifies_AndTamperedDoesNot(IPkcs11Backend backend)
+    {
+        if (!backend.Supports(CKM.CKM_ECDSA))
+            Assert.Skip("Backend does not advertise CKM_ECDSA.");
+        var hash = HashAlgorithmName.SHA3_256;
+        bool bcl = RequireSha3(backend, hash);
+
+        using var session = OpenSession(backend);
+        using var template = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .Label($"ec-wycheproof-{Guid.NewGuid():N}").Verify().OnToken(false)
+            .EcParams(TestKeys.EcP256Oid)
+            .Attribute(CKA.CKA_EC_POINT, WycheproofEcPoint)
+            .Build();
+        using var key = session.ImportKey(template);
+        try
+        {
+            using var ec = new ECDsaPkcs11(key);
+            byte[] der = WycheproofDerSignature;
+            byte[] ieee = [.. der.AsSpan(4, 32), .. der.AsSpan(38, 32)];
+            byte[] tampered = [.. WycheproofMessage];
+            tampered[^1] ^= 0x01;
+            byte[] badIeee = [.. ieee];
+            badIeee[^1] ^= 0x01;
+            byte[] badDer = [.. der];
+            badDer[^1] ^= 0x01;
+
+            Assert.True(ec.VerifyData(WycheproofMessage.AsSpan(), ieee, hash));
+            Assert.False(ec.VerifyData(tampered.AsSpan(), ieee, hash));
+            Assert.False(ec.VerifyData(WycheproofMessage.AsSpan(), badIeee, hash));
+            if (!bcl)
+                return;
+
+            Assert.True(ec.VerifyData(WycheproofMessage, ieee, hash));
+            Assert.True(ec.VerifyData(WycheproofMessage, der, hash, DSASignatureFormat.Rfc3279DerSequence));
+            Assert.False(ec.VerifyData(tampered, der, hash, DSASignatureFormat.Rfc3279DerSequence));
+            Assert.False(ec.VerifyData(WycheproofMessage, badDer, hash, DSASignatureFormat.Rfc3279DerSequence));
+        }
+        finally
+        {
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
+        }
+    }
+
     internal static void Assert_TrySignData_DestinationTooSmall_ReturnsFalse(IPkcs11Backend backend) =>
         WithEcDsa(backend, "P-256", (ec, hash) =>
         {

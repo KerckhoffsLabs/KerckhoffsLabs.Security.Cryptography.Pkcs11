@@ -9,8 +9,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 /// <summary>
 /// Backend-agnostic tests of the token's combined SHA-3 signing mechanisms (<c>CKM_ECDSA_SHA3_256</c>,
 /// <c>CKM_SHA3_256_RSA_PKCS_PSS</c> with <c>CKG_MGF1_SHA3_256</c>): the token signs, and the BCL verifies
-/// with its own SHA-3 against the exported public key. The signing adapters hash in managed code and offer
-/// SHA-2 only, so these go through <see cref="Pkcs11Key.Sign"/>.
+/// with its own SHA-3 against the exported public key. These go through <see cref="Pkcs11Key.Sign"/>, so that
+/// they test the token's combined mechanisms themselves, whichever path a signing adapter takes.
 /// </summary>
 internal static class Sha3SignatureTestCases
 {

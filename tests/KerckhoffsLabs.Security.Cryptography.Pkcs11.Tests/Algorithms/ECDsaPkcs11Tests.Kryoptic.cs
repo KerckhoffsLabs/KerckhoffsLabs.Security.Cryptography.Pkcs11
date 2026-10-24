@@ -44,6 +44,15 @@ public sealed class ECDsaPkcs11Tests_Kryoptic(KryopticBackendFixture f)
     [InlineData("P-521")]
     public void SignData_VerifiesUnderBclFromExportedPublicKey(string curve) => ECDsaPkcs11TestCases.Assert_SignData_VerifiesUnderBclFromExportedPublicKey(_backend, curve);
 
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData("SHA3-256")]
+    [InlineData("SHA3-384")]
+    [InlineData("SHA3-512")]
+    public void Sha3_SignVerifyData_EveryOverload_RoundTrips(string hashName) => ECDsaPkcs11TestCases.Assert_Sha3_SignVerifyData_EveryOverload_RoundTrips(_backend, hashName);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void Sha3_256_WycheproofVector_Verifies_AndTamperedDoesNot() => ECDsaPkcs11TestCases.Assert_Sha3_256_WycheproofVector_Verifies_AndTamperedDoesNot(_backend);
+
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ctor_NonEcKey_Throws() => ECDsaPkcs11TestCases.Assert_Ctor_NonEcKey_Throws(_backend);
 

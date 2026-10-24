@@ -115,7 +115,7 @@ public static class Pkcs11MechanismMap
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for ECDSA signing with the given hash.
     /// </summary>
-    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
+    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-256, SHA3-384, SHA3-512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_ECDSA_SHA224</c>) has no <see cref="HashAlgorithmName"/> constant in the BCL
     /// and is gated behind the session's crypto policy — same opt-in as SHA-1. See
@@ -129,6 +129,9 @@ public static class Pkcs11MechanismMap
         Sha256 => new Mechanism(CKM.CKM_ECDSA_SHA256),
         Sha384 => new Mechanism(CKM.CKM_ECDSA_SHA384),
         Sha512 => new Mechanism(CKM.CKM_ECDSA_SHA512),
+        Sha3_256 => new Mechanism(CKM.CKM_ECDSA_SHA3_256),
+        Sha3_384 => new Mechanism(CKM.CKM_ECDSA_SHA3_384),
+        Sha3_512 => new Mechanism(CKM.CKM_ECDSA_SHA3_512),
         _ => throw new NotSupportedException(
             $"ECDSA does not support hash {hash.Name}."),
     };
