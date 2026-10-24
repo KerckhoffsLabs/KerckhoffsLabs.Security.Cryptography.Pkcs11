@@ -25,7 +25,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <see cref="Pkcs11Library"/>. On <see cref="Dispose"/> it logs the user out (<c>C_Logout</c>,
 /// best-effort — a token-wide state change, since PKCS#11 login state is per-application/slot) and
 /// then closes the session (<c>C_CloseSession</c>), so the HSM audit log records an explicit logout,
-/// not just a session close. A logout that fails because no user was logged in is ignored.
+/// not just a session close. A logout that fails because no user was logged in is ignored. Several
+/// sessions opened with a login on the same token share it: only the last of them to be disposed
+/// logs out, so disposing one leaves the others logged in.
 /// </para>
 /// <para>
 /// Keys obtained via the session's factory methods hold a non-owning reference to the
@@ -117,7 +119,7 @@ public sealed partial class Pkcs11Session : IDisposable
         // logout, not just a session close. Best-effort: the caller may have already logged out
         // (CKR_USER_NOT_LOGGED_IN), or the library/session may already be torn down — none of
         // those should make disposal throw. C_Logout affects the whole application's login state
-        // on the slot, which is the intended end-of-context behaviour for an owned session.
+        // on the slot, so it is sent only by the last session holding the login (see SlotLogins).
         // LogoutForDispose waits out a call in flight on another thread instead of throwing on
         // the contention: the session close below must always be reached.
         try
