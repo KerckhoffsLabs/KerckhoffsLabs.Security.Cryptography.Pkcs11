@@ -50,9 +50,9 @@ public sealed class DSAPkcs11Tests_Managed
         => WithDsa((dsa, bcl, _) => body(dsa, bcl));
 
     // With publicObject false only the private half is imported: a key that can sign but has no public value.
-    private static void WithDsa(Action<DSAPkcs11, DSA, Pkcs11Session> body, bool publicObject = true)
+    private static void WithDsa(Action<DSAPkcs11, DSA, Pkcs11Session> body, bool publicObject = true, ManagedSoftToken? token = null)
     {
-        using var library = ManagedToken.NewLibrary();
+        using var library = (token ?? new ManagedSoftToken()).Load();
         using var session = ManagedToken.OpenSession(library);
 
         using var bcl = DSA.Create(2048);
@@ -181,9 +181,9 @@ public sealed class DSAPkcs11Tests_Managed
         }
     });
 
-    // Pkcs11MechanismMap.DsaSign accepts SHA224 (CKM_DSA_SHA224 exists in the spec), but this
-    // adapter's own managed-fallback HashData helper has no SHA224 case — a real gap, surfaced only
-    // via the fallback branch a backend without CKM_DSA_SHA224 support takes.
+    // Pkcs11MechanismMap.DsaSign accepts SHA224 (CKM_DSA_SHA224 exists in the spec), but without it the
+    // adapter hashes before raw CKM_DSA, and the BCL has no SHA-224 for that: only a token's CKM_SHA224
+    // digest does, which this token does not list (see Sha224Sign_HashesWithTheTokensDigest).
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void TrySignData_Sha224_ThrowsNotSupported_ViaManagedFallbackHasher() => WithDsa((dsa, _, session) =>
     {
@@ -853,5 +853,156 @@ public sealed class DSAPkcs11Tests_Managed
 
         Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA256));
         Assert.True(dsa.VerifyData(stream, sig, HashAlgorithmName.SHA256));
+    });
+
+    // === SHA-224: the BCL has none, so the token's CKM_SHA224 digest stands in =====================
+
+    private static readonly HashAlgorithmName Sha224 = new("SHA224");
+
+    // The managed token's SHA-224. The BCL has none to give it, so this is a stand-in: whatever it computes,
+    // a signature the adapter makes over SHA-224 is a signature over it.
+    private static byte[] StandInSha224(byte[] data) => SHA256.HashData(data)[..28];
+
+    // Each entry point that takes a hash name, with the formats it can produce or take: the ones without a
+    // format are P1363. TrySignData and VerifyData(span) without a format take the adapter's own path,
+    // which hashes on the managed side here because the token does not list CKM_DSA_SHA224.
+    private static readonly Dictionary<string, Func<DSA, byte[], DSASignatureFormat, byte[]>> Sha224Signs = new()
+    {
+        ["SignData(byte[])"] = (d, data, _) => d.SignData(data, Sha224),
+        ["SignData(byte[], offset, count)"] = (d, data, _) => d.SignData(data, 0, data.Length, Sha224),
+        ["SignData(Stream)"] = (d, data, _) =>
+        {
+            using var stream = new MemoryStream(data);
+            return d.SignData(stream, Sha224);
+        },
+        ["TrySignData(span)"] = (d, data, _) => TrySign(destination => d.TrySignData(data, destination, Sha224, out int written) ? written : -1),
+        ["SignData(byte[], format)"] = (d, data, f) => d.SignData(data, Sha224, f),
+        ["SignData(byte[], offset, count, format)"] = (d, data, f) => d.SignData(data, 0, data.Length, Sha224, f),
+        ["SignData(Stream, format)"] = (d, data, f) =>
+        {
+            using var stream = new MemoryStream(data);
+            return d.SignData(stream, Sha224, f);
+        },
+        ["TrySignData(span, format)"] = (d, data, f) => TrySign(destination => d.TrySignData(data, destination, Sha224, f, out int written) ? written : -1),
+    };
+
+    private static readonly Dictionary<string, Func<DSA, byte[], byte[], DSASignatureFormat, bool>> Sha224Verifies = new()
+    {
+        ["VerifyData(byte[])"] = (d, data, sig, _) => d.VerifyData(data, sig, Sha224),
+        ["VerifyData(byte[], offset, count)"] = (d, data, sig, _) => d.VerifyData(data, 0, data.Length, sig, Sha224),
+        ["VerifyData(Stream)"] = (d, data, sig, _) =>
+        {
+            using var stream = new MemoryStream(data);
+            return d.VerifyData(stream, sig, Sha224);
+        },
+        ["VerifyData(span)"] = (d, data, sig, _) => d.VerifyData(data.AsSpan(), sig.AsSpan(), Sha224),
+        ["VerifyData(byte[], format)"] = (d, data, sig, f) => d.VerifyData(data, sig, Sha224, f),
+        ["VerifyData(byte[], offset, count, format)"] = (d, data, sig, f) => d.VerifyData(data, 0, data.Length, sig, Sha224, f),
+        ["VerifyData(Stream, format)"] = (d, data, sig, f) =>
+        {
+            using var stream = new MemoryStream(data);
+            return d.VerifyData(stream, sig, Sha224, f);
+        },
+        ["VerifyData(span, format)"] = (d, data, sig, f) => d.VerifyData(data.AsSpan(), sig.AsSpan(), Sha224, f),
+    };
+
+    private static byte[] TrySign(Func<byte[], int> sign)
+    {
+        byte[] destination = new byte[256];
+        int written = sign(destination);
+        Assert.True(written > 0);
+        return destination[..written];
+    }
+
+    private static TheoryData<string, DSASignatureFormat> Sha224Cases(IEnumerable<string> calls)
+    {
+        var cases = new TheoryData<string, DSASignatureFormat>();
+        foreach (string name in calls)
+        {
+            cases.Add(name, P1363);
+            if (name.Contains("format", StringComparison.Ordinal))
+                cases.Add(name, Der);
+        }
+        return cases;
+    }
+
+    public static TheoryData<string, DSASignatureFormat> Sha224SignCases() => Sha224Cases(Sha224Signs.Keys);
+
+    public static TheoryData<string, DSASignatureFormat> Sha224VerifyCases() => Sha224Cases(Sha224Verifies.Keys);
+
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    [MemberData(nameof(Sha224SignCases))]
+    public void Sha224Sign_HashesWithTheTokensDigest(string call, DSASignatureFormat format) => WithDsa((dsa, bcl, session) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes($"{call} over the token's SHA-224");
+        byte[] sig;
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            sig = Sha224Signs[call](dsa, data, format);
+
+        Assert.True(bcl.VerifySignature(StandInSha224(data), sig, format));
+    }, token: new ManagedSoftToken { Sha224Digest = StandInSha224 });
+
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    [MemberData(nameof(Sha224VerifyCases))]
+    public void Sha224Verify_HashesWithTheTokensDigest(string call, DSASignatureFormat format) => WithDsa((dsa, bcl, session) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes($"{call} over the token's SHA-224");
+        byte[] sig = bcl.CreateSignature(StandInSha224(data), format);
+        byte[] tampered = [.. data];
+        tampered[0] ^= 0xFF;
+        using var policy = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+        Assert.True(Sha224Verifies[call](dsa, data, sig, format));
+        Assert.False(Sha224Verifies[call](dsa, tampered, sig, format));
+    }, token: new ManagedSoftToken { Sha224Digest = StandInSha224 });
+
+    // The hash is put to the session's policy before the token digests anything, as for every other hash.
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void Sha224_GatedByDefault_ThrowsBeforeTheTokenDigests()
+    {
+        int digests = 0;
+        var token = new ManagedSoftToken { Sha224Digest = data => { digests++; return StandInSha224(data); } };
+        WithDsa((dsa, _, _) =>
+        {
+            foreach (var sign in Sha224Signs.Values)
+                Assert.IsType<HashUseRequest>(Assert.Throws<CryptoPolicyViolationException>(() => sign(dsa, Data, Der)).Request);
+            foreach (var verify in Sha224Verifies.Values)
+                Assert.IsType<HashUseRequest>(Assert.Throws<CryptoPolicyViolationException>(() => verify(dsa, Data, new byte[64], Der)).Request);
+        }, token: token);
+        Assert.Equal(0, digests);
+    }
+
+    // Without the token's CKM_SHA224 the base class hashes, and fails as it does for the BCL's own DSA. The
+    // adapter's TrySignData and VerifyData(span) fail with NotSupportedException instead, as they did before
+    // (TrySignData_Sha224_ThrowsNotSupported_ViaManagedFallbackHasher).
+    public static TheoryData<string> Sha224BaseClassCalls() =>
+    [
+        .. Sha224Signs.Keys.Where(name => name != "TrySignData(span)"),
+        .. Sha224Verifies.Keys.Where(name => name != "VerifyData(span)"),
+    ];
+
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    [MemberData(nameof(Sha224BaseClassCalls))]
+    public void Sha224_WithoutTheTokensDigest_FailsAsTheBclDoes(string call) => WithDsa((dsa, bcl, session) =>
+    {
+        using var policy = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+        Exception expected = Sha224Signs.TryGetValue(call, out var sign)
+            ? Assert.ThrowsAny<Exception>(() => sign(bcl, Data, Der))
+            : Assert.ThrowsAny<Exception>(() => Sha224Verifies[call](bcl, Data, new byte[64], Der));
+        Exception actual = Sha224Signs.TryGetValue(call, out sign)
+            ? Assert.ThrowsAny<Exception>(() => sign(dsa, Data, Der))
+            : Assert.ThrowsAny<Exception>(() => Sha224Verifies[call](dsa, Data, new byte[64], Der));
+
+        Assert.IsType<CryptographicException>(expected);
+        Assert.Equal(expected.GetType(), actual.GetType());
+        Assert.Equal(expected.Message, actual.Message);
+    });
+
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void VerifyDataSpan_Sha224_WithoutTheTokensDigest_ThrowsNotSupported() => WithDsa((dsa, _, session) =>
+    {
+        using var policy = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        Assert.Throws<NotSupportedException>(() => Sha224Verifies["VerifyData(span)"](dsa, Data, new byte[64], P1363));
     });
 }
