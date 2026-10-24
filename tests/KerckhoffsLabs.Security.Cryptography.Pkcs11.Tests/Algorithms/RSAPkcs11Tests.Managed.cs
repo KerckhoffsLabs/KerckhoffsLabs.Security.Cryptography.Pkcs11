@@ -426,6 +426,12 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, ex.ReturnValue);
     });
 
+    [Theory]
+    [InlineData("Pkcs1")]
+    [InlineData("Oaep")]
+    public void Decrypt_CiphertextNotBelowTheModulus_Throws(string padding) => WithTransportRsa((session, rsa) =>
+        RSAPkcs11TestCases.AssertRefusesCiphertextNotBelowTheModulus(session, rsa, padding));
+
     [Fact]
     public void Encrypt_NullArguments_Throw() => WithTransportRsa((_, rsa) =>
     {

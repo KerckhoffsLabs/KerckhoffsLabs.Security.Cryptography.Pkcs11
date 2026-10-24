@@ -438,6 +438,51 @@ internal static class RSAPkcs11TestCases
         });
     }
 
+    // A ciphertext that is not less than the modulus is no RSA ciphertext (RFC 8017 §7.1.2 and §7.2.2, step 2),
+    // so it is refused as the BCL refuses it, whatever the padding. NSS answered PKCS#1 v1.5's with
+    // implicit-rejection output instead until 3.132 (Bug 2079457).
+    internal static void Assert_Decrypt_CiphertextNotBelowTheModulus_Throws(IPkcs11Backend backend, string padding)
+    {
+        backend.RequireMechanisms(padding == "Pkcs1" ? CKM.CKM_RSA_PKCS : CKM.CKM_RSA_PKCS_OAEP);
+        WithRsa(backend, (session, rsa) => AssertRefusesCiphertextNotBelowTheModulus(session, rsa, padding));
+    }
+
+    // The body of Assert_Decrypt_CiphertextNotBelowTheModulus_Throws, for a token with its own key setup:
+    // padding is "Pkcs1" or "Oaep" (OAEP-SHA256). The token decrypts a ciphertext the BCL made under its public
+    // key before and after, so the refusal is of the value, not of the mechanism. (The BCL encrypts, since NSS
+    // cannot encrypt PKCS#1 v1.5 through the library; see NssBackendFixture.SupportsRsaPkcs1Encrypt.)
+    internal static void AssertRefusesCiphertextNotBelowTheModulus(Pkcs11Session session, RSAPkcs11 rsa, string padding)
+    {
+        RSAEncryptionPadding rsaPadding = padding == "Pkcs1" ? RSAEncryptionPadding.Pkcs1 : RSAEncryptionPadding.OaepSHA256;
+        using var insecure = padding == "Pkcs1" ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        byte[] plaintext = Encoding.UTF8.GetBytes("below the modulus");
+        byte[] ct;
+        using (var publicKey = RSA.Create())
+        {
+            publicKey.ImportParameters(rsa.ExportParameters(includePrivateParameters: false));
+            ct = publicKey.Encrypt(plaintext, rsaPadding);
+        }
+        Assert.Equal(plaintext, OrSkipIfOaepHashUnsupported(() => rsa.Decrypt(ct, rsaPadding)));
+
+        using (var bcl = RSA.Create(2048))
+        {
+            Assert.All(NotBelowTheModulus(bcl.ExportParameters(includePrivateParameters: false).Modulus!),
+                tooLarge => Assert.ThrowsAny<CryptographicException>(() => bcl.Decrypt(tooLarge, rsaPadding)));
+        }
+        Assert.All(NotBelowTheModulus(rsa.ExportParameters(includePrivateParameters: false).Modulus!),
+            tooLarge => Assert.ThrowsAny<CryptographicException>(() => rsa.Decrypt(tooLarge, rsaPadding)));
+
+        Assert.Equal(plaintext, rsa.Decrypt(ct, rsaPadding));
+    }
+
+    // Ciphertexts of the modulus length that are not less than the modulus: the modulus itself, and the
+    // largest value of that length.
+    private static IEnumerable<byte[]> NotBelowTheModulus(byte[] modulus)
+    {
+        yield return modulus;
+        yield return Enumerable.Repeat((byte)0xFF, modulus.Length).ToArray();
+    }
+
     internal static void Assert_Decrypt_OaepCiphertextFromDifferentKey_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
