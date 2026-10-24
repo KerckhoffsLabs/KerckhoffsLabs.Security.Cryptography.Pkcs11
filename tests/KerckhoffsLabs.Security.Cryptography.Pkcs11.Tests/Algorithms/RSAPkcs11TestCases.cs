@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -385,6 +386,72 @@ internal static class RSAPkcs11TestCases
                 Assert.Equal(plaintext, recovered);
             }
         });
+    }
+
+    // A PKCS#1 v1.5 ciphertext with invalid padding either throws or, on a token that implements
+    // implicit rejection (draft-irtf-cfrg-rsa-guidance), decrypts to a synthetic plaintext derived
+    // from the key and the ciphertext. Either way it never yields the message, and the outcome is
+    // repeatable. Pins the behaviour documented on RSAPkcs11.Decrypt so a token change is noticed.
+    internal static void Assert_Decrypt_Pkcs1InvalidPadding_NeverReturnsTheMessage(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS);
+        WithRsa(backend, AssertPkcs1InvalidPaddingNeverReturnsTheMessage);
+    }
+
+    internal static void AssertPkcs1InvalidPaddingNeverReturnsTheMessage(Pkcs11Session session, RSAPkcs11 rsa)
+    {
+        byte[] message = Encoding.UTF8.GetBytes("pkcs1 payload");
+        RSAParameters publicKey = rsa.ExportParameters(includePrivateParameters: false);
+        byte[] ciphertext = RawEncryptWithBlockType(publicKey, message, 0x03);
+
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            // Control: the same construction with the correct block type decrypts to the message.
+            Assert.Equal(message, rsa.Decrypt(RawEncryptWithBlockType(publicKey, message, 0x02), RSAEncryptionPadding.Pkcs1));
+
+            byte[]? first = TryDecryptPkcs1(rsa, ciphertext);
+            byte[]? second = TryDecryptPkcs1(rsa, ciphertext);
+
+            if (first is null)
+            {
+                Assert.Null(second);
+                return;
+            }
+            Assert.NotEqual(message, first);
+            Assert.Equal(first, second);
+        }
+    }
+
+    private static byte[]? TryDecryptPkcs1(RSAPkcs11 rsa, byte[] ciphertext)
+    {
+        try
+        {
+            return rsa.Decrypt(ciphertext, RSAEncryptionPadding.Pkcs1);
+        }
+        catch (CryptographicException ex) when (ex is not CryptoPolicyViolationException)
+        {
+            return null;
+        }
+    }
+
+    // m^e mod n over 00 || blockType || PS (non-zero) || 00 || message, so the padding is wrong
+    // only in the block-type byte (02 is the one RSAES-PKCS1-v1_5 decryption accepts).
+    private static byte[] RawEncryptWithBlockType(RSAParameters publicKey, byte[] message, byte blockType)
+    {
+        int k = publicKey.Modulus!.Length;
+        byte[] block = new byte[k];
+        block[1] = blockType;
+        block.AsSpan(2, k - 3 - message.Length).Fill(0xA5);
+        message.CopyTo(block.AsSpan(k - message.Length));
+
+        BigInteger c = BigInteger.ModPow(
+            new BigInteger(block, isUnsigned: true, isBigEndian: true),
+            new BigInteger(publicKey.Exponent, isUnsigned: true, isBigEndian: true),
+            new BigInteger(publicKey.Modulus, isUnsigned: true, isBigEndian: true));
+
+        byte[] ciphertext = new byte[k];
+        c.TryWriteBytes(ciphertext.AsSpan(k - c.GetByteCount(isUnsigned: true)), out _, isUnsigned: true, isBigEndian: true);
+        return ciphertext;
     }
 
     internal static void Assert_Encrypt_NullArguments_Throw(IPkcs11Backend backend) =>
