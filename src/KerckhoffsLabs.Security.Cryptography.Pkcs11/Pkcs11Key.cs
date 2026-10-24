@@ -132,16 +132,7 @@ public sealed partial class Pkcs11Key : IDisposable
                     }
                 }
             case CKK.CKK_RSA:
-                {
-                    // Without a public half these are the private one's, so its modulus is kept for decryption.
-                    bool privateHalf = PublicHandle.IsInvalid;
-                    using var attrs = GetAttributeValue(CKA.CKA_MODULUS_BITS, CKA.CKA_MODULUS);
-                    if (privateHalf && !attrs[1].CannotBeRead)
-                        KeepRsaModulus(attrs[1].GetValueAsByteArray());
-                    if (!attrs[0].CannotBeRead)
-                        return checked((int)attrs[0].GetValueAsUlong());
-                    return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
-                }
+                return ReadRsaKeySizeBits();
             case CKK.CKK_DSA:
                 {
                     // PKCS#11 has no CKA_PRIME_BITS (unlike RSA's CKA_MODULUS_BITS).
@@ -158,6 +149,19 @@ public sealed partial class Pkcs11Key : IDisposable
                     return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
                 }
         }
+    }
+
+    // CKA_MODULUS_BITS, else the bit length of CKA_MODULUS. Without a public half these are the private one's,
+    // so its modulus is kept for decryption.
+    private int? ReadRsaKeySizeBits()
+    {
+        bool privateHalf = PublicHandle.IsInvalid;
+        using var attrs = GetAttributeValue(CKA.CKA_MODULUS_BITS, CKA.CKA_MODULUS);
+        if (privateHalf && !attrs[1].CannotBeRead)
+            KeepRsaModulus(attrs[1].GetValueAsByteArray());
+        if (!attrs[0].CannotBeRead)
+            return checked((int)attrs[0].GetValueAsUlong());
+        return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
     }
 
     // Bit length of a big-endian unsigned integer, ignoring leading zero bytes.
