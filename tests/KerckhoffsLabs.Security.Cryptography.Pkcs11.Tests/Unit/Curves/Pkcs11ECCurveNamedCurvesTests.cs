@@ -23,6 +23,9 @@ public sealed class Pkcs11ECCurveNamedCurvesTests
     [InlineData("NistP256", "1.2.840.10045.3.1.7", "nistP256", 256)]
     [InlineData("NistP384", "1.3.132.0.34", "nistP384", 384)]
     [InlineData("NistP521", "1.3.132.0.35", "nistP521", 521)]
+    [InlineData("Secp160k1", "1.3.132.0.9", "secp160k1", 160)]
+    [InlineData("Secp160r1", "1.3.132.0.8", "secp160r1", 160)]
+    [InlineData("Secp160r2", "1.3.132.0.30", "secp160r2", 160)]
     [InlineData("Secp192k1", "1.3.132.0.31", "secp192k1", 192)]
     [InlineData("Secp224k1", "1.3.132.0.32", "secp224k1", 224)]
     [InlineData("Secp256k1", "1.3.132.0.10", "secp256k1", 256)]
@@ -60,7 +63,7 @@ public sealed class Pkcs11ECCurveNamedCurvesTests
         string?[] fromProperties = [.. Properties.Select(p => ((Pkcs11ECCurve)p.GetValue(null)!).Oid).Order(StringComparer.Ordinal)];
         string[] fromCatalog = [.. Pkcs11CurveCatalog.Default.Curves.Select(c => c.Oid).Order(StringComparer.Ordinal)];
 
-        Assert.Equal(23, fromProperties.Length);
+        Assert.Equal(26, fromProperties.Length);
         Assert.Equal(fromCatalog, fromProperties);
     }
 }

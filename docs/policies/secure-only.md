@@ -455,9 +455,12 @@ Documentation only: every item below is refused because it is absent from the al
 |---|---|---|---|
 | `sm2` | `1.2.156.10197.1.301` | SM2 is a regional (Chinese national standard) curve that has not been reviewed for this policy. | NistP256 or stronger |
 | `nistP192` | `1.2.840.10045.3.1.1` | The curve provides less than 128-bit security. | NistP256 or stronger |
+| `secp160r2` | `1.3.132.0.30` | The curve provides less than 128-bit security. | NistP256 or stronger |
 | `secp192k1` | `1.3.132.0.31` | The curve provides less than 128-bit security. | NistP256 or stronger |
 | `secp224k1` | `1.3.132.0.32` | The curve provides less than 128-bit security. | NistP256 or stronger |
 | `nistP224` | `1.3.132.0.33` | The curve provides less than 128-bit security. | NistP256 or stronger |
+| `secp160r1` | `1.3.132.0.8` | The curve provides less than 128-bit security. | NistP256 or stronger |
+| `secp160k1` | `1.3.132.0.9` | The curve provides less than 128-bit security. | NistP256 or stronger |
 | `brainpoolP160r1` | `1.3.36.3.3.2.8.1.1.1` | The curve provides less than 128-bit security. | NistP256 or stronger |
 | `brainpoolP160t1` | `1.3.36.3.3.2.8.1.1.2` | The curve provides less than 128-bit security. | NistP256 or stronger |
 | `brainpoolP192r1` | `1.3.36.3.3.2.8.1.1.3` | The curve provides less than 128-bit security. | NistP256 or stronger |

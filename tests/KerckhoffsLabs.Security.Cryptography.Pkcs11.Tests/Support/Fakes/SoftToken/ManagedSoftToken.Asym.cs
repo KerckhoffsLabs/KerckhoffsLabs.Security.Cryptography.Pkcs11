@@ -54,8 +54,7 @@ internal sealed partial class ManagedSoftToken
                     if (!pub.TryGetValue((ulong)CKA.CKA_EC_PARAMS, out var ecParams))
                         return CKR.CKR_TEMPLATE_INCOMPLETE;
                     var ec = ECDsa.Create(CurveFromOid(ecParams));
-                    ECParameters ep = ec.ExportParameters(includePrivateParameters: false);
-                    byte[] ecPoint = EncodeEcPoint(ep.Q);
+                    byte[] ecPoint = EncodeEcPoint(FieldLengthPoint(ec));
 
                     SetCommon(pub, CKO.CKO_PUBLIC_KEY, CKK.CKK_EC);
                     SetCommon(priv, CKO.CKO_PRIVATE_KEY, CKK.CKK_EC);
@@ -97,6 +96,15 @@ internal sealed partial class ManagedSoftToken
     // whatever named curves the host BCL implements (NIST, brainpool, …), not just a hardcoded few.
     private static ECCurve CurveFromOid(byte[] ecParams) =>
         Pkcs11ECCurve.FromEcParams(ecParams).ToECCurve();
+
+    // The public point with field-length coordinates, as PKCS#11 encodes it. On Windows, ExportParameters pads
+    // X and Y on the right to the order's length on secp160k1/r1/r2 and secp224k1 (dotnet/runtime#129003); the
+    // explicit export is correct, and is used there.
+    private static ECPoint FieldLengthPoint(ECDsa ec)
+    {
+        ECPoint q = ec.ExportParameters(includePrivateParameters: false).Q;
+        return q.X!.Length == (ec.KeySize + 7) / 8 ? q : ec.ExportExplicitParameters(includePrivateParameters: false).Q;
+    }
 
     // CKA_EC_POINT = DER OCTET STRING wrapping the uncompressed point (0x04 ‖ X ‖ Y).
     private static byte[] EncodeEcPoint(ECPoint q)

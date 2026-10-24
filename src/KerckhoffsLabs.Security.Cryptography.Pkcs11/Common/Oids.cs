@@ -61,6 +61,11 @@ internal static class Oids
         internal const string NistP384 = "1.3.132.0.34";
         internal const string NistP521 = "1.3.132.0.35";
 
+        // SECG 160-bit curves (SEC 2 v1).
+        internal const string Secp160k1 = "1.3.132.0.9";
+        internal const string Secp160r1 = "1.3.132.0.8";
+        internal const string Secp160r2 = "1.3.132.0.30";
+
         // SECG Koblitz curves (SEC 2 v2).
         internal const string Secp192k1 = "1.3.132.0.31";
         internal const string Secp224k1 = "1.3.132.0.32";

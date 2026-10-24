@@ -62,4 +62,26 @@ public sealed class ECDsaPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void GenerateKey_Throws() => ECDsaPkcs11TestCases.Assert_GenerateKey_Throws(_backend);
+
+    // secp160r1 and secp224k1, whose group order is one bit longer than the field; not every backend
+    // implements them.
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [InlineData("secp224k1/352")]
+    [InlineData("secp224k1/1")]
+    [InlineData("secp160r1/351")]
+    [InlineData("secp160r1/1")]
+    public void VerifyHash_DerSignature_OrderLongerThanField_Verifies(string vector) => ECDsaPkcs11TestCases.Assert_VerifyHash_DerSignature_OrderLongerThanField_Verifies(_backend, vector);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [InlineData("secp224k1/352")]
+    [InlineData("secp160r1/351")]
+    public void VerifyHash_P1363_OrderLongerThanField_TakesTheOrdersLength(string vector) => ECDsaPkcs11TestCases.Assert_VerifyHash_P1363_OrderLongerThanField_TakesTheOrdersLength(_backend, vector);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void VerifyHash_DerZeroSignature_ReturnsFalse() => ECDsaPkcs11TestCases.Assert_VerifyHash_DerZeroSignature_ReturnsFalse(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [InlineData("secp224k1")]
+    [InlineData("secp160r1")]
+    public void SignHash_OrderLongerThanField_RoundTrips(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_OrderLongerThanField_RoundTrips(_backend, curve);
 }

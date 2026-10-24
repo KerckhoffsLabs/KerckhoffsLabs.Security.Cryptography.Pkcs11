@@ -141,7 +141,7 @@ public sealed class DSAPkcs11 : DSA
             case DSASignatureFormat.Rfc3279DerSequence:
                 // A malformed signature does not verify, as for the BCL's own conversion.
                 _key.Session.Enforce(new MechanismUseRequest(mech, CryptoOperation.Verify));
-                byte[]? ieee = DerToIeeeP1363(signature, GetSubprimeLength());
+                byte[]? ieee = DssSignatureEncoding.DerToIeeeP1363(signature, GetSubprimeLength());
                 return ieee is not null ? _key.Verify(mech, hash, ieee) : DoesNotVerify();
             default:
                 // The public overloads reject an unknown format before reaching here; as DSAOpenSsl.
@@ -185,46 +185,6 @@ public sealed class DSAPkcs11 : DSA
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "DSAPkcs11 (q is zero)");
         Volatile.Write(ref _subprimeLength, q.Length);
         return q.Length;
-    }
-
-    // RFC 3279 Dss-Sig-Value { r, s } to r‖s, each left-padded to fieldLength; null when the encoding is
-    // malformed or a value does not fit, where the BCL's conversion throws and its caller returns false.
-    private static byte[]? DerToIeeeP1363(ReadOnlySpan<byte> signature, int fieldLength)
-    {
-        try
-        {
-            AsnDecoder.ReadSequence(signature, AsnEncodingRules.DER, out int offset, out int length, out int consumed);
-            if (consumed != signature.Length)
-                return null;
-            ReadOnlySpan<byte> sequence = signature.Slice(offset, length);
-            ReadOnlySpan<byte> r = AsnDecoder.ReadIntegerBytes(sequence, AsnEncodingRules.DER, out consumed);
-            sequence = sequence[consumed..];
-            ReadOnlySpan<byte> s = AsnDecoder.ReadIntegerBytes(sequence, AsnEncodingRules.DER, out consumed);
-            if (consumed != sequence.Length)
-                return null;
-
-            byte[] ieee = new byte[2 * fieldLength];
-            return TryCopyField(r, ieee.AsSpan(0, fieldLength)) && TryCopyField(s, ieee.AsSpan(fieldLength))
-                ? ieee
-                : null;
-        }
-        catch (AsnContentException)
-        {
-            return null;
-        }
-    }
-
-    // A DER INTEGER is one byte longer than the field only for the zero that keeps a set high bit positive.
-    private static bool TryCopyField(ReadOnlySpan<byte> field, Span<byte> destination)
-    {
-        if (field.Length > destination.Length)
-        {
-            if (field.Length != destination.Length + 1 || field is not [0, > 0x7F, ..])
-                return false;
-            field = field[1..];
-        }
-        field.CopyTo(destination[(destination.Length - field.Length)..]);
-        return true;
     }
 
     // -----------------------------------------------------------------------
