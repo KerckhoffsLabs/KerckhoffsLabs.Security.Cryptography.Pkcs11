@@ -51,3 +51,4 @@
 [submodule "vendor/tpm2-abrmd"]
 	path = vendor/tpm2-abrmd
 	url = https://github.com/tpm2-software/tpm2-abrmd.git
+	ignore = untracked
