@@ -24,6 +24,15 @@ public sealed class ECDsaPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void SignData_VerifiesUnderBclFromExportedPublicKey() => ECDsaPkcs11TestCases.Assert_SignData_VerifiesUnderBclFromExportedPublicKey(_backend, "P-256");
 
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [InlineData("SHA3-256")]
+    [InlineData("SHA3-384")]
+    [InlineData("SHA3-512")]
+    public void Sha3_SignVerifyData_EveryOverload_RoundTrips(string hashName) => ECDsaPkcs11TestCases.Assert_Sha3_SignVerifyData_EveryOverload_RoundTrips(_backend, hashName);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void Sha3_256_WycheproofVector_Verifies_AndTamperedDoesNot() => ECDsaPkcs11TestCases.Assert_Sha3_256_WycheproofVector_Verifies_AndTamperedDoesNot(_backend);
+
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Ctor_NonEcKey_Throws() => ECDsaPkcs11TestCases.Assert_Ctor_NonEcKey_Throws(_backend);
 

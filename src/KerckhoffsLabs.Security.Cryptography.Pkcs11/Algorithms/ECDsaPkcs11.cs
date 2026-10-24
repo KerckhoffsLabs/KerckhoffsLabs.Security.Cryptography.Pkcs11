@@ -2,6 +2,11 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
+// This file builds the very mechanisms the secure-by-default policy gates: it sits on the
+// enforcement side of the check (the session's crypto policy check rejects them at the point of
+// use unless the session's crypto policy permits it), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+#pragma warning disable KLPKCS11009
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
 /// <summary>
@@ -87,7 +92,8 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// <c>SignData(byte[], HashAlgorithmName)</c> convenience overload, which this class does not
     /// override, does NOT reach this method — see the class remarks.
     /// </remarks>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512 or SHA3-256/384/512, or is SHA-224 on a token with neither <c>CKM_ECDSA_SHA224</c> nor the <c>CKM_SHA224</c> digest.</exception>
+    /// <exception cref="PlatformNotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is SHA-3, the token lacks the combined <c>CKM_ECDSA_SHA3_*</c> mechanism, and the platform has no SHA-3.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
@@ -114,7 +120,8 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// <see cref="ECDsa.VerifyData(byte[], byte[], HashAlgorithmName)"/> convenience overload does NOT
     /// reach this method — see the class remarks.
     /// </remarks>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512 or SHA3-256/384/512, or is SHA-224 on a token with neither <c>CKM_ECDSA_SHA224</c> nor the <c>CKM_SHA224</c> digest.</exception>
+    /// <exception cref="PlatformNotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is SHA-3, the token lacks the combined <c>CKM_ECDSA_SHA3_*</c> mechanism, and the platform has no SHA-3.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
@@ -280,15 +287,24 @@ public sealed class ECDsaPkcs11 : ECDsa
         return base.HashData(data, hashAlgorithm);
     }
 
+    // The span overloads' hasher, for a token without the combined CKM_ECDSA_* mechanism. SHA-3 is the
+    // BCL's, which throws PlatformNotSupportedException where the platform has no SHA-3, as the BCL's own
+    // ECDsa does. .NET has no SHA-224 through any API, so a SHA-224 digest is the token's CKM_SHA224; a
+    // token with neither falls through to the NotSupportedException below rather than to a hand-rolled
+    // SHA-224 that this adapter has no business owning.
     private byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data, CryptoOperation operation)
     {
         GuardWeakHash(hashAlgorithm, operation);
         return hashAlgorithm.Name switch
         {
             "SHA1" => SHA1.HashData(data),
+            "SHA224" when _key.SupportsMechanism(CKM.CKM_SHA224, CKF.CKF_DIGEST) => _key.Session.Digest(new Mechanism(CKM.CKM_SHA224), data),
             "SHA256" => SHA256.HashData(data),
             "SHA384" => SHA384.HashData(data),
             "SHA512" => SHA512.HashData(data),
+            "SHA3-256" => SHA3_256.HashData(data),
+            "SHA3-384" => SHA3_384.HashData(data),
+            "SHA3-512" => SHA3_512.HashData(data),
             _ => throw new NotSupportedException($"ECDSA does not support hash {hashAlgorithm.Name}.")
         };
     }

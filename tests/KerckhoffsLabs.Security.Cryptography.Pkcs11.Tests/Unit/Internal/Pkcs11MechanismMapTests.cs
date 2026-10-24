@@ -91,6 +91,9 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA256", CKM.CKM_ECDSA_SHA256)]
     [InlineData("SHA384", CKM.CKM_ECDSA_SHA384)]
     [InlineData("SHA512", CKM.CKM_ECDSA_SHA512)]
+    [InlineData("SHA3-256", CKM.CKM_ECDSA_SHA3_256)]
+    [InlineData("SHA3-384", CKM.CKM_ECDSA_SHA3_384)]
+    [InlineData("SHA3-512", CKM.CKM_ECDSA_SHA3_512)]
     public void EcdsaSign_HashToCkm_ReturnsExpected(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.EcdsaSign(new HashAlgorithmName(hashName));

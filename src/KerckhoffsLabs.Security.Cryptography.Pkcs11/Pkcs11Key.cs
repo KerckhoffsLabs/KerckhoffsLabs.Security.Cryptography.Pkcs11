@@ -876,6 +876,9 @@ public sealed partial class Pkcs11Key : IDisposable
             CKM.CKM_ECDSA_SHA256 => System.Security.Cryptography.HashAlgorithmName.SHA256,
             CKM.CKM_ECDSA_SHA384 => System.Security.Cryptography.HashAlgorithmName.SHA384,
             CKM.CKM_ECDSA_SHA512 => System.Security.Cryptography.HashAlgorithmName.SHA512,
+            CKM.CKM_ECDSA_SHA3_256 => System.Security.Cryptography.HashAlgorithmName.SHA3_256,
+            CKM.CKM_ECDSA_SHA3_384 => System.Security.Cryptography.HashAlgorithmName.SHA3_384,
+            CKM.CKM_ECDSA_SHA3_512 => System.Security.Cryptography.HashAlgorithmName.SHA3_512,
             _ => throw new NotSupportedException(
                 $"Managed ECDSA verify is not implemented for mechanism {mechanism.Type}. " +
                 "Provide a CKO_PUBLIC_KEY companion on the token to use the native verify path."),
