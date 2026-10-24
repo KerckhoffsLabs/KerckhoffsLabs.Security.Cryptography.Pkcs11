@@ -162,12 +162,22 @@ internal static class WrapUnwrapCurve25519TestCases
         });
     }
 
-    private static void RequireEd25519(IPkcs11Backend backend) =>
-        backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD, CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKM.CKM_EDDSA);
+    private static void RequireEd25519(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKM.CKM_EDDSA);
+        RequireCbcPadKeyWrap(backend);
+    }
 
-    private static void RequireX25519(IPkcs11Backend backend) =>
-        backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD, CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN,
-            CKM.CKM_ECDH1_DERIVE, CKM.CKM_SHA256_HMAC);
+    private static void RequireX25519(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_SHA256_HMAC);
+        RequireCbcPadKeyWrap(backend);
+    }
+
+    // Craton HSM lists CKM_AES_CBC_PAD for C_Encrypt and C_Decrypt only, and refuses C_WrapKey and
+    // C_UnwrapKey with it (CKR_MECHANISM_INVALID).
+    private static void RequireCbcPadKeyWrap(IPkcs11Backend backend) =>
+        backend.RequireMechanismFlags(CKM.CKM_AES_CBC_PAD, f => f.Wrap && f.Unwrap, "CKF_WRAP and CKF_UNWRAP");
 
     // The session runs under AllowInsecure: CBC wrapping, extractable private keys and a raw CKD_NULL
     // agreement are what is under test, and SecureOnly refuses all three.
