@@ -76,7 +76,7 @@ updates:
 # Deliberately not tracked:
 #
 # - gitsubmodule. The vendored modules under vendor/ are pinned to chosen points: an upstream release
-#   (NSS_3_131_RTM, BouncyHsm v2.3.3) or a reviewed commit just past one. Dependabot can only move a
+#   (NSS_3_132_RTM, BouncyHsm v2.3.3) or a reviewed commit just past one. Dependabot can only move a
 #   submodule to the tip of a branch, which would replace each of those choices with whatever the
 #   development branch holds that day.
 # - dotnet-sdk. global.json names 10.0.100 with rollForward: latestFeature, and CI installs the latest
