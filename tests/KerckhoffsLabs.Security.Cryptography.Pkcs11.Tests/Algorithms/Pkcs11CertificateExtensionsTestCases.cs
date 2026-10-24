@@ -259,11 +259,16 @@ internal static class Pkcs11CertificateExtensionsTestCases
 
     // === SLH-DSA ==================================================================================
 
-    internal static void Assert_GetSlhDsaPrivateKey_SignsForTheCertificate(Pkcs11Session session, Func<CKM, bool> supports)
+    // Over SHA2-128f, the fastest; a token that implements only others uses the overload taking the set.
+    internal static void Assert_GetSlhDsaPrivateKey_SignsForTheCertificate(Pkcs11Session session, Func<CKM, bool> supports) =>
+        Assert_GetSlhDsaPrivateKey_SignsForTheCertificate(session, supports, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F);
+
+    internal static void Assert_GetSlhDsaPrivateKey_SignsForTheCertificate(Pkcs11Session session, Func<CKM, bool> supports,
+        CkpSlhDsa parameterSet)
     {
         RequirePostQuantum(supports, SlhDsa.IsSupported, CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA);
         byte[] id = NewId();
-        using var key = GenerateSlhDsaKeyPair(session, id, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F);
+        using var key = GenerateSlhDsaKeyPair(session, id, parameterSet);
         using var certificate = Store(session, IssueFor(key), id);
 
         AssertOnlyTheseAnswer(certificate, "SlhDsa");
