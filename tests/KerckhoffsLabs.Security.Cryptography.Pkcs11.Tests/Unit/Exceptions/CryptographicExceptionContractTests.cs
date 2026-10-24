@@ -53,7 +53,8 @@ public sealed class CryptographicExceptionContractTests
         using RSA rsa = new RSAPkcs11(key);
 
         byte[] ciphertext = rsa.Encrypt(RandomNumberGenerator.GetBytes(32), RSAEncryptionPadding.OaepSHA256);
-        ciphertext[0] ^= 0xFF;
+        // A middle byte: the first could take the value past the modulus, which RSAPkcs11 refuses itself.
+        ciphertext[ciphertext.Length / 2] ^= 0xFF;
 
         var ex = Assert.ThrowsAny<CryptographicException>(
             () => rsa.Decrypt(ciphertext, RSAEncryptionPadding.OaepSHA256));

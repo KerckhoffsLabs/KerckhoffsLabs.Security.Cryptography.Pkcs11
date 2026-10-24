@@ -497,7 +497,9 @@ internal static class RSAPkcs11TestCases
                     byte[] ct = OrSkipIfOaepHashUnsupported(
                         () => otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1));
 
-                    Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+                    // About half the time the other key's ciphertext is not below this key's modulus, and the
+                    // adapter refuses it before the token does.
+                    Assert.ThrowsAny<CryptographicException>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
                 }
             }
             finally
@@ -505,6 +507,103 @@ internal static class RSAPkcs11TestCases
                 try { other.Destroy(); } catch { /* best-effort cleanup of the second key */ }
             }
         });
+    }
+
+    // === A ciphertext the key cannot have produced =========================
+    // As for the BCL's own RSA, a ciphertext must be the modulus's length and its value below the modulus; one
+    // that is not throws CryptographicException without reaching the token. Some tokens answer one with a
+    // plaintext, which Wycheproof test vectors (C2SP/wycheproof) found: rsa_pkcs1_2048_test.json tcId 30 (c = n),
+    // tcId 32 (an empty ciphertext) and tcId 35 (a truncated one).
+
+    // Every RSA decryption entry point. Only Decrypt(byte[], ...) is overridden: the BCL routes the others to it.
+    internal static readonly Dictionary<string, Func<RSA, byte[], RSAEncryptionPadding, byte[]>> DecryptCalls = new()
+    {
+        ["Decrypt(byte[])"] = (rsa, c, p) => rsa.Decrypt(c, p),
+        ["Decrypt(span)"] = (rsa, c, p) => rsa.Decrypt(c.AsSpan(), p),
+        ["Decrypt(span, span)"] = (rsa, c, p) =>
+        {
+            byte[] destination = new byte[c.Length + 512];
+            return destination[..rsa.Decrypt(c.AsSpan(), destination, p)];
+        },
+        ["TryDecrypt"] = (rsa, c, p) =>
+        {
+            byte[] destination = new byte[c.Length + 512];
+            Assert.True(rsa.TryDecrypt(c, destination, p, out int written));
+            return destination[..written];
+        },
+    };
+
+    // Ciphertexts a key cannot have produced, from its modulus and one ciphertext it did produce.
+    internal static (string Name, byte[] Ciphertext)[] CiphertextsNotFromTheKey(byte[] modulus, byte[] ciphertext) =>
+    [
+        ("empty", []),
+        ("one byte short", ciphertext[..^1]),
+        ("one byte long", [0x00, .. ciphertext]),
+        ("c = n", modulus),
+        ("c = n + 1", PlusOne(modulus)),
+        ("c = 2^k - 1", Enumerable.Repeat((byte)0xFF, modulus.Length).ToArray()),
+    ];
+
+    private static byte[] PlusOne(byte[] value)
+    {
+        byte[] sum = [.. value];
+        for (int i = sum.Length - 1; i >= 0; i--)
+        {
+            sum[i] = unchecked((byte)(sum[i] + 1));
+            if (sum[i] != 0)
+                break;
+        }
+        return sum;
+    }
+
+    internal static RSAEncryptionPadding EncryptionPadding(string name) =>
+        name == "Pkcs1" ? RSAEncryptionPadding.Pkcs1 : RSAEncryptionPadding.OaepSHA256;
+
+    internal static void Assert_Decrypt_CiphertextNotFromTheKey_Throws(IPkcs11Backend backend, string paddingName)
+    {
+        RSAEncryptionPadding padding = EncryptionPadding(paddingName);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, padding == RSAEncryptionPadding.Pkcs1 ? CKM.CKM_RSA_PKCS : CKM.CKM_RSA_PKCS_OAEP);
+        using var session = OpenSession(backend);
+        using var key = GenerateRsaKey(session);
+        try
+        {
+            using var rsa = new RSAPkcs11(key);
+            RSAParameters publicKey = rsa.ExportParameters(includePrivateParameters: false);
+            using var bcl = RSA.Create(publicKey);
+            byte[] plaintext = Encoding.UTF8.GetBytes("for this key only");
+            byte[] ciphertext = bcl.Encrypt(plaintext, padding);
+            var notFromTheKey = CiphertextsNotFromTheKey(publicKey.Modulus!, ciphertext);
+
+            // The policy refuses PKCS#1 v1.5 before the ciphertext is looked at.
+            if (padding == RSAEncryptionPadding.Pkcs1)
+                Assert.All(notFromTheKey, c => Assert.Throws<CryptoPolicyViolationException>(() => rsa.Decrypt(c.Ciphertext, padding)));
+
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            {
+                // Only the exact type: a token's refusal would be a Pkcs11Exception.
+                Assert.All(notFromTheKey, c => Assert.All(DecryptCalls.Values, decrypt =>
+                    Assert.Throws<CryptographicException>(() => decrypt(rsa, c.Ciphertext, padding))));
+
+                Assert.Equal(plaintext, OrSkipIfOaepHashUnsupported(() => rsa.Decrypt(ciphertext, padding)));
+                Assert.All(DecryptCalls.Values, decrypt => Assert.Equal(plaintext, decrypt(rsa, ciphertext, padding)));
+
+                // Pkcs11Key's own Decrypt and Unwrap check it too: the adapter is not the only way in.
+                Mechanism mechanism = padding == RSAEncryptionPadding.Pkcs1
+                    ? new Mechanism(CKM.CKM_RSA_PKCS)
+                    : Pkcs11MechanismMap.RsaOaep(HashAlgorithmName.SHA256);
+                using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Build();
+                Assert.All(notFromTheKey, c =>
+                {
+                    Assert.Throws<CryptographicException>(() => key.Decrypt(mechanism, c.Ciphertext));
+                    Assert.Throws<CryptographicException>(() => key.Unwrap(mechanism, c.Ciphertext, template));
+                });
+                Assert.Equal(plaintext, key.Decrypt(mechanism, ciphertext));
+            }
+        }
+        finally
+        {
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
+        }
     }
 
     // === Key material export ===============================================

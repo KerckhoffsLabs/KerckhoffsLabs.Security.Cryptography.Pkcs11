@@ -288,10 +288,17 @@ public sealed class RSAPkcs11 : RSA
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// <see cref="RSA.TryDecrypt"/> and both <see cref="RSA.Decrypt(ReadOnlySpan{byte}, RSAEncryptionPadding)"/>
+    /// overloads come here. As for the BCL's own RSA, a ciphertext must be exactly the modulus's length, and its
+    /// big-endian value must be less than the modulus; one that is not never reaches the token, which might
+    /// otherwise answer it with a plaintext. <see cref="Pkcs11Key.Decrypt"/> checks it.
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>), or OAEP with a SHA-1 or SHA-224 hash, unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; use OAEP with SHA-256 or stronger instead.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> call.</exception>
+    /// <exception cref="CryptographicException">Thrown if <paramref name="data"/> is not the length of the key's modulus, or its value is not less than the modulus.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from reading the key's <c>CKA_MODULUS</c> or from the underlying <c>C_Decrypt</c> call.</exception>
     public override byte[] Decrypt(byte[] data, RSAEncryptionPadding padding)
     {
         ArgumentNullException.ThrowIfNull(data);

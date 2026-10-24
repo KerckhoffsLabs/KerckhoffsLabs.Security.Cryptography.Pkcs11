@@ -228,6 +228,13 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         throw new CryptoPolicyViolationException(policy.Name, request, decision.Reason!);
     }
 
+    /// <summary>
+    /// Refuses an input the operation's key cannot accept, by throwing. Called under the session's lock, after
+    /// the policy has allowed the mechanism and before the token sees the input; it may read the key's
+    /// attributes, as the lock is reentrant.
+    /// </summary>
+    internal delegate void InputCheck(ReadOnlySpan<byte> input);
+
     /// <summary>Evaluates without throwing or logging.</summary>
     internal bool IsPermitted(PolicyRequest request)
     {

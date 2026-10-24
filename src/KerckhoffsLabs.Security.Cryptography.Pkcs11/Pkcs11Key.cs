@@ -113,56 +113,73 @@ public sealed partial class Pkcs11Key : IDisposable
     private const int KeySizeUnknown = 0;
     private int _keySizeBits = KeySizeNotRead;
 
-    private int? ReadKeySizeBits()
+    private int? ReadKeySizeBits() => _keyType switch
     {
-        switch (_keyType)
+        CKK.CKK_EC => ReadEcKeySizeBits(),
+        CKK.CKK_RSA => ReadRsaKeySizeBits(),
+        CKK.CKK_DSA => ReadDsaKeySizeBits(),
+        CKK.CKK_DH or CKK.CKK_X9_42_DH or CKK.CKK_EC_MONTGOMERY or CKK.CKK_KEA or CKK.CKK_GOSTR3410 => null,
+        var t when IsAsymmetricKeyType(t) => null,
+        _ => ReadSecretKeySizeBits(),
+    };
+
+    // The curve's field size from the library's catalog; null for a curve it doesn't list.
+    private int? ReadEcKeySizeBits()
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
+        if (attrs[0].CannotBeRead)
+            return null;
+        try
         {
-            case CKK.CKK_EC:
-                {
-                    using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
-                    if (attrs[0].CannotBeRead)
-                        return null;
-                    try
-                    {
-                        return _session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
-                    }
-                    catch (ArgumentException)
-                    {
-                        return null; // not a DER-encoded named-curve OID
-                    }
-                }
-            case CKK.CKK_RSA:
-                {
-                    using var attrs = GetAttributeValue(CKA.CKA_MODULUS_BITS, CKA.CKA_MODULUS);
-                    if (!attrs[0].CannotBeRead)
-                        return checked((int)attrs[0].GetValueAsUlong());
-                    return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
-                }
-            case CKK.CKK_DSA:
-                {
-                    // PKCS#11 has no CKA_PRIME_BITS (unlike RSA's CKA_MODULUS_BITS).
-                    using var attrs = GetAttributeValue(CKA.CKA_PRIME);
-                    return attrs[0].CannotBeRead ? null : BitLength(attrs[0].GetValueAsByteArray());
-                }
-            case CKK.CKK_DH or CKK.CKK_X9_42_DH or CKK.CKK_EC_MONTGOMERY or CKK.CKK_KEA or CKK.CKK_GOSTR3410:
-                return null;
-            case var t when IsAsymmetricKeyType(t):
-                return null;
-            default:
-                {
-                    using var attrs = GetAttributeValue(CKA.CKA_VALUE_LEN);
-                    return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
-                }
+            return _session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
         }
+        catch (ArgumentException)
+        {
+            return null; // not a DER-encoded named-curve OID
+        }
+    }
+
+    // CKA_MODULUS_BITS, else the bit length of CKA_MODULUS. Without a public half these are the private one's,
+    // so its modulus is kept for decryption.
+    private int? ReadRsaKeySizeBits()
+    {
+        bool privateHalf = PublicHandle.IsInvalid;
+        using var attrs = GetAttributeValue(CKA.CKA_MODULUS_BITS, CKA.CKA_MODULUS);
+        if (privateHalf && !attrs[1].CannotBeRead)
+            KeepRsaModulus(attrs[1].GetValueAsByteArray());
+        if (!attrs[0].CannotBeRead)
+            return checked((int)attrs[0].GetValueAsUlong());
+        return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
+    }
+
+    // The bit length of CKA_PRIME: PKCS#11 has no CKA_PRIME_BITS (unlike RSA's CKA_MODULUS_BITS).
+    private int? ReadDsaKeySizeBits()
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_PRIME);
+        return attrs[0].CannotBeRead ? null : BitLength(attrs[0].GetValueAsByteArray());
+    }
+
+    // CKA_VALUE_LEN, in bytes, as bits.
+    private int? ReadSecretKeySizeBits()
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_VALUE_LEN);
+        return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
     }
 
     // Bit length of a big-endian unsigned integer, ignoring leading zero bytes.
     private static int? BitLength(ReadOnlySpan<byte> value)
     {
-        int i = value.IndexOfAnyExcept((byte)0);
-        if (i < 0)
+        value = TrimLeadingZeros(value);
+        if (value.IsEmpty)
             return null;
-        return (value.Length - i - 1) * 8 + 32 - System.Numerics.BitOperations.LeadingZeroCount((uint)value[i]);
+        return (value.Length - 1) * 8 + 32 - System.Numerics.BitOperations.LeadingZeroCount((uint)value[0]);
+    }
+
+    // A big-endian unsigned integer without its leading zero bytes; empty for zero.
+    private static ReadOnlySpan<byte> TrimLeadingZeros(ReadOnlySpan<byte> value)
+    {
+        int i = value.IndexOfAnyExcept((byte)0);
+        return i < 0 ? [] : value[i..];
     }
 
     /// <summary>The key's CKA_LABEL, or <see langword="null"/> if not set on the token.</summary>
@@ -564,9 +581,15 @@ public sealed partial class Pkcs11Key : IDisposable
     /// Decrypts <paramref name="ciphertext"/> using this key. Symmetric uses the single
     /// handle; asymmetric uses the private handle.
     /// </summary>
+    /// <remarks>
+    /// With <see cref="CKM.CKM_RSA_PKCS"/> or <see cref="CKM.CKM_RSA_PKCS_OAEP"/>, a ciphertext this RSA key cannot
+    /// have produced never reaches the token, which might otherwise answer it with a plaintext: as for the BCL's
+    /// own RSA, it must be the modulus's length and its big-endian value less than the modulus.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown, with an RSA PKCS#1 v1.5 or OAEP mechanism, if <paramref name="ciphertext"/> is not the length of the key's modulus, or its value is not less than the modulus.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Decrypt</c> call.</exception>
     public byte[] Decrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext)
     {
@@ -577,7 +600,7 @@ public sealed partial class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Decrypt (no private handle)");
 
-        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext);
+        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext, RsaCiphertextCheckFor(mechanism));
     }
 
     /// <summary>
@@ -690,10 +713,15 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <paramref name="template"/>. Symmetric uses the single handle; asymmetric
     /// uses the private handle (unwrapping is a decrypt-shaped operation).
     /// </summary>
+    /// <remarks>
+    /// As for <see cref="Decrypt"/>, with <see cref="CKM.CKM_RSA_PKCS"/> or <see cref="CKM.CKM_RSA_PKCS_OAEP"/> a
+    /// wrapped key this RSA key cannot have produced never reaches the token.
+    /// </remarks>
     /// <returns>A new <see cref="Pkcs11Key"/> wrapping the unwrapped object.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="template"/> requests an extractable or non-sensitive key, unless the session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown, with an RSA PKCS#1 v1.5 or OAEP mechanism, if <paramref name="wrappedBytes"/> is not the length of the key's modulus, or its value is not less than the modulus.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
     public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
     {
@@ -706,9 +734,74 @@ public sealed partial class Pkcs11Key : IDisposable
                 "Pkcs11Key.Unwrap (no private handle)");
 
         ObjectHandle resulting = _session.Core.UnwrapKey(
-            mechanism, PrivateHandle, wrappedBytes, [.. template.Attributes]);
+            mechanism, PrivateHandle, wrappedBytes, [.. template.Attributes], RsaCiphertextCheckFor(mechanism));
 
         return _session.HydrateExistingHandleAsKey(resulting);
+    }
+
+    // What an RSA ciphertext is held to. Null until first needed; read and written with Volatile, so a thread
+    // racing the first write sees null or the whole value. A key object's CKA_MODULUS cannot be modified.
+    private RsaModulus? _rsaModulus;
+
+    // Value is the modulus, big-endian without leading zero bytes, or null when only its byte Length is known.
+    // A Length of zero knows nothing.
+    private sealed record RsaModulus(byte[]? Value, int Length)
+    {
+        public static readonly RsaModulus Unknown = new(null, 0);
+    }
+
+    // The check that refuses, as the BCL's own RSA does, a ciphertext an RSA key cannot have produced under
+    // CKM_RSA_PKCS or CKM_RSA_PKCS_OAEP: one that is not the modulus's length, or whose big-endian value is not
+    // less than the modulus. Some tokens answer one with a plaintext (Wycheproof rsa_pkcs1_2048_test.json tcIds
+    // 30, 32 and 35). Null for any other key type or mechanism. The core calls it once the policy has allowed
+    // the mechanism, so a refused PKCS#1 v1.5 is refused as such, and the token is not read for it.
+    private Pkcs11SessionCore.InputCheck? RsaCiphertextCheckFor(Mechanism mechanism) =>
+        _keyType == CKK.CKK_RSA && mechanism.Type is CKM.CKM_RSA_PKCS or CKM.CKM_RSA_PKCS_OAEP
+            ? ThrowIfNotRsaCiphertext
+            : null;
+
+    // Equal-length big-endian values compare as their bytes do. Neither is secret, so the comparison need not
+    // run in constant time.
+    private void ThrowIfNotRsaCiphertext(ReadOnlySpan<byte> data)
+    {
+        RsaModulus modulus = Volatile.Read(ref _rsaModulus) ?? ReadRsaModulus();
+        if (modulus.Length == 0)
+            return;
+        if (data.Length != modulus.Length)
+            throw new System.Security.Cryptography.CryptographicException(
+                "The length of the data to decrypt is not valid for the size of this key.");
+        if (modulus.Value is not null && data.SequenceCompareTo(modulus.Value) >= 0)
+            throw new System.Security.Cryptography.CryptographicException(
+                "The data to decrypt is not less than the key's modulus.");
+    }
+
+    // The private half's CKA_MODULUS: that half is the one that decrypts, and a public half found by CKA_ID
+    // could be another key's. A private key need not expose it; then KeySize, best-effort, still fixes the
+    // length, and with neither the ciphertext goes to the token unchecked, as it did before. A modulus of
+    // zero throws CKR_ATTRIBUTE_VALUE_INVALID rather than refusing every ciphertext.
+    private RsaModulus ReadRsaModulus()
+    {
+        using (var attrs = _session.Core.GetAttributeValue(PrivateHandle, [CKA.CKA_MODULUS]))
+        {
+            if (!attrs[0].CannotBeRead)
+                return KeepRsaModulus(attrs[0].GetValueAsByteArray())
+                    ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "Pkcs11Key.Decrypt (RSA modulus is zero)");
+        }
+
+        RsaModulus fromSize = KeySize is int bits ? new(null, (bits + 7) / 8) : RsaModulus.Unknown;
+        Volatile.Write(ref _rsaModulus, fromSize);
+        return fromSize;
+    }
+
+    // Keeps a non-zero modulus; null for zero.
+    private RsaModulus? KeepRsaModulus(ReadOnlySpan<byte> value)
+    {
+        value = TrimLeadingZeros(value);
+        if (value.IsEmpty)
+            return null;
+        var modulus = new RsaModulus(value.ToArray(), value.Length);
+        Volatile.Write(ref _rsaModulus, modulus);
+        return modulus;
     }
 
     /// <summary>

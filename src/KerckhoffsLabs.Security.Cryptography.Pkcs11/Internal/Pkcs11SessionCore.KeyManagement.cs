@@ -211,6 +211,15 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="attributes">Template for the resulting unwrapped key.</param>
     /// <returns>Handle of the newly unwrapped key.</returns>
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes)
+        => UnwrapKey(mechanism, unwrappingKeyHandle, wrappedKey, attributes, checkInput: null);
+
+    /// <inheritdoc cref="UnwrapKey(Mechanism, ObjectHandle, ReadOnlySpan{byte}, List{ObjectAttribute})"/>
+    /// <param name="mechanism">Key-unwrap mechanism.</param>
+    /// <param name="unwrappingKeyHandle">Handle of the unwrapping key (private RSA, AES-WRAP key, etc.).</param>
+    /// <param name="wrappedKey">Wrapped key bytes to unwrap.</param>
+    /// <param name="attributes">Template for the resulting unwrapped key.</param>
+    /// <param name="checkInput">Refuses a wrapped key the unwrapping key cannot have produced; see <see cref="InputCheck"/>.</param>
+    internal ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes, InputCheck? checkInput)
     {
         using var _ = AcquireExclusive();
 
@@ -230,6 +239,9 @@ internal sealed partial class Pkcs11SessionCore
         // caller omitted them; an explicit insecure value requires a policy that permits it (throws otherwise).
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
+
+        // After every policy check, the template's included.
+        checkInput?.Invoke(wrappedKey);
 
         CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, in ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, out NativeCULong unwrappedKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
