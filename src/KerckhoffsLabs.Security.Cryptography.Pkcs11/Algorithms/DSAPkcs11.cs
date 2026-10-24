@@ -22,7 +22,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// produce IEEE P1363 (r‖s) signatures, matching the BCL default — the base class converts to the
 /// DER format on request via the <c>DSASignatureFormat</c> overloads. Verification with a
 /// <c>DSASignatureFormat</c> converts a DER signature to r‖s here, sizing it from the key's
-/// <c>CKA_SUBPRIME</c>, and verifies it with raw <c>CKM_DSA</c>.
+/// <c>CKA_SUBPRIME</c>, and verifies it with raw <c>CKM_DSA</c>. The BCL has no SHA-224, so wherever a
+/// message is hashed before raw <c>CKM_DSA</c>, a SHA-224 digest is computed on the token with
+/// <c>CKM_SHA224</c> when the token offers it; without it, SHA-224 fails there as it does for the BCL's DSA.
 /// </para>
 /// <para>
 /// Note: NIST FIPS 186-5 (2023) disallows DSA for signature generation; this adapter is for interop
@@ -277,7 +279,7 @@ public sealed class DSAPkcs11 : DSA
         ThrowIfNoHashName(hashAlgorithm);
 
         GuardHash(hashAlgorithm, CryptoOperation.Verify);
-        return VerifySignature(base.HashData(data, offset, count, hashAlgorithm), signature);
+        return VerifySignature(HashArray(data, offset, count, hashAlgorithm), signature);
     }
 
     /// <inheritdoc/>
@@ -289,7 +291,7 @@ public sealed class DSAPkcs11 : DSA
         ThrowIfNoHashName(hashAlgorithm);
 
         GuardHash(hashAlgorithm, CryptoOperation.Verify);
-        return VerifySignature(base.HashData(data, hashAlgorithm), signature);
+        return VerifySignature(HashStream(data, hashAlgorithm), signature);
     }
 
     /// <inheritdoc/>
@@ -298,7 +300,7 @@ public sealed class DSAPkcs11 : DSA
     {
         GuardHash(hashAlgorithm, CryptoOperation.Verify);
         byte[] buffer = data.ToArray();
-        return VerifySignatureCore(base.HashData(buffer, 0, buffer.Length, hashAlgorithm), signature, signatureFormat);
+        return VerifySignatureCore(HashArray(buffer, 0, buffer.Length, hashAlgorithm), signature, signatureFormat);
     }
 
     /// <inheritdoc/>
@@ -306,7 +308,7 @@ public sealed class DSAPkcs11 : DSA
         Stream data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm, DSASignatureFormat signatureFormat)
     {
         GuardHash(hashAlgorithm, CryptoOperation.Verify);
-        return VerifySignatureCore(base.HashData(data, hashAlgorithm), signature, signatureFormat);
+        return VerifySignatureCore(HashStream(data, hashAlgorithm), signature, signatureFormat);
     }
 
     // With every verification overload above hashing on its own, the base class reaches these two only
@@ -316,15 +318,46 @@ public sealed class DSAPkcs11 : DSA
     protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
     {
         GuardHash(hashAlgorithm, CryptoOperation.Sign);
-        return base.HashData(data, offset, count, hashAlgorithm);
+        return HashArray(data, offset, count, hashAlgorithm);
     }
 
     /// <inheritdoc/>
     protected override byte[] HashData(Stream data, HashAlgorithmName hashAlgorithm)
     {
         GuardHash(hashAlgorithm, CryptoOperation.Sign);
-        return base.HashData(data, hashAlgorithm);
+        return HashStream(data, hashAlgorithm);
     }
+
+    // The BCL has no SHA-224: its HashData throws CryptographicException ("not a known hash algorithm"),
+    // as it does for the BCL's own DSA. A token that offers the CKM_SHA224 digest computes it instead,
+    // under the session's policy; every other hash, and SHA-224 on a token without it, is the base class's.
+    private byte[] HashArray(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
+        => CanDigestOnToken(hashAlgorithm)
+            ? DigestOnToken(data.AsSpan(offset, count))
+            : base.HashData(data, offset, count, hashAlgorithm);
+
+    // C_Digest is single-part, so the stream is read to its end first, as SHA256Pkcs11 buffers its input.
+    private byte[] HashStream(Stream data, HashAlgorithmName hashAlgorithm)
+    {
+        if (!CanDigestOnToken(hashAlgorithm))
+            return base.HashData(data, hashAlgorithm);
+
+        using var buffer = new MemoryStream();
+        data.CopyTo(buffer);
+        try
+        {
+            return DigestOnToken(buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(buffer.GetBuffer());
+        }
+    }
+
+    private bool CanDigestOnToken(HashAlgorithmName hashAlgorithm)
+        => hashAlgorithm.Name == "SHA224" && _key.SupportsMechanism(CKM.CKM_SHA224, CKF.CKF_DIGEST);
+
+    private byte[] DigestOnToken(ReadOnlySpan<byte> data) => _key.Session.Digest(new Mechanism(CKM.CKM_SHA224), data);
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
@@ -357,19 +390,18 @@ public sealed class DSAPkcs11 : DSA
     }
 
     //
-    // SHA-224 is deliberately absent: Pkcs11MechanismMap.DsaSign accepts it (CKM_DSA_SHA224 is a real
-    // PKCS#11 mechanism), but .NET has no SHA-224 implementation through any API — no concrete type,
-    // and IncrementalHash.CreateHash(new HashAlgorithmName("SHA224")) throws CryptographicException
-    // ("not a known hash algorithm"). If the token doesn't support the combined CKM_DSA_SHA224
-    // mechanism itself, this managed-side fallback has no way to compute the hash, so SHA-224 falls
-    // through to the NotSupportedException below rather than a hand-rolled SHA-224 (same compression
-    // function as SHA-256, different IV, truncated output) that this adapter has no business owning.
+    // .NET has no SHA-224 through any API, so without the combined CKM_DSA_SHA224 mechanism a SHA-224
+    // digest is the token's CKM_SHA224, as for the base class's overloads above. A token with neither
+    // falls through to the NotSupportedException below rather than to a hand-rolled SHA-224 (same
+    // compression function as SHA-256, different IV, truncated output) that this adapter has no business
+    // owning.
     private byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data, CryptoOperation operation)
     {
         GuardHash(hashAlgorithm, operation);
         return hashAlgorithm.Name switch
         {
             "SHA1" => SHA1.HashData(data),
+            "SHA224" when CanDigestOnToken(hashAlgorithm) => DigestOnToken(data),
             "SHA256" => SHA256.HashData(data),
             "SHA384" => SHA384.HashData(data),
             "SHA512" => SHA512.HashData(data),

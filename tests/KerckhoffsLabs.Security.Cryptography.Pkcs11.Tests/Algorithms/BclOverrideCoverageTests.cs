@@ -78,7 +78,7 @@ public sealed class BclOverrideCoverageTests
     private const string DsaThroughCreateSignature =
         "Signs or verifies with CreateSignature or VerifySignature, which the adapter overrides; the formats are converted around them.";
     private const string DsaHashThroughOverride =
-        "Hashes through the HashData override, which puts the hash to the session's policy.";
+        "Hashes through the HashData override, which puts the hash to the session's policy and computes SHA-224, which the BCL lacks, with the token's CKM_SHA224 digest when the token has it.";
     private const string DsaVerifyThroughCore =
         "Ends in VerifySignatureCore, through the VerifyDataCore overrides where it hashes; the adapter overrides it to verify with CKM_DSA on the token, converting a DER signature to r‖s sized from CKA_SUBPRIME, so a token error propagates rather than reading as false.";
     private const string DsaMaxSignatureSizeNeedsPublicObject =
