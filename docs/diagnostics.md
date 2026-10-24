@@ -77,6 +77,15 @@ a symbol: there is nothing to mark obsolete when a consumer writes
 Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `SecureOnly`
 policy check. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
 
+If you suppress it, never treat the success or failure of PKCS#1 v1.5 decryption as a signal. Some
+tokens implement *implicit rejection* (draft-irtf-cfrg-rsa-guidance), the countermeasure to the Marvin
+attack: a ciphertext with invalid padding does not fail, and `C_Decrypt` returns a synthetic plaintext
+derived deterministically from the private key and the ciphertext. SoftHSMv2, Kryoptic, NSS and
+openCryptoki were observed to do this; BouncyHsm returns an error. So `RSAPkcs11.Decrypt` does not
+always throw `CryptographicException` for bad padding, as the BCL `RSA.Decrypt` contract leads callers
+to expect, and a returned value is no evidence that the ciphertext was well formed. Where the token
+does fail, any observable difference between the two outcomes is a padding oracle.
+
 > **RSA *signatures* are a different story.** RSASSA-PKCS#1 v1.5 with a strong hash
 > (`CKM_SHA256_RSA_PKCS` and friends) is **allowed by default** and is *not* reported: it is
 > FIPS 186-5-approved and required by JWT RS256, TLS 1.2 CertificateVerify, X.509, and code signing.

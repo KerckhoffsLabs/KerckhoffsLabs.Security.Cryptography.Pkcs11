@@ -288,6 +288,22 @@ public sealed class RSAPkcs11 : RSA
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// <para>
+    /// With PKCS#1 v1.5 padding, invalid padding does not necessarily throw. Some tokens implement
+    /// <em>implicit rejection</em> (draft-irtf-cfrg-rsa-guidance), the Marvin-attack countermeasure:
+    /// instead of failing, <c>CKM_RSA_PKCS</c> returns a synthetic plaintext derived deterministically
+    /// from the private key and the ciphertext. SoftHSMv2, Kryoptic, NSS and openCryptoki were observed
+    /// to do this; BouncyHsm throws. This departs from the <see cref="RSA.Decrypt(byte[], RSAEncryptionPadding)"/>
+    /// contract, under which bad padding throws <see cref="CryptographicException"/>.
+    /// </para>
+    /// <para>
+    /// Never use the success or failure of PKCS#1 v1.5 decryption as a signal. A returned value is
+    /// not evidence that the ciphertext was well formed, and where the token throws, any observable
+    /// difference between the two outcomes is a Bleichenbacher padding oracle. Use OAEP
+    /// (<see cref="RSAEncryptionPadding.OaepSHA256"/>), whose padding check fails with an exception.
+    /// </para>
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>), or OAEP with a SHA-1 or SHA-224 hash, unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; use OAEP with SHA-256 or stronger instead.</exception>
