@@ -151,9 +151,9 @@ public sealed class AesGcmPkcs11Tests_Managed
         WithImportedGcm(key, gcm =>
         {
             byte[] tag = new byte[16];
-            gcm.Encrypt(nonce, [], [], tag, aad);
+            gcm.Encrypt(nonce, Array.Empty<byte>(), Array.Empty<byte>(), tag, aad);
             Assert.Equal(bclTag, tag); // tag authenticates the AAD over an empty message
-            gcm.Decrypt(nonce, [], tag, [], aad); // must not throw
+            gcm.Decrypt(nonce, Array.Empty<byte>(), tag, Array.Empty<byte>(), aad); // must not throw
         });
     }
 
@@ -381,6 +381,16 @@ public sealed class AesGcmPkcs11Tests_Managed
         Assert.Throws<ObjectDisposedException>(() =>
             gcm.Decrypt(new byte[12], new byte[8], new byte[16], new byte[8]));
     });
+
+    [Fact]
+    public void ByteArrayOverloads_NullArguments_FailAsBcl() => WithAnyGcm(AesGcmPkcs11TestCases.AssertNullArgumentsFailAsBcl);
+
+    [Fact]
+    public void ByteArrayOverloads_MatchBcl()
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        WithImportedGcm(key, gcm => AesGcmPkcs11TestCases.AssertArrayOverloadsMatchBcl(gcm, key));
+    }
 
     /// <summary>
     /// A failed tag check clears the plaintext destination before throwing, as the BCL does, so a

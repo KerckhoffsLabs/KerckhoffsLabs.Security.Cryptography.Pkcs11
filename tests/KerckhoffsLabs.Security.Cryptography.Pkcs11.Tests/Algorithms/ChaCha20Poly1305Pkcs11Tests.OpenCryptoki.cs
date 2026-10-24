@@ -44,6 +44,12 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_OpenCryptoki(OpenCryptokiBackend
     public void Decrypt_AfterDispose_Throws() => ChaCha20Poly1305Pkcs11TestCases.Assert_Decrypt_AfterDispose_Throws(_backend);
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void ByteArrayOverloads_NullArguments_FailAsBcl() => ChaCha20Poly1305Pkcs11TestCases.Assert_ByteArrayOverloads_NullArguments_FailAsBcl(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void ByteArrayOverloads_MatchBcl() => ChaCha20Poly1305Pkcs11TestCases.Assert_ByteArrayOverloads_MatchBcl(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void EncryptDecrypt_RoundTrips_WithAad() => ChaCha20Poly1305Pkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_WithAad(_backend);
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]

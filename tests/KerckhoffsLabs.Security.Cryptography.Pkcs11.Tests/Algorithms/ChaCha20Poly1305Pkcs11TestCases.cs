@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -259,6 +260,40 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
             byte[] dest = new byte[plaintext.Length];
             AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_CHACHA20_POLY1305, () => chacha.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
+
+    // === byte[] overloads: validated and computed as the BCL's ============
+
+    internal static void Assert_ByteArrayOverloads_NullArguments_FailAsBcl(IPkcs11Backend backend) =>
+        WithChaCha(backend, AssertNullArgumentsFailAsBcl);
+
+    internal static void Assert_ByteArrayOverloads_MatchBcl(IPkcs11Backend backend)
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        WithImportedChaCha(backend, key, chacha => AssertArrayOverloadsMatchBcl(chacha, key));
+    }
+
+    private static void SkipUnlessBclChaCha()
+    {
+        if (!ChaCha20Poly1305.IsSupported)
+            Assert.Skip("The platform has no ChaCha20Poly1305 to compare against.");
+    }
+
+    // Shared with the managed-token suite, which builds its ChaCha20Poly1305Pkcs11 without a backend.
+    internal static void AssertNullArgumentsFailAsBcl(ChaCha20Poly1305Pkcs11 chacha)
+    {
+        SkipUnlessBclChaCha();
+        using var bcl = new ChaCha20Poly1305(RandomNumberGenerator.GetBytes(32));
+        AeadTestSupport.AssertNullArgumentsFailAsBcl([12, 8, 8, 16], bcl.Encrypt, (n, a, b, c, ad) => chacha.Encrypt(n, a, b, c, ad));
+        AeadTestSupport.AssertNullArgumentsFailAsBcl([12, 8, 16, 8], bcl.Decrypt, (n, a, b, c, ad) => chacha.Decrypt(n, a, b, c, ad));
+    }
+
+    internal static void AssertArrayOverloadsMatchBcl(ChaCha20Poly1305Pkcs11 chacha, byte[] key)
+    {
+        SkipUnlessBclChaCha();
+        using var bcl = new ChaCha20Poly1305(key);
+        AeadTestSupport.AssertArrayOverloadsMatchBcl(12, 16, bcl.Encrypt,
+            (n, a, b, c, ad) => chacha.Encrypt(n, a, b, c, ad), (n, a, b, c, ad) => chacha.Decrypt(n, a, b, c, ad));
+    }
 
     // Known-answer test: RFC 8439 §2.8.2 (also confirmed via the BCL ChaCha20Poly1305 primitive).
     internal static void Assert_Encrypt_KnownAnswer_MatchesReferenceVector(IPkcs11Backend backend)

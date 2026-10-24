@@ -9,6 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// wrapper over a PKCS#11 ChaCha20 key. ChaCha20Poly1305 is sealed in the BCL so
 /// this is a wrapper, not a subclass. Method shapes mirror the BCL.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "Mirrors ChaCha20Poly1305's byte[] and span Encrypt/Decrypt overloads one-for-one; arrays bind to the byte[] overload and spans to the span one, so no call site is ambiguous.")]
 public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
 {
     // ChaCha20-Poly1305 mandates exactly 12-byte nonce and 16-byte tag per RFC 8439.
@@ -61,6 +62,18 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         AeadSizes.RequireLegal(TagByteSizes, tag.Length, "Tag length", nameof(tag));
     }
 
+    /// <inheritdoc cref="Encrypt(ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, Span{byte}, ReadOnlySpan{byte})"/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="nonce"/>, <paramref name="plaintext"/>, <paramref name="ciphertext"/> or <paramref name="tag"/> is <see langword="null"/>.</exception>
+    public void Encrypt(byte[] nonce, byte[] plaintext, byte[] ciphertext, byte[] tag, byte[]? associatedData = null)
+    {
+        ArgumentNullException.ThrowIfNull(nonce);
+        ArgumentNullException.ThrowIfNull(plaintext);
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(tag);
+
+        Encrypt((ReadOnlySpan<byte>)nonce, plaintext, ciphertext, tag, associatedData);
+    }
+
     /// <summary>
     /// Encrypts data and writes the authentication tag using the token-resident ChaCha20 key —
     /// one-shot ChaCha20-Poly1305 AEAD, mirroring <see cref="System.Security.Cryptography.ChaCha20Poly1305"/>.
@@ -111,6 +124,18 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
                 $"ChaCha20-Poly1305 encrypt returned {result.Length} bytes; expected {plaintext.Length + tag.Length}.");
         result.AsSpan(0, plaintext.Length).CopyTo(ciphertext);
         result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
+    }
+
+    /// <inheritdoc cref="Decrypt(ReadOnlySpan{byte}, ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, ReadOnlySpan{byte})"/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="nonce"/>, <paramref name="ciphertext"/>, <paramref name="tag"/> or <paramref name="plaintext"/> is <see langword="null"/>.</exception>
+    public void Decrypt(byte[] nonce, byte[] ciphertext, byte[] tag, byte[] plaintext, byte[]? associatedData = null)
+    {
+        ArgumentNullException.ThrowIfNull(nonce);
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(tag);
+        ArgumentNullException.ThrowIfNull(plaintext);
+
+        Decrypt((ReadOnlySpan<byte>)nonce, ciphertext, tag, plaintext, associatedData);
     }
 
     /// <summary>
