@@ -167,4 +167,11 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
             session.Dispose();
         }
     }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void Unwrap_EcPrivateKeyWithoutPublicPoint_Signs()
+    {
+        _backend.RequireSoftoken(3, 132, "an EC private key without a public point unwraps since 3.132 (Bug 2082671)");
+        WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend);
+    }
 }

@@ -1,3 +1,5 @@
+using System.Formats.Asn1;
+using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -206,5 +208,75 @@ internal static class WrapUnwrapKeyTestCases
                 finally { session.DestroyObject(unwrapped); }
             }
         });
+    }
+
+    /// <summary>
+    /// An EC private key whose PKCS#8 carries no public point, which RFC 5915 makes optional (and the
+    /// parameters too, the AlgorithmIdentifier naming the curve), unwraps to a key that signs for that point.
+    /// </summary>
+    /// <remarks>
+    /// NSS refused it with <c>CKR_KEY_TYPE_INCONSISTENT</c> until 3.132 (Bug 2082671). The key is wrapped here,
+    /// under an AES key the test holds, with <c>CKM_AES_CBC_PAD</c>, the wrap every backend offers for private
+    /// keys, so the session opts in to it.
+    /// </remarks>
+    internal static void Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD, CKM.CKM_ECDSA);
+        using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        byte[] pkcs8 = EcPkcs8WithoutPublicPoint(ec.ExportParameters(includePrivateParameters: true).D!);
+        using var aes = Aes.Create();
+        aes.Key = RandomNumberGenerator.GetBytes(32);
+        byte[] iv = RandomNumberGenerator.GetBytes(16);
+        byte[] wrapped = aes.EncryptCbc(pkcs8, iv, PaddingMode.PKCS7);
+
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            ObjectHandle kek = TestKeys.ImportAesWrappingKey(session, aes.Key);
+            using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+            using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+#pragma warning disable KLPKCS11009 // CBC-PAD is the private-key wrap under test (see the remarks).
+            ObjectHandle key = session.UnwrapKey(new Mechanism(CKM.CKM_AES_CBC_PAD, iv), kek, wrapped, [cls, type, token, sign]);
+#pragma warning restore KLPKCS11009
+            try
+            {
+                byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes("signed by an unwrapped EC key"));
+                byte[] signature = session.Sign(new Mechanism(CKM.CKM_ECDSA), key, digest);
+                Assert.True(ec.VerifyHash(digest, signature, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+            }
+            finally
+            {
+                session.DestroyObject(key);
+                session.DestroyObject(kek);
+            }
+        }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
+    }
+
+    // A P-256 PrivateKeyInfo whose ECPrivateKey holds the version and the private key only (RFC 5915 §3).
+    private static byte[] EcPkcs8WithoutPublicPoint(byte[] d)
+    {
+        var ecPrivateKey = new AsnWriter(AsnEncodingRules.DER);
+        using (ecPrivateKey.PushSequence())
+        {
+            ecPrivateKey.WriteInteger(1);
+            ecPrivateKey.WriteOctetString(d);
+        }
+
+        var info = new AsnWriter(AsnEncodingRules.DER);
+        using (info.PushSequence())
+        {
+            info.WriteInteger(0);
+            using (info.PushSequence())
+            {
+                info.WriteObjectIdentifier("1.2.840.10045.2.1");    // id-ecPublicKey
+                info.WriteObjectIdentifier("1.2.840.10045.3.1.7");  // prime256v1
+            }
+            info.WriteOctetString(ecPrivateKey.Encode());
+        }
+        return info.Encode();
     }
 }
