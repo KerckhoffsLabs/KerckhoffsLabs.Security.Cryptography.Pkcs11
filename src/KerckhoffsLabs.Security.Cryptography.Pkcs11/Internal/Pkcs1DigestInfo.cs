@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 internal static class Pkcs1DigestInfo
 {
     /// <summary>Encodes the DigestInfo for <paramref name="digest"/>, and names the combined mechanism.</summary>
-    /// <exception cref="NotSupportedException"><paramref name="hash"/> is not SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="hash"/> is not SHA-1, SHA-224, SHA-256, SHA-384, SHA-512, SHA3-256, SHA3-384 or SHA3-512.</exception>
     /// <exception cref="CryptographicException"><paramref name="digest"/> is not the length of a <paramref name="hash"/> digest.</exception>
     public static (CKM Scheme, byte[] DigestInfo) Encode(HashAlgorithmName hash, ReadOnlySpan<byte> digest)
     {
@@ -24,6 +24,9 @@ internal static class Pkcs1DigestInfo
             "SHA256" => (CKM.CKM_SHA256_RSA_PKCS, Oids.HashAlgorithms.Sha256, 32),
             "SHA384" => (CKM.CKM_SHA384_RSA_PKCS, Oids.HashAlgorithms.Sha384, 48),
             "SHA512" => (CKM.CKM_SHA512_RSA_PKCS, Oids.HashAlgorithms.Sha512, 64),
+            "SHA3-256" => (CKM.CKM_SHA3_256_RSA_PKCS, Oids.HashAlgorithms.Sha3_256, 32),
+            "SHA3-384" => (CKM.CKM_SHA3_384_RSA_PKCS, Oids.HashAlgorithms.Sha3_384, 48),
+            "SHA3-512" => (CKM.CKM_SHA3_512_RSA_PKCS, Oids.HashAlgorithms.Sha3_512, 64),
             _ => throw new NotSupportedException($"RSA does not support hash {hash.Name}."),
         };
         if (digest.Length != length)

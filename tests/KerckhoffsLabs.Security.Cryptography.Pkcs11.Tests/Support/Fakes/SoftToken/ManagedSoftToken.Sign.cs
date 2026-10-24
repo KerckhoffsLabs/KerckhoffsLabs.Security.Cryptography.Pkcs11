@@ -56,6 +56,9 @@ internal sealed partial class ManagedSoftToken
             CKM.CKM_SHA256 => (HashAlgorithmName.SHA256, CKG.CKG_MGF1_SHA256, 32),
             CKM.CKM_SHA384 => (HashAlgorithmName.SHA384, CKG.CKG_MGF1_SHA384, 48),
             CKM.CKM_SHA512 => (HashAlgorithmName.SHA512, CKG.CKG_MGF1_SHA512, 64),
+            CKM.CKM_SHA3_256 => (HashAlgorithmName.SHA3_256, CKG.CKG_MGF1_SHA3_256, 32),
+            CKM.CKM_SHA3_384 => (HashAlgorithmName.SHA3_384, CKG.CKG_MGF1_SHA3_384, 48),
+            CKM.CKM_SHA3_512 => (HashAlgorithmName.SHA3_512, CKG.CKG_MGF1_SHA3_512, 64),
             _ => (default, default, -1),
         };
         return length > 0 && (CKG)(ulong)p.Mgf == mgf && (ulong)p.Len == (ulong)length;
@@ -141,7 +144,9 @@ internal sealed partial class ManagedSoftToken
 
     private static bool IsRsaSign(CKM m) => m is
         CKM.CKM_SHA1_RSA_PKCS or CKM.CKM_SHA256_RSA_PKCS or CKM.CKM_SHA384_RSA_PKCS or CKM.CKM_SHA512_RSA_PKCS
-        or CKM.CKM_SHA1_RSA_PKCS_PSS or CKM.CKM_SHA256_RSA_PKCS_PSS or CKM.CKM_SHA384_RSA_PKCS_PSS or CKM.CKM_SHA512_RSA_PKCS_PSS;
+        or CKM.CKM_SHA3_256_RSA_PKCS or CKM.CKM_SHA3_384_RSA_PKCS or CKM.CKM_SHA3_512_RSA_PKCS
+        or CKM.CKM_SHA1_RSA_PKCS_PSS or CKM.CKM_SHA256_RSA_PKCS_PSS or CKM.CKM_SHA384_RSA_PKCS_PSS or CKM.CKM_SHA512_RSA_PKCS_PSS
+        or CKM.CKM_SHA3_256_RSA_PKCS_PSS or CKM.CKM_SHA3_384_RSA_PKCS_PSS or CKM.CKM_SHA3_512_RSA_PKCS_PSS;
 
     private static bool IsDsaSign(CKM m) => m is
         CKM.CKM_DSA or CKM.CKM_DSA_SHA1 or CKM.CKM_DSA_SHA256 or CKM.CKM_DSA_SHA384 or CKM.CKM_DSA_SHA512;
@@ -227,6 +232,9 @@ internal sealed partial class ManagedSoftToken
                 "2.16.840.1.101.3.4.2.1" => HashAlgorithmName.SHA256,
                 "2.16.840.1.101.3.4.2.2" => HashAlgorithmName.SHA384,
                 "2.16.840.1.101.3.4.2.3" => HashAlgorithmName.SHA512,
+                "2.16.840.1.101.3.4.2.8" => HashAlgorithmName.SHA3_256,
+                "2.16.840.1.101.3.4.2.9" => HashAlgorithmName.SHA3_384,
+                "2.16.840.1.101.3.4.2.10" => HashAlgorithmName.SHA3_512,
                 var oid => throw new CryptographicException($"ManagedSoftToken: unsupported DigestInfo hash {oid}."),
             };
             algorithm.ReadNull();
@@ -247,10 +255,16 @@ internal sealed partial class ManagedSoftToken
         CKM.CKM_SHA256_RSA_PKCS => (HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1),
         CKM.CKM_SHA384_RSA_PKCS => (HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1),
         CKM.CKM_SHA512_RSA_PKCS => (HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA3_256_RSA_PKCS => (HashAlgorithmName.SHA3_256, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA3_384_RSA_PKCS => (HashAlgorithmName.SHA3_384, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA3_512_RSA_PKCS => (HashAlgorithmName.SHA3_512, RSASignaturePadding.Pkcs1),
         CKM.CKM_SHA1_RSA_PKCS_PSS => (HashAlgorithmName.SHA1, RSASignaturePadding.Pss),
         CKM.CKM_SHA256_RSA_PKCS_PSS => (HashAlgorithmName.SHA256, RSASignaturePadding.Pss),
         CKM.CKM_SHA384_RSA_PKCS_PSS => (HashAlgorithmName.SHA384, RSASignaturePadding.Pss),
         CKM.CKM_SHA512_RSA_PKCS_PSS => (HashAlgorithmName.SHA512, RSASignaturePadding.Pss),
+        CKM.CKM_SHA3_256_RSA_PKCS_PSS => (HashAlgorithmName.SHA3_256, RSASignaturePadding.Pss),
+        CKM.CKM_SHA3_384_RSA_PKCS_PSS => (HashAlgorithmName.SHA3_384, RSASignaturePadding.Pss),
+        CKM.CKM_SHA3_512_RSA_PKCS_PSS => (HashAlgorithmName.SHA3_512, RSASignaturePadding.Pss),
         _ => throw new CryptographicException($"ManagedSoftToken: unsupported RSA sign mechanism {m}."),
     };
 }

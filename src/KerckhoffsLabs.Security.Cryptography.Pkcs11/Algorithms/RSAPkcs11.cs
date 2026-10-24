@@ -80,7 +80,7 @@ public sealed class RSAPkcs11 : RSA
     /// here. The full un-hashed data is forwarded to PKCS#11; the token hashes and signs
     /// in one <c>C_Sign</c> call.
     /// </remarks>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512 or SHA3-256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown for a broken-hash signature (e.g. SHA-1, which maps to <c>CKM_SHA1_RSA_PKCS</c> / <c>CKM_SHA1_RSA_PKCS_PSS</c>) or a SHA-224 one (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; strong-hash PKCS#1 v1.5 and PSS are allowed by default.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
@@ -113,7 +113,7 @@ public sealed class RSAPkcs11 : RSA
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="offset"/> or <paramref name="count"/> is negative or outside the bounds of <paramref name="data"/>.</exception>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512 or SHA3-256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown for a broken-hash signature (e.g. SHA-1) or a SHA-224 one (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] SignData(
@@ -139,6 +139,7 @@ public sealed class RSAPkcs11 : RSA
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>, or <paramref name="hashAlgorithm"/> has no name.</exception>
     /// <exception cref="NotSupportedException"><paramref name="padding"/> or <paramref name="hashAlgorithm"/> is not supported.</exception>
+    /// <exception cref="PlatformNotSupportedException"><paramref name="hashAlgorithm"/> is a SHA-3 hash the platform cannot compute (<see cref="SHA3_256.IsSupported"/> and its siblings).</exception>
     /// <exception cref="CryptoPolicyViolationException">The session's policy refuses the hash or the mechanism.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] SignData(Stream data, HashAlgorithmName hashAlgorithm, RSASignaturePadding padding)
@@ -160,7 +161,7 @@ public sealed class RSAPkcs11 : RSA
     /// Span entry-point — the .NET 10 BCL routes <c>VerifyData(ReadOnlySpan, ReadOnlySpan, …)</c>
     /// here.
     /// </remarks>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512 or SHA3-256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown for a broken-hash signature (e.g. SHA-1) or a SHA-224 one (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
@@ -181,7 +182,7 @@ public sealed class RSAPkcs11 : RSA
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/>, <paramref name="signature"/>, or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="offset"/> or <paramref name="count"/> is negative or outside the bounds of <paramref name="data"/>.</exception>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512 or SHA3-256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown for a broken-hash signature (e.g. SHA-1) or a SHA-224 one (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
@@ -276,7 +277,7 @@ public sealed class RSAPkcs11 : RSA
 
     /// <inheritdoc/>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512 or SHA3-256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>), or OAEP with a SHA-1 or SHA-224 hash, unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; use OAEP with SHA-256 or stronger instead.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Encrypt</c> call.</exception>
     public override byte[] Encrypt(byte[] data, RSAEncryptionPadding padding)
@@ -295,7 +296,7 @@ public sealed class RSAPkcs11 : RSA
     /// otherwise answer it with a plaintext. <see cref="Pkcs11Key.Decrypt"/> checks it.
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512 or SHA3-256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>), or OAEP with a SHA-1 or SHA-224 hash, unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; use OAEP with SHA-256 or stronger instead.</exception>
     /// <exception cref="CryptographicException">Thrown if <paramref name="data"/> is not the length of the key's modulus, or its value is not less than the modulus.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from reading the key's <c>CKA_MODULUS</c> or from the underlying <c>C_Decrypt</c> call.</exception>
@@ -405,6 +406,9 @@ public sealed class RSAPkcs11 : RSA
         "SHA256" => 32,
         "SHA384" => 48,
         "SHA512" => 64,
+        "SHA3-256" => 32,
+        "SHA3-384" => 48,
+        "SHA3-512" => 64,
         _ => throw new NotSupportedException($"RSA does not support hash {hash.Name}."),
     };
 

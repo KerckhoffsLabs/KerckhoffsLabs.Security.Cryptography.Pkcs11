@@ -366,6 +366,98 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.Equal(CryptoOperation.Verify, Assert.IsType<HashUseRequest>(verify.Request).Operation);
     });
 
+    // === SHA-3 ===============================================================
+    // The managed token hashes with the BCL, so these need the host's SHA-3; the case without it is pinned
+    // below against the BCL's own RSA.
+
+    public static TheoryData<string, string> Sha3HashesAndPaddings => new()
+    {
+        { "SHA3-256", "Pkcs1" }, { "SHA3-384", "Pkcs1" }, { "SHA3-512", "Pkcs1" },
+        { "SHA3-256", "Pss" }, { "SHA3-384", "Pss" }, { "SHA3-512", "Pss" },
+    };
+
+    // SignData hashes on the token through CKM_SHA3_*_RSA_PKCS(_PSS), SignHash signs the caller's digest through
+    // the raw mechanism, and the BCL verifies both.
+    [Theory(SkipUnless = nameof(SHA3_256.IsSupported), SkipType = typeof(SHA3_256), Skip = "Requires " + nameof(SHA3_256.IsSupported))]
+    [MemberData(nameof(Sha3HashesAndPaddings))]
+    public void Sha3_SignDataAndSignHash_InteropWithBcl(string hashName, string paddingName) => WithRsa((_, rsa) =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        var padding = paddingName == "Pss" ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1;
+        byte[] data = Encoding.UTF8.GetBytes("sha-3 on a managed token");
+        byte[] digest = CryptographicOperations.HashData(hash, data);
+        using RSA bcl = BclPublic(rsa);
+
+        byte[] overData = rsa.SignData(data, hash, padding);
+        byte[] overDigest = rsa.SignHash(digest, hash, padding);
+
+        Assert.True(bcl.VerifyData(data, overData, hash, padding));
+        Assert.True(bcl.VerifyHash(digest, overDigest, hash, padding));
+        Assert.True(rsa.VerifyHash(digest, overData, hash, padding));
+        Assert.True(rsa.VerifyData(data, overDigest, hash, padding));
+    });
+
+    // The Stream overloads hash with the BCL's SHA-3, then sign or verify the digest.
+    [Theory(SkipUnless = nameof(SHA3_256.IsSupported), SkipType = typeof(SHA3_256), Skip = "Requires " + nameof(SHA3_256.IsSupported))]
+    [MemberData(nameof(Sha3HashesAndPaddings))]
+    public void Sha3_Stream_RoundTrips(string hashName, string paddingName) => WithRsa((_, rsa) =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        var padding = paddingName == "Pss" ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1;
+        byte[] data = Encoding.UTF8.GetBytes("streamed sha-3");
+        using var toSign = new MemoryStream(data);
+        using var toVerify = new MemoryStream(data);
+
+        byte[] sig = rsa.SignData(toSign, hash, padding);
+
+        Assert.True(rsa.VerifyData(toVerify, sig, hash, padding));
+        Assert.True(rsa.VerifyData(data, sig, hash, padding));
+    });
+
+    // Without the platform's SHA-3, the Stream overloads, which hash in managed code, fail as the BCL's RSA does.
+    [Fact]
+    public void Sha3_Stream_WithoutPlatformSha3_FailsAsTheBcl() => WithRsa((_, rsa) =>
+    {
+        Assert.SkipWhen(SHA3_256.IsSupported, "The host has SHA3-256.");
+        using var bcl = RSA.Create(2048);
+
+        foreach (var padding in (RSASignaturePadding[])[RSASignaturePadding.Pkcs1, RSASignaturePadding.Pss])
+        {
+            using var bclSignData = new MemoryStream([1, 2, 3]);
+            using var rsaSignData = new MemoryStream([1, 2, 3]);
+            using var bclVerifyData = new MemoryStream([1, 2, 3]);
+            using var rsaVerifyData = new MemoryStream([1, 2, 3]);
+            AssertSameFailureAsBcl(
+                () => bcl.SignData(bclSignData, HashAlgorithmName.SHA3_256, padding),
+                () => rsa.SignData(rsaSignData, HashAlgorithmName.SHA3_256, padding));
+            AssertSameFailureAsBcl(
+                () => bcl.VerifyData(bclVerifyData, new byte[256], HashAlgorithmName.SHA3_256, padding),
+                () => rsa.VerifyData(rsaVerifyData, new byte[256], HashAlgorithmName.SHA3_256, padding));
+        }
+    });
+
+    private static void AssertSameFailureAsBcl(Action bcl, Action adapter)
+    {
+        Exception expected = Assert.ThrowsAny<Exception>(bcl);
+        Exception actual = Assert.ThrowsAny<Exception>(adapter);
+        Assert.Equal(expected.GetType(), actual.GetType());
+    }
+
+    // A SHA-3 digest of the wrong length cannot be signed, and does not verify; no SHA-3 is computed for it.
+    [Theory]
+    [InlineData("SHA3-256", 32)]
+    [InlineData("SHA3-384", 48)]
+    [InlineData("SHA3-512", 64)]
+    public void Sha3_SignHash_DigestOfTheWrongLength_Throws_AndDoesNotVerify(string hashName, int length) => WithRsa((_, rsa) =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+
+        Assert.Throws<CryptographicException>(() => rsa.SignHash(new byte[length - 1], hash, RSASignaturePadding.Pss));
+        Assert.Throws<CryptographicException>(() => rsa.SignHash(new byte[length + 1], hash, RSASignaturePadding.Pkcs1));
+        Assert.False(rsa.VerifyHash(new byte[length - 1], new byte[256], hash, RSASignaturePadding.Pss));
+        Assert.False(rsa.VerifyHash(new byte[length + 1], new byte[256], hash, RSASignaturePadding.Pkcs1));
+    });
+
     // === Encryption / decryption ===========================================
 
     public static TheoryData<string> OaepHashes => ["SHA1", "SHA256"];
@@ -395,6 +487,21 @@ public sealed class RSAPkcs11Tests_Managed
         // covers its encrypt path, and the tamper case below covers padding-failure handling.
         byte[] bclCiphertext = bcl.Encrypt(plaintext, oaep);
         Assert.Equal(plaintext, rsa.Decrypt(bclCiphertext, oaep));
+    });
+
+    public static TheoryData<string> Sha3Hashes => ["SHA3-256", "SHA3-384", "SHA3-512"];
+
+    // OAEP with a SHA-3 hash and MGF1: token round-trip, and the token decrypts the BCL's ciphertext.
+    [Theory(SkipUnless = nameof(SHA3_256.IsSupported), SkipType = typeof(SHA3_256), Skip = "Requires " + nameof(SHA3_256.IsSupported))]
+    [MemberData(nameof(Sha3Hashes))]
+    public void OaepSha3_EncryptDecrypt_RoundTrips_AndInteropsWithBcl(string hashName) => WithTransportRsa((_, rsa) =>
+    {
+        var oaep = RSAEncryptionPadding.CreateOaep(new HashAlgorithmName(hashName));
+        byte[] plaintext = RandomNumberGenerator.GetBytes(32);
+        using var bcl = RSA.Create(rsa.ExportParameters(includePrivateParameters: false));
+
+        Assert.Equal(plaintext, rsa.Decrypt(rsa.Encrypt(plaintext, oaep), oaep));
+        Assert.Equal(plaintext, rsa.Decrypt(bcl.Encrypt(plaintext, oaep), oaep));
     });
 
     // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires the AllowInsecure policy.
