@@ -150,7 +150,7 @@ broken/legacy ciphers (DES/3DES, RC2, RC4, SEED, CAST, Blowfish, SKIPJACK), brok
 (MD2/MD5/SHA-1/RIPEMD), PKCS#1 v1.5 *encryption* and raw RSA (`CKM_RSA_PKCS`, `CKM_RSA_X_509`),
 sub-128-bit EC curves, SHA-1 KDF PRFs, and AES-GCM tags under 96 bits or AES-CCM MACs under 64 bits. Where the insecure choice is visible at compile time,
 [analyzers](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html)
-(`KLPKCS11001`–`KLPKCS11010`) surface it as a build warning too.
+(`KLPKCS11001`–`KLPKCS11013`) surface it as a build warning too.
 
 When `SecureOnly` refuses something you need, there are two remedies:
 
