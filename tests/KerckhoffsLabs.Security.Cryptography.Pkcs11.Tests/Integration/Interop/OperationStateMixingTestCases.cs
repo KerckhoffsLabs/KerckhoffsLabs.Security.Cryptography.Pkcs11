@@ -49,7 +49,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// <item><description>Digest-1: enforced on Kryoptic; NSS/SoftHSM2 treat it as a continuation.</description></item>
 /// <item><description>Digest-2: enforced on all three.</description></item>
 /// <item><description>Sign-2: enforced on SoftHSM2/Kryoptic; NSS treats it as a continuation.</description></item>
-/// <item><description>Encrypt-1: NOT enforced on any of the three — all three treat it as a
+/// <item><description>Encrypt-1: enforced on Kryoptic since 1.5.4, which ends the active operation on
+/// the call and answers CKR_OPERATION_NOT_INITIALIZED; NSS and SoftHSM2 treat it as a
 /// continuation (CBC-PAD only emits whole ciphertext blocks as they become available and buffers
 /// the remainder, so the single-part call's own output is a PREFIX of the full combined result
 /// whenever the combined input doesn't land on a block boundary — not a different behavior, just
@@ -238,7 +239,7 @@ internal static class OperationStateMixingTestCases
 
     // === Encrypt / Decrypt ====================================================
 
-    // Not enforced on NSS, SoftHSM2 or Kryoptic — see the class remarks. Craton HSM enforces it
+    // Not enforced on NSS or SoftHSM2 — see the class remarks. Craton HSM, and Kryoptic since 1.5.4, enforce it
     // (Assert_Encrypt_SinglePartAfterUpdate_Throws).
     internal static void Assert_Encrypt_SinglePartAfterUpdate_TreatsAsContinuation(IPkcs11Backend backend) =>
         WithRawSession(backend, (lowLevel, sid, session) =>
@@ -281,7 +282,8 @@ internal static class OperationStateMixingTestCases
         });
 
     // PKCS#11 v3.0 §5.8: C_Encrypt "cannot be used to terminate a multi-part operation"; v3.2 names the
-    // code, CKR_OPERATION_ACTIVE, which Craton HSM returns since craton-co/craton-hsm-core#87.
+    // code, CKR_OPERATION_ACTIVE, which Craton HSM returns since craton-co/craton-hsm-core#87. Kryoptic refuses
+    // it since 1.5.4 (ea51862) with CKR_OPERATION_NOT_INITIALIZED, having ended the operation on the error.
     internal static void Assert_Encrypt_SinglePartAfterUpdate_Throws(IPkcs11Backend backend) =>
         WithRawSession(backend, (lowLevel, sid, session) =>
         {

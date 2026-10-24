@@ -24,6 +24,13 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void Unwrap_Rfc5958Ed25519KeyWithOptionalFields_SignsTheRfc8032Signature()
+    {
+        _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
+        WrapUnwrapCurve25519TestCases.Assert_Unwrap_Rfc5958Ed25519KeyWithOptionalFields_SignsTheRfc8032Signature(_backend);
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Unwrap_Rfc8410X25519Key_AgreesTheRfc7748Secret()
     {
         _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
