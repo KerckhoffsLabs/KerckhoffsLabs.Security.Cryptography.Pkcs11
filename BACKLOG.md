@@ -1845,17 +1845,18 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No (added `CkmEcdh1DeriveParams.ForEncapsulation`, purely additive)
 - **Raised by:** Cross-referencing kryoptic#432 against this wrapper's own test coverage
 
-### [BL-161] Lift the BouncyHsm empty-input gate once harrison314/BouncyHsm#115 ships
+### [BL-161] Lift the BouncyHsm empty-digest gate once BouncyHsm digests empty data
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsEmptyInput`)
-- **Problem:** BouncyHsm v2.3.3 refuses zero-length data in `C_Digest`/`C_DigestUpdate`/`C_Verify` (`CKR_ARGUMENTS_BAD`) and `C_Sign` (`CKR_GENERAL_ERROR`), so the EmptyInput SHA-256 and HMAC cases skip on it.
-- **Proposed action:** After a `vendor/bouncyhsm` bump that includes the fix, `BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent`/`EmptyHmac_QuirkStillPresent` fail. Then set the flag to true and delete both tests.
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsEmptyDigest`)
+- **Problem:** BouncyHsm v2.3.3 refused zero-length data in `C_Digest`/`C_DigestUpdate`/`C_Verify` (`CKR_ARGUMENTS_BAD`) and `C_Sign` (`CKR_GENERAL_ERROR`). The fix for harrison314/BouncyHsm#115, in the 8a5584ab bump, lets empty data through the client and signs and verifies it, so the EmptyInput HMAC case runs again. A digest of empty data is still refused: `DigestSessionState.Final` answers it with `CKR_DATA_LEN_RANGE`, so the EmptyInput SHA-256 case still skips.
+- **Proposed action:** After a `vendor/bouncyhsm` bump that digests empty data, `BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-162] Lift the BouncyHsm out-of-range-signature gate once harrison314/BouncyHsm#116 ships
+### [BL-162] ✅ RESOLVED — Lift the BouncyHsm out-of-range-signature gate once harrison314/BouncyHsm#116 ships
+- **Status:** Resolved 2026-10-24 by the `vendor/bouncyhsm` bump to 8a5584ab. An RSA-PSS signature at or above the modulus, and one a byte too long, now give `CKR_SIGNATURE_INVALID`; `BouncyHsmRejectsOutOfRangeSignatures` and its quirk test are gone and `SignVerifyData_Pss_RoundTrips` runs on BouncyHsm.
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
@@ -1865,7 +1866,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-163] Recheck BouncyHsm against harrison314/BouncyHsm#114 after the fix ships
+### [BL-163] ✅ RESOLVED — Recheck BouncyHsm against harrison314/BouncyHsm#114 after the fix ships
+- **Status:** Resolved 2026-10-24 by the `vendor/bouncyhsm` bump to 8a5584ab, which reports the required length with `CKR_BUFFER_TOO_SMALL`. The RSA encrypt wrappers still pass on BouncyHsm; the length-query fallback stays covered by `Pkcs11SessionCoreTokenQuirkTests` (`Encrypt_WhenTheTokenDoesNotReportTheLength_QueriesItAndEncrypts` and its siblings).
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
@@ -1885,7 +1887,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-165] Lift the BouncyHsm extract-only HKDF gate once harrison314/BouncyHsm#119 ships
+### [BL-165] ✅ RESOLVED — Lift the BouncyHsm extract-only HKDF gate once harrison314/BouncyHsm#119 ships
+- **Status:** Resolved 2026-10-24 by the `vendor/bouncyhsm` bump to 8a5584ab: an extract-only `CKM_HKDF_DERIVE` now gives the PRK. `BouncyHsmHonoursHkdfExtractOnly` and its quirk test are gone and the four extract-only HKDF cases run on BouncyHsm.
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S

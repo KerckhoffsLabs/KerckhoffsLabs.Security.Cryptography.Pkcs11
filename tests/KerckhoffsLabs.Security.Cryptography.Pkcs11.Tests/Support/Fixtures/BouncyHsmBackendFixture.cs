@@ -41,24 +41,16 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
         OperatingSystem.IsLinux() && ServerAssemblyPath() is not null && NativeLibraryPath() is not null;
 
     /// <summary>
-    /// False while harrison314/BouncyHsm#115 is open: the client refuses <c>ulDataLen == 0</c> in
-    /// <c>C_Digest</c>/<c>C_DigestUpdate</c>/<c>C_Verify</c> (<c>CKR_ARGUMENTS_BAD</c>) and the server refuses to
-    /// sign or verify empty data (<c>CKR_GENERAL_ERROR</c>). BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent
-    /// and EmptyHmac_QuirkStillPresent fail once it is fixed.
+    /// False while the server refuses to digest empty data: the fix for harrison314/BouncyHsm#115 lets
+    /// <c>ulDataLen == 0</c> through the client and the server signs and verifies empty data, but
+    /// <c>DigestSessionState.Final</c> still answers a digest of no data with <c>CKR_DATA_LEN_RANGE</c>. Not yet
+    /// reported upstream. BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmAcceptsEmptyInput = false;
-
-    /// <summary>
-    /// False while harrison314/BouncyHsm#116 is open: an RSA-PSS signature whose value is at least the
-    /// modulus gives <c>CKR_GENERAL_ERROR</c> instead of <c>CKR_SIGNATURE_INVALID</c>, so a tamper check
-    /// fails for about half of all random tamperings.
-    /// BouncyHsmQuirkTests.OutOfRangePssSignature_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRejectsOutOfRangeSignatures = false;
+    public const bool BouncyHsmAcceptsEmptyDigest = false;
 
     /// <summary>
     /// False while the native client refuses <c>ulSignatureLen == 0</c> in <c>C_Verify</c> with
-    /// <c>CKR_ARGUMENTS_BAD</c> (<c>bouncy-pkcs11.c</c>), where an empty signature is simply invalid. Not yet
+    /// <c>CKR_ARGUMENTS_BAD</c> (<c>bouncy-pkcs11.c</c>, as does <c>C_VerifyFinal</c>), where an empty signature is simply invalid. Not yet
     /// reported upstream. BouncyHsmQuirkTests.EmptySignature_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmAcceptsEmptySignature = false;
@@ -70,31 +62,14 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmAcceptsNonZeroChaCha20Counter = false;
 
-    /// <summary>
-    /// False while harrison314/BouncyHsm#119 is open: a <c>CKM_HKDF_DERIVE</c> with <c>bExpand</c> false still
-    /// runs the expand stage, so an extract-only derivation gives HKDF-Expand(PRK, empty info) instead of the
-    /// PRK, against PKCS#11 v3.0 §2.43. BouncyHsmQuirkTests.HkdfExtractOnly_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmHonoursHkdfExtractOnly = false;
+    /// <summary>Gate for empty-input digest cases: see <see cref="BouncyHsmAcceptsEmptyDigest"/>.</summary>
+    public static bool EmptyDigestAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyDigest;
 
-    /// <summary>Gate for empty-input digest and MAC cases: see <see cref="BouncyHsmAcceptsEmptyInput"/>.</summary>
-    public static bool EmptyDigestAndMacAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyInput;
-
-    /// <summary>Gate for cases that verify a tampered RSA-PSS signature: see <see cref="BouncyHsmRejectsOutOfRangeSignatures"/>.</summary>
-    public static bool OutOfRangeSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmRejectsOutOfRangeSignatures;
-
-    /// <summary>
-    /// Gate for cases that verify RSA signatures one byte too long or empty: see
-    /// <see cref="BouncyHsmRejectsOutOfRangeSignatures"/> and <see cref="BouncyHsmAcceptsEmptySignature"/>.
-    /// </summary>
-    public static bool WrongLengthRsaSignatureRejectionAvailable =>
-        OutOfRangeSignatureRejectionAvailable && BouncyHsmAcceptsEmptySignature;
+    /// <summary>Gate for cases that verify an empty RSA signature: see <see cref="BouncyHsmAcceptsEmptySignature"/>.</summary>
+    public static bool WrongLengthRsaSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptySignature;
 
     /// <summary>Gate for raw ChaCha20 cases that start at a non-zero block counter: see <see cref="BouncyHsmAcceptsNonZeroChaCha20Counter"/>.</summary>
     public static bool NonZeroChaCha20CounterAvailable => BouncyHsmAvailable && BouncyHsmAcceptsNonZeroChaCha20Counter;
-
-    /// <summary>Gate for extract-only HKDF cases: see <see cref="BouncyHsmHonoursHkdfExtractOnly"/>.</summary>
-    public static bool HkdfExtractOnlyAvailable => BouncyHsmAvailable && BouncyHsmHonoursHkdfExtractOnly;
 
     public BouncyHsmBackendFixture()
     {

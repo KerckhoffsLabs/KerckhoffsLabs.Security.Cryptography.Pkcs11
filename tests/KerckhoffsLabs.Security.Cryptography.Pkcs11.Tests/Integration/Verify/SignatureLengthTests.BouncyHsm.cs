@@ -11,7 +11,7 @@ public sealed class SignatureLengthTests_BouncyHsm(BouncyHsmBackendFixture backe
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void EcDsa_WrongLengthSignature_ReturnsFalse() => SignatureLengthTestCases.Assert_EcDsa_WrongLengthSignature_ReturnsFalse(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.WrongLengthRsaSignatureRejectionAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "harrison314/BouncyHsm#116 and an empty-signature quirk: a one-byte-long PSS signature gives CKR_GENERAL_ERROR, an empty one CKR_ARGUMENTS_BAD")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.WrongLengthRsaSignatureRejectionAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm's client refuses an empty signature with CKR_ARGUMENTS_BAD")]
     public void Rsa_WrongLengthSignature_ReturnsFalse() => SignatureLengthTestCases.Assert_Rsa_WrongLengthSignature_ReturnsFalse(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
