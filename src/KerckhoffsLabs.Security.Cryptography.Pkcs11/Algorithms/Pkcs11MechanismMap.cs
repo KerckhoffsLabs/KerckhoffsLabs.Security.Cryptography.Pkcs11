@@ -22,6 +22,9 @@ public static class Pkcs11MechanismMap
     private const string Sha256 = "SHA256";
     private const string Sha384 = "SHA384";
     private const string Sha512 = "SHA512";
+    private const string Sha3_256 = "SHA3-256";
+    private const string Sha3_384 = "SHA3-384";
+    private const string Sha3_512 = "SHA3-512";
 
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for RSA PKCS#1 v1.5 signing with the given hash.
@@ -211,7 +214,7 @@ public static class Pkcs11MechanismMap
     /// This returns the fixed-output-length variant. For the variable-length variant
     /// (<c>CKM_SHA*_HMAC_GENERAL</c>), use a different overload that accepts a truncation length.
     /// </remarks>
-    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
+    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-256, SHA3-384, SHA3-512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_HMAC</c>) has no <see cref="HashAlgorithmName"/> constant in the BCL
     /// and is gated behind the session's crypto policy — same opt-in as SHA-1. See
@@ -225,6 +228,9 @@ public static class Pkcs11MechanismMap
         Sha256 => new Mechanism(CKM.CKM_SHA256_HMAC),
         Sha384 => new Mechanism(CKM.CKM_SHA384_HMAC),
         Sha512 => new Mechanism(CKM.CKM_SHA512_HMAC),
+        Sha3_256 => new Mechanism(CKM.CKM_SHA3_256_HMAC),
+        Sha3_384 => new Mechanism(CKM.CKM_SHA3_384_HMAC),
+        Sha3_512 => new Mechanism(CKM.CKM_SHA3_512_HMAC),
         _ => throw new NotSupportedException(
             $"HMAC does not support hash {hash.Name}."),
     };
