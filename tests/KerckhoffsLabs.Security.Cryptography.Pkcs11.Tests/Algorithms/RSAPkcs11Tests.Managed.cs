@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -413,13 +415,14 @@ public sealed class RSAPkcs11Tests_Managed
             rsa.Encrypt(Encoding.UTF8.GetBytes("nope"), RSAEncryptionPadding.Pkcs1)));
 
     // A ciphertext whose padding is corrupted must fail decryption — the token surfaces this as
-    // CKR_ENCRYPTED_DATA_INVALID.
+    // CKR_ENCRYPTED_DATA_INVALID. The flipped byte is not the first: that one could take the value past the
+    // modulus, which the adapter refuses before the token sees it.
     [Fact]
     public void Decrypt_TamperedOaepCiphertext_Throws() => WithTransportRsa((_, rsa) =>
     {
         byte[] plaintext = RandomNumberGenerator.GetBytes(32);
         byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA256);
-        ct[0] ^= 0xFF;
+        ct[ct.Length / 2] ^= 0xFF;
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
             rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA256));
@@ -445,6 +448,162 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.Throws<ArgumentNullException>(() => rsa.Decrypt(null!, RSAEncryptionPadding.OaepSHA1));
         Assert.Throws<ArgumentNullException>(() => rsa.Decrypt(new byte[4], null!));
     });
+
+    // === A ciphertext the key cannot have produced never reaches the token ==
+    // The fake's C_Decrypt answers CKR_OK with an empty plaintext whatever it is given, as some tokens answer
+    // an empty ciphertext, so only the adapter can refuse one. Its key's modulus is 2048 bits.
+
+    private static readonly byte[] FakeModulus = [0xC3, .. Enumerable.Repeat((byte)0x5A, 254), 0x6B];
+
+    // A ciphertext of the modulus's length and below it, as the key could have produced.
+    private static readonly byte[] FakeCiphertext = [0x01, .. new byte[255]];
+
+    // CKA_MODULUS_BITS as the token's CK_ULONG, for the key's size, which the span entry points need.
+    private static readonly byte[] FakeModulusBits =
+        MemoryMarshal.AsBytes<NativeCULong>([(NativeCULong)(ulong)(FakeModulus.Length * 8)]).ToArray();
+
+    private static (CKR, byte[]?) FakeRsaAttribute(CKA type) => type switch
+    {
+        CKA.CKA_MODULUS => (CKR.CKR_OK, FakeModulus),
+        CKA.CKA_MODULUS_BITS => (CKR.CKR_OK, FakeModulusBits),
+        _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+    };
+
+    private static FakeKey LenientRsaKey(
+        Action onDecrypt, ICryptoPolicy? policy = null, Func<CKA, (CKR, byte[]?)>? modulus = null) =>
+        FakeKeys.Create(
+            CKK.CKK_RSA,
+            ca => ca == CKA.CKA_MODULUS && modulus is not null ? modulus(ca) : FakeRsaAttribute(ca),
+            policy ?? CryptoPolicy.AllowInsecure,
+            decrypt: _ =>
+            {
+                onDecrypt();
+                return [];
+            });
+
+    public static TheoryData<string, string> EncryptionPaddingsAndDecryptCalls()
+    {
+        var data = new TheoryData<string, string>();
+        foreach (string padding in (string[])["Pkcs1", "OaepSHA256"])
+        {
+            foreach (string call in RSAPkcs11TestCases.DecryptCalls.Keys)
+                data.Add(padding, call);
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(EncryptionPaddingsAndDecryptCalls))]
+    public void Decrypt_CiphertextNotFromTheKey_ThrowsWithoutTheToken(string paddingName, string call)
+    {
+        int decrypts = 0;
+        using var key = LenientRsaKey(() => decrypts++);
+        using var rsa = new RSAPkcs11(key);
+        RSAEncryptionPadding padding = RSAPkcs11TestCases.EncryptionPadding(paddingName);
+        var decrypt = RSAPkcs11TestCases.DecryptCalls[call];
+
+        Assert.All(RSAPkcs11TestCases.CiphertextsNotFromTheKey(FakeModulus, FakeCiphertext), c =>
+            Assert.Throws<CryptographicException>(() => decrypt(rsa, c.Ciphertext, padding)));
+        Assert.Equal(0, decrypts);
+
+        // Just below the modulus is a ciphertext the key could have produced.
+        byte[] belowModulus = [.. FakeModulus];
+        belowModulus[^1]--;
+        Assert.Empty(decrypt(rsa, belowModulus, padding));
+        Assert.Empty(decrypt(rsa, FakeCiphertext, padding));
+        Assert.Equal(2, decrypts);
+    }
+
+    // The BCL's own RSA refuses the same ciphertexts with a CryptographicException.
+    [Theory]
+    [InlineData("Pkcs1")]
+    [InlineData("OaepSHA256")]
+    public void Decrypt_CiphertextNotFromTheKey_ThrowsAsTheBclDoes(string paddingName)
+    {
+        using var bcl = RSA.Create(2048);
+        RSAEncryptionPadding padding = RSAPkcs11TestCases.EncryptionPadding(paddingName);
+        byte[] ciphertext = bcl.Encrypt([0x2A], padding);
+        var notFromTheKey = RSAPkcs11TestCases.CiphertextsNotFromTheKey(bcl.ExportParameters(false).Modulus!, ciphertext);
+
+        Assert.All(notFromTheKey, c => Assert.All(RSAPkcs11TestCases.DecryptCalls.Values, decrypt =>
+            Assert.ThrowsAny<CryptographicException>(() => decrypt(bcl, c.Ciphertext, padding))));
+    }
+
+    // The policy judges the padding, which the BCL validates before the ciphertext: a refused PKCS#1 v1.5 is
+    // refused as such, whatever the ciphertext, and the token is not read for it.
+    [Fact]
+    public void Decrypt_Pkcs1_GatedByDefault_ThrowsBeforeTheCiphertextIsChecked()
+    {
+        int decrypts = 0, reads = 0;
+        using var key = LenientRsaKey(() => decrypts++, CryptoPolicy.SecureOnly, ca =>
+        {
+            reads++;
+            return (CKR.CKR_DEVICE_ERROR, null);
+        });
+        using var rsa = new RSAPkcs11(key);
+        reads = 0; // The constructor reads the key's size.
+
+        Assert.All(RSAPkcs11TestCases.CiphertextsNotFromTheKey(FakeModulus, FakeCiphertext), c =>
+            Assert.Throws<CryptoPolicyViolationException>(() => rsa.Decrypt(c.Ciphertext, RSAEncryptionPadding.Pkcs1)));
+        Assert.Throws<CryptoPolicyViolationException>(() => rsa.Decrypt(FakeCiphertext, RSAEncryptionPadding.Pkcs1));
+        Assert.Equal(0, reads);
+        Assert.Equal(0, decrypts);
+    }
+
+    // The modulus is read once. A refused ciphertext reads it again, to confirm the key could have decrypted.
+    [Fact]
+    public void Decrypt_Modulus_IsReadOnce_ExceptToConfirmARefusal()
+    {
+        int reads = 0;
+        using var key = LenientRsaKey(() => { }, modulus: _ =>
+        {
+            reads++;
+            return (CKR.CKR_OK, FakeModulus);
+        });
+        using var rsa = new RSAPkcs11(key);
+        reads = 0; // The constructor reads the key's size.
+
+        rsa.Decrypt(FakeCiphertext, RSAEncryptionPadding.OaepSHA256);
+        // C_GetAttributeValue may be called twice for one read (its length, then its value).
+        int perRead = reads;
+        Assert.NotEqual(0, perRead);
+        rsa.Decrypt(FakeCiphertext, RSAEncryptionPadding.OaepSHA256);
+        Assert.Equal(perRead, reads);
+
+        Assert.Throws<CryptographicException>(() => rsa.Decrypt(FakeModulus, RSAEncryptionPadding.OaepSHA256));
+        Assert.Equal(2 * perRead, reads);
+    }
+
+    // Once the modulus is read, a disposed key still throws rather than the cached modulus refusing the
+    // ciphertext.
+    [Fact]
+    public void Decrypt_CiphertextNotFromTheKey_DisposedKey_ThrowsObjectDisposed()
+    {
+        using var key = LenientRsaKey(() => { });
+        using var rsa = new RSAPkcs11(key);
+        rsa.Decrypt(FakeCiphertext, RSAEncryptionPadding.OaepSHA256);
+        key.Key.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => rsa.Decrypt(FakeModulus, RSAEncryptionPadding.OaepSHA256));
+        Assert.Throws<ObjectDisposedException>(() => rsa.Decrypt((byte[])[], RSAEncryptionPadding.OaepSHA256));
+    }
+
+    // A modulus that cannot be read fails as ExportParameters(false) does; one of zero would refuse every
+    // ciphertext, so it is an invalid attribute instead.
+    [Theory]
+    [InlineData(CKR.CKR_ATTRIBUTE_SENSITIVE, CKR.CKR_ATTRIBUTE_SENSITIVE)]
+    [InlineData(CKR.CKR_DEVICE_ERROR, CKR.CKR_DEVICE_ERROR)]
+    [InlineData(CKR.CKR_OK, CKR.CKR_ATTRIBUTE_VALUE_INVALID)]
+    public void Decrypt_UnusableModulus_Throws(CKR read, CKR expected)
+    {
+        int decrypts = 0;
+        using var key = LenientRsaKey(() => decrypts++, modulus: _ => (read, read == CKR.CKR_OK ? [0x00, 0x00] : null));
+        using var rsa = new RSAPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(FakeCiphertext, RSAEncryptionPadding.OaepSHA256));
+        Assert.Equal(expected, ex.ReturnValue);
+        Assert.Equal(0, decrypts);
+    }
 
     // === Key material export ===============================================
 

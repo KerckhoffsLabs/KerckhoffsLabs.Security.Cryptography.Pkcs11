@@ -9,11 +9,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 /// Minimal <see cref="FakeModule"/> that answers every <c>C_GetAttributeValue</c> query via a
 /// caller-supplied responder — including a fatal <see cref="CKR"/> a real backend cannot be coaxed
 /// into returning for a well-formed key object's required attributes. Every other function is absent,
-/// so the library sees <c>CKR_FUNCTION_NOT_SUPPORTED</c> for it; <c>C_Initialize</c>/<c>C_Finalize</c>
+/// so the library sees <c>CKR_FUNCTION_NOT_SUPPORTED</c> for it, except <c>C_Decrypt</c> when a <c>decrypt</c>
+/// answer is given; <c>C_Initialize</c>/<c>C_Finalize</c>
 /// succeed, and disposing the library from <see cref="FakeModule.Load(Pkcs11LibraryOptions?)"/> releases the module. See
 /// <see cref="FakeKeys.Create"/>.
 /// </summary>
-internal sealed class AttributeResponseModule(Func<CKA, (CKR Rv, byte[]? Value)> respond) : FakeModule
+internal sealed class AttributeResponseModule(
+    Func<CKA, (CKR Rv, byte[]? Value)> respond, Func<byte[], byte[]>? decrypt = null) : FakeModule
 {
     protected override bool ReleasedByFinalize => true;
 
@@ -35,6 +37,26 @@ internal sealed class AttributeResponseModule(Func<CKA, (CKR Rv, byte[]? Value)>
                 UnmanagedMemory.Write(template[i].value, value!);
             template[i].valueLen = (NativeCULong)(ulong)value!.Length;
         }
+        return CKR.CKR_OK;
+    }
+
+    // With a decrypt answer, C_DecryptInit accepts any mechanism and C_Decrypt answers CKR_OK with whatever
+    // it returns, as a token that checks nothing would. Without one, both are unsupported, as when absent.
+    protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
+        => decrypt is null ? CKR.CKR_FUNCTION_NOT_SUPPORTED : CKR.CKR_OK;
+
+    protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
+    {
+        if (decrypt is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        byte[] plaintext = decrypt(encryptedData.ToArray());
+        dataLen = (NativeCULong)(ulong)plaintext.Length;
+        if (data.IsNull)
+            return CKR.CKR_OK;
+        if (data.Span.Length < plaintext.Length)
+            return CKR.CKR_BUFFER_TOO_SMALL;
+        plaintext.CopyTo(data.Span);
         return CKR.CKR_OK;
     }
 }

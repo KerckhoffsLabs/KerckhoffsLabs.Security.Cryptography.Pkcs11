@@ -11,13 +11,19 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 /// token's required key attributes (e.g. RSA's <c>CKA_MODULUS</c>, DSA's <c>CKA_PRIME</c>) can't be
 /// made unreadable or fatally erroring on a well-formed key object, which is what the adapters'
 /// key-size fallback paths need to see. The key carries a private handle only, unless
-/// <c>publicOnly</c> asks for a public handle only; the module answers the same either way.
+/// <c>publicOnly</c> asks for a public handle only; the module answers the same either way. A <c>decrypt</c>
+/// answer makes the module's <c>C_Decrypt</c> succeed with what it returns.
 /// </summary>
 internal static class FakeKeys
 {
-    public static FakeKey Create(CKK keyType, Func<CKA, (CKR Rv, byte[]? Value)> respond, ICryptoPolicy? policy = null, bool publicOnly = false)
+    public static FakeKey Create(
+        CKK keyType,
+        Func<CKA, (CKR Rv, byte[]? Value)> respond,
+        ICryptoPolicy? policy = null,
+        bool publicOnly = false,
+        Func<byte[], byte[]>? decrypt = null)
     {
-        var library = new AttributeResponseModule(respond).Load();
+        var library = new AttributeResponseModule(respond, decrypt).Load();
         var lowLevel = library.LowLevelLibrary!;
         var slot = new Pkcs11Slot(lowLevel, slotId: 1);
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1, policy: policy);
