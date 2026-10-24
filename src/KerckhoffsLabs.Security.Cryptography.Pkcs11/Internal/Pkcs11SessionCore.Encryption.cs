@@ -337,12 +337,21 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="encryptedData">Ciphertext to decrypt.</param>
     /// <returns>A freshly-allocated byte array containing the plaintext.</returns>
     public byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData)
+        => Decrypt(mechanism, keyHandle, encryptedData, checkInput: null);
+
+    /// <inheritdoc cref="Decrypt(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/>
+    /// <param name="mechanism">The decryption mechanism to use.</param>
+    /// <param name="keyHandle">Handle of the key to decrypt with.</param>
+    /// <param name="encryptedData">Ciphertext to decrypt.</param>
+    /// <param name="checkInput">Refuses a ciphertext the key cannot have produced; see <see cref="InputCheck"/>.</param>
+    internal byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData, InputCheck? checkInput)
     {
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
         Enforce(mechanism, CryptoOperation.Decrypt);
+        checkInput?.Invoke(encryptedData);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
 

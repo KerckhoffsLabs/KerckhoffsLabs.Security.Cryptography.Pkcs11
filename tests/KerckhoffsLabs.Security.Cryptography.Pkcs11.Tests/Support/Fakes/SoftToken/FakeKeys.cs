@@ -11,13 +11,22 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 /// token's required key attributes (e.g. RSA's <c>CKA_MODULUS</c>, DSA's <c>CKA_PRIME</c>) can't be
 /// made unreadable or fatally erroring on a well-formed key object, which is what the adapters'
 /// key-size fallback paths need to see. The key carries a private handle only, unless
-/// <c>publicOnly</c> asks for a public handle only; the module answers the same either way.
+/// <c>publicOnly</c> asks for a public handle only, or <c>respondFor</c> is given: then the key has both, the
+/// private one handle 1 and the public one handle 2, and <c>respondFor</c> answers for each. Otherwise the
+/// module answers the same for either. A <c>decrypt</c> answer makes the module's <c>C_Decrypt</c> succeed
+/// with what it returns.
 /// </summary>
 internal static class FakeKeys
 {
-    public static FakeKey Create(CKK keyType, Func<CKA, (CKR Rv, byte[]? Value)> respond, ICryptoPolicy? policy = null, bool publicOnly = false)
+    public static FakeKey Create(
+        CKK keyType,
+        Func<CKA, (CKR Rv, byte[]? Value)> respond,
+        ICryptoPolicy? policy = null,
+        bool publicOnly = false,
+        Func<byte[], byte[]>? decrypt = null,
+        Func<ulong, CKA, (CKR Rv, byte[]? Value)>? respondFor = null)
     {
-        var library = new AttributeResponseModule(respond).Load();
+        var library = new AttributeResponseModule(respond, decrypt, respondFor).Load();
         var lowLevel = library.LowLevelLibrary!;
         var slot = new Pkcs11Slot(lowLevel, slotId: 1);
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1, policy: policy);
@@ -25,7 +34,7 @@ internal static class FakeKeys
         var key = new Pkcs11Key(
             session,
             privateHandle: publicOnly ? ObjectHandle.Invalid : new ObjectHandle(1),
-            publicHandle: publicOnly ? new ObjectHandle(2) : ObjectHandle.Invalid,
+            publicHandle: publicOnly || respondFor is not null ? new ObjectHandle(2) : ObjectHandle.Invalid,
             keyType: keyType,
             label: null,
             id: []);
