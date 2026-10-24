@@ -36,3 +36,22 @@
 	path = vendor/freehsm
 	url = https://github.com/afchine1337/freehsm.git
 	ignore = untracked
+[submodule "vendor/libtpms"]
+	path = vendor/libtpms
+	url = https://github.com/stefanberger/libtpms.git
+	ignore = untracked
+[submodule "vendor/swtpm"]
+	path = vendor/swtpm
+	url = https://github.com/stefanberger/swtpm.git
+	ignore = untracked
+[submodule "vendor/tpm2-pkcs11"]
+	path = vendor/tpm2-pkcs11
+	url = https://github.com/tpm2-software/tpm2-pkcs11.git
+	ignore = untracked
+[submodule "vendor/json-glib"]
+	path = vendor/json-glib
+	url = https://gitlab.gnome.org/GNOME/json-glib.git
+	ignore = untracked
+[submodule "vendor/tpm2-abrmd"]
+	path = vendor/tpm2-abrmd
+	url = https://github.com/tpm2-software/tpm2-abrmd.git
