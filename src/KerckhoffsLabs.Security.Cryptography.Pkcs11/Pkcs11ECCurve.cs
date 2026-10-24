@@ -13,8 +13,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <remarks>
 /// <para>
 /// The <see cref="NamedCurves"/> nested class provides the prime-field (Weierstrass) curves a PKCS#11
-/// v3.2 token may implement via <c>CKM_EC_KEY_PAIR_GEN</c> — the NIST primes, the Koblitz curves
-/// (secp192k1/secp224k1/secp256k1), the Brainpool family (RFC 5639), and SM2. Any other curve can be selected with
+/// v3.2 token may implement via <c>CKM_EC_KEY_PAIR_GEN</c> — the NIST primes, the SEC 2 curves
+/// (secp160k1/secp160r1/secp160r2, secp192k1/secp224k1/secp256k1), the Brainpool family (RFC 5639), and SM2. Any other curve can be selected with
 /// <see cref="CreateFromValue(string, string?, int?)"/>, and described to the library (name, field size) through a
 /// <see cref="Pkcs11CurveCatalog"/>. Twisted-Edwards (Ed25519/Ed448) and Montgomery
 /// (X25519/X448) curves use different key types and key-pair-gen mechanisms and are intentionally
@@ -69,7 +69,8 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// <para>
     /// This is the key size the BCL reports for the curve (<see cref="AsymmetricAlgorithm.KeySize"/>).
     /// A coordinate, and a raw ECDH shared secret, is <c>(FieldSizeBits + 7) / 8</c> bytes: 66 for P-521,
-    /// not 521 / 8.
+    /// not 521 / 8. An ECDSA signature's r and s are sized from the group order instead, which can be one
+    /// bit longer (<see cref="Pkcs11CurveInfo.OrderSizeBits"/>).
     /// </para>
     /// <para>
     /// Not part of equality, which compares OIDs only. A curve read off a token

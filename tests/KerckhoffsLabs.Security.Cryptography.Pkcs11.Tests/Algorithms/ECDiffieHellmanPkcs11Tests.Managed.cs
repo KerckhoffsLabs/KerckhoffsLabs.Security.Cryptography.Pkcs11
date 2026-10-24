@@ -53,6 +53,11 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         catch (CryptographicException) { return false; }
     }
 
+    // secp160r1 (SEC 2) is in the built-in catalog, below the default policy's floor.
+    private const string Secp160r1Oid = "1.3.132.0.8";
+
+    public static bool Secp160r1Supported { get; } = ProbeCurve(Secp160r1Oid);
+
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     // Maps a named-curve name to the production Pkcs11ECCurve (token side) and the BCL ECCurve (peer side).
@@ -488,6 +493,22 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(expectedBits, only.MinSize);
         Assert.Equal(expectedBits, only.MaxSize);
     });
+
+    // KeySize is the field size, as the BCL reports it, also on a curve whose group order is one bit longer.
+    [Fact(SkipUnless = nameof(Secp160r1Supported), Skip = "Requires " + nameof(Secp160r1Supported))]
+    public void KeySize_Secp160r1_IsTheBclKeySize()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(Secp160r1Oid));
+        using var alice = new ECDiffieHellmanPkcs11(key);
+        using var bob = ECDiffieHellman.Create(BclECCurve.CreateFromValue(Secp160r1Oid));
+
+        Assert.Equal(160, alice.KeySize);
+        Assert.Equal(bob.KeySize, alice.KeySize);
+        Assert.Equal(bob.DeriveRawSecretAgreement(alice.PublicKey), alice.DeriveRawSecretAgreement(bob.PublicKey));
+    }
 
     // A real token can't be coaxed into failing to read CKA_EC_PARAMS — it's a required attribute of
     // every EC key object — so this drives the fallback's error path via a fake library.

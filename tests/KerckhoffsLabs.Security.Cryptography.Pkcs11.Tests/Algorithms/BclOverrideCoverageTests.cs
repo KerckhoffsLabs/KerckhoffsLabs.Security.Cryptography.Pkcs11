@@ -91,8 +91,6 @@ public sealed class BclOverrideCoverageTests
         "The modulus length in bytes, from KeySize, which the constructor sets from the token key's CKA_MODULUS_BITS or CKA_MODULUS.";
     private const string RsaStreamThroughVerifyHash =
         "Hashes through the HashData override, which puts the hash to the session's policy, and verifies with VerifyHash, which the adapter overrides.";
-    private const string EcdsaSignatureSize =
-        "Sized from KeySize, the curve's field size the constructor reads from the library's curve catalog, as the BCL sizes its own signatures.";
     private const string ForwardsToOverride =
         "Validates its arguments and forwards to the overload the adapter overrides.";
     private const string BlockThroughCore =
@@ -256,7 +254,6 @@ public sealed class BclOverrideCoverageTests
         ["static ECDsa.Create(ECParameters)"] = StaticFactory,
         ["static ECDsa.Create(String)"] = StaticFactory,
         ["ECDsa.FromXmlString(String)"] = NoEcXmlFormat,
-        ["ECDsa.GetMaxSignatureSize(DSASignatureFormat)"] = EcdsaSignatureSize,
         ["ECDsa.SignData(Byte[], HashAlgorithmName)"] = EcdsaThroughSignHash,
         ["ECDsa.SignData(Byte[], HashAlgorithmName, DSASignatureFormat)"] = EcdsaThroughSignHash,
         ["ECDsa.SignData(Byte[], Int32, Int32, HashAlgorithmName)"] = EcdsaThroughSignHash,
@@ -289,7 +286,6 @@ public sealed class BclOverrideCoverageTests
         ["ECDsa.VerifyHash(Byte[], Byte[], DSASignatureFormat)"] = EcdsaThroughSignHash,
         ["ECDsa.VerifyHash(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>)"] = EcdsaThroughSignHash,
         ["ECDsa.VerifyHash(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, DSASignatureFormat)"] = EcdsaThroughSignHash,
-        ["ECDsa.VerifyHashCore(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, DSASignatureFormat)"] = EcdsaThroughSignHash,
         ["ECDsa.get_KeyExchangeAlgorithm()"] = AlgorithmName,
         ["ECDsa.get_SignatureAlgorithm()"] = AlgorithmName,
         ["static HMAC.Create()"] = StaticFactory,
@@ -674,10 +670,14 @@ public sealed class BclOverrideCoverageTests
     private const string UnwrapLeftInPool =
         "Unwraps into a buffer rented from ArrayPool<byte>.Shared and returns it without zeroing it, so the unwrapped key stays in the shared pool; the BCL does this for every Aes and the method is not virtual. The overloads that write to the caller's destination leave nothing behind.";
 
+    private const string EcdsaSignatureSizeFromField =
+        "Sized from KeySize, the curve's field size, as the BCL sizes its own signatures. The token's r‖s takes the group order's length for r and s, so on secp160k1, secp160r1, secp160r2 and secp224k1, whose order is one bit longer than the field, the IEEE P1363 size is two bytes short; the DER size still fits. Not virtual, and documented in the adapter's remarks.";
+
     internal static readonly Dictionary<string, string> KnownGaps = new(StringComparer.Ordinal)
     {
         ["Aes.DecryptKeyWrapPadded(Byte[])"] = UnwrapLeftInPool,
         ["Aes.DecryptKeyWrapPadded(ReadOnlySpan<Byte>)"] = UnwrapLeftInPool,
+        ["ECDsa.GetMaxSignatureSize(DSASignatureFormat)"] = EcdsaSignatureSizeFromField,
     };
 
     [Theory]

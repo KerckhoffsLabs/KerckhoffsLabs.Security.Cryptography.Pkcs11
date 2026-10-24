@@ -380,6 +380,7 @@ public sealed partial class SecureOnlyPolicy
 #pragma warning disable KLPKCS11007 // the weak curves are what this table documents
         foreach (Pkcs11ECCurve curve in (Pkcs11ECCurve[])[
             Pkcs11ECCurve.NamedCurves.NistP192, Pkcs11ECCurve.NamedCurves.NistP224,
+            Pkcs11ECCurve.NamedCurves.Secp160k1, Pkcs11ECCurve.NamedCurves.Secp160r1, Pkcs11ECCurve.NamedCurves.Secp160r2,
             Pkcs11ECCurve.NamedCurves.Secp192k1, Pkcs11ECCurve.NamedCurves.Secp224k1,
             Pkcs11ECCurve.NamedCurves.BrainpoolP160r1, Pkcs11ECCurve.NamedCurves.BrainpoolP160t1,
             Pkcs11ECCurve.NamedCurves.BrainpoolP192r1, Pkcs11ECCurve.NamedCurves.BrainpoolP192t1,

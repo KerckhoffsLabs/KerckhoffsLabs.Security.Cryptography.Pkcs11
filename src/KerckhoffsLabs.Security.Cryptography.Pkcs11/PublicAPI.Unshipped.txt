@@ -2014,6 +2014,9 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Nis
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.NistP256.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.NistP384.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.NistP521.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Secp160k1.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Secp160r1.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Secp160r2.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Secp192k1.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Secp224k1.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Secp256k1.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
@@ -2104,7 +2107,9 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Equals(KerckhoffsLab
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.FieldSizeBits.get -> int
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Name.get -> string!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Oid.get -> string!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.OrderSizeBits.get -> int
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Pkcs11CurveInfo(string! oid, string! name, int fieldSizeBits) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Pkcs11CurveInfo(string! oid, string! name, int fieldSizeBits, int orderSizeBits) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.ToCurve() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CurveCatalog.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CurveCatalog.init -> void

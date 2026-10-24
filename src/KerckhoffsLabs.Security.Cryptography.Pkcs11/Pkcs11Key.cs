@@ -118,19 +118,7 @@ public sealed partial class Pkcs11Key : IDisposable
         switch (_keyType)
         {
             case CKK.CKK_EC:
-                {
-                    using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
-                    if (attrs[0].CannotBeRead)
-                        return null;
-                    try
-                    {
-                        return _session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
-                    }
-                    catch (ArgumentException)
-                    {
-                        return null; // not a DER-encoded named-curve OID
-                    }
-                }
+                return ReadEcCurve()?.FieldSizeBits;
             case CKK.CKK_RSA:
                 {
                     using var attrs = GetAttributeValue(CKA.CKA_MODULUS_BITS, CKA.CKA_MODULUS);
@@ -153,6 +141,28 @@ public sealed partial class Pkcs11Key : IDisposable
                     using var attrs = GetAttributeValue(CKA.CKA_VALUE_LEN);
                     return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
                 }
+        }
+    }
+
+    /// <summary>
+    /// The curve of an EC key as the library's <see cref="Pkcs11LibraryOptions.CurveCatalog"/> describes it,
+    /// read from <c>CKA_EC_PARAMS</c>; <see langword="null"/> when that can't be read, is not a DER-encoded
+    /// named-curve OID, or names a curve the catalog doesn't list. Not cached.
+    /// </summary>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
+    internal Pkcs11CurveInfo? ReadEcCurve()
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
+        if (attrs[0].CannotBeRead)
+            return null;
+        try
+        {
+            string oid = Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()).Oid!;
+            return _session.Library.CurveCatalog.TryGetByOid(oid, out Pkcs11CurveInfo? curve) ? curve : null;
+        }
+        catch (ArgumentException)
+        {
+            return null; // not a DER-encoded named-curve OID
         }
     }
 

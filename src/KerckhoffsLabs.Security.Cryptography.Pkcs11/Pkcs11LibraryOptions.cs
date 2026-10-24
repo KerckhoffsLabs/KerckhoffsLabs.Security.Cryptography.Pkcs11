@@ -165,14 +165,15 @@ public sealed class Pkcs11LibraryOptions
     }
 
     /// <summary>
-    /// The curves every session of the library knows the name and field size of, or
+    /// The curves every session of the library knows the name, field size and order size of, or
     /// <see langword="null"/> (the default) for <see cref="Pkcs11CurveCatalog.Default"/>.
     /// </summary>
     /// <remarks>
     /// The curve of a token EC key is read off the token as a bare OID and resolved through this
     /// catalog. Its field size sets the coordinate length a peer's ECDH public key must have, the length
     /// of a raw ECDH secret, and the <see cref="System.Security.Cryptography.AsymmetricAlgorithm.KeySize"/>
-    /// of <see cref="Algorithms.ECDsaPkcs11"/> and <see cref="Algorithms.ECDiffieHellmanPkcs11"/>. Set it
+    /// of <see cref="Algorithms.ECDsaPkcs11"/> and <see cref="Algorithms.ECDiffieHellmanPkcs11"/>; its order
+    /// size, the length of r and s that a DER ECDSA signature is converted to for the token. Set it
     /// to a catalog extended with <see cref="Pkcs11CurveCatalog.With(Pkcs11CurveInfo)"/> when the token
     /// holds keys on curves outside the built-in set; it does not make the session's policy permit them.
     /// </remarks>

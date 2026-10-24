@@ -27,10 +27,27 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// class's code ever runs, on every backend — see <c>ECDsaPkcs11TestCases</c>'s SHA-224 coverage,
 /// which exercises only the span path for this reason.
 /// </para>
+/// <para>
+/// Signature sizes come from the library's <see cref="Pkcs11LibraryOptions.CurveCatalog"/>.
+/// <see cref="AsymmetricAlgorithm.KeySize"/> is the curve's field size, as the BCL reports it. The r‖s
+/// (IEEE P1363) form is the token's: r and s each take the length of the group order n, as PKCS#11 defines
+/// them. On secp160k1, secp160r1, secp160r2 and secp224k1, n is one bit longer than the field, so an r‖s
+/// signature is two bytes longer than the BCL's own for the curve, and than
+/// <see cref="ECDsa.GetMaxSignatureSize(DSASignatureFormat)"/>, which is not virtual and sizes from
+/// <c>KeySize</c>. The DER form is the same on both sides.
+/// </para>
+/// <para>
+/// On a curve the catalog doesn't list, <c>KeySize</c> stays 0 and a DER signature can't be converted
+/// for the token, so it does not verify; describe the curve with <see cref="Pkcs11CurveCatalog.With(Pkcs11CurveInfo)"/>.
+/// </para>
 /// </remarks>
 public sealed class ECDsaPkcs11 : ECDsa
 {
     private readonly Pkcs11Key _key;
+
+    // The length of r and of s in the token's r‖s signature, (order bits + 7) / 8; 0 for a curve the
+    // library's catalog doesn't list.
+    private readonly int _signatureFieldSize;
 
     /// <summary>
     /// Wraps a PKCS#11 EC key as a BCL <see cref="ECDsa"/> instance. Does not take
@@ -48,25 +65,28 @@ public sealed class ECDsaPkcs11 : ECDsa
                 $"Expected an EC key, got {key.KeyType}.", nameof(key));
         _key = key;
 
-        // Reflect the token key's real curve field size. Best-effort: the ECDsa base constructor
-        // leaves KeySize=0 (via KeySizeValue), which we keep if the curve can't be identified —
-        // callers relying on KeySize/LegalKeySizes (or the DER signature-format overloads, which the
-        // BCL base class implements in terms of KeySize) would already be broken in that case.
-        int? bits = TryReadKeySizeBits(key);
-        if (bits is int b)
+        // Reflect the token key's real curve: KeySize is its field size, and r and s are each as long as
+        // its group order. Best-effort: the ECDsa base constructor leaves KeySize=0 (via KeySizeValue),
+        // which we keep if the curve can't be identified. Neither size can be derived from the key itself:
+        // CKA_EC_PARAMS is only the curve's OID, and CKA_EC_POINT gives the field's byte length, which the
+        // order's can exceed by one (secp224k1).
+        Pkcs11CurveInfo? curve = TryReadCurve(key);
+        if (curve is not null)
         {
+            int b = curve.FieldSizeBits;
             KeySizeValue = b;
             LegalKeySizesValue = [new KeySizes(b, b, 0)];
+            _signatureFieldSize = (curve.OrderSizeBits + 7) / 8;
         }
     }
 
     // A token-resident key has exactly one size — it can't be resized — so LegalKeySizesValue
     // reports that single size rather than a generic range the token may not actually support.
-    private static int? TryReadKeySizeBits(Pkcs11Key key)
+    private static Pkcs11CurveInfo? TryReadCurve(Pkcs11Key key)
     {
         try
         {
-            return key.KeySize;
+            return key.ReadEcCurve();
         }
         catch (Pkcs11Exception)
         {
@@ -231,6 +251,30 @@ public sealed class ECDsaPkcs11 : ECDsa
         ArgumentNullException.ThrowIfNull(signature);
         var mech = new Mechanism(CKM.CKM_ECDSA);
         return _key.Verify(mech, hash, signature);
+    }
+
+    // Every verification with a DSASignatureFormat ends here. The base class converts a DER signature to
+    // r‖s sized from KeySize, the field size, which is one byte short of r and s on a curve whose order is
+    // longer than its field; on a curve the catalog doesn't list it sizes to zero, and a zero r or s then
+    // threw IndexOutOfRangeException. This sizes from the order instead.
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A DER signature is converted to r‖s with r and s each as long as the curve's group order, the form
+    /// the token verifies. One that is malformed, has a value too long for the curve, or is on a curve the
+    /// library's catalog doesn't list does not verify, as for the BCL's own conversion.
+    /// </remarks>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
+    protected override bool VerifyHashCore(
+        ReadOnlySpan<byte> hash,
+        ReadOnlySpan<byte> signature,
+        DSASignatureFormat signatureFormat)
+    {
+        if (signatureFormat != DSASignatureFormat.Rfc3279DerSequence)
+            return base.VerifyHashCore(hash, signature, signatureFormat);
+
+        byte[]? ieee = _signatureFieldSize == 0 ? null : DssSignatureEncoding.DerToIeeeP1363(signature, _signatureFieldSize);
+        return ieee is not null && VerifyHash(hash.ToArray(), ieee);
     }
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)

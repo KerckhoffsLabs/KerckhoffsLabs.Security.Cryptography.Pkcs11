@@ -180,6 +180,9 @@ public sealed class Pkcs11ECCurveTests
             (Pkcs11ECCurve.NamedCurves.NistP256, "1.2.840.10045.3.1.7", "nistP256"),
             (Pkcs11ECCurve.NamedCurves.NistP384, "1.3.132.0.34", "nistP384"),
             (Pkcs11ECCurve.NamedCurves.NistP521, "1.3.132.0.35", "nistP521"),
+            (Pkcs11ECCurve.NamedCurves.Secp160k1, "1.3.132.0.9", "secp160k1"),
+            (Pkcs11ECCurve.NamedCurves.Secp160r1, "1.3.132.0.8", "secp160r1"),
+            (Pkcs11ECCurve.NamedCurves.Secp160r2, "1.3.132.0.30", "secp160r2"),
             (Pkcs11ECCurve.NamedCurves.Secp192k1, "1.3.132.0.31", "secp192k1"),
             (Pkcs11ECCurve.NamedCurves.Secp224k1, "1.3.132.0.32", "secp224k1"),
             (Pkcs11ECCurve.NamedCurves.Secp256k1, "1.3.132.0.10", "secp256k1"),
@@ -201,7 +204,7 @@ public sealed class Pkcs11ECCurveTests
         ];
 #pragma warning restore KLPKCS11007
 
-        Assert.Equal(23, catalog.Length);
+        Assert.Equal(26, catalog.Length);
         foreach (var (curve, oid, name) in catalog)
         {
             Assert.Equal(oid, curve.Oid);

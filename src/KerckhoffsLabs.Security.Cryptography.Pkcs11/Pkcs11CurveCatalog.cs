@@ -4,9 +4,11 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// An immutable set of named elliptic curves the library knows the name and field size of. The field
-/// size drives the checks and sizes of EC operations on token keys: the peer public key's coordinate
-/// length in ECDH, the length of a raw ECDH secret, and <see cref="System.Security.Cryptography.AsymmetricAlgorithm.KeySize"/>.
+/// An immutable set of named elliptic curves the library knows the name, field size and order size of.
+/// The field size drives the checks and sizes of EC operations on token keys: the peer public key's
+/// coordinate length in ECDH, the length of a raw ECDH secret, and
+/// <see cref="System.Security.Cryptography.AsymmetricAlgorithm.KeySize"/>. The order size gives the length
+/// of r and s in an ECDSA signature, which a DER signature is converted to for the token.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -41,8 +43,13 @@ public sealed class Pkcs11CurveCatalog
 
     /// <summary>
     /// The built-in catalog: every curve of <see cref="Pkcs11ECCurve.NamedCurves"/> — the NIST primes,
-    /// the SEC 2 Koblitz curves, the Brainpool family (RFC 5639) and SM2.
+    /// the SEC 2 160-bit and Koblitz curves, the Brainpool family (RFC 5639) and SM2.
     /// </summary>
+    /// <remarks>
+    /// The field sizes are the key sizes the BCL reports for these curves. The group order of secp160k1,
+    /// secp160r1, secp160r2 and secp224k1 is one bit longer than the field, so their signature values
+    /// take one byte more than a coordinate.
+    /// </remarks>
     public static Pkcs11CurveCatalog Default { get; } = new(
     [
         new(Oids.Curves.NistP192,        "nistP192",        192),
@@ -50,8 +57,11 @@ public sealed class Pkcs11CurveCatalog
         new(Oids.Curves.NistP256,        "nistP256",        256),
         new(Oids.Curves.NistP384,        "nistP384",        384),
         new(Oids.Curves.NistP521,        "nistP521",        521),
+        new(Oids.Curves.Secp160k1,       "secp160k1",       160, orderSizeBits: 161),
+        new(Oids.Curves.Secp160r1,       "secp160r1",       160, orderSizeBits: 161),
+        new(Oids.Curves.Secp160r2,       "secp160r2",       160, orderSizeBits: 161),
         new(Oids.Curves.Secp192k1,       "secp192k1",       192),
-        new(Oids.Curves.Secp224k1,       "secp224k1",       224),
+        new(Oids.Curves.Secp224k1,       "secp224k1",       224, orderSizeBits: 225),
         new(Oids.Curves.Secp256k1,       "secp256k1",       256),
         new(Oids.Curves.BrainpoolP160r1, "brainpoolP160r1", 160),
         new(Oids.Curves.BrainpoolP160t1, "brainpoolP160t1", 160),
