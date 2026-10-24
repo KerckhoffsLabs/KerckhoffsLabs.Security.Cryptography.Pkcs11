@@ -2,4 +2,4 @@
 # requirements-nss.txt pins these and everything they pull in by hash, for pip --require-hashes;
 # regenerate it after changing this file:
 #   pip-compile --generate-hashes --allow-unsafe --strip-extras --no-header requirements-nss.in
-gyp-next==0.22.3
+gyp-next==0.22.4

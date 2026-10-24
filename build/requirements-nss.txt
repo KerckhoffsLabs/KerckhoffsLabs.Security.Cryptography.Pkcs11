@@ -1,6 +1,6 @@
-gyp-next==0.22.3 \
-    --hash=sha256:4278d5b0b368d898389be74bb77c1a17631a50587d1b49e5607e40d211d4592d \
-    --hash=sha256:cda65d585e378250685bf2f63afa365ac6738501bef992337914e219caf71c69
+gyp-next==0.22.4 \
+    --hash=sha256:303f2f8f6db31465562eeb519d10eceaf44eef55a58ed304e76e44f5b1433d9a \
+    --hash=sha256:bd52d1824f83f26683c6d2f26f188c57bf4460b1524c4e9ae9c9483c6c3699f9
     # via -r requirements-nss.in
 packaging==26.3 \
     --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
