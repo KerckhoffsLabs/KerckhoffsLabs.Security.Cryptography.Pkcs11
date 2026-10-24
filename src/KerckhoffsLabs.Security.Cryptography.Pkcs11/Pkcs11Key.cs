@@ -113,41 +113,29 @@ public sealed partial class Pkcs11Key : IDisposable
     private const int KeySizeUnknown = 0;
     private int _keySizeBits = KeySizeNotRead;
 
-    private int? ReadKeySizeBits()
+    private int? ReadKeySizeBits() => _keyType switch
     {
-        switch (_keyType)
+        CKK.CKK_EC => ReadEcKeySizeBits(),
+        CKK.CKK_RSA => ReadRsaKeySizeBits(),
+        CKK.CKK_DSA => ReadDsaKeySizeBits(),
+        CKK.CKK_DH or CKK.CKK_X9_42_DH or CKK.CKK_EC_MONTGOMERY or CKK.CKK_KEA or CKK.CKK_GOSTR3410 => null,
+        var t when IsAsymmetricKeyType(t) => null,
+        _ => ReadSecretKeySizeBits(),
+    };
+
+    // The curve's field size from the library's catalog; null for a curve it doesn't list.
+    private int? ReadEcKeySizeBits()
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
+        if (attrs[0].CannotBeRead)
+            return null;
+        try
         {
-            case CKK.CKK_EC:
-                {
-                    using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
-                    if (attrs[0].CannotBeRead)
-                        return null;
-                    try
-                    {
-                        return _session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
-                    }
-                    catch (ArgumentException)
-                    {
-                        return null; // not a DER-encoded named-curve OID
-                    }
-                }
-            case CKK.CKK_RSA:
-                return ReadRsaKeySizeBits();
-            case CKK.CKK_DSA:
-                {
-                    // PKCS#11 has no CKA_PRIME_BITS (unlike RSA's CKA_MODULUS_BITS).
-                    using var attrs = GetAttributeValue(CKA.CKA_PRIME);
-                    return attrs[0].CannotBeRead ? null : BitLength(attrs[0].GetValueAsByteArray());
-                }
-            case CKK.CKK_DH or CKK.CKK_X9_42_DH or CKK.CKK_EC_MONTGOMERY or CKK.CKK_KEA or CKK.CKK_GOSTR3410:
-                return null;
-            case var t when IsAsymmetricKeyType(t):
-                return null;
-            default:
-                {
-                    using var attrs = GetAttributeValue(CKA.CKA_VALUE_LEN);
-                    return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
-                }
+            return _session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray())).FieldSizeBits;
+        }
+        catch (ArgumentException)
+        {
+            return null; // not a DER-encoded named-curve OID
         }
     }
 
@@ -162,6 +150,20 @@ public sealed partial class Pkcs11Key : IDisposable
         if (!attrs[0].CannotBeRead)
             return checked((int)attrs[0].GetValueAsUlong());
         return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
+    }
+
+    // The bit length of CKA_PRIME: PKCS#11 has no CKA_PRIME_BITS (unlike RSA's CKA_MODULUS_BITS).
+    private int? ReadDsaKeySizeBits()
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_PRIME);
+        return attrs[0].CannotBeRead ? null : BitLength(attrs[0].GetValueAsByteArray());
+    }
+
+    // CKA_VALUE_LEN, in bytes, as bits.
+    private int? ReadSecretKeySizeBits()
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_VALUE_LEN);
+        return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
     }
 
     // Bit length of a big-endian unsigned integer, ignoring leading zero bytes.
