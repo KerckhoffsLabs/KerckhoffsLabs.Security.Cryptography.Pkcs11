@@ -48,6 +48,8 @@ public sealed class WrapUnwrapKeyTests_BouncyHsm(BouncyHsmBackendFixture backend
         WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend, wrapMechanism);
     }
 
+    // BouncyHsm takes the curve from the template's CKA_EC_PARAMS, not from the PKCS#8, and refuses an unwrap
+    // without it with CKR_ATTRIBUTE_VALUE_INVALID (UnwrapKeyHandler.SetKeyvalueForEcdsaPrivateKeyObject).
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void Unwrap_EcPrivateKeyWithoutPublicPoint_Signs() => WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend);
+    public void Unwrap_EcPrivateKeyWithoutPublicPoint_Signs() => WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend, ecParamsInTemplate: true);
 }

@@ -219,9 +219,15 @@ internal static class WrapUnwrapKeyTestCases
     /// under an AES key the test holds, with <c>CKM_AES_CBC_PAD</c>, the wrap every backend offers for private
     /// keys, so the session opts in to it.
     /// </remarks>
-    internal static void Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(IPkcs11Backend backend)
+    /// <param name="backend">The backend under test.</param>
+    /// <param name="ecParamsInTemplate">
+    /// Whether the unwrap template names the curve in <c>CKA_EC_PARAMS</c>. PKCS#11 says it must not (the
+    /// footnote 6 attributes come from the wrapped key), so only a token that requires it anyway passes true.
+    /// </param>
+    internal static void Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(IPkcs11Backend backend, bool ecParamsInTemplate = false)
     {
-        backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD, CKM.CKM_ECDSA);
+        backend.RequireMechanismFlags(CKM.CKM_AES_CBC_PAD, f => f.Unwrap, "CKF_UNWRAP");
+        backend.RequireMechanism(CKM.CKM_ECDSA);
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         byte[] pkcs8 = EcPkcs8WithoutPublicPoint(ec.ExportParameters(includePrivateParameters: true).D!);
         using var aes = Aes.Create();
@@ -238,8 +244,10 @@ internal static class WrapUnwrapKeyTestCases
             using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
             using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
             using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+            using var ecParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+            List<ObjectAttribute> template = ecParamsInTemplate ? [cls, type, token, sign, ecParams] : [cls, type, token, sign];
 #pragma warning disable KLPKCS11009 // CBC-PAD is the private-key wrap under test (see the remarks).
-            ObjectHandle key = session.UnwrapKey(new Mechanism(CKM.CKM_AES_CBC_PAD, iv), kek, wrapped, [cls, type, token, sign]);
+            ObjectHandle key = session.UnwrapKey(new Mechanism(CKM.CKM_AES_CBC_PAD, iv), kek, wrapped, template);
 #pragma warning restore KLPKCS11009
             try
             {
