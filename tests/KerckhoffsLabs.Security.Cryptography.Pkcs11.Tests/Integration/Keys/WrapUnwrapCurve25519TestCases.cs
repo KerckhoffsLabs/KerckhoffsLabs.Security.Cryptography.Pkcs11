@@ -85,6 +85,26 @@ internal static class WrapUnwrapCurve25519TestCases
         });
     }
 
+    // The RFC 8032 key as an RFC 5958 OneAsymmetricKey v2 laid out as RFC 8410 §10.3's second example:
+    // version 1, a [0] friendlyName attribute and the [1] public key. Both fields are optional, and a token
+    // must take them on unwrap (Kryoptic refused both with CKR_WRAPPED_KEY_INVALID until 1.5.4,
+    // latchset/kryoptic#532).
+    internal static void Assert_Unwrap_Rfc5958Ed25519KeyWithOptionalFields_SignsTheRfc8032Signature(IPkcs11Backend backend)
+    {
+        RequireEd25519(backend);
+        RunInSession(backend, session =>
+        {
+            using var kek = new Kek(session);
+            byte[] pkcs8 = OneAsymmetricKeyV2(Ed25519Oid, Rfc8032Test2Secret, Rfc8032Test2Public);
+
+            ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_EDWARDS, CKA.CKA_SIGN);
+
+            AssertUsage(session, key, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
+            AssertWrapsTheKey(kek.Wrap(key), Ed25519Oid, Rfc8032Test2Secret, Rfc8032Test2Public);
+            Assert.Equal(Rfc8032Test2Signature, session.Sign(new Mechanism(CKM.CKM_EDDSA), key, Rfc8032Test2Message));
+        });
+    }
+
     internal static void Assert_Unwrap_Rfc8410X25519Key_AgreesTheRfc7748Secret(IPkcs11Backend backend)
     {
         RequireX25519(backend);
@@ -170,6 +190,32 @@ internal static class WrapUnwrapCurve25519TestCases
     private static byte[] Pkcs8(byte oid, byte[] privateKey) =>
         [0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, oid,
          0x04, 0x22, 0x04, 0x20, .. privateKey];
+
+    // RFC 5958 OneAsymmetricKey v2 (IMPLICIT tags): version 1, the curve's AlgorithmIdentifier, the key as a
+    // CurvePrivateKey, [0] attributes holding a friendlyName (PKCS#9), and [1] the public key.
+    private static byte[] OneAsymmetricKeyV2(byte oid, byte[] privateKey, byte[] publicKey)
+    {
+        var curvePrivateKey = new AsnWriter(AsnEncodingRules.DER);
+        curvePrivateKey.WriteOctetString(privateKey);
+
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteInteger(1);
+            using (writer.PushSequence())
+                writer.WriteObjectIdentifier($"1.3.101.{oid}");
+            writer.WriteOctetString(curvePrivateKey.Encode());
+            using (writer.PushSetOf(new Asn1Tag(TagClass.ContextSpecific, 0, isConstructed: true)))
+            using (writer.PushSequence())
+            {
+                writer.WriteObjectIdentifier("1.2.840.113549.1.9.20"); // friendlyName
+                using (writer.PushSetOf())
+                    writer.WriteCharacterString(UniversalTagNumber.BMPString, "Curdle Chairs");
+            }
+            writer.WriteBitString(publicKey, tag: new Asn1Tag(TagClass.ContextSpecific, 1));
+        }
+        return writer.Encode();
+    }
 
     // Reads a wrapped Curve25519 key as RFC 8410 has it, refusing anything else: version 0, or version 1
     // (RFC 5958 OneAsymmetricKey v2), the curve's OID with no parameters, the 32-byte key in a
