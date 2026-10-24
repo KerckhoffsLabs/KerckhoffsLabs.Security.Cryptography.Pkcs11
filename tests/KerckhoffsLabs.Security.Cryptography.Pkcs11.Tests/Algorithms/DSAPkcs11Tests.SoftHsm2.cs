@@ -9,16 +9,8 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
-    // SHA-224 is deliberately absent here: DSA.SignData(byte[], HashAlgorithmName) is a non-virtual
-    // BCL convenience overload that hashes internally via CryptographicOperations.HashData before ever
-    // reaching DSAPkcs11's override, and the BCL itself has no SHA-224 support -- so this entry point
-    // can never work with SHA224 on any backend, regardless of what the token supports. See
-    // TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering below, which calls DSAPkcs11's own
-    // virtual TrySignData/VerifyData overrides directly and does exercise SHA224 (SoftHSM's
-    // SoftHSM.cpp dispatches CKM_DSA_SHA224 to a real AsymMech::DSA_SHA224 sign/verify implementation,
-    // so DSAPkcs11.SignDataInternal/VerifyData's SupportsMechanism check takes the combined on-token
-    // path here, never reaching the managed-fallback HashData that has no SHA224 case).
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [InlineData("SHA224")]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
@@ -53,6 +45,14 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void VerifyWithSignatureFormat_MalformedSignature_ReturnsFalse() => DSAPkcs11TestCases.Assert_VerifyWithSignatureFormat_MalformedSignature_ReturnsFalse(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence)]
+    public void Sha224_EveryOverload_RoundTrips_AndRejectsTampering(DSASignatureFormat format) => DSAPkcs11TestCases.Assert_Sha224_EveryOverload_RoundTrips_AndRejectsTampering(_backend, format);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void Sha224_WycheproofVector_Verifies_AndTamperedDoesNot() => DSAPkcs11TestCases.Assert_Sha224_WycheproofVector_Verifies_AndTamperedDoesNot(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ExportParameters_ReturnsProvidedDomain() => DSAPkcs11TestCases.Assert_ExportParameters_ReturnsProvidedDomain(_backend);
