@@ -67,6 +67,9 @@ internal sealed partial class ManagedSoftToken
             CKM.CKM_SHA256 => RSAEncryptionPadding.OaepSHA256,
             CKM.CKM_SHA384 => RSAEncryptionPadding.OaepSHA384,
             CKM.CKM_SHA512 => RSAEncryptionPadding.OaepSHA512,
+            CKM.CKM_SHA3_256 => RSAEncryptionPadding.OaepSHA3_256,
+            CKM.CKM_SHA3_384 => RSAEncryptionPadding.OaepSHA3_384,
+            CKM.CKM_SHA3_512 => RSAEncryptionPadding.OaepSHA3_512,
             var h => throw new CryptographicException($"ManagedSoftToken: unsupported OAEP hash {h}."),
         };
     }

@@ -22,11 +22,14 @@ public static class Pkcs11MechanismMap
     private const string Sha256 = "SHA256";
     private const string Sha384 = "SHA384";
     private const string Sha512 = "SHA512";
+    private const string Sha3_256 = "SHA3-256";
+    private const string Sha3_384 = "SHA3-384";
+    private const string Sha3_512 = "SHA3-512";
 
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for RSA PKCS#1 v1.5 signing with the given hash.
     /// </summary>
-    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
+    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-256, SHA3-384, SHA3-512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_RSA_PKCS</c>) has no <see cref="HashAlgorithmName"/> constant in the
     /// BCL and is gated behind the session's crypto policy — same opt-in as SHA-1 — since
@@ -41,6 +44,9 @@ public static class Pkcs11MechanismMap
         Sha256 => new Mechanism(CKM.CKM_SHA256_RSA_PKCS),
         Sha384 => new Mechanism(CKM.CKM_SHA384_RSA_PKCS),
         Sha512 => new Mechanism(CKM.CKM_SHA512_RSA_PKCS),
+        Sha3_256 => new Mechanism(CKM.CKM_SHA3_256_RSA_PKCS),
+        Sha3_384 => new Mechanism(CKM.CKM_SHA3_384_RSA_PKCS),
+        Sha3_512 => new Mechanism(CKM.CKM_SHA3_512_RSA_PKCS),
         _ => throw new NotSupportedException(
             $"RSA PKCS#1 sign does not support hash {hash.Name}."),
     };
@@ -48,10 +54,11 @@ public static class Pkcs11MechanismMap
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for RSA-PSS signing with the given hash and salt length.
     /// </summary>
-    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
+    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-256, SHA3-384, SHA3-512).</param>
     /// <param name="saltLength">
     /// Salt length in bytes. Pass a negative value to use the recommended default
-    /// (hash output length: 20 / 28 / 32 / 48 / 64 bytes respectively).
+    /// (hash output length: 20 / 28 / 32 / 48 / 64 bytes for SHA-1 / SHA-224 / SHA-256 / SHA-384 / SHA-512,
+    /// and 32 / 48 / 64 bytes for SHA3-256 / SHA3-384 / SHA3-512).
     /// </param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_RSA_PKCS_PSS</c>) has no <see cref="HashAlgorithmName"/> constant in
@@ -68,6 +75,9 @@ public static class Pkcs11MechanismMap
             Sha256 => (CKM.CKM_SHA256_RSA_PKCS_PSS, CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength < 0 ? 32 : saltLength),
             Sha384 => (CKM.CKM_SHA384_RSA_PKCS_PSS, CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, saltLength < 0 ? 48 : saltLength),
             Sha512 => (CKM.CKM_SHA512_RSA_PKCS_PSS, CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, saltLength < 0 ? 64 : saltLength),
+            Sha3_256 => (CKM.CKM_SHA3_256_RSA_PKCS_PSS, CKM.CKM_SHA3_256, CKG.CKG_MGF1_SHA3_256, saltLength < 0 ? 32 : saltLength),
+            Sha3_384 => (CKM.CKM_SHA3_384_RSA_PKCS_PSS, CKM.CKM_SHA3_384, CKG.CKG_MGF1_SHA3_384, saltLength < 0 ? 48 : saltLength),
+            Sha3_512 => (CKM.CKM_SHA3_512_RSA_PKCS_PSS, CKM.CKM_SHA3_512, CKG.CKG_MGF1_SHA3_512, saltLength < 0 ? 64 : saltLength),
             _ => throw new NotSupportedException(
                 $"RSA-PSS does not support hash {hash.Name}."),
         };
@@ -77,7 +87,7 @@ public static class Pkcs11MechanismMap
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for RSA-OAEP encryption/decryption with the given hash.
     /// </summary>
-    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
+    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-256, SHA3-384, SHA3-512).</param>
     /// <remarks>
     /// SHA-1 and SHA-224 inner hashes are gated behind the session's crypto policy by
     /// <c>SecureOnlyPolicy</c>, which inspects <see cref="CkmRsaPkcsOaepParams.HashAlg"/>
@@ -93,6 +103,9 @@ public static class Pkcs11MechanismMap
             Sha256 => (CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256),
             Sha384 => (CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384),
             Sha512 => (CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512),
+            Sha3_256 => (CKM.CKM_SHA3_256, CKG.CKG_MGF1_SHA3_256),
+            Sha3_384 => (CKM.CKM_SHA3_384, CKG.CKG_MGF1_SHA3_384),
+            Sha3_512 => (CKM.CKM_SHA3_512, CKG.CKG_MGF1_SHA3_512),
             _ => throw new NotSupportedException(
                 $"RSA-OAEP does not support hash {hash.Name}."),
         };
