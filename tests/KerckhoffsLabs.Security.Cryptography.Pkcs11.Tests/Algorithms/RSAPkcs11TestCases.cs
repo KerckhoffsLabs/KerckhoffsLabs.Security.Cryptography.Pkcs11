@@ -18,7 +18,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// Backend-agnostic RSAPkcs11 tests: sign/verify (byte[] + span) under PKCS#1 and PSS, the key-size
 /// sweep (1024 under the AllowInsecure policy, up to the OpenSSL 16384 max, BCL cross-verify best-effort),
 /// OAEP encryption (SHA-1 and modern hashes), gated PKCS#1 v1.5 encryption, public-parameter export,
-/// and the unsupported surface. Cases skip where the backend does not advertise the mechanism they use.
+/// the SHA-3 hashes across every path that takes one, and the unsupported surface. Cases skip where the
+/// backend does not advertise the mechanism they use.
 /// </summary>
 internal static class RSAPkcs11TestCases
 {
@@ -545,6 +546,178 @@ internal static class RSAPkcs11TestCases
 
             Assert.Equal(overData, rsa.SignHash(digest, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
             Assert.True(rsa.VerifyHash(digest, overData, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+        });
+    }
+
+    // === SHA-3 ===============================================================
+
+    private static RSASignaturePadding SignaturePadding(string padding) =>
+        padding == "Pss" ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1;
+
+    // The combined mechanism SignData uses for the hash and padding.
+    private static CKM CombinedSignMechanism(HashAlgorithmName hash, string padding) =>
+        padding == "Pss" ? Pkcs11MechanismMap.RsaPssSign(hash, saltLength: -1).Type : Pkcs11MechanismMap.RsaPkcs1Sign(hash).Type;
+
+    private static CKM Sha3DigestMechanism(string hash) => hash switch
+    {
+        "SHA3-256" => CKM.CKM_SHA3_256,
+        "SHA3-384" => CKM.CKM_SHA3_384,
+        _ => CKM.CKM_SHA3_512,
+    };
+
+    // SignData / VerifyData with a SHA-3 hash run the combined CKM_SHA3_*_RSA_PKCS(_PSS) mechanism, the token
+    // hashing, on both the byte[] and span entry points. The BCL cross-check needs the host's own SHA-3.
+    internal static void Assert_SignVerifyData_Sha3_RoundTrips(IPkcs11Backend backend, string hash, string padding)
+    {
+        var hashAlgorithm = new HashAlgorithmName(hash);
+        RSASignaturePadding signaturePadding = SignaturePadding(padding);
+        backend.RequireMechanisms(CombinedSignMechanism(hashAlgorithm, padding));
+        WithRsa(backend, (_, rsa) =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes($"{hash} {padding} payload");
+            byte[] sig = rsa.SignData(data, hashAlgorithm, signaturePadding);
+            Assert.Equal(256, sig.Length);
+            Assert.True(rsa.VerifyData(data, sig, hashAlgorithm, signaturePadding));
+
+            byte[] spanSig = new byte[256];
+            Assert.True(rsa.TrySignData(data, spanSig, hashAlgorithm, signaturePadding, out int written));
+            Assert.True(rsa.VerifyData(data.AsSpan(), spanSig.AsSpan(0, written), hashAlgorithm, signaturePadding));
+
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+            Assert.False(rsa.VerifyData(tampered, sig, hashAlgorithm, signaturePadding));
+
+            if (SHA3_256.IsSupported)
+            {
+                using var bcl = RSA.Create(rsa.ExportParameters(includePrivateParameters: false));
+                Assert.True(bcl.VerifyData(data, sig, hashAlgorithm, signaturePadding));
+            }
+        });
+    }
+
+    // SignHash / VerifyHash over a SHA-3 digest: PKCS#1 v1.5 is raw CKM_RSA_PKCS over a DigestInfo naming the
+    // SHA-3 OID, PSS is raw CKM_RSA_PKCS_PSS with CKM_SHA3_* and CKG_MGF1_SHA3_*. The digest comes from the
+    // token, so the case runs whether or not the host has SHA-3; the signatures interoperate with SignData's.
+    internal static void Assert_SignHash_Sha3_InteropsWithSignData(IPkcs11Backend backend, string hash, string padding)
+    {
+        var hashAlgorithm = new HashAlgorithmName(hash);
+        RSASignaturePadding signaturePadding = SignaturePadding(padding);
+        backend.RequireMechanisms(
+            CombinedSignMechanism(hashAlgorithm, padding),
+            padding == "Pss" ? CKM.CKM_RSA_PKCS_PSS : CKM.CKM_RSA_PKCS,
+            Sha3DigestMechanism(hash));
+        WithRsa(backend, (session, rsa) =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes($"{hash} {padding} over a digest");
+            byte[] digest = session.Digest(new Mechanism(Sha3DigestMechanism(hash)), data);
+
+            byte[] overData = rsa.SignData(data, hashAlgorithm, signaturePadding);
+            byte[] overDigest = rsa.SignHash(digest, hashAlgorithm, signaturePadding);
+
+            Assert.True(rsa.VerifyHash(digest, overData, hashAlgorithm, signaturePadding));
+            Assert.True(rsa.VerifyData(data, overDigest, hashAlgorithm, signaturePadding));
+            if (padding == "Pkcs1")
+                Assert.Equal(overData, overDigest); // deterministic scheme
+
+            byte[] tampered = [.. digest];
+            tampered[0] ^= 0xFF;
+            Assert.False(rsa.VerifyHash(tampered, overDigest, hashAlgorithm, signaturePadding));
+
+            // As the BCL: a digest of the wrong length cannot be signed, and does not verify.
+            Assert.Throws<CryptographicException>(() => rsa.SignHash(digest[..^1], hashAlgorithm, signaturePadding));
+            Assert.False(rsa.VerifyHash(digest[..^1], overDigest, hashAlgorithm, signaturePadding));
+        });
+    }
+
+    // RSA-OAEP with a SHA-3 hash and MGF1 (CKM_RSA_PKCS_OAEP naming CKM_SHA3_* / CKG_MGF1_SHA3_*). A token that
+    // rejects the hash parameter is a skip; the token decrypts a BCL ciphertext where the host has SHA-3.
+    internal static void Assert_EncryptDecrypt_OaepSha3_RoundTrips(IPkcs11Backend backend, string hash)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
+        WithRsa(backend, (_, rsa) =>
+        {
+            var padding = RSAEncryptionPadding.CreateOaep(new HashAlgorithmName(hash));
+            byte[] plaintext = Encoding.UTF8.GetBytes($"oaep-{hash} payload");
+            byte[] ct = OrSkipIfOaepHashUnsupported(() => rsa.Encrypt(plaintext, padding));
+            Assert.Equal(plaintext, rsa.Decrypt(ct, padding));
+
+            if (SHA3_256.IsSupported)
+            {
+                using var bcl = RSA.Create(rsa.ExportParameters(includePrivateParameters: false));
+                Assert.Equal(plaintext, rsa.Decrypt(bcl.Encrypt(plaintext, padding), padding));
+            }
+        });
+    }
+
+    // C2SP/wycheproof rsa_signature_2048_sha3_256_test.json: the group's public key, tcId 4 (valid) and tcId 24
+    // ("appending 0's to digestInfo", invalid), both over the message "123400". The modulus drops the vector's
+    // leading DER sign byte.
+    private static readonly byte[] WycheproofSha3Modulus = Convert.FromHexString(
+        "9a9978ed8968b4eeff1bba921ec7a8aff62f89c289d2a4576bed7e05ffec8af9101771f1cde3f5bcabf555021f102384" +
+        "8aa2ad24f3f0c75cdc68e565e806c8fc35393c4503895e622b8e335ab8a1faddfa0a3eea79361b0662459d58887fa7d0" +
+        "f320230c36f521dfea5cf13d864c4ea1811aa5953afbac29f1fcb68847640f4711c92742af9c7eca813f2e1e9e794ce3" +
+        "fe5130ed5bb11be3bdf730d491fc62eb0a26b440f4bf4eb822933fa89b2b9783df06b0b725d09df9365489c30b55bdef" +
+        "fada4d8c893ce32000e248c172c6e76d5db2185ddd1204b33c3a64d2723500b4912197d13304c80b93357019f3cbb778" +
+        "34f88d72b3a23e214e288097213876c7");
+
+    private static readonly byte[] WycheproofSha3Message = Convert.FromHexString("313233343030");
+
+    private static readonly byte[] WycheproofSha3ValidSignature = Convert.FromHexString(
+        "7f5159eb69ac6fc09a9c0eb3aaff7165144b103afd849b9b073e5f7788055fc62eff18e8a5a0b7e7b2ff58502b333cef" +
+        "f924a991cb493c6a39a0724f1fab353475112d2318c50fe3313916dae7af496b89a15264c251cd4a1189e1fd3a794018" +
+        "460f8a74227e27e3211febf5babff0ed5fb52c7dea480893198dd7dcc142ac4b231106d7441b40ce695c40d7b8de67e1" +
+        "40f696a55cf73372aed00ae57e6c26a43927af9f456a67653bf3ded6be9b76b8cd4d5216eecdfd54fbcfeffc14855140" +
+        "17e211c2b09dd23f0e9a42d294fbd19c9bd46500f39343969e54375342ed105045923016f3ee1f5e53bcbf5d3276928b" +
+        "98df49a4ce587b8f151fe741e63cf1a1");
+
+    private static readonly byte[] WycheproofSha3InvalidSignature = Convert.FromHexString(
+        "2ce5c23ec3c369a6bbd072ad83965ffd225be9492ac501f74e20d4ef5d7d6eac13d985c2bef747e07cfcabae1d25124b" +
+        "d38e66081763d012f4330c325d103fb85b34d28cec31db3cece8e28914bf9eecf5e88c3a271b48056f143077ea307f50" +
+        "295308a2de7c7952f1e12128f61fd81d78af40696352d190015eaa65cf38b9f7b72b157f2f63bb62337753c65cd47e1a" +
+        "c9ffe830d22ec1db75ad91d9dd5280fab9a6035cf2b2545bffc488cbf17277929bb448b9a36d3f2e657e666a951f5e92" +
+        "f9a5ac2bd45dba2079a2171b7bfddd87c18633b8a5832285b3ced8a2d6067a5446e84c7c7c6039752fc049c26778b130" +
+        "60b23c3af57cd6e4a4f24853dac54bfd");
+
+    // Imports the vector's public key as a session object, runs the body with the adapter, then destroys it.
+    private static void WithWycheproofSha3Key(IPkcs11Backend backend, Action<Pkcs11Session, RSAPkcs11> body)
+    {
+        using var session = OpenSession(backend);
+        using var template = ObjectTemplate.ForPublicKey(CKK.CKK_RSA).Verify().OnToken(false)
+            .Attribute(CKA.CKA_MODULUS, WycheproofSha3Modulus)
+            .Attribute(CKA.CKA_PUBLIC_EXPONENT, [0x01, 0x00, 0x01])
+            .Build();
+        using var key = session.ImportKey(template);
+        try
+        {
+            using var rsa = new RSAPkcs11(key);
+            body(session, rsa);
+        }
+        finally
+        {
+            try { key.Destroy(); } catch { /* best-effort cleanup */ }
+        }
+    }
+
+    internal static void Assert_VerifyData_Sha3_256Pkcs1_WycheproofVectors(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_SHA3_256_RSA_PKCS);
+        WithWycheproofSha3Key(backend, (_, rsa) =>
+        {
+            Assert.True(rsa.VerifyData(WycheproofSha3Message, WycheproofSha3ValidSignature, HashAlgorithmName.SHA3_256, RSASignaturePadding.Pkcs1));
+            Assert.False(rsa.VerifyData(WycheproofSha3Message, WycheproofSha3InvalidSignature, HashAlgorithmName.SHA3_256, RSASignaturePadding.Pkcs1));
+        });
+    }
+
+    // The same vectors through VerifyHash: the DigestInfo the adapter builds must carry the SHA3-256 OID the
+    // signer used, so this pins the encoding against a signature made elsewhere.
+    internal static void Assert_VerifyHash_Sha3_256Pkcs1_WycheproofVectors(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS, CKM.CKM_SHA3_256);
+        WithWycheproofSha3Key(backend, (session, rsa) =>
+        {
+            byte[] digest = session.Digest(new Mechanism(CKM.CKM_SHA3_256), WycheproofSha3Message);
+            Assert.True(rsa.VerifyHash(digest, WycheproofSha3ValidSignature, HashAlgorithmName.SHA3_256, RSASignaturePadding.Pkcs1));
+            Assert.False(rsa.VerifyHash(digest, WycheproofSha3InvalidSignature, HashAlgorithmName.SHA3_256, RSASignaturePadding.Pkcs1));
         });
     }
 }

@@ -66,12 +66,60 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         CKM.CKM_SHA256_RSA_PKCS_PSS => (HashAlgorithmName.SHA256, RSASignaturePadding.Pss),
         CKM.CKM_SHA384_RSA_PKCS_PSS => (HashAlgorithmName.SHA384, RSASignaturePadding.Pss),
         CKM.CKM_SHA512_RSA_PKCS_PSS => (HashAlgorithmName.SHA512, RSASignaturePadding.Pss),
+        CKM.CKM_SHA3_256_RSA_PKCS => (HashAlgorithmName.SHA3_256, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA3_384_RSA_PKCS => (HashAlgorithmName.SHA3_384, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA3_512_RSA_PKCS => (HashAlgorithmName.SHA3_512, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA3_256_RSA_PKCS_PSS => (HashAlgorithmName.SHA3_256, RSASignaturePadding.Pss),
+        CKM.CKM_SHA3_384_RSA_PKCS_PSS => (HashAlgorithmName.SHA3_384, RSASignaturePadding.Pss),
+        CKM.CKM_SHA3_512_RSA_PKCS_PSS => (HashAlgorithmName.SHA3_512, RSASignaturePadding.Pss),
         _ => throw new ArgumentOutOfRangeException(nameof(mechanismType)),
     };
+
+    // The SHA-3 mechanisms verify with the BCL's SHA-3, so they need the host to have it.
+    public static TheoryData<CKM> RsaSha3Mechanisms() =>
+    [
+        CKM.CKM_SHA3_256_RSA_PKCS,
+        CKM.CKM_SHA3_384_RSA_PKCS,
+        CKM.CKM_SHA3_512_RSA_PKCS,
+        CKM.CKM_SHA3_256_RSA_PKCS_PSS,
+        CKM.CKM_SHA3_384_RSA_PKCS_PSS,
+        CKM.CKM_SHA3_512_RSA_PKCS_PSS,
+    ];
 
     [Theory]
     [MemberData(nameof(RsaMechanisms))]
     public void Verify_PrivateOnlyRsaKey_SynthesizesPublicKeyAndVerifies(CKM mechanismType)
+        => AssertSynthesizedRsaVerify(mechanismType);
+
+    [Theory(SkipUnless = nameof(SHA3_256.IsSupported), SkipType = typeof(SHA3_256), Skip = "Requires " + nameof(SHA3_256.IsSupported))]
+    [MemberData(nameof(RsaSha3Mechanisms))]
+    public void Verify_PrivateOnlyRsaKey_Sha3_SynthesizesPublicKeyAndVerifies(CKM mechanismType)
+        => AssertSynthesizedRsaVerify(mechanismType);
+
+    // Without the platform's SHA-3 the managed verify fails as the BCL's own RSA does.
+    [Theory]
+    [MemberData(nameof(RsaSha3Mechanisms))]
+    public void Verify_PrivateOnlyRsaKey_Sha3_WithoutPlatformSha3_FailsAsTheBcl(CKM mechanismType)
+    {
+        Assert.SkipWhen(SHA3_256.IsSupported, "The host has SHA3-256.");
+        var (hash, padding) = HashAndPaddingFor(mechanismType);
+        using var rsa = RSA.Create(2048);
+        RSAParameters pub = rsa.ExportParameters(includePrivateParameters: false);
+
+        using var fake = FakeKeys.Create(CKK.CKK_RSA, ca => ca switch
+        {
+            CKA.CKA_MODULUS => (CKR.CKR_OK, pub.Modulus),
+            CKA.CKA_PUBLIC_EXPONENT => (CKR.CKR_OK, pub.Exponent),
+            _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
+        }, Mechanics);
+        Pkcs11Key key = fake;
+
+        Exception expected = Assert.ThrowsAny<Exception>(() => rsa.VerifyData(Data, new byte[256], hash, padding));
+        Exception actual = Assert.ThrowsAny<Exception>(() => key.Verify(new Mechanism(mechanismType), Data, new byte[256]));
+        Assert.Equal(expected.GetType(), actual.GetType());
+    }
+
+    private static void AssertSynthesizedRsaVerify(CKM mechanismType)
     {
         var (hash, padding) = HashAndPaddingFor(mechanismType);
         using var rsa = RSA.Create(2048);
