@@ -46,6 +46,11 @@ public sealed class AesPkcs11Tests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void KeyWrapPadded_UsesTheTokensKwp_AndMatchesBcl() => AesPkcs11TestCases.Assert_KeyWrapPadded_UsesTheTokensKwp_AndMatchesBcl(_backend);
 
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(AesPkcs11TestCases.InvalidKeyWrapVectors), MemberType = typeof(AesPkcs11TestCases))]
+    public void DecryptKeyWrapPadded_InvalidWrap_Throws(string keyHex, string ciphertextHex)
+        => AesPkcs11TestCases.Assert_DecryptKeyWrapPadded_InvalidWrap_Throws(_backend, keyHex, ciphertextHex);
+
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void GenerateIV_ProducesBlockSizedIv() => AesPkcs11TestCases.Assert_GenerateIV_ProducesBlockSizedIv(_backend);
 

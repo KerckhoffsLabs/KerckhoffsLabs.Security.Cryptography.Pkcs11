@@ -36,6 +36,11 @@ internal sealed partial class ManagedSoftToken
     /// act as a token that leaves the length as the caller passed it (opencryptoki does).</summary>
     public Func<int, int, int>? ReportedCfbLength { get; set; }
 
+    /// <summary>What a symmetric <c>C_Decrypt</c> answers when the ciphertext does not decrypt (a failed
+    /// integrity check, bad padding). Lets tests act as a token that reports it with a generic code
+    /// (Kryoptic answers a failed <c>CKM_AES_KEY_WRAP_KWP</c> unwrap with <c>CKR_DEVICE_ERROR</c>).</summary>
+    public CKR DecryptFailureResult { get; set; } = CKR.CKR_ENCRYPTED_DATA_INVALID;
+
     protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         => IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
             ? InitRsaCipher((ulong)session, ref mechanism, (ulong)key)
@@ -127,7 +132,7 @@ internal sealed partial class ManagedSoftToken
                 : BlockTransform(op, inBytes, encrypt);
         }
         catch (PlatformNotSupportedException) { _ops.Remove(session); return CKR.CKR_MECHANISM_INVALID; }
-        catch (CryptographicException) { _ops.Remove(session); return encrypt ? CKR.CKR_DATA_LEN_RANGE : CKR.CKR_ENCRYPTED_DATA_INVALID; }
+        catch (CryptographicException) { _ops.Remove(session); return encrypt ? CKR.CKR_DATA_LEN_RANGE : DecryptFailureResult; }
 
         // Size probe / under-allocation: report the required length, keep the op live for retry.
         if (output.IsEmpty) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }

@@ -42,17 +42,21 @@ internal static class AesPkcs11TestCases
     }
 
     // Imports Key256 as a token AES key and hands a wrapping AesPkcs11 (and its session) to the body.
-    private static void WithImportedAes(IPkcs11Backend backend, Action<Pkcs11Session, AesPkcs11> body)
+    private static void WithImportedAes(IPkcs11Backend backend, Action<Pkcs11Session, AesPkcs11> body) =>
+        WithImportedAes(backend, Key256, (session, _, aes) => body(session, aes));
+
+    // Imports keyValue as a token AES key and hands it, a wrapping AesPkcs11 and its session to the body.
+    private static void WithImportedAes(IPkcs11Backend backend, byte[] keyValue, Action<Pkcs11Session, Pkcs11Key, AesPkcs11> body)
     {
         using var session = OpenSession(backend);
         string label = $"aes-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).Value(Key256).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
+            .Label(label).Value(keyValue).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = session.ImportKey(tpl);
             using var aes = new AesPkcs11(key);
-            body(session, aes);
+            body(session, key, aes);
         }
         finally { DestroyByLabel(session, label); }
     }
@@ -256,6 +260,37 @@ internal static class AesPkcs11TestCases
             Assert.Equal(bcl.EncryptKeyWrapPadded(keyToWrap), wrapped);
             Assert.Equal(keyToWrap, aes.DecryptKeyWrapPadded(wrapped));
             Assert.Equal(keyToWrap, bcl.DecryptKeyWrapPadded(wrapped));
+        });
+
+    /// <summary>
+    /// Invalid vectors from Wycheproof (C2SP/wycheproof) aes_kwp_test.json, as key and ciphertext: tcId 26
+    /// (modified IV), 50 (modified padding) and 63 (an encoded length of 2^32-1).
+    /// </summary>
+    public static TheoryData<string, string> InvalidKeyWrapVectors => new()
+    {
+        { "4f710eb6b5e28703becfc3dc52fa8bc1", "4cdd2962f23ec897d41d14c3f818516c055799185f459e2d" },
+        { "4f710eb6b5e28703becfc3dc52fa8bc1", "96518bcf3d24b1c6c3c6ed642a3336531563abaa9bc19873" },
+        { "48a53c11ef2d727db7eb9a834b134ea9", "6d1bfda356b7b954e7aaccc6df953322f75be95947b02b30" },
+    };
+
+    // An InvalidKeyWrapVectors wrap fails its integrity check and throws CryptographicException, as the
+    // BCL's does, whether the token unwraps it with its own CKM_AES_KEY_WRAP_KWP or, on a token that does
+    // not decrypt with it, the base class does over AES-ECB, allowed for the purpose. Tokens report the
+    // failure with different codes (see AesPkcs11.DecryptKeyWrapPaddedCore), so only the type is pinned.
+    internal static void Assert_DecryptKeyWrapPadded_InvalidWrap_Throws(IPkcs11Backend backend, string keyHex, string ciphertextHex) =>
+        WithImportedAes(backend, Convert.FromHexString(keyHex), (session, key, aes) =>
+        {
+            byte[] ciphertext = Convert.FromHexString(ciphertextHex);
+            bool onTheToken = key.SupportsMechanism(CKM.CKM_AES_KEY_WRAP_KWP, CKF.CKF_DECRYPT);
+            if (!onTheToken)
+                backend.RequireMechanism(CKM.CKM_AES_ECB);
+            using var bcl = Aes.Create();
+            bcl.Key = Convert.FromHexString(keyHex);
+            Assert.ThrowsAny<CryptographicException>(() => bcl.DecryptKeyWrapPadded(ciphertext));
+
+            using IDisposable? insecure = onTheToken ? null : session.UsePolicy(CryptoPolicy.AllowInsecure);
+            var e = Assert.ThrowsAny<CryptographicException>(() => aes.DecryptKeyWrapPadded(ciphertext));
+            Assert.IsNotType<CryptoPolicyViolationException>(e);
         });
 
     internal static void Assert_GenerateIV_ProducesBlockSizedIv(IPkcs11Backend backend) =>

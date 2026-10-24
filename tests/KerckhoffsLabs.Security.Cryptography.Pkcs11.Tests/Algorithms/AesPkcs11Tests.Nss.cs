@@ -46,6 +46,11 @@ public sealed class AesPkcs11Tests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void KeyWrapPadded_UsesTheTokensKwp_AndMatchesBcl() => AesPkcs11TestCases.Assert_KeyWrapPadded_UsesTheTokensKwp_AndMatchesBcl(_backend);
 
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(AesPkcs11TestCases.InvalidKeyWrapVectors), MemberType = typeof(AesPkcs11TestCases))]
+    public void DecryptKeyWrapPadded_InvalidWrap_Throws(string keyHex, string ciphertextHex)
+        => AesPkcs11TestCases.Assert_DecryptKeyWrapPadded_InvalidWrap_Throws(_backend, keyHex, ciphertextHex);
+
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void GenerateIV_ProducesBlockSizedIv() => AesPkcs11TestCases.Assert_GenerateIV_ProducesBlockSizedIv(_backend);
 
