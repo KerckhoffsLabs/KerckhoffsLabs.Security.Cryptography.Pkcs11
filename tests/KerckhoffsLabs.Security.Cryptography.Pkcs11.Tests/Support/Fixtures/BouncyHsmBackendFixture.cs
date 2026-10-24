@@ -57,6 +57,13 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmRejectsOutOfRangeSignatures = false;
 
     /// <summary>
+    /// False while the native client refuses <c>ulSignatureLen == 0</c> in <c>C_Verify</c> with
+    /// <c>CKR_ARGUMENTS_BAD</c> (<c>bouncy-pkcs11.c</c>), where an empty signature is simply invalid. Not yet
+    /// reported upstream. BouncyHsmQuirkTests.EmptySignature_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmAcceptsEmptySignature = false;
+
+    /// <summary>
     /// False while harrison314/BouncyHsm#118 is open: raw <c>CKM_CHACHA20</c> takes only a zero
     /// <c>blockCounter</c> in <c>CK_CHACHA20_PARAMS</c> and refuses any other at init with
     /// <c>CKR_GENERAL_ERROR</c>. BouncyHsmQuirkTests.NonZeroChaCha20Counter_QuirkStillPresent fails once it is fixed.
@@ -75,6 +82,13 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for cases that verify a tampered RSA-PSS signature: see <see cref="BouncyHsmRejectsOutOfRangeSignatures"/>.</summary>
     public static bool OutOfRangeSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmRejectsOutOfRangeSignatures;
+
+    /// <summary>
+    /// Gate for cases that verify RSA signatures one byte too long or empty: see
+    /// <see cref="BouncyHsmRejectsOutOfRangeSignatures"/> and <see cref="BouncyHsmAcceptsEmptySignature"/>.
+    /// </summary>
+    public static bool WrongLengthRsaSignatureRejectionAvailable =>
+        OutOfRangeSignatureRejectionAvailable && BouncyHsmAcceptsEmptySignature;
 
     /// <summary>Gate for raw ChaCha20 cases that start at a non-zero block counter: see <see cref="BouncyHsmAcceptsNonZeroChaCha20Counter"/>.</summary>
     public static bool NonZeroChaCha20CounterAvailable => BouncyHsmAvailable && BouncyHsmAcceptsNonZeroChaCha20Counter;
