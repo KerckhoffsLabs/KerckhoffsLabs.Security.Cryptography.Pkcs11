@@ -33,6 +33,7 @@ public sealed class TestCollectionConventionTests
         ("_Kryoptic", "Kryoptic"),
         ("_BouncyHsm", "BouncyHsm"),
         ("_CratonHsm", "CratonHsm"),
+        ("_Tpm2Pkcs11", "Tpm2Pkcs11"),
     ];
 
     // -----------------------------------------------------------------------------------------

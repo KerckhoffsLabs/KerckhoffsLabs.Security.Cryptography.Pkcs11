@@ -1,0 +1,22 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
+
+/// <summary>SHA3_512Pkcs11 over tpm2-pkcs11 — thin wrapper over <see cref="SHA3_512Pkcs11TestCases"/>.</summary>
+[Collection("Tpm2Pkcs11")]
+public sealed class SHA3_512Pkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture f)
+{
+    private readonly Tpm2Pkcs11BackendFixture _backend = f;
+
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
+    public void ComputeHash_KnownAnswer() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_KnownAnswer(_backend);
+
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
+    public void ComputeHash_MatchesBcl() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_MatchesBcl(_backend);
+
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
+    public void ComputeHash_Streamed_MatchesOneShot() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_Streamed_MatchesOneShot(_backend);
+
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
+    public void Reuse_AfterInitialize_ProducesFreshHash() => SHA3_512Pkcs11TestCases.Assert_Reuse_AfterInitialize_ProducesFreshHash(_backend);
+}

@@ -110,6 +110,34 @@ public static class Settings
     public static string? CratonHsmLibraryPath =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_CRATON_HSM_LIBRARY");
 
+    /// <summary>
+    /// Path to the tpm2-pkcs11 PKCS#11 library, set by the tpm2-pkcs11 image
+    /// (build/tpm2-pkcs11/Dockerfile) the tests run in. Unset elsewhere, and its tests skip.
+    /// </summary>
+    public static string? Tpm2Pkcs11LibraryPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_TPM2_PKCS11_LIBRARY");
+
+    /// <summary>
+    /// Path to the swtpm program the tpm2-pkcs11 fixture starts its software TPM with, set by the
+    /// same image. Unset elsewhere, and the tpm2-pkcs11 tests skip.
+    /// </summary>
+    public static string? SwtpmPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_SWTPM");
+
+    /// <summary>
+    /// Path to tpm2-abrmd, the TPM resource manager the tpm2-pkcs11 fixture puts in front of swtpm, set by
+    /// the same image. Unset elsewhere, and the tpm2-pkcs11 tests skip.
+    /// </summary>
+    public static string? Tpm2AbrmdPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_TPM2_ABRMD");
+
+    /// <summary>
+    /// Path to dbus-daemon, which the tpm2-pkcs11 fixture runs the private session bus tpm2-abrmd is on
+    /// with, set by the same image. Unset elsewhere, and the tpm2-pkcs11 tests skip.
+    /// </summary>
+    public static string? DbusDaemonPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_DBUS_DAEMON");
+
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;
