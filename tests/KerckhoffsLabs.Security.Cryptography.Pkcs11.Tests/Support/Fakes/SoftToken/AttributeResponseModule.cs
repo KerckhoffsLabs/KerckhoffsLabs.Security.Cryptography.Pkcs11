@@ -8,14 +8,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 /// <summary>
 /// Minimal <see cref="FakeModule"/> that answers every <c>C_GetAttributeValue</c> query via a
 /// caller-supplied responder — including a fatal <see cref="CKR"/> a real backend cannot be coaxed
-/// into returning for a well-formed key object's required attributes. Every other function is absent,
+/// into returning for a well-formed key object's required attributes. A <c>respondFor</c> responder, given
+/// the object's handle too, takes the place of <c>respond</c>. Every other function is absent,
 /// so the library sees <c>CKR_FUNCTION_NOT_SUPPORTED</c> for it, except <c>C_Decrypt</c> when a <c>decrypt</c>
 /// answer is given; <c>C_Initialize</c>/<c>C_Finalize</c>
 /// succeed, and disposing the library from <see cref="FakeModule.Load(Pkcs11LibraryOptions?)"/> releases the module. See
 /// <see cref="FakeKeys.Create"/>.
 /// </summary>
 internal sealed class AttributeResponseModule(
-    Func<CKA, (CKR Rv, byte[]? Value)> respond, Func<byte[], byte[]>? decrypt = null) : FakeModule
+    Func<CKA, (CKR Rv, byte[]? Value)> respond,
+    Func<byte[], byte[]>? decrypt = null,
+    Func<ulong, CKA, (CKR Rv, byte[]? Value)>? respondFor = null) : FakeModule
 {
     protected override bool ReleasedByFinalize => true;
 
@@ -23,7 +26,8 @@ internal sealed class AttributeResponseModule(
     {
         for (int i = 0; i < template.Length; i++)
         {
-            (CKR rv, byte[]? value) = respond((CKA)(ulong)template[i].type);
+            var type = (CKA)(ulong)template[i].type;
+            (CKR rv, byte[]? value) = respondFor is null ? respond(type) : respondFor((ulong)objectId, type);
             if (rv != CKR.CKR_OK)
             {
                 // PKCS#11 sentinel: ulValueLen = (CK_ULONG)-1 marks an unavailable attribute —

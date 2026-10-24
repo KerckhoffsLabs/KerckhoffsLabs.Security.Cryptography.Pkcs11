@@ -562,9 +562,12 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_Decrypt_CiphertextNotFromTheKey_Throws(IPkcs11Backend backend, string paddingName)
     {
         RSAEncryptionPadding padding = EncryptionPadding(paddingName);
-        backend.RequireMechanisms(padding == RSAEncryptionPadding.Pkcs1 ? CKM.CKM_RSA_PKCS : CKM.CKM_RSA_PKCS_OAEP);
-        WithRsa(backend, (session, rsa) =>
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, padding == RSAEncryptionPadding.Pkcs1 ? CKM.CKM_RSA_PKCS : CKM.CKM_RSA_PKCS_OAEP);
+        using var session = OpenSession(backend);
+        using var key = GenerateRsaKey(session);
+        try
         {
+            using var rsa = new RSAPkcs11(key);
             RSAParameters publicKey = rsa.ExportParameters(includePrivateParameters: false);
             using var bcl = RSA.Create(publicKey);
             byte[] plaintext = Encoding.UTF8.GetBytes("for this key only");
@@ -583,8 +586,24 @@ internal static class RSAPkcs11TestCases
 
                 Assert.Equal(plaintext, OrSkipIfOaepHashUnsupported(() => rsa.Decrypt(ciphertext, padding)));
                 Assert.All(DecryptCalls.Values, decrypt => Assert.Equal(plaintext, decrypt(rsa, ciphertext, padding)));
+
+                // Pkcs11Key's own Decrypt and Unwrap check it too: the adapter is not the only way in.
+                Mechanism mechanism = padding == RSAEncryptionPadding.Pkcs1
+                    ? new Mechanism(CKM.CKM_RSA_PKCS)
+                    : Pkcs11MechanismMap.RsaOaep(HashAlgorithmName.SHA256);
+                using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Build();
+                Assert.All(notFromTheKey, c =>
+                {
+                    Assert.Throws<CryptographicException>(() => key.Decrypt(mechanism, c.Ciphertext));
+                    Assert.Throws<CryptographicException>(() => key.Unwrap(mechanism, c.Ciphertext, template));
+                });
+                Assert.Equal(plaintext, key.Decrypt(mechanism, ciphertext));
             }
-        });
+        }
+        finally
+        {
+            try { key.Destroy(); } catch { /* best-effort cleanup */ }
+        }
     }
 
     // === Key material export ===============================================

@@ -28,10 +28,6 @@ public sealed class RSAPkcs11 : RSA
 {
     private readonly Pkcs11Key _key;
 
-    // The modulus, big-endian without leading zero bytes, read from the key on first decryption; null until
-    // then. Read and written with Volatile, so a thread racing the first write sees null or the whole array.
-    private byte[]? _modulus;
-
     /// <summary>
     /// Wraps a PKCS#11 RSA key as a BCL <see cref="RSA"/> instance. Does not take
     /// ownership — disposing this provider does not dispose <paramref name="key"/>.
@@ -296,21 +292,18 @@ public sealed class RSAPkcs11 : RSA
     /// <see cref="RSA.TryDecrypt"/> and both <see cref="RSA.Decrypt(ReadOnlySpan{byte}, RSAEncryptionPadding)"/>
     /// overloads come here. As for the BCL's own RSA, a ciphertext must be exactly the modulus's length, and its
     /// big-endian value must be less than the modulus; one that is not never reaches the token, which might
-    /// otherwise answer it with a plaintext. The modulus is read from the key's <c>CKA_MODULUS</c> once.
+    /// otherwise answer it with a plaintext. <see cref="Pkcs11Key.Decrypt"/> checks it.
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>), or OAEP with a SHA-1 or SHA-224 hash, unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it; use OAEP with SHA-256 or stronger instead.</exception>
     /// <exception cref="CryptographicException">Thrown if <paramref name="data"/> is not the length of the key's modulus, or its value is not less than the modulus.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/> when the key's <c>CKA_MODULUS</c> cannot be read, as for <see cref="ExportParameters(bool)"/>; otherwise propagated from reading it or from the underlying <c>C_Decrypt</c> call.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from reading the key's <c>CKA_MODULUS</c> or from the underlying <c>C_Decrypt</c> call.</exception>
     public override byte[] Decrypt(byte[] data, RSAEncryptionPadding padding)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(padding);
         var mech = EncryptMechanismFor(padding);
-        // The policy judges the padding, which the BCL validates before the ciphertext's length.
-        _key.Session.Enforce(new MechanismUseRequest(mech, CryptoOperation.Decrypt));
-        ThrowIfNotCiphertext(data);
         return _key.Decrypt(mech, data);
     }
 
@@ -421,41 +414,6 @@ public sealed class RSAPkcs11 : RSA
         => padding.Mode == RSASignaturePaddingMode.Pss
             ? new Mechanism(CKM.CKM_RSA_PKCS_PSS, Pkcs11MechanismMap.RsaPssSign(hashAlgorithm, saltLength: -1).Parameters!)
             : throw new NotSupportedException($"Unsupported RSA signature padding: {padding}.");
-
-    // Equal-length big-endian values compare as their bytes do. Neither is secret, so the comparison need not
-    // run in constant time. A refused ciphertext reads the modulus again first, so a key that could not have
-    // decrypted it (a disposed one, or one whose session has closed) throws as the token path would, rather
-    // than the cached modulus answering for it.
-    private void ThrowIfNotCiphertext(ReadOnlySpan<byte> data)
-    {
-        ReadOnlySpan<byte> modulus = GetModulus();
-        if (data.Length == modulus.Length && data.SequenceCompareTo(modulus) < 0)
-            return;
-
-        ReadModulus();
-        throw new CryptographicException(data.Length == modulus.Length
-            ? "The data to decrypt is not less than the key's modulus."
-            : "The length of the data to decrypt is not valid for the size of this key.");
-    }
-
-    // Read once: a key object's CKA_MODULUS cannot be modified.
-    private byte[] GetModulus() => Volatile.Read(ref _modulus) ?? ReadModulus();
-
-    // From either half, as Pkcs11Key.Export reads it. A modulus of zero throws CKR_ATTRIBUTE_VALUE_INVALID
-    // rather than refusing every ciphertext.
-    private byte[] ReadModulus()
-    {
-        using var attrs = _key.GetAttributeValue(CKA.CKA_MODULUS);
-        if (attrs[0].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE, "RSAPkcs11.Decrypt (CKA_MODULUS not readable)");
-        byte[] value = attrs[0].GetValueAsByteArray();
-        int start = value.AsSpan().IndexOfAnyExcept((byte)0);
-        if (start < 0)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "RSAPkcs11.Decrypt (modulus is zero)");
-        byte[] modulus = value[start..];
-        Volatile.Write(ref _modulus, modulus);
-        return modulus;
-    }
 
     private static Mechanism EncryptMechanismFor(RSAEncryptionPadding padding)
     {
