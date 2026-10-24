@@ -302,10 +302,18 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(signature);
 
-        using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new();
-        bool isValid = DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputMemoryStream, outputMemorySteam, signature);
-        decryptedData = outputMemorySteam.ToArray();
-        return isValid;
+        // As in DecryptDigest: one buffer, sized to the ciphertext, zeroized on the way out.
+        using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new(data.Length);
+        try
+        {
+            bool isValid = DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputMemoryStream, outputMemorySteam, signature);
+            decryptedData = outputMemorySteam.ToArray();
+            return isValid;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(outputMemorySteam.GetBuffer());
+        }
     }
 
     /// <summary>
@@ -405,12 +413,18 @@ internal sealed partial class Pkcs11SessionCore
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, lengthOnly: false, out lastPartLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
-        operation.End(CKF.CKF_DECRYPT);
+        try
+        {
+            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, lengthOnly: false, out lastPartLen);
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
+            operation.End(CKF.CKF_DECRYPT);
 
-        outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
-        CryptographicOperations.ZeroMemory(lastPart);
+            outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(lastPart);
+        }
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
         operation.CompletedIfVerdict(rv);
