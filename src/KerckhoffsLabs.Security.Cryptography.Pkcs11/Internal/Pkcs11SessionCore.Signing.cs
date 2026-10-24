@@ -180,10 +180,8 @@ internal sealed partial class Pkcs11SessionCore
         }
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
-        // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
-        // the call failed with any other CKR — the verify operation is consumed.
-        operation.CompletedVerify(rv);
-        bool isValid = IsVerified(rv, OpVerifyFinal);
+        operation.CompletedIfVerdict(rv);
+        bool isValid = IsVerified(rv, OpVerifyFinal, mechanism.Type, signature.Length);
 
         mechanism.AbsorbOutput(mechParams);
         return isValid;
@@ -218,8 +216,8 @@ internal sealed partial class Pkcs11SessionCore
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
-        operation.CompletedVerify(rv);
-        bool isValid = IsVerified(rv, OpVerify);
+        operation.CompletedIfVerdict(rv);
+        bool isValid = IsVerified(rv, OpVerify, mechanism.Type, signature.Length);
 
         mechanism.AbsorbOutput(mechParams);
         return isValid;
@@ -258,7 +256,7 @@ internal sealed partial class Pkcs11SessionCore
 
         byte[] recovered = new byte[ReportedLength.ForAllocation(dataLen, OpVerifyRecover)];
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, recovered, lengthOnly: false, out dataLen);
-        operation.CompletedVerify(rv);
+        operation.CompletedIfVerdict(rv);
         bool isValid = IsVerified(rv, OpVerifyRecover);
 
         mechanism.AbsorbOutput(mechParams);
@@ -415,8 +413,8 @@ internal sealed partial class Pkcs11SessionCore
         CryptographicOperations.ZeroMemory(lastPart);
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
-        operation.CompletedVerify(rv);
-        bool isValid = IsVerified(rv, OpVerifyFinal);
+        operation.CompletedIfVerdict(rv);
+        bool isValid = IsVerified(rv, OpVerifyFinal, verificationMechanism.Type, signature.Length);
 
         verificationMechanism.AbsorbOutput(verifyParams);
         decryptionMechanism.AbsorbOutput(decryptParams);

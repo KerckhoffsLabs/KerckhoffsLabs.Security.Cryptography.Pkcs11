@@ -125,11 +125,11 @@ public sealed class ECDsaPkcs11 : ECDsa
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
         if (_key.SupportsMechanism(combined.Type))
         {
-            return _key.Verify(combined, data, signature);
+            return HasSignatureLength(signature) && _key.Verify(combined, data, signature);
         }
         byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Verify);
         var raw = new Mechanism(CKM.CKM_ECDSA);
-        return _key.Verify(raw, hash, signature);
+        return HasSignatureLength(signature) && _key.Verify(raw, hash, signature);
     }
 
     // The BCL routes these verification overloads through the protected HashData overrides, which are
@@ -230,8 +230,15 @@ public sealed class ECDsaPkcs11 : ECDsa
         ArgumentNullException.ThrowIfNull(hash);
         ArgumentNullException.ThrowIfNull(signature);
         var mech = new Mechanism(CKM.CKM_ECDSA);
-        return _key.Verify(mech, hash, signature);
+        return HasSignatureLength(signature) && _key.Verify(mech, hash, signature);
     }
+
+    // An IEEE P1363 signature is r || s, each the field size: any other length is invalid, and the BCL's
+    // ECDsa returns false for it. Checked here because modules report it inconsistently: SoftHSM2 and
+    // Kryoptic with CKR_SIGNATURE_LEN_RANGE, NSS 3.51 with CKR_DATA_LEN_RANGE. With the curve unknown
+    // (KeySize 0) the module decides.
+    private bool HasSignatureLength(ReadOnlySpan<byte> signature)
+        => KeySizeValue == 0 || signature.Length == 2 * ((KeySizeValue + 7) / 8);
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {

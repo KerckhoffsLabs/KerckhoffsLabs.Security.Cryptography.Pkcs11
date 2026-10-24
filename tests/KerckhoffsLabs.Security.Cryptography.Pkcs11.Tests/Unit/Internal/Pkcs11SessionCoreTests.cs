@@ -395,7 +395,7 @@ public sealed class Pkcs11SessionCoreTests
         using var fake = new CryptoFake { VerifyRv = CKR.CKR_OK };
         using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
-        bool valid = s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 });
+        bool valid = s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[32]);
         Assert.True(valid);
     }
 
@@ -420,7 +420,18 @@ public sealed class Pkcs11SessionCoreTests
         using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         Assert.ThrowsAny<Pkcs11Exception>(() =>
-            s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 }));
+            s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[32]));
+    }
+
+    [Fact]
+    public void Verify_FixedLengthMacOfAnotherLength_IsFalseWhateverTheModuleAnswers()
+    {
+        // NSS 3.51 answers a short HMAC with CKR_DEVICE_ERROR; the length alone makes it invalid.
+        using var fake = new CryptoFake { VerifyRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        bool valid = s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[31]);
+        Assert.False(valid);
     }
 
     // === Objects ============================================================================

@@ -115,6 +115,76 @@ public sealed class OperationScopeTests
         Assert.Equal(64, signature.Length);
     }
 
+    // A verdict ends the verify, as the spec has every C_Verify return do.
+    [Theory]
+    [InlineData(CKR.CKR_OK, true)]
+    [InlineData(CKR.CKR_SIGNATURE_INVALID, false)]
+    public void Verify_Verdict_CancelsNothing(CKR verifyRv, bool expected)
+    {
+        using var fake = new OperationFake { VerifyRv = verifyRv };
+        using var session = Session(fake);
+
+        bool isValid = session.Verify(Ecdsa(), new ObjectHandle(1), "data"u8, new byte[64]);
+
+        Assert.Equal(expected, isValid);
+        Assert.Empty(fake.Cancelled);
+    }
+
+    // Kryoptic answers a signature of the wrong length with CKR_SIGNATURE_LEN_RANGE before it finalizes the
+    // operation: an invalid signature for the caller, and an operation the scope cancels.
+    [Fact]
+    public void Verify_SignatureLenRange_ReturnsFalse_AndCancelsTheVerifyOperation()
+    {
+        using var fake = new OperationFake { VerifyRv = CKR.CKR_SIGNATURE_LEN_RANGE, CancelRv = CKR.CKR_OPERATION_NOT_INITIALIZED };
+        using var session = Session(fake);
+
+        bool isValid = session.Verify(Ecdsa(), new ObjectHandle(1), "data"u8, new byte[63]);
+
+        Assert.False(isValid);
+        Assert.Equal([CKF.CKF_VERIFY], fake.Cancelled);
+    }
+
+    [Fact]
+    public void Verify_ModuleError_KeepsTheError_AndCancelsTheVerifyOperation()
+    {
+        using var fake = new OperationFake { VerifyRv = CKR.CKR_ARGUMENTS_BAD };
+        using var session = Session(fake);
+
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => session.Verify(Ecdsa(), new ObjectHandle(1), "data"u8, new byte[64]));
+
+        Assert.Equal(CKR.CKR_ARGUMENTS_BAD, e.ReturnValue);
+        Assert.Equal([CKF.CKF_VERIFY], fake.Cancelled);
+    }
+
+    // NSS compares only min(macLen, sigLen) bytes of a non-general HMAC and answers CKR_OK for a truncated,
+    // empty or extended MAC; a fixed-length MAC of any other length is never valid.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(16)]
+    [InlineData(31)]
+    [InlineData(33)]
+    public void Verify_FixedLengthMac_OfAnotherLength_IsInvalid_EvenWhenTheModuleSaysOk(int macLength)
+    {
+        using var fake = new OperationFake { VerifyRv = CKR.CKR_OK };
+        using var session = Session(fake);
+
+        bool isValid = session.Verify(new Mechanism(CKM.CKM_SHA256_HMAC), new ObjectHandle(1), "data"u8, new byte[macLength]);
+
+        Assert.False(isValid);
+        Assert.Empty(fake.Cancelled);
+    }
+
+    [Fact]
+    public void Verify_FixedLengthMac_OfItsLength_TakesTheModulesVerdict()
+    {
+        using var fake = new OperationFake { VerifyRv = CKR.CKR_OK };
+        using var session = Session(fake);
+
+        bool isValid = session.Verify(new Mechanism(CKM.CKM_SHA256_HMAC), new ObjectHandle(1), "data"u8, new byte[32]);
+
+        Assert.True(isValid);
+    }
+
     private static Pkcs11SessionCore Session(OperationFake fake, CapturingLogger? logger = null)
         => fake.CreateSession(SessionId, logger is null ? null : new CapturingLoggerFactory(logger));
 
@@ -136,6 +206,7 @@ public sealed class OperationScopeTests
         public CKR FillRv { get; init; } = CKR.CKR_OK;
         public CKR CancelRv { get; init; } = CKR.CKR_OK;
         public CKR DecryptInitRv { get; init; } = CKR.CKR_OK;
+        public CKR VerifyRv { get; init; } = CKR.CKR_OK;
         public bool KeepsAbandonedSignActive { get; init; }
         public List<ulong> Cancelled { get; } = [];
 
@@ -149,6 +220,7 @@ public sealed class OperationScopeTests
 
         protected override CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => DecryptInitRv;
+        protected override CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature) => VerifyRv;
 
         protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
             => Answer(signature.Span, out signatureLen, 64);

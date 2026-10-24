@@ -276,7 +276,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
-        bool isValid = s.Verify(mech, new ObjectHandle(1), input, [9, 9]);
+        bool isValid = s.Verify(mech, new ObjectHandle(1), input, new byte[32]);
 
         Assert.True(isValid);
     }
@@ -293,7 +293,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
-        bool isValid = s.Verify(mech, new ObjectHandle(1), input, [9, 9]);
+        bool isValid = s.Verify(mech, new ObjectHandle(1), input, new byte[32]);
 
         Assert.False(isValid);
     }
@@ -307,7 +307,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
-            s.Verify(mech, new ObjectHandle(1), input, [9, 9]));
+            s.Verify(mech, new ObjectHandle(1), input, new byte[32]));
     }
 
     [Fact]
@@ -318,7 +318,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
-        bool isValid = s.Verify(mech, new ObjectHandle(1), input, [9, 9], bufferLength: 2);
+        bool isValid = s.Verify(mech, new ObjectHandle(1), input, new byte[32], bufferLength: 2);
 
         Assert.True(isValid);
         Assert.Equal(3, fake.UpdateCalls);

@@ -448,9 +448,9 @@ public sealed partial class Pkcs11Key : IDisposable
 
     /// <summary>
     /// Verifies <paramref name="signature"/> over <paramref name="data"/> using the
-    /// given mechanism. Uses the real public handle when present; falls back to managed
-    /// verification via the synthesized RSA/EC public parameters when no real handle
-    /// exists.
+    /// given mechanism. A secret key verifies with its own handle. An asymmetric key uses the real
+    /// public handle when present, and falls back to managed verification via the synthesized
+    /// RSA/EC public parameters when no real handle exists.
     /// </summary>
     /// <returns><see langword="true"/> if the signature is valid, <see langword="false"/> if not.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
@@ -462,6 +462,10 @@ public sealed partial class Pkcs11Key : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
+
+        // A secret key (HMAC, CMAC) verifies with the same object it signs with: it has no public half.
+        if (!IsAsymmetricKeyType(_keyType) && !PrivateHandle.IsInvalid)
+            return _session.Core.Verify(mechanism, PrivateHandle, data, signature);
 
         // Prefer the real public handle.
         if (!PublicHandle.IsInvalid)

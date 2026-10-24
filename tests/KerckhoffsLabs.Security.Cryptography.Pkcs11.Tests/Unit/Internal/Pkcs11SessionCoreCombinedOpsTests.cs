@@ -152,7 +152,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         byte[] data = [1, 2, 3];
 
         bool isValid = s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-            data, signature: [9, 9], out byte[] decrypted);
+            data, signature: new byte[32], out byte[] decrypted);
 
         Assert.True(isValid);
         Assert.Equal(data, decrypted);
@@ -184,7 +184,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
-                data: [1, 2, 3], signature: [9, 9], out _));
+                data: [1, 2, 3], signature: new byte[32], out _));
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
         using var inStream = new MemoryStream(input);
         using var outStream = new MemoryStream();
         bool isValid = s.DecryptVerify(HmacSha256(), new ObjectHandle(2), AesGcm(), new ObjectHandle(1),
-            inStream, outStream, signature: [9, 9], bufferLength: 2);
+            inStream, outStream, signature: new byte[32], bufferLength: 2);
         output = outStream.ToArray();
         return isValid;
     }

@@ -76,6 +76,29 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void EmptySignature_QuirkStillPresent()
+    {
+        using var session = _backend.OpenSession();
+        string label = $"quirk-emptysig-{Guid.NewGuid():N}";
+        byte[] id = Encoding.ASCII.GetBytes(label);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Verify().ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01]).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA).Label(label).Id(id).Sign().Build();
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
+        var pss = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32));
+        try
+        {
+            var ex = Record.Exception(() => key.Verify(pss, "abc"u8, []));
+
+            Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_ARGUMENTS_BAD },
+                "C_Verify of an empty signature no longer gives CKR_ARGUMENTS_BAD " +
+                $"(got {ex?.GetType().Name ?? "no exception"}): set " +
+                "BouncyHsmBackendFixture.BouncyHsmAcceptsEmptySignature to true and delete this test.");
+        }
+        finally { key.Destroy(); }
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void NonZeroChaCha20Counter_QuirkStillPresent()
     {
         using var session = _backend.OpenSession();
