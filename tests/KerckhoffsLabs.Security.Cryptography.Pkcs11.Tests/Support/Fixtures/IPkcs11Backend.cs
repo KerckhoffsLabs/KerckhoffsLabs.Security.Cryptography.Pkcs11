@@ -86,4 +86,18 @@ public interface IPkcs11Backend
     /// NSS and opencryptoki require and Kryoptic also accepts; SoftHSM, which takes only the DER form,
     /// overrides it.</summary>
     bool EcxPointIsDerEncoded => false;
+
+    /// <summary>True when the token runs <c>CKM_AES_GCM</c> as a multi-part operation
+    /// (<c>C_EncryptUpdate</c>/<c>C_DecryptUpdate</c>), not only single-part. Default <see langword="true"/>;
+    /// Craton HSM, whose AES-GCM is single-part only, overrides it.</summary>
+    bool SupportsMultipartAesGcm => true;
+
+    /// <summary>True when ML-DSA and SLH-DSA signing accept a non-empty context string
+    /// (<c>CK_SIGN_ADDITIONAL_CONTEXT.pContext</c>). Default <see langword="true"/>; Craton HSM, which
+    /// refuses any context with <c>CKR_MECHANISM_PARAM_INVALID</c>, overrides it.</summary>
+    bool SupportsPqcSignContext => true;
+
+    /// <summary>The SLH-DSA parameter set tests use when the parameter set is not what they test. Default
+    /// SHA2-128f, the fastest to sign; Craton HSM, which implements only SHA2-128s and SHA2-256s, overrides it.</summary>
+    CkpSlhDsa SlhDsaTestParameterSet => CkpSlhDsa.CKP_SLH_DSA_SHA2_128F;
 }

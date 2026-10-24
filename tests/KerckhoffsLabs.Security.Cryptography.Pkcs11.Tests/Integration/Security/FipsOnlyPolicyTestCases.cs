@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
@@ -24,7 +25,8 @@ internal static class FipsOnlyPolicyTestCases
         backend.RequireMechanisms(CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM);
         using var session = OpenFips(backend);
         using var key = session.GenerateAesKey(256);
-        byte[] iv = new byte[12];
+        // Random, not all zero: Craton HSM refuses an all-zero GCM IV, and one already used with the key.
+        byte[] iv = RandomNumberGenerator.GetBytes(12);
         byte[] plaintext = [1, 2, 3, 4];
 
         byte[] ct = key.Encrypt(new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(iv, [], 128)), plaintext);

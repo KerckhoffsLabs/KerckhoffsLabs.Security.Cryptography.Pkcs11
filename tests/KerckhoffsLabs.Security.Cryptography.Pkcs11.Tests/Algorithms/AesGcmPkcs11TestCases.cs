@@ -85,6 +85,7 @@ internal static class AesGcmPkcs11TestCases
 
     internal static void Assert_Ctor_NonAesKey_Throws(IPkcs11Backend backend)
     {
+        backend.RequireMechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN);
         using var session = OpenSession(backend);
         string label = $"gcm-nonaes-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)

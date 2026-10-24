@@ -57,6 +57,8 @@ internal static class KnownAnswerTestCases
             "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662" +
             "76fc6ece0f4e1768cddf8853bb2d551b");
 
+        if (!backend.SupportsMultipartAesGcm)
+            Assert.Skip("Backend runs CKM_AES_GCM single-part only.");
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
@@ -96,6 +98,7 @@ internal static class KnownAnswerTestCases
         byte[] data = Encoding.ASCII.GetBytes("Test Using Larger Than Block-Size Key - Hash Key First");
         byte[] expected = H("60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54");
 
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
@@ -160,6 +163,7 @@ internal static class KnownAnswerTestCases
             "7ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116" +
             "1ae10b594f09e26a7e902ecbd0600691");
 
+        backend.RequireMechanism(CKM.CKM_CHACHA20_POLY1305);
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
@@ -199,6 +203,7 @@ internal static class KnownAnswerTestCases
 
     private static void AssertHmacKat(IPkcs11Backend backend, CKM mechanism, byte[] key, byte[] data, byte[] expected)
     {
+        backend.RequireMechanism(mechanism);
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {

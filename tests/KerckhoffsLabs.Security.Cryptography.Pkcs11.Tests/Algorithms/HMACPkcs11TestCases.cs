@@ -48,6 +48,7 @@ internal static class HMACPkcs11TestCases
     // minimum HMAC key size, so callers size the key to the digest length) and runs the body.
     private static void WithHmacKey(IPkcs11Backend backend, int keyLen, Action<Pkcs11Session, Pkcs11Key> body)
     {
+        backend.RequireMechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN);
         using var session = OpenSession(backend);
         string label = $"hmac-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
