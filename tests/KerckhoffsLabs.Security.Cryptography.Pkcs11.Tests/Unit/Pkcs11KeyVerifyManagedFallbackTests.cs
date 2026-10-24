@@ -165,9 +165,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     [InlineData(CKM.CKM_ECDSA_SHA256, "SHA256")]
     [InlineData(CKM.CKM_ECDSA_SHA384, "SHA384")]
     [InlineData(CKM.CKM_ECDSA_SHA512, "SHA512")]
+    [InlineData(CKM.CKM_ECDSA_SHA3_256, "SHA3-256")]
+    [InlineData(CKM.CKM_ECDSA_SHA3_384, "SHA3-384")]
+    [InlineData(CKM.CKM_ECDSA_SHA3_512, "SHA3-512")]
     public void Verify_PrivateOnlyEcKey_CombinedMechanism_SynthesizesPublicKeyAndVerifies(
         CKM mechanismType, string hashName)
     {
+        Assert.SkipWhen(hashName.StartsWith("SHA3-", StringComparison.Ordinal) && !SHA3_256.IsSupported, "The host BCL has no SHA-3.");
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         ECParameters pub = ec.ExportParameters(includePrivateParameters: false);
         var hash = new HashAlgorithmName(hashName);
