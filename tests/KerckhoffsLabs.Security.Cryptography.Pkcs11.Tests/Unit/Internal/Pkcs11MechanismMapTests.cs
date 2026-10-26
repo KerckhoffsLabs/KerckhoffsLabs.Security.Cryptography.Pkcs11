@@ -154,10 +154,20 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA256", CKM.CKM_SHA256_HMAC)]
     [InlineData("SHA384", CKM.CKM_SHA384_HMAC)]
     [InlineData("SHA512", CKM.CKM_SHA512_HMAC)]
+    [InlineData("SHA3-256", CKM.CKM_SHA3_256_HMAC)]
+    [InlineData("SHA3-384", CKM.CKM_SHA3_384_HMAC)]
+    [InlineData("SHA3-512", CKM.CKM_SHA3_512_HMAC)]
     public void HmacHash_HashToCkm_ReturnsExpected(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.Hmac(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
+    }
+
+    [Fact]
+    public void Hmac_UnsupportedHash_Throws()
+    {
+        Assert.Throws<NotSupportedException>(() =>
+            Pkcs11MechanismMap.Hmac(HashAlgorithmName.MD5));
     }
 
     [Theory]

@@ -16,8 +16,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <summary>
 /// HMACPkcs11 over the in-process <c>ManagedSoftToken</c> — runs without SoftHSM. The token
 /// computes <c>CKM_*_HMAC</c> with the BCL's <c>HMACSHA*</c> primitives, so on-token MACs are
-/// cross-checked against <see cref="HMACSHA256"/>/<see cref="HMACSHA384"/>/<see cref="HMACSHA512"/>
-/// and an RFC 4231 known-answer vector. Mirrors <c>HMACPkcs11Tests.SoftHsm2.cs</c>; the managed
+/// cross-checked against <see cref="HMACSHA256"/>/<see cref="HMACSHA384"/>/<see cref="HMACSHA512"/>,
+/// the SHA-3 HMACs, and an RFC 4231 known-answer vector. Mirrors <c>HMACPkcs11Tests.SoftHsm2.cs</c>; the managed
 /// token does not enforce a per-mechanism minimum key size, so key material is sized freely.
 /// SHA-1 HMAC is insecure-by-default and runs only under <c>UsePolicy(CryptoPolicy.AllowInsecure)</c>.
 /// </summary>
@@ -54,8 +54,17 @@ public sealed class HMACPkcs11Tests_Managed
         "SHA256" => HMACSHA256.HashData(key, data),
         "SHA384" => HMACSHA384.HashData(key, data),
         "SHA512" => HMACSHA512.HashData(key, data),
+        "SHA3-256" => HMACSHA3_256.HashData(key, data),
+        "SHA3-384" => HMACSHA3_384.HashData(key, data),
+        "SHA3-512" => HMACSHA3_512.HashData(key, data),
         _ => throw new InvalidOperationException($"unmapped hash {hashName}"),
     };
+
+    // The managed token computes its MACs with the host BCL, so a SHA-3 HMAC runs only where the host has
+    // SHA-3 (not on macOS).
+    private static void RequireHostHmac(string hashName) =>
+        Assert.SkipUnless(HMACPkcs11TestCases.HostSupportsHmac(hashName),
+            $"Host BCL does not support HMAC over {hashName} (needs OpenSSL 3.x or Windows 11+).");
 
     // === Real crypto: cross-checked against the BCL =======================================
 
@@ -63,8 +72,12 @@ public sealed class HMACPkcs11Tests_Managed
     [InlineData("SHA256", 32)]
     [InlineData("SHA384", 48)]
     [InlineData("SHA512", 64)]
+    [InlineData("SHA3-256", 32)]
+    [InlineData("SHA3-384", 48)]
+    [InlineData("SHA3-512", 64)]
     public void ComputeHash_MatchesBcl_OverManagedToken(string hashName, int expectedLen)
     {
+        RequireHostHmac(hashName);
         byte[] keyBytes = RandomNumberGenerator.GetBytes(32);
         byte[] data = Encoding.UTF8.GetBytes("authenticated by a managed-token HMAC");
         byte[] expected = BclHmac(hashName, keyBytes, data);
@@ -152,8 +165,12 @@ public sealed class HMACPkcs11Tests_Managed
     [InlineData("SHA256", 32)]
     [InlineData("SHA384", 48)]
     [InlineData("SHA512", 64)]
+    [InlineData("SHA3-256", 32)]
+    [InlineData("SHA3-384", 48)]
+    [InlineData("SHA3-512", 64)]
     public void TryComputeHash_MatchesBcl_AndTheInstanceCanBeReused(string hashName, int macLen)
     {
+        RequireHostHmac(hashName);
         byte[] keyBytes = RandomNumberGenerator.GetBytes(32);
         byte[] first = Encoding.UTF8.GetBytes("first message");
         byte[] second = Encoding.UTF8.GetBytes("second message");
@@ -273,6 +290,21 @@ public sealed class HMACPkcs11Tests_Managed
             Assert.Equal(expected, hmac.ComputeHash(data));
         });
     }
+
+    // SHA-3 HMAC with keys shorter than, equal to and longer than the hash's block size.
+    [Theory]
+    [MemberData(nameof(HMACPkcs11TestCases.Sha3KeySizes), MemberType = typeof(HMACPkcs11TestCases))]
+    public void Sha3_ComputeAndTryComputeHash_MatchBcl(string hashName, int keyLength)
+    {
+        RequireHostHmac(hashName);
+        HMACPkcs11TestCases.AssertSha3MatchesBcl(
+            (rawKey, body) => WithImportedHmacKey(rawKey, (_, key) => body(key)), hashName, keyLength);
+    }
+
+    [Fact(SkipUnless = nameof(HMACSHA3_256.IsSupported), SkipType = typeof(HMACSHA3_256), Skip = "Requires " + nameof(HMACSHA3_256.IsSupported))]
+    public void HmacSha3_256_WycheproofVectors() =>
+        HMACPkcs11TestCases.AssertHmacSha3_256Vectors(
+            (rawKey, body) => WithImportedHmacKey(rawKey, (_, key) => body(key)));
 
     // === Construction and argument validation (throw before any native call) ==============
 

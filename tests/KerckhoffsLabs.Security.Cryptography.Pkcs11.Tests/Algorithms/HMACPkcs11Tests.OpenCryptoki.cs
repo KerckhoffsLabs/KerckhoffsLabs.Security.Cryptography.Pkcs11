@@ -29,4 +29,12 @@ public sealed class HMACPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture back
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void ComputeHash_HmacSha256_KnownAnswer() => HMACPkcs11TestCases.Assert_ComputeHash_HmacSha256_KnownAnswer(_backend);
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [MemberData(nameof(HMACPkcs11TestCases.Sha3KeySizes), MemberType = typeof(HMACPkcs11TestCases))]
+    public void Sha3_ComputeAndTryComputeHash_MatchBcl(string hashName, int keyLength)
+        => HMACPkcs11TestCases.Assert_Sha3_ComputeAndTryComputeHash_MatchBcl(_backend, hashName, keyLength);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void HmacSha3_256_WycheproofVectors() => HMACPkcs11TestCases.Assert_HmacSha3_256_WycheproofVectors(_backend);
 }

@@ -39,18 +39,19 @@ public sealed class HMACPkcs11 : HMAC
     /// This instance does NOT take ownership.
     /// </param>
     /// <param name="hashAlgorithm">
-    /// The hash algorithm (SHA1, SHA224, SHA256, SHA384, or SHA512). The corresponding
-    /// <c>CKM_*_HMAC</c> mechanism will be selected automatically.
+    /// The hash algorithm (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-256, SHA3-384, or SHA3-512).
+    /// The corresponding <c>CKM_*_HMAC</c> mechanism will be selected automatically.
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">
-    /// Thrown when <paramref name="hashAlgorithm"/> is not one of the five supported algorithms.
+    /// Thrown when <paramref name="hashAlgorithm"/> is not one of the eight supported algorithms.
     /// </exception>
     /// <remarks>
     /// SHA-224 is accepted here (it merely determines the HMAC output size); the
     /// session's crypto policy gate for it fires later, at the actual
     /// <c>CKM_SHA224_HMAC</c> sign call inside <see cref="HashFinal"/> — see
-    /// <c>SecureOnlyPolicy</c>.
+    /// <c>SecureOnlyPolicy</c>. The token applies the HMAC key schedule itself, including hashing a key
+    /// longer than the hash's block size (136, 104 and 72 bytes for SHA3-256, SHA3-384 and SHA3-512).
     /// </remarks>
     public HMACPkcs11(Pkcs11Key key, HashAlgorithmName hashAlgorithm)
     {
@@ -58,7 +59,8 @@ public sealed class HMACPkcs11 : HMAC
         _key = key;
         _hashAlgorithm = hashAlgorithm;
         HashName = hashAlgorithm.Name
-            ?? throw new NotSupportedException("HMAC requires a named hash algorithm (SHA1, SHA224, SHA256, SHA384, or SHA512).");
+            ?? throw new NotSupportedException(
+                "HMAC requires a named hash algorithm (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-256, SHA3-384, or SHA3-512).");
         HashSizeValue = HashSizeFromName(hashAlgorithm) * 8;
     }
 
@@ -134,6 +136,9 @@ public sealed class HMACPkcs11 : HMAC
         "SHA256" => 32,
         "SHA384" => 48,
         "SHA512" => 64,
+        "SHA3-256" => 32,
+        "SHA3-384" => 48,
+        "SHA3-512" => 64,
         _ => throw new NotSupportedException($"Unsupported hash: {hash.Name}."),
     };
 }
