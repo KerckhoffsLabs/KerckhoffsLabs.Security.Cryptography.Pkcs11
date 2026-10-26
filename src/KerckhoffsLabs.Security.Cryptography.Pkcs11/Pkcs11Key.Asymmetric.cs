@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -10,6 +11,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 public sealed partial class Pkcs11Key
 {
     // === Public-key export and key agreement ==================================
+
+    // The operation name the export's attribute errors carry.
+    private const string ExportOperation = "Pkcs11Key.Export";
 
     /// <summary>
     /// Exports this key's public half in <paramref name="format"/>, read from the public-key handle when
@@ -35,7 +39,8 @@ public sealed partial class Pkcs11Key
     /// <exception cref="NotSupportedException">Thrown if <see cref="KeyType"/> is not supported.</exception>
     /// <exception cref="Pkcs11Exception">
     /// Thrown when the public attributes are sensitive, cannot be read from any available handle, or
-    /// cannot be parsed; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.
+    /// cannot be parsed; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when an RSA or DSA integer the token
+    /// returned is empty or zero; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.
     /// </exception>
     public byte[] Export(Pkcs11KeyBlobFormat format)
     {
@@ -57,7 +62,7 @@ public sealed partial class Pkcs11Key
 
     private byte[] ExportEc(bool spki)
     {
-        ECParameters ec = Pkcs11PublicKeyView.ReadEcPublicKey(this, "Pkcs11Key.Export");
+        ECParameters ec = Pkcs11PublicKeyView.ReadEcPublicKey(this, ExportOperation);
         return spki ? SubjectPublicKeyInfoEncoding.EncodeEc(ec) : [0x04, .. ec.Q.X!, .. ec.Q.Y!];
     }
 
@@ -69,8 +74,8 @@ public sealed partial class Pkcs11Key
         if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 "Pkcs11Key.Export (CKA_MODULUS / CKA_PUBLIC_EXPONENT not readable from any available handle)");
-        byte[] modulus = attrs[0].GetValueAsByteArray();
-        byte[] exponent = attrs[1].GetValueAsByteArray();
+        byte[] modulus = PublicKeySynthesis.RequirePublicInteger(attrs[0].GetValueAsByteArray(), CKA.CKA_MODULUS, ExportOperation);
+        byte[] exponent = PublicKeySynthesis.RequirePublicInteger(attrs[1].GetValueAsByteArray(), CKA.CKA_PUBLIC_EXPONENT, ExportOperation);
         return spki
             ? SubjectPublicKeyInfoEncoding.EncodeRsa(modulus, exponent)
             : SubjectPublicKeyInfoEncoding.EncodeRsaPublicKey(modulus, exponent);
@@ -83,11 +88,14 @@ public sealed partial class Pkcs11Key
         if (domain[0].CannotBeRead || domain[1].CannotBeRead || domain[2].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 "Pkcs11Key.Export (CKA_PRIME / CKA_SUBPRIME / CKA_BASE not readable from any available handle)");
-        byte[] y = ReadPublicValue();
-        return spki
-            ? SubjectPublicKeyInfoEncoding.EncodeDsa(
-                domain[0].GetValueAsByteArray(), domain[1].GetValueAsByteArray(), domain[2].GetValueAsByteArray(), y)
-            : SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey(y);
+        byte[] y = PublicKeySynthesis.RequirePublicInteger(ReadPublicValue(), CKA.CKA_VALUE, ExportOperation);
+        if (!spki)
+            return SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey(y);
+        return SubjectPublicKeyInfoEncoding.EncodeDsa(
+            PublicKeySynthesis.RequirePublicInteger(domain[0].GetValueAsByteArray(), CKA.CKA_PRIME, ExportOperation),
+            PublicKeySynthesis.RequirePublicInteger(domain[1].GetValueAsByteArray(), CKA.CKA_SUBPRIME, ExportOperation),
+            PublicKeySynthesis.RequirePublicInteger(domain[2].GetValueAsByteArray(), CKA.CKA_BASE, ExportOperation),
+            y);
     }
 
     private byte[] ExportPostQuantum(bool spki)

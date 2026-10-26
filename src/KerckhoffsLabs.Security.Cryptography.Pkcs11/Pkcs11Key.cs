@@ -126,16 +126,17 @@ public sealed partial class Pkcs11Key : IDisposable
     // The curve's field size from the library's catalog; null for a curve it doesn't list.
     private int? ReadEcKeySizeBits() => ReadEcCurve()?.FieldSizeBits;
 
-    // CKA_MODULUS_BITS, else the bit length of CKA_MODULUS. Without a public half these are the private one's,
-    // so its modulus is kept for decryption.
+    // CKA_MODULUS_BITS, else the bit length of CKA_MODULUS: also when CKA_MODULUS_BITS is too large for an
+    // int, which no key's is. Without a public half these are the private one's, so its modulus is kept
+    // for decryption.
     private int? ReadRsaKeySizeBits()
     {
         bool privateHalf = PublicHandle.IsInvalid;
         using var attrs = GetAttributeValue(CKA.CKA_MODULUS_BITS, CKA.CKA_MODULUS);
         if (privateHalf && !attrs[1].CannotBeRead)
             KeepRsaModulus(attrs[1].GetValueAsByteArray());
-        if (!attrs[0].CannotBeRead)
-            return checked((int)attrs[0].GetValueAsUlong());
+        if (!attrs[0].CannotBeRead && attrs[0].GetValueAsUlong() is var bits and <= int.MaxValue)
+            return (int)bits;
         return attrs[1].CannotBeRead ? null : BitLength(attrs[1].GetValueAsByteArray());
     }
 
@@ -150,7 +151,9 @@ public sealed partial class Pkcs11Key : IDisposable
     private int? ReadSecretKeySizeBits()
     {
         using var attrs = GetAttributeValue(CKA.CKA_VALUE_LEN);
-        return attrs[0].CannotBeRead ? null : checked((int)attrs[0].GetValueAsUlong() * 8);
+        if (attrs[0].CannotBeRead)
+            return null;
+        return attrs[0].GetValueAsUlong() is var bytes and <= int.MaxValue / 8 ? (int)bytes * 8 : null;
     }
 
     /// <summary>
@@ -483,7 +486,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="NotSupportedException">Thrown when the managed verification fallback is taken (no public handle on the token) and <paramref name="mechanism"/> has no managed RSA/ECDSA equivalent.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when the token's RSA modulus or public exponent, read for managed verification, is empty or zero; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public bool Verify(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

@@ -175,6 +175,37 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, digest.ReturnValue);
     }
 
+    // A modulus or exponent the token returns empty or zero is no public key: refused with the
+    // attribute named, rather than handed to the BCL, which throws IndexOutOfRangeException for an
+    // empty one.
+    [Theory]
+    [InlineData(CKA.CKA_MODULUS, 0)]
+    [InlineData(CKA.CKA_MODULUS, 256)]
+    [InlineData(CKA.CKA_PUBLIC_EXPONENT, 0)]
+    [InlineData(CKA.CKA_PUBLIC_EXPONENT, 1)]
+    public void Verify_PrivateOnlyRsaKey_EmptyOrZeroValue_ThrowsAttributeValueInvalid(CKA attribute, int zeroBytes)
+    {
+        using var rsa = RSA.Create(2048);
+        RSAParameters pub = rsa.ExportParameters(includePrivateParameters: false);
+        using var fake = FakeKeys.Create(CKK.CKK_RSA, ca => ca switch
+        {
+            _ when ca == attribute => (CKR.CKR_OK, new byte[zeroBytes]),
+            CKA.CKA_MODULUS => (CKR.CKR_OK, pub.Modulus),
+            CKA.CKA_PUBLIC_EXPONENT => (CKR.CKR_OK, pub.Exponent),
+            _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
+        }, Mechanics);
+        Pkcs11Key key = fake;
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(
+            () => key.Verify(new Mechanism(CKM.CKM_SHA256_RSA_PKCS), Data, new byte[256]));
+        Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, ex.ReturnValue);
+        Assert.Contains(attribute.ToString(), ex.Message);
+
+        var digest = Assert.ThrowsAny<Pkcs11Exception>(
+            () => key.VerifyPkcs1Digest(HashAlgorithmName.SHA256, new byte[32], new byte[256]));
+        Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, digest.ReturnValue);
+    }
+
     // === EC ==================================================================
 
     // CKA_EC_POINT is a DER OCTET STRING wrapping the uncompressed point (0x04 || X || Y) — same
