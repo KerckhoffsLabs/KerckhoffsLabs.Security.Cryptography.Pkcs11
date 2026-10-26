@@ -84,6 +84,7 @@ internal sealed partial class ManagedSoftToken : FakeModule
             CKM.CKM_SHA3_256, CKM.CKM_SHA3_384, CKM.CKM_SHA3_512,
             CKM.CKM_SHA256_HMAC, CKM.CKM_SHA384_HMAC, CKM.CKM_SHA512_HMAC,
             .. (CKM[])(AdvertisesAesKeyWrapKwp ? [CKM.CKM_AES_KEY_WRAP_KWP] : []),
+            .. (CKM[])(Sha224Digest is not null ? [CKM.CKM_SHA224] : []),
         ];
         if (mechanismList.IsNull) { count = (NativeCULong)mechs.Length; return CKR.CKR_OK; }
         if (mechanismList.Span.Length < mechs.Length) { count = (NativeCULong)mechs.Length; return CKR.CKR_BUFFER_TOO_SMALL; }

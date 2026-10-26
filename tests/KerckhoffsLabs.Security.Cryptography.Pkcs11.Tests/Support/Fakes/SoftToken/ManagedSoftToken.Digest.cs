@@ -11,6 +11,10 @@ internal sealed partial class ManagedSoftToken
 {
     private readonly Dictionary<ulong, ulong> _digestOps = [];
 
+    /// <summary>When set, the token lists and digests <c>CKM_SHA224</c> with this function. The BCL has no
+    /// SHA-224, so a test supplies one: whatever it computes, the token's SHA-224 digests are that.</summary>
+    public Func<byte[], byte[]>? Sha224Digest { get; set; }
+
     protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
@@ -37,13 +41,15 @@ internal sealed partial class ManagedSoftToken
         return CKR.CKR_OK;
     }
 
-    private static bool IsDigest(CKM m) => m is
+    private bool IsDigest(CKM m) => m is
         CKM.CKM_MD5 or CKM.CKM_SHA_1 or CKM.CKM_SHA256 or CKM.CKM_SHA384 or CKM.CKM_SHA512
-        or CKM.CKM_SHA3_256 or CKM.CKM_SHA3_384 or CKM.CKM_SHA3_512;
+        or CKM.CKM_SHA3_256 or CKM.CKM_SHA3_384 or CKM.CKM_SHA3_512
+        || (m == CKM.CKM_SHA224 && Sha224Digest is not null);
 
-    private static byte[] ComputeDigest(CKM mech, byte[] data) => mech switch
+    private byte[] ComputeDigest(CKM mech, byte[] data) => mech switch
     {
         CKM.CKM_MD5 => MD5.HashData(data),
+        CKM.CKM_SHA224 when Sha224Digest is { } sha224 => sha224(data),
         CKM.CKM_SHA_1 => SHA1.HashData(data),
         CKM.CKM_SHA256 => SHA256.HashData(data),
         CKM.CKM_SHA384 => SHA384.HashData(data),

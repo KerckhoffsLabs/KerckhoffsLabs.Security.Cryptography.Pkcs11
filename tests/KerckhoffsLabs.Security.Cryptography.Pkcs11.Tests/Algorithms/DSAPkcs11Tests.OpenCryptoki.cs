@@ -10,12 +10,14 @@ public sealed class DSAPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backe
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [InlineData("SHA224")]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
     public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => DSAPkcs11TestCases.Assert_SignVerifyData_AcrossHashAlgorithms_RoundTrips(_backend, hashName);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [InlineData("SHA224")]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
@@ -43,6 +45,14 @@ public sealed class DSAPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backe
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void VerifyWithSignatureFormat_MalformedSignature_ReturnsFalse() => DSAPkcs11TestCases.Assert_VerifyWithSignatureFormat_MalformedSignature_ReturnsFalse(_backend);
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence)]
+    public void Sha224_EveryOverload_RoundTrips_AndRejectsTampering(DSASignatureFormat format) => DSAPkcs11TestCases.Assert_Sha224_EveryOverload_RoundTrips_AndRejectsTampering(_backend, format);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void Sha224_WycheproofVector_Verifies_AndTamperedDoesNot() => DSAPkcs11TestCases.Assert_Sha224_WycheproofVector_Verifies_AndTamperedDoesNot(_backend);
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void ExportParameters_ReturnsProvidedDomain() => DSAPkcs11TestCases.Assert_ExportParameters_ReturnsProvidedDomain(_backend);
