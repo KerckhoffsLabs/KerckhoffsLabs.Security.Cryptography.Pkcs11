@@ -55,21 +55,11 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmAcceptsEmptySignature = false;
 
-    /// <summary>
-    /// False while harrison314/BouncyHsm#118 is open: raw <c>CKM_CHACHA20</c> takes only a zero
-    /// <c>blockCounter</c> in <c>CK_CHACHA20_PARAMS</c> and refuses any other at init with
-    /// <c>CKR_GENERAL_ERROR</c>. BouncyHsmQuirkTests.NonZeroChaCha20Counter_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmAcceptsNonZeroChaCha20Counter = false;
-
     /// <summary>Gate for empty-input digest cases: see <see cref="BouncyHsmAcceptsEmptyDigest"/>.</summary>
     public static bool EmptyDigestAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyDigest;
 
     /// <summary>Gate for cases that verify an empty RSA signature: see <see cref="BouncyHsmAcceptsEmptySignature"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptySignature;
-
-    /// <summary>Gate for raw ChaCha20 cases that start at a non-zero block counter: see <see cref="BouncyHsmAcceptsNonZeroChaCha20Counter"/>.</summary>
-    public static bool NonZeroChaCha20CounterAvailable => BouncyHsmAvailable && BouncyHsmAcceptsNonZeroChaCha20Counter;
 
     public BouncyHsmBackendFixture()
     {

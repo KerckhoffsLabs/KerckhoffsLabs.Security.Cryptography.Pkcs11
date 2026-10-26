@@ -8,7 +8,7 @@ public sealed class RawChaCha20Tests_BouncyHsm(BouncyHsmBackendFixture backend)
 {
     private readonly BouncyHsmBackendFixture _backend = backend;
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.NonZeroChaCha20CounterAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "harrison314/BouncyHsm#118: only a zero ChaCha20 block counter is accepted")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Encrypt_MatchesBclChaCha20Poly1305Keystream() =>
         RawChaCha20TestCases.Assert_Encrypt_MatchesBclChaCha20Poly1305Keystream(_backend);
 
@@ -16,7 +16,7 @@ public sealed class RawChaCha20Tests_BouncyHsm(BouncyHsmBackendFixture backend)
     public void EncryptDecrypt_RoundTrips() =>
         RawChaCha20TestCases.Assert_EncryptDecrypt_RoundTrips(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.NonZeroChaCha20CounterAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "harrison314/BouncyHsm#118: only a zero ChaCha20 block counter is accepted")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Decrypt_WrongCounter_ProducesGarbageNotException() =>
         RawChaCha20TestCases.Assert_Decrypt_WrongCounter_ProducesGarbageNotException(_backend);
 }

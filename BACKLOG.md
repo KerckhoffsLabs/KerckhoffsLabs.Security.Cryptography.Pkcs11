@@ -1877,7 +1877,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-164] Lift the BouncyHsm ChaCha20 block-counter gate once harrison314/BouncyHsm#118 ships
+### [BL-164] ✅ RESOLVED — Lift the BouncyHsm ChaCha20 block-counter gate once harrison314/BouncyHsm#118 ships
+- **Status:** Resolved 2026-10-26 by the `vendor/bouncyhsm` bump to v2.3.4 (27bc4987). Raw `CKM_CHACHA20` and `CKM_SALSA20` now take a non-zero initial block counter; `BouncyHsmAcceptsNonZeroChaCha20Counter` and its quirk test are gone, `Encrypt_MatchesBclChaCha20Poly1305Keystream` and `Decrypt_WrongCounter_ProducesGarbageNotException` run on BouncyHsm, and a Salsa20 case checks that a block counter of 1 starts the keystream at the second block.
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S

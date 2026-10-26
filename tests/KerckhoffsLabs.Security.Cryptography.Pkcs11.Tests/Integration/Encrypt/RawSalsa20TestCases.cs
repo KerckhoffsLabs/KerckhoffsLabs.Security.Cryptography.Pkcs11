@@ -10,14 +10,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 
 /// <summary>
 /// Backend-agnostic known-answer tests for raw <c>CKM_SALSA20</c> with <see cref="CkmSalsa20Params"/>
-/// (256-bit key, 64-bit nonce, block counter 0). The expected keystreams come from an independent
+/// (256-bit key, 64-bit nonce). The expected keystreams come from an independent
 /// implementation: the eSTREAM 256-bit set 1 vector 0, and a two-block vector computed with
 /// PyCryptodome 3.23.0, whose Salsa20 reproduces that eSTREAM vector. The session runs under
 /// <see cref="CryptoPolicy.AllowInsecure"/>, since SecureOnly refuses raw Salsa20.
 /// </summary>
 internal static class RawSalsa20TestCases
 {
-    private static readonly byte[] ZeroBlockCounter = new byte[8];
+    private static readonly byte[] TwoBlockKey = [.. Enumerable.Range(0, 32).Select(i => (byte)i)];
+    private static readonly byte[] TwoBlockNonce = Convert.FromHexString("0001020304050607");
+    private static readonly byte[] TwoBlockPlaintext =
+        "Salsa20 keystream known answer, two blocks long so the block counter moves past zero........ok!!"u8.ToArray();
+    private static readonly byte[] TwoBlockCiphertext = Convert.FromHexString(
+        "7dcc632c796519eebd17cada5c96319642fb2fc614ebb6f2788a9f63cb8bea9c03c86a5f3435b816533bd8bf9118fb85" +
+        "8eb725092e5749f2899e5589dcd4d409cf4e4e2bf96914fbdbca1eb4d6ff9585e1a7620b3d36e2e047631ed1eeb98ec6");
 
     internal static void Assert_Estream_Set1Vector0_Keystream(IPkcs11Backend backend)
     {
@@ -31,26 +37,31 @@ internal static class RawSalsa20TestCases
 
     internal static void Assert_TwoBlockMessage_MatchesReference_AndRoundTrips(IPkcs11Backend backend)
     {
-        byte[] key = [.. Enumerable.Range(0, 32).Select(i => (byte)i)];
-        byte[] nonce = Convert.FromHexString("0001020304050607");
-        byte[] plaintext = "Salsa20 keystream known answer, two blocks long so the block counter moves past zero........ok!!"u8.ToArray();
-        byte[] expected = Convert.FromHexString(
-            "7dcc632c796519eebd17cada5c96319642fb2fc614ebb6f2788a9f63cb8bea9c03c86a5f3435b816533bd8bf9118fb85" +
-            "8eb725092e5749f2899e5589dcd4d409cf4e4e2bf96914fbdbca1eb4d6ff9585e1a7620b3d36e2e047631ed1eeb98ec6");
+        byte[] ciphertext = Encrypt(backend, TwoBlockKey, TwoBlockNonce, TwoBlockPlaintext);
 
-        byte[] ciphertext = Encrypt(backend, key, nonce, plaintext);
-
-        Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(ciphertext));
-        Assert.Equal(plaintext, Decrypt(backend, key, nonce, ciphertext));
+        Assert.Equal(Convert.ToHexString(TwoBlockCiphertext), Convert.ToHexString(ciphertext));
+        Assert.Equal(TwoBlockPlaintext, Decrypt(backend, TwoBlockKey, TwoBlockNonce, ciphertext));
     }
 
-    private static byte[] Encrypt(IPkcs11Backend backend, byte[] key, byte[] nonce, byte[] data) =>
-        WithKey(backend, key, k => k.Encrypt(Salsa20(nonce), data));
+    // The two-block message's second block, encrypted on its own from block counter 1, is the reference's
+    // second block: the counter is where the keystream starts, not refused or ignored.
+    internal static void Assert_NonZeroBlockCounter_StartsTheKeystreamThere(IPkcs11Backend backend)
+    {
+        byte[] ciphertext = Encrypt(backend, TwoBlockKey, TwoBlockNonce, TwoBlockPlaintext[64..], blockCounter: 1);
 
-    private static byte[] Decrypt(IPkcs11Backend backend, byte[] key, byte[] nonce, byte[] data) =>
-        WithKey(backend, key, k => k.Decrypt(Salsa20(nonce), data));
+        Assert.Equal(Convert.ToHexString(TwoBlockCiphertext[64..]), Convert.ToHexString(ciphertext));
+        Assert.Equal(TwoBlockPlaintext[64..], Decrypt(backend, TwoBlockKey, TwoBlockNonce, ciphertext, blockCounter: 1));
+    }
 
-    private static Mechanism Salsa20(byte[] nonce) => new(CKM.CKM_SALSA20, new CkmSalsa20Params(ZeroBlockCounter, nonce, 64));
+    private static byte[] Encrypt(IPkcs11Backend backend, byte[] key, byte[] nonce, byte[] data, ulong blockCounter = 0) =>
+        WithKey(backend, key, k => k.Encrypt(Salsa20(nonce, blockCounter), data));
+
+    private static byte[] Decrypt(IPkcs11Backend backend, byte[] key, byte[] nonce, byte[] data, ulong blockCounter = 0) =>
+        WithKey(backend, key, k => k.Decrypt(Salsa20(nonce, blockCounter), data));
+
+    // CK_SALSA20_PARAMS: a little-endian 64-bit block counter.
+    private static Mechanism Salsa20(byte[] nonce, ulong blockCounter) =>
+        new(CKM.CKM_SALSA20, new CkmSalsa20Params(BitConverter.GetBytes(blockCounter), nonce, 64));
 
     private static byte[] WithKey(IPkcs11Backend backend, byte[] value, Func<Pkcs11Key, byte[]> body)
     {
