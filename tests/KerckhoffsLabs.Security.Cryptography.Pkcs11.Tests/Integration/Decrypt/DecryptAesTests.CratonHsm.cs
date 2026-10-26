@@ -16,4 +16,8 @@ public sealed class DecryptAesTests_CratonHsm(CratonHsmBackendFixture f)
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue()
         => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void AesCbcPad_StreamDecrypt_LastBlockComesFromFinal()
+        => DecryptAesTestCases.Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal(_backend);
 }

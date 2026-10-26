@@ -16,4 +16,8 @@ public sealed class DecryptAesTests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue()
         => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void AesCbcPad_StreamDecrypt_LastBlockComesFromFinal()
+        => DecryptAesTestCases.Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal(_backend);
 }

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -87,6 +88,38 @@ internal static class DecryptAesTestCases
         finally
         {
             session.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A multi-part <c>CKM_AES_CBC_PAD</c> decryption of a BCL ciphertext, in whole-block parts, returns the
+    /// plaintext. The token holds the last block back until the end, so it comes from <c>C_DecryptFinal</c>,
+    /// whatever length the token's query for it reports.
+    /// </summary>
+    internal static void Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_AES_CBC_PAD);
+        byte[] plaintext = RandomNumberGenerator.GetBytes(40);
+        byte[] iv = RandomNumberGenerator.GetBytes(16);
+        using var bcl = Aes.Create();
+        bcl.Key = AesKey256;
+        byte[] ciphertext = bcl.EncryptCbc(plaintext, iv, PaddingMode.PKCS7);
+
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
+        try
+        {
+            using var source = new MemoryStream(ciphertext);
+            using var sink = new MemoryStream();
+
+            session.Decrypt(new Mechanism(CKM.CKM_AES_CBC_PAD, iv), keyHandle, source, sink, bufferLength: 16);
+
+            Assert.Equal(plaintext, sink.ToArray());
+        }
+        finally
+        {
+            session.DestroyObject(keyHandle);
         }
     }
 }

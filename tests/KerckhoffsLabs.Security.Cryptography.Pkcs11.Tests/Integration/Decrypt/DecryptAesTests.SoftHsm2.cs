@@ -16,4 +16,8 @@ public sealed class DecryptAesTests_SoftHsm(SoftHsmBackendFixture f)
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue_SoftHsm()
         => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void AesCbcPad_StreamDecrypt_LastBlockComesFromFinal()
+        => DecryptAesTestCases.Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal(_backend);
 }

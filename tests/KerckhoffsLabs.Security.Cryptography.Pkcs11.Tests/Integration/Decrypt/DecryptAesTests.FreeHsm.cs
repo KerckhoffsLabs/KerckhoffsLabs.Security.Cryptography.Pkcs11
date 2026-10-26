@@ -16,4 +16,8 @@ public sealed class DecryptAesTests_FreeHsm(FreeHsmBackendFixture f)
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue()
         => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void AesCbcPad_StreamDecrypt_LastBlockComesFromFinal()
+        => DecryptAesTestCases.Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal(_backend);
 }

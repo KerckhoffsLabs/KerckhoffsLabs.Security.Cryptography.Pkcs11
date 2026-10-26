@@ -13,4 +13,8 @@ public sealed class DecryptAesTests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue() => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void AesCbcPad_StreamDecrypt_LastBlockComesFromFinal()
+        => DecryptAesTestCases.Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal(_backend);
 }

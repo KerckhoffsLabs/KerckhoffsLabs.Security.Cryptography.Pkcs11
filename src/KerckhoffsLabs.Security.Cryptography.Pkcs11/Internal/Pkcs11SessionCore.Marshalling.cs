@@ -283,6 +283,45 @@ internal sealed partial class Pkcs11SessionCore
         }
     }
 
+    /// <summary>
+    /// The least output buffer <see cref="CallFinal"/> hands a multi-part final: the largest block a
+    /// PKCS#11 block cipher holds back for it (AES's).
+    /// </summary>
+    private const int FinalPartMargin = 16;
+
+    /// <summary>
+    /// Runs the <c>C_*Final</c> of a multi-part transform and returns exactly what it wrote.
+    /// </summary>
+    /// <remarks>
+    /// The output buffer is at least as large as the length the module reports, as each update's
+    /// (<paramref name="bufferLength"/>) and as <see cref="FinalPartMargin"/>. PKCS#11 v3.2 §5.2 lets a
+    /// length query over-report but not under-report, yet some modules do: Kryoptic's
+    /// <c>CKM_AES_CBC_PAD</c> answers 0 while its last block is still held back, and a final into a
+    /// buffer of that size fails and ends the operation. A <c>CKR_BUFFER_TOO_SMALL</c> grows the buffer,
+    /// as <see cref="PumpStreamThrough"/> does. A failed, refused or trimmed buffer is zeroized, since
+    /// for a decryption it holds plaintext.
+    /// </remarks>
+    private static byte[] CallFinal(LengthProbedCall final, string operation, int bufferLength)
+    {
+        CKR rv = final(default, lengthOnly: true, out NativeCULong reported);
+        Pkcs11Exception.ThrowIfError(rv, operation);
+
+        byte[] buffer = new byte[Math.Max(ReportedLength.ForAllocation(reported, operation), Math.Max(bufferLength, FinalPartMargin))];
+        rv = final(buffer, lengthOnly: false, out NativeCULong written);
+        for (int grown = 0; rv == CKR.CKR_BUFFER_TOO_SMALL && grown < MaxUnreportedGrowth; grown++)
+        {
+            int length = (ulong)written > (ulong)buffer.Length
+                ? ReportedLength.ForAllocation(written, operation)
+                : checked(buffer.Length * 2);
+            CryptographicOperations.ZeroMemory(buffer);
+            buffer = new byte[length];
+
+            rv = final(buffer, lengthOnly: false, out written);
+        }
+
+        return Filled(buffer, rv, written, operation);
+    }
+
     /// <summary>Initializes the non-digest half of a combined operation (<c>C_EncryptInit</c> / <c>C_DecryptInit</c>).</summary>
     private delegate CKR TransformInit(in CK_MECHANISM mechanism, NativeCULong keyHandle);
 
@@ -337,7 +376,7 @@ internal sealed partial class Pkcs11SessionCore
         PumpStreamThrough(inputStream, outputStream, bufferLength, transform.Update, transform.UpdateOperation);
 
         // Whatever the transform held back — a partial block, or an AEAD tag.
-        byte[] lastPart = CallWithLengthProbe(transform.Final, transform.FinalOperation);
+        byte[] lastPart = CallFinal(transform.Final, transform.FinalOperation, bufferLength);
         try
         {
             operation.End(transform.CancelFlag);
