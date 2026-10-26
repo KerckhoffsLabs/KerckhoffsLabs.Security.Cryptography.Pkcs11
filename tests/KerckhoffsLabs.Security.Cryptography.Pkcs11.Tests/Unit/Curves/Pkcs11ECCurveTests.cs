@@ -64,6 +64,15 @@ public sealed class Pkcs11ECCurveTests
     public void FromEcParams_NonOidBytes_Throws() =>
         Assert.Throws<ArgumentException>(() => Pkcs11ECCurve.FromEcParams([0x01, 0x02, 0x03]));
 
+    // A named-curve OID followed by anything else is not a CKA_EC_PARAMS value, and is refused rather than
+    // read as that curve: a stray byte, an explicit-parameters SEQUENCE, or a second OID.
+    [Theory]
+    [InlineData("06082A8648CE3D03010700")]
+    [InlineData("06082A8648CE3D0301073000")]
+    [InlineData("06082A8648CE3D03010706052B81040022")]
+    public void FromEcParams_BytesAfterTheOid_Throws(string hex) =>
+        Assert.Throws<ArgumentException>(() => Pkcs11ECCurve.FromEcParams(Convert.FromHexString(hex)));
+
     [Fact]
     public void CreateFromFriendlyName_ResolvesOid()
     {

@@ -10,8 +10,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 /// named-curve OID.
 /// </summary>
 /// <remarks>
-/// Writes DER. Reads BER — a superset that also takes non-minimal lengths and constructed OCTET STRINGs,
-/// which some tokens return — but never trailing bytes after the OCTET STRING.
+/// Writes DER. Reads a primitive OCTET STRING with BER lengths, so a token that pads the length
+/// (<c>0x81</c> for one under 128) is still understood; but never a constructed OCTET STRING, segmented
+/// or of indefinite length, which would let a token assemble the point from fragments, and never
+/// trailing bytes after the OCTET STRING.
 /// </remarks>
 internal static class EcPointEncoding
 {
@@ -91,6 +93,13 @@ internal static class EcPointEncoding
 
     private static bool TryReadOctetString(byte[] encoded, [NotNullWhen(true)] out byte[]? content)
     {
+        // The primitive tag only: BER allows an indefinite length on a constructed encoding alone.
+        if (encoded is not [0x04, ..])
+        {
+            content = null;
+            return false;
+        }
+
         try
         {
             var reader = new AsnReader(encoded, AsnEncodingRules.BER);

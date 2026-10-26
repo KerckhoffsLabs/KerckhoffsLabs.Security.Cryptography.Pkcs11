@@ -140,16 +140,19 @@ public sealed class EcPointEncodingTests
         Assert.Equal(point[1..33], x);
     }
 
-    // BER also allows a constructed OCTET STRING (indefinite length, split into segments).
-    [Fact]
-    public void TryDecode_ConstructedOctetString_Accepted()
+    // A constructed OCTET STRING, segmented or of indefinite length, is BER a token has no reason to send:
+    // it would let the point be assembled from fragments, so it is refused, wrapped or bare.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TryDecode_ConstructedOctetString_ReturnsFalse(bool indefinite)
     {
         byte[] point = EcPoint(32)[2..];
-        byte[] ber = [0x24, 0x80, 0x04, 0x20, .. point[..32], 0x04, (byte)(point.Length - 32), .. point[32..], 0x00, 0x00];
+        byte[] segments = [0x04, 0x20, .. point[..32], 0x04, (byte)(point.Length - 32), .. point[32..]];
+        byte[] ber = indefinite ? [0x24, 0x80, .. segments, 0x00, 0x00] : [0x24, (byte)segments.Length, .. segments];
 
-        Assert.True(EcPointEncoding.TryDecode(ber, out byte[] x, out byte[] y));
-        Assert.Equal(point[1..33], x);
-        Assert.Equal(point[33..], y);
+        Assert.False(EcPointEncoding.TryDecode(ber, out _, out _));
+        Assert.False(EcPointEncoding.TryGetCoordinateLength(ber, out _));
     }
 
     // The old parser ignored anything after the OCTET STRING.

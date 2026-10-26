@@ -154,12 +154,14 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// <summary>
     /// Parses a <c>CKA_EC_PARAMS</c> value (a DER-encoded curve OID) back into a <see cref="Pkcs11ECCurve"/>.
     /// </summary>
-    /// <exception cref="ArgumentException">The bytes are not a DER-encoded OID.</exception>
+    /// <exception cref="ArgumentException">The bytes are not exactly one DER-encoded OID.</exception>
     public static Pkcs11ECCurve FromEcParams(ReadOnlySpan<byte> ecParams)
     {
         try
         {
-            string oid = new AsnReader(ecParams.ToArray(), AsnEncodingRules.DER).ReadObjectIdentifier();
+            var reader = new AsnReader(ecParams.ToArray(), AsnEncodingRules.DER);
+            string oid = reader.ReadObjectIdentifier();
+            reader.ThrowIfNotEmpty();
             return new Pkcs11ECCurve(oid, LookupName(oid));
         }
         catch (AsnContentException ex)
