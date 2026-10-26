@@ -123,7 +123,8 @@ internal sealed partial class Pkcs11SessionCore
     /// have written (larger than the buffer) or cannot mean (<c>CK_UNAVAILABLE_INFORMATION</c>) is
     /// refused, never padded or truncated. A <c>CKR_BUFFER_TOO_SMALL</c> on the fill call leaves the
     /// operation active (PKCS#11 v3.2 §5.2), so it is retried once with the size the module then asks
-    /// for. A trimmed buffer is zeroized, since for a decryption it holds plaintext.
+    /// for. A trimmed buffer, or one the module refused or failed to fill, is zeroized, since for a
+    /// decryption it holds plaintext.
     /// </remarks>
     /// <param name="input">The operation's input, passed to every call.</param>
     /// <param name="call">One call into the module.</param>
@@ -152,11 +153,9 @@ internal sealed partial class Pkcs11SessionCore
         {
             byte[] guessBuffer = new byte[guessed];
             CKR filled = call(first, second, guessBuffer, lengthOnly: false, out NativeCULong written);
-            if (filled == CKR.CKR_OK)
-                return ReportedLength.Trim(guessBuffer, written, operation);
-            CryptographicOperations.ZeroMemory(guessBuffer);
             if (filled != CKR.CKR_BUFFER_TOO_SMALL)
-                throw Pkcs11Exception.Create(filled, operation);
+                return Filled(guessBuffer, filled, written, operation);
+            CryptographicOperations.ZeroMemory(guessBuffer);
 
             // PKCS#11 v3.2 §5.2 has the module report the length it needs, but some leave the length
             // as it was (opencryptoki's ec_sign does). Only a length past the guess was reported; with
@@ -166,10 +165,8 @@ internal sealed partial class Pkcs11SessionCore
                 byte[] sized = new byte[ReportedLength.ForAllocation(written, operation)];
                 filled = call(first, second, sized, lengthOnly: false, out written);
                 if (filled != CKR.CKR_OPERATION_NOT_INITIALIZED || restart is null)
-                {
-                    Pkcs11Exception.ThrowIfError(filled, operation);
-                    return ReportedLength.Trim(sized, written, operation);
-                }
+                    return Filled(sized, filled, written, operation);
+                CryptographicOperations.ZeroMemory(sized);
                 Pkcs11Exception.ThrowIfError(restart(), operation);
             }
         }
@@ -181,12 +178,32 @@ internal sealed partial class Pkcs11SessionCore
         rv = call(first, second, buffer, lengthOnly: false, out reported);
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
+            CryptographicOperations.ZeroMemory(buffer);
             buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
             rv = call(first, second, buffer, lengthOnly: false, out reported);
         }
-        Pkcs11Exception.ThrowIfError(rv, operation);
 
-        return ReportedLength.Trim(buffer, reported, operation);
+        return Filled(buffer, rv, reported, operation);
+    }
+
+    /// <summary>
+    /// What a fill call wrote into <paramref name="buffer"/> (see <see cref="ReportedLength.Trim"/>), or
+    /// the failure it returned. On a failure <paramref name="buffer"/> is zeroized first: a module can
+    /// write into it before it fails, and for a decryption that is plaintext, perhaps plaintext whose
+    /// tag check then failed.
+    /// </summary>
+    private static byte[] Filled(byte[] buffer, CKR rv, NativeCULong written, string operation)
+    {
+        try
+        {
+            Pkcs11Exception.ThrowIfError(rv, operation);
+            return ReportedLength.Trim(buffer, written, operation);
+        }
+        catch
+        {
+            CryptographicOperations.ZeroMemory(buffer);
+            throw;
+        }
     }
 
     /// <summary>
@@ -321,10 +338,18 @@ internal sealed partial class Pkcs11SessionCore
 
         // Whatever the transform held back — a partial block, or an AEAD tag.
         byte[] lastPart = CallWithLengthProbe(transform.Final, transform.FinalOperation);
-        operation.End(transform.CancelFlag);
+        try
+        {
+            operation.End(transform.CancelFlag);
 
-        if (lastPart.Length > 0)
-            outputStream.Write(lastPart, 0, lastPart.Length);
+            if (lastPart.Length > 0)
+                outputStream.Write(lastPart, 0, lastPart.Length);
+        }
+        finally
+        {
+            // For a decryption it is plaintext.
+            CryptographicOperations.ZeroMemory(lastPart);
+        }
 
         byte[] digest = CallWithLengthProbe(
             (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, lengthOnly, out length),

@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
@@ -300,9 +301,18 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(data);
 
-        using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new();
-        digest = DecryptDigest(digestingMechanism, decryptionMechanism, keyHandle, inputMemoryStream, outputMemorySteam);
-        decryptedData = outputMemorySteam.ToArray();
+        // Sized to the ciphertext, which the plaintext does not outgrow, so the stream never regrows and
+        // leaves a copy behind; its one buffer is zeroized whether or not the decryption succeeded.
+        using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new(data.Length);
+        try
+        {
+            digest = DecryptDigest(digestingMechanism, decryptionMechanism, keyHandle, inputMemoryStream, outputMemorySteam);
+            decryptedData = outputMemorySteam.ToArray();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(outputMemorySteam.GetBuffer());
+        }
     }
 
     /// <summary>

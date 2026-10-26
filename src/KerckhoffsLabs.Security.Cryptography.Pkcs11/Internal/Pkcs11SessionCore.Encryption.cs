@@ -367,28 +367,38 @@ internal sealed partial class Pkcs11SessionCore
         // an opaque error instead of the plaintext length. Resize via CKR_BUFFER_TOO_SMALL
         // if the token needs more space (e.g. padding expansion on some mechanisms).
         byte[] decryptedData = new byte[encryptedData.Length];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out NativeCULong decryptedDataLen);
-
-        if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+        try
         {
-            // As in Encrypt: a length no longer than the buffer was not reported, so ask for it.
-            if ((ulong)decryptedDataLen <= (ulong)decryptedData.Length)
+            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out NativeCULong decryptedDataLen);
+
+            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
-                rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, default, lengthOnly: true, out decryptedDataLen);
-                Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+                // As in Encrypt: a length no longer than the buffer was not reported, so ask for it.
+                if ((ulong)decryptedDataLen <= (ulong)decryptedData.Length)
+                {
+                    rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, default, lengthOnly: true, out decryptedDataLen);
+                    Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+                }
+
+                CryptographicOperations.ZeroMemory(decryptedData);
+                decryptedData = new byte[ReportedLength.ForAllocation(decryptedDataLen, OpDecrypt)];
+                rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out decryptedDataLen);
             }
 
-            CryptographicOperations.ZeroMemory(decryptedData);
-            decryptedData = new byte[ReportedLength.ForAllocation(decryptedDataLen, OpDecrypt)];
-            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out decryptedDataLen);
+            Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+            operation.Completed();
+
+            mechanism.AbsorbOutput(mechParams);
+
+            return ReportedLength.Trim(decryptedData, decryptedDataLen, OpDecrypt);
         }
-
-        Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
-        operation.Completed();
-
-        mechanism.AbsorbOutput(mechParams);
-
-        return ReportedLength.Trim(decryptedData, decryptedDataLen, OpDecrypt);
+        catch
+        {
+            // A token can write into the buffer before it fails: part of the plaintext, or plaintext
+            // whose tag or integrity check then failed. None of it outlives the call.
+            CryptographicOperations.ZeroMemory(decryptedData);
+            throw;
+        }
     }
 
     /// <summary>
@@ -470,14 +480,20 @@ internal sealed partial class Pkcs11SessionCore
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, lengthOnly: false, out lastPartLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
-        operation.Completed();
+        try
+        {
+            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, lengthOnly: false, out lastPartLen);
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
+            operation.Completed();
 
-        mechanism.AbsorbOutput(mechParams);
+            mechanism.AbsorbOutput(mechParams);
 
-        outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
-        CryptographicOperations.ZeroMemory(lastPart);
+            outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(lastPart);
+        }
     }
 
     /// <summary>
