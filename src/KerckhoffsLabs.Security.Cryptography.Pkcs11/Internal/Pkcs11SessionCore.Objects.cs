@@ -33,7 +33,7 @@ internal sealed partial class Pkcs11SessionCore
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
 
-        return new ObjectHandle((ulong)objectId);
+        return ObjectHandle.FromModule(objectId, OpCreateObject);
     }
 
     /// <summary>
@@ -61,7 +61,7 @@ internal sealed partial class Pkcs11SessionCore
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
 
-        return new ObjectHandle((ulong)objectId);
+        return ObjectHandle.FromModule(objectId, OpCopyObject);
     }
 
     /// <summary>
@@ -553,7 +553,7 @@ internal sealed partial class Pkcs11SessionCore
 
         int found = ReportedLength.Written(foundObjectsCount, objects.Length, OpFindObjects);
         for (int i = 0; i < found; i++)
-            foundObjects.Add(new ObjectHandle((ulong)objects[i]));
+            foundObjects.Add(ObjectHandle.FromModule(objects[i], OpFindObjects));
 
         return foundObjects;
     }
@@ -603,7 +603,7 @@ internal sealed partial class Pkcs11SessionCore
 
                 found = ReportedLength.Written(objectCount, objects.Length, OpFindObjects);
                 for (int i = 0; i < found; i++)
-                    foundObjects.Add(new ObjectHandle((ulong)objects[i]));
+                    foundObjects.Add(ObjectHandle.FromModule(objects[i], OpFindObjects));
             }
             while (found == objects.Length);
         }

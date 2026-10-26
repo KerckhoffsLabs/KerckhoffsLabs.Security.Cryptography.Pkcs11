@@ -47,7 +47,7 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)keyId);
+        return ObjectHandle.FromModule(keyId, OpGenerateKey);
     }
 
     /// <summary>
@@ -127,8 +127,17 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
-        privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
+        // A pair with either half missing is no pair. The half the token did make is destroyed, best
+        // effort, since no one else will ever hold its handle.
+        if ((ulong)publicKeyId == CK.CK_INVALID_HANDLE || (ulong)privateKeyId == CK.CK_INVALID_HANDLE)
+        {
+            if ((ulong)publicKeyId != CK.CK_INVALID_HANDLE)
+                _pkcs11Library.C_DestroyObject(_sessionId, publicKeyId);
+            if ((ulong)privateKeyId != CK.CK_INVALID_HANDLE)
+                _pkcs11Library.C_DestroyObject(_sessionId, privateKeyId);
+        }
+        publicKeyHandle = ObjectHandle.FromModule(publicKeyId, OpGenerateKeyPair);
+        privateKeyHandle = ObjectHandle.FromModule(privateKeyId, OpGenerateKeyPair);
     }
 
     /// <summary>
@@ -252,7 +261,7 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)unwrappedKey);
+        return ObjectHandle.FromModule(unwrappedKey, OpUnwrapKey);
     }
 
     /// <summary>
@@ -406,6 +415,6 @@ internal sealed partial class Pkcs11SessionCore
         // out before `scope` is disposed.
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)derivedKey);
+        return ObjectHandle.FromModule(derivedKey, OpDeriveKey);
     }
 }

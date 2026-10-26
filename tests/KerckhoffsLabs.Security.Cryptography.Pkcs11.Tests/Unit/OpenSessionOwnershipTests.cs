@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using Microsoft.Extensions.Logging;
@@ -43,7 +44,9 @@ public sealed class OpenSessionOwnershipTests
     {
         using var fake = new SessionFake { SessionId = (NativeCULong)CK.CK_INVALID_HANDLE };
 
-        Assert.Throws<ArgumentException>(() => new Pkcs11Slot(fake.LowLevel, SlotId).OpenSessionCore());
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => new Pkcs11Slot(fake.LowLevel, SlotId).OpenSessionCore());
+        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+        Assert.Contains("CK_INVALID_HANDLE", ex.Message);
 
         Assert.Empty(fake.Closed);
     }

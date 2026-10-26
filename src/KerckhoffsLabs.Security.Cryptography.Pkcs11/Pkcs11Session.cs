@@ -686,7 +686,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(template);
 
         var handle = _core.CreateObject([.. template.Attributes]);
-        return HydrateKeyFromHandle(handle);
+        return HydrateNewKey(handle);
     }
 
     /// <summary>
@@ -705,7 +705,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(template);
 
         var handle = _core.GenerateKey(mechanism, [.. template.Attributes]);
-        return HydrateKeyFromHandle(handle);
+        return HydrateNewKey(handle);
     }
 
     /// <summary>
@@ -747,25 +747,34 @@ public sealed partial class Pkcs11Session : IDisposable
             out var publicHandle,
             out var privateHandle);
 
-        // Read identifying metadata off the private side — we already have both
-        // handles in hand so we bypass the companion-discovery lookup.
-        using var attrs = _core.GetAttributeValue(privateHandle,
-        [
-            CKA.CKA_KEY_TYPE,
-            CKA.CKA_LABEL,
-            CKA.CKA_ID,
-        ]);
-        var keyType = (CKK)attrs[0].GetValueAsUlong();
-        string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
-        byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
+        try
+        {
+            // Read identifying metadata off the private side — we already have both
+            // handles in hand so we bypass the companion-discovery lookup.
+            using var attrs = _core.GetAttributeValue(privateHandle,
+            [
+                CKA.CKA_KEY_TYPE,
+                CKA.CKA_LABEL,
+                CKA.CKA_ID,
+            ]);
+            var keyType = (CKK)attrs[0].GetValueAsUlong();
+            string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
+            byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
 
-        return new Pkcs11Key(
-            session: this,
-            privateHandle: privateHandle,
-            publicHandle: publicHandle,
-            keyType: keyType,
-            label: label,
-            id: id);
+            return new Pkcs11Key(
+                session: this,
+                privateHandle: privateHandle,
+                publicHandle: publicHandle,
+                keyType: keyType,
+                label: label,
+                id: id);
+        }
+        catch
+        {
+            DestroyUnreturned(privateHandle);
+            DestroyUnreturned(publicHandle);
+            throw;
+        }
     }
 
     private static void RequireClassIfSet(ObjectTemplate template, CKO expected, string paramName)
@@ -1014,7 +1023,35 @@ public sealed partial class Pkcs11Session : IDisposable
     /// produce a new on-token object — Unwrap, Derive).
     /// </summary>
     internal Pkcs11Key HydrateExistingHandleAsKey(ObjectHandle handle)
-        => HydrateKeyFromHandle(handle);
+        => HydrateNewKey(handle);
+
+    // A key for an object the token just created. If it can't be built, the object is destroyed: the
+    // caller never gets its handle, so nothing else ever would.
+    private Pkcs11Key HydrateNewKey(ObjectHandle handle)
+    {
+        try
+        {
+            return HydrateKeyFromHandle(handle);
+        }
+        catch
+        {
+            DestroyUnreturned(handle);
+            throw;
+        }
+    }
+
+    // Best effort, on the way out of a failed call: the failure that got here is the one the caller sees.
+    private void DestroyUnreturned(ObjectHandle handle)
+    {
+        try
+        {
+            _core.DestroyObject(handle);
+        }
+        catch (Pkcs11Exception)
+        {
+            // The object stays on the token; the token refused to destroy it or is failing anyway.
+        }
+    }
 
     /// <summary>
     /// Finds the other half of a key pair: the object of <paramref name="companionClass"/> with the same
