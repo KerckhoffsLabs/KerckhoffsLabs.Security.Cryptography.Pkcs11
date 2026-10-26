@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -18,6 +19,7 @@ internal static class PublicKeySynthesis
     /// <see cref="RSAParameters"/>. Returns <see langword="null"/> if either attribute is missing
     /// or marked sensitive.
     /// </summary>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when either value is empty or zero.</exception>
     internal static RSAParameters? TrySynthesizeRsa(Pkcs11SessionCore session, ObjectHandle privateHandle)
     {
         using var attrs = session.GetAttributeValue(privateHandle,
@@ -28,11 +30,27 @@ internal static class PublicKeySynthesis
         if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
             return null;
 
+        const string operation = "Pkcs11Key.Verify";
         return new RSAParameters
         {
-            Modulus = attrs[0].GetValueAsByteArray(),
-            Exponent = attrs[1].GetValueAsByteArray(),
+            Modulus = RequirePublicInteger(attrs[0].GetValueAsByteArray(), CKA.CKA_MODULUS, operation),
+            Exponent = RequirePublicInteger(attrs[1].GetValueAsByteArray(), CKA.CKA_PUBLIC_EXPONENT, operation),
         };
+    }
+
+    /// <summary>
+    /// A big-endian unsigned integer of a public key, as the token returned it: the RSA modulus or
+    /// exponent, a DSA domain parameter or public value. One that is empty or zero belongs to no key, so
+    /// it is refused here rather than encoded as one, or handed to the BCL, which fails on an empty one
+    /// with an <see cref="IndexOutOfRangeException"/>.
+    /// </summary>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when the value is empty or zero.</exception>
+    internal static byte[] RequirePublicInteger(byte[] value, CKA attribute, string operation)
+    {
+        if (value.AsSpan().ContainsAnyExcept((byte)0))
+            return value;
+        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
+            $"{operation} (the token returned {(value.Length == 0 ? "an empty" : "a zero")} {attribute})");
     }
 
     /// <summary>
