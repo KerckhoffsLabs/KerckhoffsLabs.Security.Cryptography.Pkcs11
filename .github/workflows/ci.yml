@@ -530,14 +530,14 @@ jobs:
           FILTER: ${{ matrix.filter }}
         run: dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "$FILTER"
 
-  # tpm2-pkcs11 over a software TPM: swtpm behind the tpm2-abrmd resource manager, in the image
-  # build/tpm2-pkcs11/Dockerfile builds from the vendored submodules on Wolfi. The test assembly is built
-  # on the runner as on every leg and run inside the image, where Tpm2Pkcs11BackendFixture finds
-  # tpm2-pkcs11, swtpm, tpm2-abrmd and dbus-daemon through the PKCS11_TEST_* variables the image sets.
-  # The image is cached on the five submodule commits and its own files, which a hit loads instead of
-  # rebuilding (several minutes, mostly libtpms).
+  # tpm2-pkcs11 over two software TPMs, in the image build/tpm2-pkcs11/Dockerfile builds from the
+  # vendored submodules on Wolfi: swtpm (libtpms) behind the tpm2-abrmd resource manager, then wolfTPM's
+  # fwTPM, connected directly. The test assembly is built on the runner as on every leg and run inside
+  # the image, where Tpm2Pkcs11BackendFixture finds tpm2-pkcs11, the TPMs, tpm2-abrmd and dbus-daemon
+  # through the PKCS11_TEST_* variables the image sets. The image is cached on the seven submodule
+  # commits and its own files, which a hit loads instead of rebuilding (several minutes, mostly libtpms).
   tpm2-pkcs11:
-    name: tpm2-pkcs11 (swtpm)
+    name: tpm2-pkcs11 (swtpm, fwTPM)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -546,13 +546,13 @@ jobs:
           persist-credentials: false
 
       - name: Check out the image's submodules
-        run: git submodule update --init --depth 1 vendor/json-glib vendor/libtpms vendor/swtpm vendor/tpm2-abrmd vendor/tpm2-pkcs11
+        run: git submodule update --init --depth 1 vendor/json-glib vendor/libtpms vendor/swtpm vendor/tpm2-abrmd vendor/tpm2-pkcs11 vendor/wolfssl vendor/wolftpm
 
       - name: Image cache key
         id: image
         run: |
           set -euo pipefail
-          revs="$(for m in json-glib libtpms swtpm tpm2-abrmd tpm2-pkcs11; do git -C "vendor/$m" rev-parse HEAD; done | sha256sum | cut -c1-16)"
+          revs="$(for m in json-glib libtpms swtpm tpm2-abrmd tpm2-pkcs11 wolfssl wolftpm; do git -C "vendor/$m" rev-parse HEAD; done | sha256sum | cut -c1-16)"
           echo "key=tpm2-pkcs11-image-${revs}-${{ hashFiles('build/tpm2-pkcs11/**', 'build/build-tpm2-pkcs11-image.sh') }}-v1" >> "$GITHUB_OUTPUT"
 
       - name: Cache tpm2-pkcs11 image
@@ -590,11 +590,23 @@ jobs:
       # The test assembly is mounted read-only and run with the image's .NET runtime, as its unprivileged
       # user. PKCS11_TEST_EXPECT_TPM2_PKCS11 arms Tpm2Pkcs11AvailabilityTests, which fails the leg if the
       # image doesn't provide the backend rather than letting its suite skip.
-      - name: Test (tpm2-pkcs11)
+      - name: Test (tpm2-pkcs11 over swtpm)
         run: |
           set -euo pipefail
           docker run --rm \
             -v "$PWD/tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0:/tests:ro" \
             -e PKCS11_TEST_EXPECT_TPM2_PKCS11=1 \
+            kerckhoffslabs/tpm2-pkcs11:ci \
+            dotnet /tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.dll -noColor -filter '/*/*/*Tpm2Pkcs11*/*'
+
+      # The same suite over wolfTPM's fwTPM (PKCS11_TEST_TPM=fwtpm), a second TPM 2.0 implementation.
+      - name: Test (tpm2-pkcs11 over fwTPM)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD/tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0:/tests:ro" \
+            -e PKCS11_TEST_EXPECT_TPM2_PKCS11=1 \
+            -e PKCS11_TEST_TPM=fwtpm \
             kerckhoffslabs/tpm2-pkcs11:ci \
             dotnet /tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.dll -noColor -filter '/*/*/*Tpm2Pkcs11*/*'

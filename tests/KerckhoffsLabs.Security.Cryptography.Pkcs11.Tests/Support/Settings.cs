@@ -125,6 +125,21 @@ public static class Settings
         Environment.GetEnvironmentVariable("PKCS11_TEST_SWTPM");
 
     /// <summary>
+    /// Path to wolfTPM's firmware TPM server (fwtpm_server), the second software TPM the tpm2-pkcs11
+    /// fixture can run tpm2-pkcs11 over, set by the same image. Used when <see cref="Tpm2SoftwareTpm"/> is
+    /// <c>fwtpm</c>.
+    /// </summary>
+    public static string? FwtpmPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_FWTPM");
+
+    /// <summary>
+    /// Which software TPM the tpm2-pkcs11 fixture runs: <c>swtpm</c> (libtpms, the default) or
+    /// <c>fwtpm</c> (wolfTPM's firmware TPM). CI runs the suite over each.
+    /// </summary>
+    public static string Tpm2SoftwareTpm =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_TPM") is { Length: > 0 } tpm ? tpm : "swtpm";
+
+    /// <summary>
     /// Path to tpm2-abrmd, the TPM resource manager the tpm2-pkcs11 fixture puts in front of swtpm, set by
     /// the same image. Unset elsewhere, and the tpm2-pkcs11 tests skip.
     /// </summary>

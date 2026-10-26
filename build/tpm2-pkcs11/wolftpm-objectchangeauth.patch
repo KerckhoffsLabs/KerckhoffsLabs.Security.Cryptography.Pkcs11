@@ -1,0 +1,24 @@
+diff --git a/src/fwtpm/fwtpm_command.c b/src/fwtpm/fwtpm_command.c
+index 9260839..000f8b5 100644
+--- a/src/fwtpm/fwtpm_command.c
++++ b/src/fwtpm/fwtpm_command.c
+@@ -6573,16 +6573,15 @@ static TPM_RC FwCmd_ObjectChangeAuth(FWTPM_CTX* ctx, TPM2_Packet* cmd,
+         }
+     }
+ 
+-    /* Re-wrap private key with new auth, then update the live object */
++    /* Re-wrap private key with new auth. The loaded object keeps its authValue
++     * (TPM 2.0 Part 3 "TPM2_ObjectChangeAuth": only outPrivate carries the new
++     * one), and the response HMAC is computed with it, as the caller expects. */
+     if (rc == 0) {
+         rc = FwWrapPrivate(parent, &ctx->rng, &obj->name, obj->pub.type,
+             &newAuth, obj->privKey, obj->privKeySize, &outPrivate);
+         if (rc != 0) {
+             rc = TPM_RC_FAILURE;
+         }
+-        else {
+-            XMEMCPY(&obj->authValue, &newAuth, sizeof(newAuth));
+-        }
+     }
+ 
+ #ifdef DEBUG_WOLFTPM

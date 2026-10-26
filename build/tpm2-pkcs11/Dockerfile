@@ -15,7 +15,7 @@ ARG WOLFI=cgr.dev/chainguard/wolfi-base:latest
 FROM ${WOLFI} AS build
 
 RUN apk add --no-cache \
-        autoconf autoconf-archive automake bash build-base gawk libtool meson ninja-build pkgconf pkgconf-dev \
+        autoconf autoconf-archive automake bash build-base gawk libtool meson ninja-build patch pkgconf pkgconf-dev \
         dbus-dev glib-dev gmp-dev libtasn1-dev openssl-dev sqlite-dev tpm2-tss-dev yaml-dev
 
 ENV PKG_CONFIG_PATH=/opt/tpm2/lib/pkgconfig
@@ -62,6 +62,58 @@ RUN cd tpm2-abrmd \
     && make -j"$(nproc)" \
     && make install
 
+# wolfSSL, the cryptography under wolfTPM's firmware TPM: the second TPM the fixture can run, so the
+# backend is exercised against two independent TPM 2.0 implementations (libtpms in swtpm, and this).
+# The options are the ones wolfTPM's own fwTPM CI builds it with. Library only. wolfSSL builds with
+# -Werror, and Wolfi's GCC 16 takes SetObjectId's guarded write (asn.c, `if (output) output[idx] = ...`)
+# for a write through a null pointer once inlined into wc_EncodeRsaPssAlgoId; that one warning is
+# kept a warning. WC_RSA_NO_PADDING gives fwTPM's TPM2_RSA_Decrypt its TPM_ALG_NULL (raw RSA) scheme,
+# which tpm2-pkcs11 pads PKCS#1 v1.5 over.
+COPY --from=wolfssl . wolfssl
+RUN cd wolfssl \
+    && ./autogen.sh \
+    && ./configure --prefix=/opt/tpm2 --enable-wolftpm --enable-pkcallbacks --enable-keygen \
+        CFLAGS="-O2 -Wno-error=stringop-overflow -DWC_RSA_NO_PADDING" \
+        --disable-examples --disable-crypttests --disable-benchmark --disable-static \
+    && make -j"$(nproc)" \
+    && make install
+
+# wolfTPM's fwTPM, as a server speaking the swtpm/mssim socket protocol (fwtpm_server). Only the
+# server: no client library, examples or tests. Its TPM2_ContextSave of an object keeps only a reference
+# to it, which TPM2_ContextLoad can't load once the object is flushed, so it can't sit behind a resource
+# manager (tpm2-abrmd, or the kernel's /dev/tpmrm0), which saves and flushes objects between commands.
+# The fixture therefore connects tpm2-pkcs11 to it directly, and it is built to hold 128 transient
+# objects at a time, not 3, for tpm2-pkcs11's one connection.
+#
+# wolftpm-param-enc-authvalue.patch: fwTPM left the authorized entity's authValue out of the
+# parameter-encryption key unless the session was bound to that entity, where tpm2-tss (and TPM 2.0
+# Part 1) include it. A response encrypted in a session bound to one object and authorizing another (as
+# tpm2-pkcs11 unseals its wrapping key) then decrypted to garbage on the client.
+#
+# wolftpm-objectchangeauth.patch: fwTPM's TPM2_ObjectChangeAuth also gave the loaded object the new
+# authValue, where Part 3 only returns it in outPrivate. The response HMAC was then computed with the new
+# authValue, which the client rejects (as tpm2-pkcs11's C_SetPIN does), and the loaded object no longer
+# took the old one.
+#
+# wolftpm-crypto-conformance.patch: where fwTPM departs from Part 1 and Part 3 in ways tpm2-pkcs11
+# meets: TPM2_RSA_Decrypt ignored the OAEP label and had no SHA-512 hash or SHA-1 MGF for OAEP;
+# ECDSA r and s came back at their minimal length, not padded to the curve size (so most P-521
+# signatures were short); and TPM2_EncryptDecrypt(2) refused every mode for a key whose mode is
+# TPM_ALG_NULL, where Part 3 lets such a key take any mode.
+#
+# None of these are reported upstream.
+COPY --from=wolftpm . wolftpm
+COPY wolftpm-param-enc-authvalue.patch wolftpm-objectchangeauth.patch wolftpm-crypto-conformance.patch /src/
+RUN cd wolftpm \
+    && patch -p1 < /src/wolftpm-param-enc-authvalue.patch \
+    && patch -p1 < /src/wolftpm-objectchangeauth.patch \
+    && patch -p1 < /src/wolftpm-crypto-conformance.patch \
+    && ./autogen.sh \
+    && ./configure --prefix=/opt/tpm2 --with-wolfcrypt=/opt/tpm2 --enable-fwtpm-only --enable-swtpm --disable-static \
+        CFLAGS="-O2 -DFWTPM_MAX_OBJECTS=128" \
+    && make -j"$(nproc)" \
+    && install -D -m 0755 src/fwtpm/fwtpm_server /opt/tpm2/bin/fwtpm_server
+
 # tpm2-pkcs11. Its bootstrap names the version with git describe, which needs the repository the
 # submodule lives in; the build script passes it instead. The SQLite store (esysdb) is the backend
 # the fixture uses, so FAPI is left out. The fixture provisions its token with C_InitToken, so
@@ -80,8 +132,9 @@ FROM ${WOLFI}
 
 RUN apk add --no-cache dbus dotnet-10-runtime glib libtasn1 openssl sqlite-libs tpm2-tss yaml
 
-# Of the programs, only the two the fixture runs: no certificate or setup tools.
+# Of the programs, only the ones the fixture runs: no certificate or setup tools.
 COPY --from=build /opt/tpm2/bin/swtpm /opt/tpm2/bin/swtpm
+COPY --from=build /opt/tpm2/bin/fwtpm_server /opt/tpm2/bin/fwtpm_server
 COPY --from=build /opt/tpm2/sbin/tpm2-abrmd /opt/tpm2/bin/tpm2-abrmd
 COPY --from=build /opt/tpm2/lib /opt/tpm2/lib
 
@@ -91,6 +144,7 @@ ENV PATH=/opt/tpm2/bin:$PATH \
     LD_LIBRARY_PATH=/opt/tpm2/lib \
     PKCS11_TEST_TPM2_PKCS11_LIBRARY=/opt/tpm2/lib/libtpm2_pkcs11.so \
     PKCS11_TEST_SWTPM=/opt/tpm2/bin/swtpm \
+    PKCS11_TEST_FWTPM=/opt/tpm2/bin/fwtpm_server \
     PKCS11_TEST_TPM2_ABRMD=/opt/tpm2/bin/tpm2-abrmd \
     PKCS11_TEST_DBUS_DAEMON=/usr/bin/dbus-daemon \
     DOTNET_CLI_TELEMETRY_OPTOUT=1

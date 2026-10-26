@@ -5,20 +5,34 @@ using System.Net.Sockets;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+/// <summary>The software TPM 2.0 implementations <see cref="SoftwareTpm"/> can run.</summary>
+internal enum SoftwareTpmKind
+{
+    /// <summary>swtpm, over libtpms.</summary>
+    Swtpm,
+
+    /// <summary>wolfTPM's firmware TPM (fwtpm_server), over wolfCrypt.</summary>
+    Fwtpm,
+}
+
 /// <summary>
-/// One software TPM 2.0 behind a resource manager, private to its owner, as <see cref="BouncyHsmServer"/>
-/// is for BouncyHsm. Three processes, each started once the one before it is ready:
+/// One software TPM 2.0, private to its owner, as <see cref="BouncyHsmServer"/> is for BouncyHsm. For
+/// swtpm, three processes, each started once the one before it is ready; for fwtpm_server, the first
+/// alone:
 /// <list type="number">
-/// <item>swtpm, the TPM, listening on loopback only on a freshly chosen pair of ports (the command port
-/// and, one above it, the control port the <c>swtpm</c> TCTI expects), started powered on and past
-/// <c>TPM2_Startup</c>.</item>
-/// <item>A D-Bus session bus of its own, on a socket in the state directory, so nothing outside it is
-/// reached or needed.</item>
-/// <item>tpm2-abrmd on that bus, connected to swtpm. A TPM holds only three transient objects and a
+/// <item>The TPM, listening on a freshly chosen pair of ports (the command port and, one above it, the
+/// control or platform port), past <c>TPM2_Startup</c>: swtpm on loopback only, started powered on and
+/// past it; or wolfTPM's fwtpm_server, already powered on, which is sent <c>TPM2_Startup(CLEAR)</c>
+/// here. Both take raw TPM commands on the command port, as the <c>swtpm</c> TCTI sends them.</item>
+/// <item>For swtpm, a D-Bus session bus of its own, on a socket in the state directory, so nothing outside
+/// it is reached or needed.</item>
+/// <item>For swtpm, tpm2-abrmd on that bus, connected to it. A TPM holds only three transient objects and a
 /// few sessions at a time; the resource manager swaps them in and out for its clients, as the
-/// kernel's <c>/dev/tpmrm0</c> does on a real machine, which tpm2-pkcs11 relies on.</item>
+/// kernel's <c>/dev/tpmrm0</c> does on a real machine, which tpm2-pkcs11 relies on. fwtpm_server can't
+/// sit behind one (its <c>TPM2_ContextSave</c> of an object keeps only a reference), so it is reached
+/// directly, and is built to hold more objects instead.</item>
 /// </list>
-/// The TPM's state and the bus socket live in a fresh temporary directory. Disposing kills the three
+/// The TPM's state and the bus socket live in a fresh temporary directory. Disposing kills the
 /// processes, last started first, and deletes the directory.
 /// </summary>
 internal sealed class SoftwareTpm : IDisposable
@@ -35,9 +49,11 @@ internal sealed class SoftwareTpm : IDisposable
     /// <summary>The D-Bus address of the private session bus tpm2-abrmd is on.</summary>
     public string BusAddress { get; }
 
-    /// <summary>The TCTI configuration string a tpm2-tss client needs to reach the TPM through tpm2-abrmd,
-    /// with <c>DBUS_SESSION_BUS_ADDRESS</c> set to <see cref="BusAddress"/>.</summary>
-    public string Tcti => "tabrmd:bus_type=session";
+    /// <summary>
+    /// The TCTI configuration string a tpm2-tss client needs to reach the TPM: through tpm2-abrmd, with
+    /// <c>DBUS_SESSION_BUS_ADDRESS</c> set to <see cref="BusAddress"/>; or, for fwtpm_server, directly.
+    /// </summary>
+    public string Tcti { get; private set; } = "tabrmd:bus_type=session";
 
     private SoftwareTpm(string stateDirectory)
     {
@@ -51,26 +67,43 @@ internal sealed class SoftwareTpm : IDisposable
     /// Starts the three processes and waits until each is ready. A failed start is retried once with a
     /// new state directory and ports, since a port can be taken between choosing and binding.
     /// </summary>
-    public static SoftwareTpm Start(string swtpmPath, string dbusDaemonPath, string abrmdPath)
+    public static SoftwareTpm Start(SoftwareTpmKind kind, string tpmPath, string dbusDaemonPath, string abrmdPath)
     {
         try
         {
-            return StartOnce(swtpmPath, dbusDaemonPath, abrmdPath);
+            return StartOnce(kind, tpmPath, dbusDaemonPath, abrmdPath);
         }
-        catch (InvalidOperationException) when (File.Exists(swtpmPath))
+        catch (InvalidOperationException) when (File.Exists(tpmPath))
         {
-            return StartOnce(swtpmPath, dbusDaemonPath, abrmdPath);
+            return StartOnce(kind, tpmPath, dbusDaemonPath, abrmdPath);
         }
     }
 
-    private static SoftwareTpm StartOnce(string swtpmPath, string dbusDaemonPath, string abrmdPath)
+    private static SoftwareTpm StartOnce(SoftwareTpmKind kind, string tpmPath, string dbusDaemonPath, string abrmdPath)
     {
         var tpm = new SoftwareTpm(Directory.CreateTempSubdirectory("kl-swtpm-").FullName);
         try
         {
             int port = FreeLoopbackPortPair();
-            tpm.StartProcess("swtpm", swtpmPath, SwtpmArguments(tpm._stateDirectory, port), environment: NoEnvironmentChanges,
-                isReady: _ => AcceptsConnections(port));
+            if (kind == SoftwareTpmKind.Swtpm)
+            {
+                tpm.StartProcess("swtpm", tpmPath, SwtpmArguments(tpm._stateDirectory, port), environment: NoEnvironmentChanges,
+                    isReady: _ => AcceptsConnections(port));
+            }
+            else
+            {
+                // fwtpm_server keeps its NV state in fwtpm_nv.bin in its working directory, the state
+                // directory, so it too starts from a factory-state TPM.
+                tpm.StartProcess("fwtpm_server", tpmPath, FwtpmArguments(port), environment: NoEnvironmentChanges,
+                    isReady: _ => AcceptsConnections(port));
+                SendStartupClear(port);
+
+                // No resource manager: fwtpm_server's TPM2_ContextSave of an object keeps only a reference,
+                // which it can't load once the object is flushed, and a resource manager flushes what it
+                // saves. Its image build gives it room for tpm2-pkcs11's objects instead.
+                tpm.Tcti = $"swtpm:host=127.0.0.1,port={port}";
+                return tpm;
+            }
 
             string busSocket = Path.Join(tpm._stateDirectory, "bus");
             tpm.StartProcess("dbus-daemon", dbusDaemonPath,
@@ -113,6 +146,32 @@ internal sealed class SoftwareTpm : IDisposable
         "--flags", "not-need-init,startup-clear",
         "--profile", "name=custom,remove-disabled=check",
     ];
+
+    // The command port and, one above it, the platform port. fwtpm_server binds every interface; the
+    // ports are freshly chosen and the test runs in a container.
+    internal static IReadOnlyList<string> FwtpmArguments(int port) =>
+    [
+        "--port", $"{port}",
+        "--platform-port", $"{port + 1}",
+    ];
+
+    // TPM2_Startup(TPM_SU_CLEAR), as a raw command on the command port. TPM_RC_INITIALIZE says the TPM
+    // was already started, which is as good.
+    private static void SendStartupClear(int port)
+    {
+        ReadOnlySpan<byte> startup = [0x80, 0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x01, 0x44, 0x00, 0x00];
+        using var client = new TcpClient();
+        client.Connect(IPAddress.Loopback, port);
+        using NetworkStream stream = client.GetStream();
+        stream.ReadTimeout = (int)ReadyTimeout.TotalMilliseconds;
+        stream.Write(startup);
+
+        byte[] response = new byte[10];
+        stream.ReadExactly(response);
+        uint rc = (uint)(response[6] << 24 | response[7] << 16 | response[8] << 8 | response[9]);
+        if (rc is not (0 or 0x100))
+            throw new InvalidOperationException($"fwtpm_server refused TPM2_Startup: TPM_RC 0x{rc:X}.");
+    }
 
     private void StartProcess(string name, string path, IReadOnlyList<string> arguments,
         IReadOnlyDictionary<string, string?> environment, Func<IReadOnlyCollection<string>, bool> isReady)
