@@ -131,4 +131,34 @@ public sealed class RSAPkcs11Tests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData() => RSAPkcs11TestCases.Assert_SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [InlineData("SHA3-256", "Pkcs1")]
+    [InlineData("SHA3-384", "Pkcs1")]
+    [InlineData("SHA3-512", "Pkcs1")]
+    [InlineData("SHA3-256", "Pss")]
+    [InlineData("SHA3-384", "Pss")]
+    [InlineData("SHA3-512", "Pss")]
+    public void SignVerifyData_Sha3_RoundTrips(string hash, string padding) => RSAPkcs11TestCases.Assert_SignVerifyData_Sha3_RoundTrips(_backend, hash, padding);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [InlineData("SHA3-256", "Pkcs1")]
+    [InlineData("SHA3-384", "Pkcs1")]
+    [InlineData("SHA3-512", "Pkcs1")]
+    [InlineData("SHA3-256", "Pss")]
+    [InlineData("SHA3-384", "Pss")]
+    [InlineData("SHA3-512", "Pss")]
+    public void SignHash_Sha3_InteropsWithSignData(string hash, string padding) => RSAPkcs11TestCases.Assert_SignHash_Sha3_InteropsWithSignData(_backend, hash, padding);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [InlineData("SHA3-256")]
+    [InlineData("SHA3-384")]
+    [InlineData("SHA3-512")]
+    public void EncryptDecrypt_OaepSha3_RoundTrips(string hash) => RSAPkcs11TestCases.Assert_EncryptDecrypt_OaepSha3_RoundTrips(_backend, hash);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void VerifyData_Sha3_256Pkcs1_WycheproofVectors() => RSAPkcs11TestCases.Assert_VerifyData_Sha3_256Pkcs1_WycheproofVectors(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void VerifyHash_Sha3_256Pkcs1_WycheproofVectors() => RSAPkcs11TestCases.Assert_VerifyHash_Sha3_256Pkcs1_WycheproofVectors(_backend);
 }

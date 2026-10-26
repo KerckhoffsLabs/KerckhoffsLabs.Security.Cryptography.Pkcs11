@@ -949,12 +949,18 @@ public sealed partial class Pkcs11Key : IDisposable
             CKM.CKM_SHA256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA384_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA512_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            CKM.CKM_SHA3_256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA3_256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            CKM.CKM_SHA3_384_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA3_384, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            CKM.CKM_SHA3_512_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA3_512, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             // PSS: RSASignaturePadding.Pss uses a digest-length salt, matching the salt the
             // RSA-PSS sign path (Pkcs11MechanismMap.RsaPssSign) defaults to.
             CKM.CKM_SHA1_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pss),
             CKM.CKM_SHA256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pss),
             CKM.CKM_SHA384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pss),
             CKM.CKM_SHA512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pss),
+            CKM.CKM_SHA3_256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_256, System.Security.Cryptography.RSASignaturePadding.Pss),
+            CKM.CKM_SHA3_384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_384, System.Security.Cryptography.RSASignaturePadding.Pss),
+            CKM.CKM_SHA3_512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_512, System.Security.Cryptography.RSASignaturePadding.Pss),
             // Raw CKM_RSA_PKCS / CKM_RSA_X_509 carry the hash inside a DigestInfo, so there is no
             // mechanism-level hash to map to a managed VerifyData call. Use a CKO_PUBLIC_KEY companion.
             _ => throw new NotSupportedException(

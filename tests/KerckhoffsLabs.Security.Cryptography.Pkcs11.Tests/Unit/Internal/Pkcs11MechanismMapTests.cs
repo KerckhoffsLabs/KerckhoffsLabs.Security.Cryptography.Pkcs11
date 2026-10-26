@@ -18,6 +18,9 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA256", CKM.CKM_SHA256_RSA_PKCS)]
     [InlineData("SHA384", CKM.CKM_SHA384_RSA_PKCS)]
     [InlineData("SHA512", CKM.CKM_SHA512_RSA_PKCS)]
+    [InlineData("SHA3-256", CKM.CKM_SHA3_256_RSA_PKCS)]
+    [InlineData("SHA3-384", CKM.CKM_SHA3_384_RSA_PKCS)]
+    [InlineData("SHA3-512", CKM.CKM_SHA3_512_RSA_PKCS)]
     public void RsaPkcs1_HashToCkm_ReturnsExpected(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.RsaPkcs1Sign(new HashAlgorithmName(hashName));
@@ -30,6 +33,9 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA256", CKM.CKM_SHA256_RSA_PKCS_PSS)]
     [InlineData("SHA384", CKM.CKM_SHA384_RSA_PKCS_PSS)]
     [InlineData("SHA512", CKM.CKM_SHA512_RSA_PKCS_PSS)]
+    [InlineData("SHA3-256", CKM.CKM_SHA3_256_RSA_PKCS_PSS)]
+    [InlineData("SHA3-384", CKM.CKM_SHA3_384_RSA_PKCS_PSS)]
+    [InlineData("SHA3-512", CKM.CKM_SHA3_512_RSA_PKCS_PSS)]
     public void RsaPss_HashToCkm_ReturnsExpectedWithParams(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: -1);
@@ -42,6 +48,9 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA256", CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32)]
     [InlineData("SHA384", CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, 48)]
     [InlineData("SHA512", CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, 64)]
+    [InlineData("SHA3-256", CKM.CKM_SHA3_256, CKG.CKG_MGF1_SHA3_256, 32)]
+    [InlineData("SHA3-384", CKM.CKM_SHA3_384, CKG.CKG_MGF1_SHA3_384, 48)]
+    [InlineData("SHA3-512", CKM.CKM_SHA3_512, CKG.CKG_MGF1_SHA3_512, 64)]
     public void RsaPss_DefaultSalt_PssParamsAreCorrect(
         string hashName, CKM expectedInnerHash, CKG expectedMgf, int expectedSalt)
     {
@@ -60,6 +69,9 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
+    [InlineData("SHA3-256")]
+    [InlineData("SHA3-384")]
+    [InlineData("SHA3-512")]
     public void RsaPss_ExplicitSalt_IsKept_IncludingZero(string hashName)
     {
         foreach (int salt in (int[])[0, 10])
@@ -75,6 +87,9 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA256", CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)]
     [InlineData("SHA384", CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384)]
     [InlineData("SHA512", CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512)]
+    [InlineData("SHA3-256", CKM.CKM_SHA3_256, CKG.CKG_MGF1_SHA3_256)]
+    [InlineData("SHA3-384", CKM.CKM_SHA3_384, CKG.CKG_MGF1_SHA3_384)]
+    [InlineData("SHA3-512", CKM.CKM_SHA3_512, CKG.CKG_MGF1_SHA3_512)]
     public void RsaOaep_HashToCkm_ReturnsExpectedWithParams(
         string hashName, CKM expectedInnerHash, CKG expectedMgf)
     {
@@ -121,6 +136,16 @@ public sealed class Pkcs11MechanismMapTests
     {
         Assert.Throws<NotSupportedException>(() =>
             Pkcs11MechanismMap.RsaPkcs1Sign(HashAlgorithmName.MD5));
+    }
+
+    // SHA3-224 has no HashAlgorithmName constant and no BCL RSA support, so none of the RSA maps take it.
+    [Fact]
+    public void Rsa_Sha3_224_IsNotMapped()
+    {
+        var sha3_224 = new HashAlgorithmName("SHA3-224");
+        Assert.Throws<NotSupportedException>(() => Pkcs11MechanismMap.RsaPkcs1Sign(sha3_224));
+        Assert.Throws<NotSupportedException>(() => Pkcs11MechanismMap.RsaPssSign(sha3_224, saltLength: -1));
+        Assert.Throws<NotSupportedException>(() => Pkcs11MechanismMap.RsaOaep(sha3_224));
     }
 
     [Theory]

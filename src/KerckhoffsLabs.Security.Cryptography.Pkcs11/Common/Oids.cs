@@ -43,6 +43,9 @@ internal static class Oids
         internal const string Sha256 = "2.16.840.1.101.3.4.2.1";
         internal const string Sha384 = "2.16.840.1.101.3.4.2.2";
         internal const string Sha512 = "2.16.840.1.101.3.4.2.3";
+        internal const string Sha3_256 = "2.16.840.1.101.3.4.2.8";
+        internal const string Sha3_384 = "2.16.840.1.101.3.4.2.9";
+        internal const string Sha3_512 = "2.16.840.1.101.3.4.2.10";
     }
 
     /// <summary>
