@@ -21,7 +21,11 @@ public sealed class RSAPkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture backend)
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
-    public void EncryptDecrypt_OaepModernHash_RoundTrips(string hash) => RSAPkcs11TestCases.Assert_EncryptDecrypt_OaepModernHash_RoundTrips(_backend, hash);
+    public void EncryptDecrypt_OaepModernHash_RoundTrips(string hash)
+    {
+        _backend.SkipUnlessTpmImplementsSha512(hash == "SHA512");
+        RSAPkcs11TestCases.Assert_EncryptDecrypt_OaepModernHash_RoundTrips(_backend, hash);
+    }
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SecretKeyGenerationAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#564: C_GenerateKey is not implemented")]
     public void Ctor_NonRsaKey_Throws() => RSAPkcs11TestCases.Assert_Ctor_NonRsaKey_Throws(_backend);

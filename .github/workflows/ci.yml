@@ -530,29 +530,29 @@ jobs:
           FILTER: ${{ matrix.filter }}
         run: dotnet test --solution KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "$FILTER"
 
-  # tpm2-pkcs11 over two software TPMs, in the image build/tpm2-pkcs11/Dockerfile builds from the
-  # vendored submodules on Wolfi: swtpm (libtpms) behind the tpm2-abrmd resource manager, then wolfTPM's
-  # fwTPM, connected directly. The test assembly is built on the runner as on every leg and run inside
+  # tpm2-pkcs11 over three software TPMs, in the image build/tpm2-pkcs11/Dockerfile builds from the
+  # vendored submodules on Wolfi: swtpm (libtpms) and the TCG reference implementation, each behind the
+  # tpm2-abrmd resource manager, and wolfTPM's fwTPM, connected directly. The test assembly is built on the runner as on every leg and run inside
   # the image, where Tpm2Pkcs11BackendFixture finds tpm2-pkcs11, the TPMs, tpm2-abrmd and dbus-daemon
-  # through the PKCS11_TEST_* variables the image sets. The image is cached on the seven submodule
+  # through the PKCS11_TEST_* variables the image sets. The image is cached on the eight submodule
   # commits and its own files, which a hit loads instead of rebuilding (several minutes, mostly libtpms).
   tpm2-pkcs11:
-    name: tpm2-pkcs11 (swtpm, fwTPM)
+    name: tpm2-pkcs11 (swtpm, fwTPM, TCG reference)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40 # the TCG reference TPM alone takes about five minutes
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Check out the image's submodules
-        run: git submodule update --init --depth 1 vendor/json-glib vendor/libtpms vendor/swtpm vendor/tpm2-abrmd vendor/tpm2-pkcs11 vendor/wolfssl vendor/wolftpm
+        run: git submodule update --init --depth 1 vendor/json-glib vendor/libtpms vendor/swtpm vendor/tpm2-abrmd vendor/tpm2-pkcs11 vendor/wolfssl vendor/wolftpm vendor/tcg-tpm
 
       - name: Image cache key
         id: image
         run: |
           set -euo pipefail
-          revs="$(for m in json-glib libtpms swtpm tpm2-abrmd tpm2-pkcs11 wolfssl wolftpm; do git -C "vendor/$m" rev-parse HEAD; done | sha256sum | cut -c1-16)"
+          revs="$(for m in json-glib libtpms swtpm tpm2-abrmd tpm2-pkcs11 wolfssl wolftpm tcg-tpm; do git -C "vendor/$m" rev-parse HEAD; done | sha256sum | cut -c1-16)"
           echo "key=tpm2-pkcs11-image-${revs}-${{ hashFiles('build/tpm2-pkcs11/**', 'build/build-tpm2-pkcs11-image.sh') }}-v1" >> "$GITHUB_OUTPUT"
 
       - name: Cache tpm2-pkcs11 image
@@ -608,5 +608,17 @@ jobs:
             -v "$PWD/tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0:/tests:ro" \
             -e PKCS11_TEST_EXPECT_TPM2_PKCS11=1 \
             -e PKCS11_TEST_TPM=fwtpm \
+            kerckhoffslabs/tpm2-pkcs11:ci \
+            dotnet /tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.dll -noColor -filter '/*/*/*Tpm2Pkcs11*/*'
+
+      # And over the TCG's TPM 2.0 reference implementation (PKCS11_TEST_TPM=tcgtpm).
+      - name: Test (tpm2-pkcs11 over the TCG reference TPM)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD/tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0:/tests:ro" \
+            -e PKCS11_TEST_EXPECT_TPM2_PKCS11=1 \
+            -e PKCS11_TEST_TPM=tcgtpm \
             kerckhoffslabs/tpm2-pkcs11:ci \
             dotnet /tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.dll -noColor -filter '/*/*/*Tpm2Pkcs11*/*'

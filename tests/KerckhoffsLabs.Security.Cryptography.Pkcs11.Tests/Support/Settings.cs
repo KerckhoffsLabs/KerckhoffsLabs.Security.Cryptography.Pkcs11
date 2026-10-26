@@ -133,8 +133,17 @@ public static class Settings
         Environment.GetEnvironmentVariable("PKCS11_TEST_FWTPM");
 
     /// <summary>
-    /// Which software TPM the tpm2-pkcs11 fixture runs: <c>swtpm</c> (libtpms, the default) or
-    /// <c>fwtpm</c> (wolfTPM's firmware TPM). CI runs the suite over each.
+    /// Path to the TCG's TPM 2.0 reference implementation, built as a simulator (tpm2-simulator), the third
+    /// software TPM the tpm2-pkcs11 fixture can run tpm2-pkcs11 over, set by the same image. Used when
+    /// <see cref="Tpm2SoftwareTpm"/> is <c>tcgtpm</c>.
+    /// </summary>
+    public static string? TcgTpmPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_TCGTPM");
+
+    /// <summary>
+    /// Which software TPM the tpm2-pkcs11 fixture runs: <c>swtpm</c> (libtpms, the default), <c>fwtpm</c>
+    /// (wolfTPM's firmware TPM) or <c>tcgtpm</c> (the TCG reference implementation). CI runs the suite over
+    /// each.
     /// </summary>
     public static string Tpm2SoftwareTpm =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_TPM") is { Length: > 0 } tpm ? tpm : "swtpm";

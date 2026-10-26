@@ -63,3 +63,8 @@
 	url = https://github.com/wolfSSL/wolfssl.git
 	shallow = true
 	ignore = untracked
+[submodule "vendor/tcg-tpm"]
+	path = vendor/tcg-tpm
+	url = https://github.com/TrustedComputingGroup/TPM.git
+	shallow = true
+	ignore = untracked

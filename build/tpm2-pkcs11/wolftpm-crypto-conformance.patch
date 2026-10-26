@@ -1,8 +1,27 @@
 diff --git a/src/fwtpm/fwtpm_command.c b/src/fwtpm/fwtpm_command.c
-index 9260839..e3265cd 100644
+index 9260839..39082e6 100644
 --- a/src/fwtpm/fwtpm_command.c
 +++ b/src/fwtpm/fwtpm_command.c
-@@ -9023,7 +9023,8 @@ static TPM_RC FwCmd_RSA_Decrypt(FWTPM_CTX* ctx, TPM2_Packet* cmd,
+@@ -1375,10 +1375,18 @@ static TPM_RC FwCmd_GetCapability(FWTPM_CTX* ctx, TPM2_Packet* cmd,
+             #ifndef NO_RSA
+                 { TPM_ALG_RSA, TPMA_ALGORITHM_asymmetric |
+                     TPMA_ALGORITHM_object },
++            #endif
++            /* Every hash fwTPM computes (TPM2_GetHashType), so a client that checks
++             * this list before using one finds it */
++            #ifndef NO_SHA
++                { TPM_ALG_SHA1, TPMA_ALGORITHM_hash },
+             #endif
+                 { TPM_ALG_SHA256, TPMA_ALGORITHM_hash },
+             #ifdef WOLFSSL_SHA384
+                 { TPM_ALG_SHA384, TPMA_ALGORITHM_hash },
++            #endif
++            #ifdef WOLFSSL_SHA512
++                { TPM_ALG_SHA512, TPMA_ALGORITHM_hash },
+             #endif
+                 { TPM_ALG_HMAC, TPMA_ALGORITHM_hash |
+                     TPMA_ALGORITHM_signing },
+@@ -9023,7 +9031,8 @@ static TPM_RC FwCmd_RSA_Decrypt(FWTPM_CTX* ctx, TPM2_Packet* cmd,
      UINT32 keyHandle;
      FWTPM_DECLARE_VAR(cipherText, TPM2B_PUBLIC_KEY_RSA);
      UINT16 decScheme, decHashAlg;
@@ -12,7 +31,7 @@ index 9260839..e3265cd 100644
      FWTPM_Object* obj = NULL;
      FWTPM_DECLARE_VAR(rsaKey, RsaKey);
      int rsaKeyInit = 0;
-@@ -9091,6 +9092,8 @@ static TPM_RC FwCmd_RSA_Decrypt(FWTPM_CTX* ctx, TPM2_Packet* cmd,
+@@ -9091,6 +9100,8 @@ static TPM_RC FwCmd_RSA_Decrypt(FWTPM_CTX* ctx, TPM2_Packet* cmd,
              rc = TPM_RC_COMMAND_SIZE;
          }
          else {
@@ -21,7 +40,7 @@ index 9260839..e3265cd 100644
              cmd->pos += labelSize;
          }
  
-@@ -9141,7 +9144,7 @@ static TPM_RC FwCmd_RSA_Decrypt(FWTPM_CTX* ctx, TPM2_Packet* cmd,
+@@ -9141,7 +9152,7 @@ static TPM_RC FwCmd_RSA_Decrypt(FWTPM_CTX* ctx, TPM2_Packet* cmd,
                  outBuf, (word32)FWTPM_MAX_PUB_BUF, rsaKey,
                  WC_RSA_OAEP_PAD, (enum wc_HashType)wcHashType,
                  FwGetMgfType(oaepHash),
@@ -30,7 +49,7 @@ index 9260839..e3265cd 100644
          }
          else if (decScheme == TPM_ALG_NULL) {
              /* Raw RSA (no padding) */
-@@ -14559,8 +14562,15 @@ static TPM_RC FwEncryptDecryptCore(FWTPM_CTX* ctx, TPM2_Packet* cmd,
+@@ -14559,8 +14570,15 @@ static TPM_RC FwEncryptDecryptCore(FWTPM_CTX* ctx, TPM2_Packet* cmd,
          mode = obj->pub.parameters.symDetail.sym.mode.sym;
      }
      /* A non-NULL wire mode must match the key's configured mode; otherwise

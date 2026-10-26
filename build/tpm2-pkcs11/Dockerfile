@@ -6,7 +6,8 @@
 # the submodule commits and the build context stays small.
 #
 # Wolfi packages tpm2-tss and .NET, but not swtpm, its libtpms and json-glib dependencies,
-# tpm2-abrmd or tpm2-pkcs11, so those five are built in the first stage and installed under /opt/tpm2.
+# tpm2-abrmd, tpm2-pkcs11, wolfTPM (with its wolfSSL) or the TCG reference TPM, so those are built in
+# the first stage and installed under /opt/tpm2.
 # The second stage takes their libraries and the programs the fixture runs only. wolfi-base:latest is both stages' base: it has apk
 # and a shell, and Chainguard publishes no latest-dev tag of it.
 
@@ -99,7 +100,8 @@ RUN cd wolfssl \
 # meets: TPM2_RSA_Decrypt ignored the OAEP label and had no SHA-512 hash or SHA-1 MGF for OAEP;
 # ECDSA r and s came back at their minimal length, not padded to the curve size (so most P-521
 # signatures were short); and TPM2_EncryptDecrypt(2) refused every mode for a key whose mode is
-# TPM_ALG_NULL, where Part 3 lets such a key take any mode.
+# TPM_ALG_NULL, where Part 3 lets such a key take any mode; and TPM2_GetCapability(TPM2_CAP_ALGS) left out
+# SHA-1 and SHA-512, which it implements, so tpm2-pkcs11 took them for missing.
 #
 # None of these are reported upstream.
 COPY --from=wolftpm . wolftpm
@@ -113,6 +115,30 @@ RUN cd wolftpm \
         CFLAGS="-O2 -DFWTPM_MAX_OBJECTS=128" \
     && make -j"$(nproc)" \
     && install -D -m 0755 src/fwtpm/fwtpm_server /opt/tpm2/bin/fwtpm_server
+
+# The TCG's TPM 2.0 reference implementation, as its simulator (tpm2-simulator, speaking the mssim
+# protocol): the third TPM the fixture can run, the one the specification itself describes. Built with
+# its autotools files, which upstream keeps for the move to CMake but no longer supports (CMake on Linux
+# is experimental and installs in stages); two patches make them build here:
+#
+# tcg-tpm-openssl-4.patch: the reference code reaches into OpenSSL's private struct bignum_st, so it
+# refuses an OpenSSL newer than the ones checked (up to 3.5). Wolfi has 4.0; the struct is unchanged
+# in 4.0.3's crypto/bn/bn_local.h, so the check is moved past 4.0.
+#
+# tcg-tpm-autotools-vendor-command.patch: the autotools build leaves out the vendor command handler
+# (Vendor_TCG_Test.c) the CMake build links, so the simulator didn't link.
+#
+# Neither is reported upstream. OpenSSL 3.0 deprecated some of what it calls; those warnings stay warnings.
+COPY --from=tcg-tpm . tcg-tpm
+COPY tcg-tpm-openssl-4.patch tcg-tpm-autotools-vendor-command.patch /src/
+RUN cd tcg-tpm \
+    && patch -p1 < /src/tcg-tpm-openssl-4.patch \
+    && patch -p1 < /src/tcg-tpm-autotools-vendor-command.patch \
+    && cd TPMCmd \
+    && ./bootstrap \
+    && ./configure \
+    && make -j"$(nproc)" \
+    && install -D -m 0755 Simulator/src/tpm2-simulator /opt/tpm2/bin/tpm2-simulator
 
 # tpm2-pkcs11. Its bootstrap names the version with git describe, which needs the repository the
 # submodule lives in; the build script passes it instead. The SQLite store (esysdb) is the backend
@@ -135,16 +161,18 @@ RUN apk add --no-cache dbus dotnet-10-runtime glib libtasn1 openssl sqlite-libs 
 # Of the programs, only the ones the fixture runs: no certificate or setup tools.
 COPY --from=build /opt/tpm2/bin/swtpm /opt/tpm2/bin/swtpm
 COPY --from=build /opt/tpm2/bin/fwtpm_server /opt/tpm2/bin/fwtpm_server
+COPY --from=build /opt/tpm2/bin/tpm2-simulator /opt/tpm2/bin/tpm2-simulator
 COPY --from=build /opt/tpm2/sbin/tpm2-abrmd /opt/tpm2/bin/tpm2-abrmd
 COPY --from=build /opt/tpm2/lib /opt/tpm2/lib
 
-# The fixture starts swtpm, a D-Bus session bus and tpm2-abrmd itself, and loads tpm2-pkcs11 from
+# The fixture starts the TPM (swtpm, fwtpm_server or tpm2-simulator), a D-Bus session bus and tpm2-abrmd itself, and loads tpm2-pkcs11 from
 # here (see Tpm2Pkcs11BackendFixture).
 ENV PATH=/opt/tpm2/bin:$PATH \
     LD_LIBRARY_PATH=/opt/tpm2/lib \
     PKCS11_TEST_TPM2_PKCS11_LIBRARY=/opt/tpm2/lib/libtpm2_pkcs11.so \
     PKCS11_TEST_SWTPM=/opt/tpm2/bin/swtpm \
     PKCS11_TEST_FWTPM=/opt/tpm2/bin/fwtpm_server \
+    PKCS11_TEST_TCGTPM=/opt/tpm2/bin/tpm2-simulator \
     PKCS11_TEST_TPM2_ABRMD=/opt/tpm2/bin/tpm2-abrmd \
     PKCS11_TEST_DBUS_DAEMON=/usr/bin/dbus-daemon \
     DOTNET_CLI_TELEMETRY_OPTOUT=1

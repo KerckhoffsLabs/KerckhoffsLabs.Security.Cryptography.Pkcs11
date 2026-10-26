@@ -10,16 +10,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// the TPM's storage hierarchy and runs RSA, ECDSA and HMAC on the TPM, through tpm2-tss.
 ///
 /// The TPM is a software one, private to the fixture, as <c>PKCS11_TEST_TPM</c> chooses: swtpm (the
-/// default) behind the tpm2-abrmd resource manager, or wolfTPM's fwtpm_server (<c>fwtpm</c>), reached
-/// directly. <see cref="SoftwareTpm"/> starts it, and for swtpm tpm2-abrmd and a D-Bus session bus for
-/// them, with the TPM's state in a temporary directory, so every run starts from a factory-state TPM and
+/// default) or the TCG's reference implementation (<c>tcgtpm</c>) behind the tpm2-abrmd resource manager,
+/// or wolfTPM's fwtpm_server (<c>fwtpm</c>), reached directly. <see cref="SoftwareTpm"/> starts it, and
+/// tpm2-abrmd and a D-Bus session bus for them where one is used, with the TPM's state in a temporary directory, so every run starts from a factory-state TPM and
 /// leaves nothing behind.
 /// tpm2-pkcs11 reaches it through the TCTI named by <c>TPM2_PKCS11_TCTI</c>, and keeps its token
 /// metadata in a SQLite store in the directory named by <c>TPM2_PKCS11_STORE</c>, also temporary.
 ///
 /// The library and the programs come from the tpm2-pkcs11 image (build/tpm2-pkcs11/Dockerfile),
 /// which sets <see cref="Settings.Tpm2Pkcs11LibraryPath"/>, <see cref="Settings.SwtpmPath"/>,
-/// <see cref="Settings.FwtpmPath"/>, <see cref="Settings.Tpm2AbrmdPath"/> and
+/// <see cref="Settings.FwtpmPath"/>, <see cref="Settings.TcgTpmPath"/>, <see cref="Settings.Tpm2AbrmdPath"/> and
 /// <see cref="Settings.DbusDaemonPath"/>; the tests run inside
 /// it in CI. Elsewhere the variables are unset and the tests skip. Linux-only, like the image.
 ///
@@ -43,6 +43,21 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when <paramref name="mechanism"/> appears in the token's mechanism list.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
+    /// <summary>
+    /// Whether the TPM implements SHA-512, which a TPM needn't (the TCG reference implementation's default
+    /// profile hasn't it): tpm2-pkcs11 lists <c>CKM_SHA512_HMAC</c> exactly when <c>TPM2_CAP_ALGS</c> has
+    /// SHA-512. Without it the TPM can't decrypt RSA-OAEP with SHA-512, nor sign a SHA-512 digest with a
+    /// P-521 key (whose order is longer than the digest, so tpm2-pkcs11 can't sign it as a shorter one).
+    /// </summary>
+    public bool TpmImplementsSha512 => Supports(CKM.CKM_SHA512_HMAC);
+
+    /// <summary>Skips a case that needs the TPM's SHA-512: see <see cref="TpmImplementsSha512"/>.</summary>
+    internal void SkipUnlessTpmImplementsSha512(bool needsIt)
+    {
+        if (needsIt && !TpmImplementsSha512)
+            Assert.Skip("The TPM doesn't implement SHA-512 (TPM2_CAP_ALGS).");
+    }
+
     private readonly SoftwareTpm? _tpm;
     private readonly string _storeDirectory = string.Empty;
 
@@ -52,10 +67,19 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
         (TpmKind == SoftwareTpmKind.Fwtpm || (Exists(Settings.Tpm2AbrmdPath) && Exists(Settings.DbusDaemonPath)));
 
     /// <summary>The software TPM the fixture runs, from <see cref="Settings.Tpm2SoftwareTpm"/>.</summary>
-    internal static SoftwareTpmKind TpmKind =>
-        Settings.Tpm2SoftwareTpm.Equals("fwtpm", StringComparison.OrdinalIgnoreCase) ? SoftwareTpmKind.Fwtpm : SoftwareTpmKind.Swtpm;
+    internal static SoftwareTpmKind TpmKind => Settings.Tpm2SoftwareTpm.ToLowerInvariant() switch
+    {
+        "fwtpm" => SoftwareTpmKind.Fwtpm,
+        "tcgtpm" => SoftwareTpmKind.TcgReference,
+        _ => SoftwareTpmKind.Swtpm,
+    };
 
-    private static string? TpmPath => TpmKind == SoftwareTpmKind.Fwtpm ? Settings.FwtpmPath : Settings.SwtpmPath;
+    private static string? TpmPath => TpmKind switch
+    {
+        SoftwareTpmKind.Fwtpm => Settings.FwtpmPath,
+        SoftwareTpmKind.TcgReference => Settings.TcgTpmPath,
+        _ => Settings.SwtpmPath,
+    };
 
     private static bool Exists(string? path) => path is not null && File.Exists(path);
 

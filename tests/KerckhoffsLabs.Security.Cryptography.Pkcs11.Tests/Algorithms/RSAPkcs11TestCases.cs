@@ -139,6 +139,7 @@ internal static class RSAPkcs11TestCases
             Assert.Skip($"RSA-{modulusBits} keygen is restricted to the Linux x64 CI leg (too slow elsewhere).");
 
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        backend.RequireKeySize(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, (ulong)modulusBits);
         using var session = OpenSession(backend);
         using IDisposable? insecure = modulusBits < 2048 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
         using var key = GenerateRsaKey(session, modulusBits);

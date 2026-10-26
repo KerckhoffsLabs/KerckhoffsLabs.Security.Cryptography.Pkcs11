@@ -1,0 +1,13 @@
+diff --git a/TPMCmd/Makefile.am b/TPMCmd/Makefile.am
+index 76ec6a7..fa88037 100644
+--- a/TPMCmd/Makefile.am
++++ b/TPMCmd/Makefile.am
+@@ -42,4 +42,7 @@ endif
+ 
+ tpm_src_libtpm_a_CFLAGS = $(EXTRA_CFLAGS) $(PLATFORM_INC) $(TPM_INC) \
+     $(LIBCRYPTO_CFLAGS)
+-tpm_src_libtpm_a_SOURCES = $(TPM_C) $(TPM_H) $(PLATFORM_H)
++# The vendor command handlers the CMake build links (TpmVendorCommandHandlers); the dispatch tables
++# name TPM2_Vendor_TCG_Test, so the simulator doesn't link without it.
++tpm_src_libtpm_a_SOURCES = $(TPM_C) $(TPM_H) $(PLATFORM_H) \
++    TpmConfiguration/TpmVendorCommandHandlers/Vendor_TCG_Test.c

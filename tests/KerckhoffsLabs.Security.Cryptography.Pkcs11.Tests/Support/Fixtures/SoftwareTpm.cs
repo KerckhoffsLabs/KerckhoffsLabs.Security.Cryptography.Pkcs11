@@ -13,20 +13,25 @@ internal enum SoftwareTpmKind
 
     /// <summary>wolfTPM's firmware TPM (fwtpm_server), over wolfCrypt.</summary>
     Fwtpm,
+
+    /// <summary>The TCG's TPM 2.0 reference implementation (tpm2-simulator), over OpenSSL.</summary>
+    TcgReference,
 }
 
 /// <summary>
 /// One software TPM 2.0, private to its owner, as <see cref="BouncyHsmServer"/> is for BouncyHsm. For
-/// swtpm, three processes, each started once the one before it is ready; for fwtpm_server, the first
-/// alone:
+/// swtpm and the TCG reference implementation, three processes, each started once the one before it is
+/// ready; for fwtpm_server, the first alone:
 /// <list type="number">
 /// <item>The TPM, listening on a freshly chosen pair of ports (the command port and, one above it, the
 /// control or platform port), past <c>TPM2_Startup</c>: swtpm on loopback only, started powered on and
-/// past it; or wolfTPM's fwtpm_server, already powered on, which is sent <c>TPM2_Startup(CLEAR)</c>
-/// here. Both take raw TPM commands on the command port, as the <c>swtpm</c> TCTI sends them.</item>
-/// <item>For swtpm, a D-Bus session bus of its own, on a socket in the state directory, so nothing outside
-/// it is reached or needed.</item>
-/// <item>For swtpm, tpm2-abrmd on that bus, connected to it. A TPM holds only three transient objects and a
+/// past it; wolfTPM's fwtpm_server, already powered on, which is sent <c>TPM2_Startup(CLEAR)</c>
+/// here; or the TCG reference implementation's tpm2-simulator, freshly manufactured, which the
+/// <c>mssim</c> TCTI powers on and tpm2-abrmd starts up. The first two take raw TPM commands on the
+/// command port, as the <c>swtpm</c> TCTI sends them; tpm2-simulator takes them framed for <c>mssim</c>.</item>
+/// <item>For swtpm and tpm2-simulator, a D-Bus session bus of its own, on a socket in the state
+/// directory, so nothing outside it is reached or needed.</item>
+/// <item>For swtpm and tpm2-simulator, tpm2-abrmd on that bus, connected to it. A TPM holds only three transient objects and a
 /// few sessions at a time; the resource manager swaps them in and out for its clients, as the
 /// kernel's <c>/dev/tpmrm0</c> does on a real machine, which tpm2-pkcs11 relies on. fwtpm_server can't
 /// sit behind one (its <c>TPM2_ContextSave</c> of an object keeps only a reference), so it is reached
@@ -85,10 +90,20 @@ internal sealed class SoftwareTpm : IDisposable
         try
         {
             int port = FreeLoopbackPortPair();
+            string tcti;
             if (kind == SoftwareTpmKind.Swtpm)
             {
                 tpm.StartProcess("swtpm", tpmPath, SwtpmArguments(tpm._stateDirectory, port), environment: NoEnvironmentChanges,
                     isReady: _ => AcceptsConnections(port));
+                tcti = $"swtpm:host=127.0.0.1,port={port}";
+            }
+            else if (kind == SoftwareTpmKind.TcgReference)
+            {
+                // tpm2-simulator keeps its NV state in NVChip in its working directory, the state
+                // directory, and -m manufactures it afresh.
+                tpm.StartProcess("tpm2-simulator", tpmPath, TcgReferenceArguments(port), environment: NoEnvironmentChanges,
+                    isReady: _ => AcceptsConnections(port));
+                tcti = $"mssim:host=127.0.0.1,port={port}";
             }
             else
             {
@@ -116,7 +131,7 @@ internal sealed class SoftwareTpm : IDisposable
             // the one connection tpm2-pkcs11 keeps for the whole run, and at the cap every later C_Login
             // fails too, so one failure would fail every test after it.
             tpm.StartProcess("tpm2-abrmd", abrmdPath,
-                ["--session", "--logger=stdout", "--flush-all", "--max-transients=100", $"--tcti=swtpm:host=127.0.0.1,port={port}"],
+                ["--session", "--logger=stdout", "--flush-all", "--max-transients=100", $"--tcti={tcti}"],
                 environment: new Dictionary<string, string?>
                 {
                     ["DBUS_SESSION_BUS_ADDRESS"] = tpm.BusAddress,
@@ -154,6 +169,10 @@ internal sealed class SoftwareTpm : IDisposable
         "--port", $"{port}",
         "--platform-port", $"{port + 1}",
     ];
+
+    // The command port, and -m to manufacture the NV state. The platform port is always one above it.
+    // tpm2-simulator binds every interface; the ports are freshly chosen and the test runs in a container.
+    internal static IReadOnlyList<string> TcgReferenceArguments(int port) => [$"{port}", "-m"];
 
     // TPM2_Startup(TPM_SU_CLEAR), as a raw command on the command port. TPM_RC_INITIALIZE says the TPM
     // was already started, which is as good.
