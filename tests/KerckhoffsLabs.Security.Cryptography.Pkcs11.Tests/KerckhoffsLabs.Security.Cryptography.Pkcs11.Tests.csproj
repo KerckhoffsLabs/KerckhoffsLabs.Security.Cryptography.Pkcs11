@@ -64,7 +64,7 @@
   </ItemGroup>
 
   <!-- SkipNativeBuilds=true skips every native build below (pkcs11-mock, the ABI oracle, the gate
-       shims, SoftHSM, Kryoptic, BouncyHsm and Craton HSM), for a managed-only build that needs neither the submodules nor a
+       shims, SoftHSM, Kryoptic, BouncyHsm, Craton HSM and FreeHSM), for a managed-only build that needs neither the submodules nor a
        C toolchain. Each target keeps its own Skip* switch; a value passed on the command line still
        wins over this one. -->
   <PropertyGroup Condition="'$(SkipNativeBuilds)' == 'true'">
@@ -75,6 +75,7 @@
     <BuildKryoptic>false</BuildKryoptic>
     <BuildBouncyHsm>false</BuildBouncyHsm>
     <BuildCratonHsm>false</BuildCratonHsm>
+    <BuildFreeHsm>false</BuildFreeHsm>
   </PropertyGroup>
 
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
@@ -159,6 +160,17 @@
       <_CratonHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_CratonHsmOutputDir>
     </PropertyGroup>
     <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-craton-hsm.sh&quot; &quot;$(_CratonHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <!-- FreeHSM: opt-in like Kryoptic — default OFF, flip it on with -p:BuildFreeHsm=true (or the env
+       var of the same name). Needs a C toolchain and the OpenSSL 3.5 named by OPENSSL_PREFIX. Wired
+       into CI on the ubuntu-latest leg only (see ci.yml); build-freehsm.sh no-ops on non-Linux and
+       skips the rebuild when the submodule is unchanged. -->
+  <Target Name="BuildFreeHsm" BeforeTargets="PrepareForBuild" Condition="'$(BuildFreeHsm)' == 'true' AND $([MSBuild]::IsOSPlatform('Linux'))">
+    <PropertyGroup>
+      <_FreeHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_FreeHsmOutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-freehsm.sh&quot; &quot;$(_FreeHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
 </Project>

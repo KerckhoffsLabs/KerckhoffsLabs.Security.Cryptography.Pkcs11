@@ -43,4 +43,10 @@ public sealed class ECDiffieHellmanPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ImportParameters_NotSupported() => ECDiffieHellmanPkcs11TestCases.Assert_ImportParameters_NotSupported(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [InlineData("P-256")]
+    [InlineData("P-384")]
+    public void DeriveRawSecretAgreement_PeerXLooksLikeADerLength_MatchesBcl(string curve)
+        => ECDiffieHellmanPkcs11TestCases.Assert_DeriveRawSecretAgreement_PeerXLooksLikeADerLength_MatchesBcl(_backend, curve);
 }

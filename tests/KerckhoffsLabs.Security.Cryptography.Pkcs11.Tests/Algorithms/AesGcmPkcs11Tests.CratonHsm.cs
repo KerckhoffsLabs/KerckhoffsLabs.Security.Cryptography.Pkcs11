@@ -70,4 +70,12 @@ public sealed class AesGcmPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void Encrypt_KnownAnswer_MatchesReferenceVector() => AesGcmPkcs11TestCases.Assert_Encrypt_KnownAnswer_MatchesReferenceVector(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    // 16 only: Craton HSM's AES-GCM takes a 96-bit IV and a 128-bit tag, nothing else.
+    [InlineData(16)]
+    public void Encrypt_TagSize_MatchesBcl(int tagLen) => AesGcmPkcs11TestCases.Assert_Encrypt_TagSize_MatchesBcl(_backend, tagLen);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void EncryptDecrypt_LargeAad_MatchesBcl() => AesGcmPkcs11TestCases.Assert_EncryptDecrypt_LargeAad_MatchesBcl(_backend);
 }

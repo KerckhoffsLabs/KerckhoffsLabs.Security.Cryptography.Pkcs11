@@ -174,4 +174,12 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
         _backend.RequireSoftoken(3, 132, "an EC private key without a public point unwraps since 3.132 (Bug 2082671)");
         WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend);
     }
+
+    // NSS reveals the value of a non-sensitive key even when CKA_EXTRACTABLE is FALSE, where PKCS#11 v3.2 §5.7
+    // withholds the value of an unextractable key; it takes the attribute to govern wrapping only.
+    [Fact(SkipUnless = nameof(NssBackendFixture.ClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ClassicAesGcmAvailable))]
+    public void KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable() => WrapUnwrapKeyTestCases.Assert_KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable(_backend, unextractableValueIsReadable: true);
+
+    // No AesKeyWrap_KeyOver256Bytes_RoundTrips: NSS holds an unwrapped symmetric key of at most 256 bytes
+    // (MAX_KEY_LEN, pkcs11i.h) and refuses a longer one with CKR_TEMPLATE_INCONSISTENT.
 }

@@ -49,4 +49,10 @@ public sealed class WrapUnwrapKeyTests_Kryoptic(KryopticBackendFixture backend)
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Unwrap_EcPrivateKeyWithoutPublicPoint_Signs() => WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable() => WrapUnwrapKeyTestCases.Assert_KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void AesKeyWrap_KeyOver256Bytes_RoundTrips() => WrapUnwrapKeyTestCases.Assert_AesKeyWrap_KeyOver256Bytes_RoundTrips(_backend);
 }

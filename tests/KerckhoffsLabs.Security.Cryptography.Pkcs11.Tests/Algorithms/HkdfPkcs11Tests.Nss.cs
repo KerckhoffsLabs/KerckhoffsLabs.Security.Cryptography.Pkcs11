@@ -34,4 +34,7 @@ public sealed class HkdfPkcs11Tests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void ByteResults_AreRefusedUnderTheDefaultPolicy() => HkdfPkcs11TestCases.Assert_ByteResults_AreRefusedUnderTheDefaultPolicy(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.ExtractableDeriveAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ExtractableDeriveAvailable))]
+    public void DeriveKey_AtTheRfc5869Ceiling_MatchesBcl() => HkdfPkcs11TestCases.Assert_DeriveKey_AtTheRfc5869Ceiling_MatchesBcl(_backend);
 }

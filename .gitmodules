@@ -32,3 +32,7 @@
 	path = vendor/craton-hsm-core
 	url = https://github.com/craton-co/craton-hsm-core.git
 	ignore = untracked
+[submodule "vendor/freehsm"]
+	path = vendor/freehsm
+	url = https://github.com/afchine1337/freehsm.git
+	ignore = untracked

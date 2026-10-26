@@ -44,7 +44,7 @@ internal static class MLDsaPkcs11TestCases
 
         using var session = OpenSession(backend);
         string label = $"mldsa-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_DSA)
             .Label(label).Id(id).Verify()

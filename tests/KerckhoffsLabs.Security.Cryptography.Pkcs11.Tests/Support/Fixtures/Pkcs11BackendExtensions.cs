@@ -49,13 +49,16 @@ internal static class Pkcs11BackendExtensions
     /// capability check — e.g. NSS only added ML-KEM-512 support in 3.129, so its 3.128 mechanism info
     /// would report a min above the 512 key size and this skips cleanly instead of failing with
     /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>. <c>CKM_ML_KEM</c> itself is checked first via
-    /// <see cref="RequireMechanism"/>.
+    /// <see cref="RequireMechanism"/>. A range of [0, 0] reports nothing (FreeHSM leaves both fields zero for
+    /// all three parameter sets), so it skips nothing.
     /// </summary>
     internal static void RequireMlKemParameterSet(this IPkcs11Backend backend, int encapsulationKeySizeInBytes)
     {
         backend.RequireMechanism(CKM.CKM_ML_KEM);
         Pkcs11Slot slot = backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)backend.SlotId);
         MechanismInfo info = slot.GetMechanismInfo(CKM.CKM_ML_KEM_KEY_PAIR_GEN);
+        if (info.MaxKeySize == 0)
+            return;
         if ((ulong)encapsulationKeySizeInBytes < info.MinKeySize || (ulong)encapsulationKeySizeInBytes > info.MaxKeySize)
             Assert.Skip($"Backend's CKM_ML_KEM_KEY_PAIR_GEN key-size range [{info.MinKeySize}, {info.MaxKeySize}] " +
                 $"does not cover a {encapsulationKeySizeInBytes}-byte encapsulation key.");

@@ -43,4 +43,10 @@ public sealed class ECDiffieHellmanPkcs11Tests_CratonHsm(CratonHsmBackendFixture
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void ImportParameters_NotSupported() => ECDiffieHellmanPkcs11TestCases.Assert_ImportParameters_NotSupported(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [InlineData("P-256")]
+    [InlineData("P-384")]
+    public void DeriveRawSecretAgreement_PeerXLooksLikeADerLength_MatchesBcl(string curve)
+        => ECDiffieHellmanPkcs11TestCases.Assert_DeriveRawSecretAgreement_PeerXLooksLikeADerLength_MatchesBcl(_backend, curve);
 }

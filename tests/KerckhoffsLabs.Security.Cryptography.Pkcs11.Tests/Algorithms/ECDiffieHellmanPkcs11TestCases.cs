@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using BclECCurve = System.Security.Cryptography.ECCurve;
-using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -56,7 +55,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         using var session = OpenSession(backend);
         using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"ecdh-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .Label(label).Id(id).EcParams(ecParams).Build();
@@ -215,4 +214,34 @@ internal static class ECDiffieHellmanPkcs11TestCases
     internal static void Assert_ImportParameters_NotSupported(IPkcs11Backend backend) =>
         WithEcdh(backend, alice =>
             Assert.Throws<NotSupportedException>(() => alice.ImportParameters(new ECParameters())));
+
+    // CKM_ECDH1_DERIVE takes the peer's point raw (04 || X || Y) or as a DER OCTET STRING (04 len ...). A module
+    // that told them apart from the first two bytes took a raw P-256 point whose X begins 0x3F (P-384: 0x5F)
+    // for a 63-byte (95-byte) OCTET STRING and dropped two bytes. One peer in 256 does that; this test makes
+    // one, and the secret must still match the BCL's.
+    internal static void Assert_DeriveRawSecretAgreement_PeerXLooksLikeADerLength_MatchesBcl(IPkcs11Backend backend, string curve)
+    {
+        var (ecParams, bclCurve, length) = curve == "P-256"
+            ? (TestKeys.EcP256Oid, BclECCurve.NamedCurves.nistP256, 32)
+            : (TestKeys.EcP384Oid, BclECCurve.NamedCurves.nistP384, 48);
+        byte lengthByte = (byte)(2 * length - 1);
+
+        WithEcdh(backend, ecParams, alice =>
+        {
+            ECDiffieHellman bob = ECDiffieHellman.Create(bclCurve);
+            while (bob.ExportParameters(includePrivateParameters: false).Q.X![0] != lengthByte)
+            {
+                bob.Dispose();
+                bob = ECDiffieHellman.Create(bclCurve);
+            }
+            using (bob)
+            {
+                byte[] aliceZ = alice.DeriveRawSecretAgreement(bob.PublicKey);
+                byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
+
+                Assert.Equal(length, aliceZ.Length);
+                Assert.Equal(bobZ, aliceZ);
+            }
+        });
+    }
 }

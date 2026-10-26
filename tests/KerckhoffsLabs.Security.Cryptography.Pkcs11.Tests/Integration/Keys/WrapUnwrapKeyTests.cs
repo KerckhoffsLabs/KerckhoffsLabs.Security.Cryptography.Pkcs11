@@ -211,6 +211,125 @@ internal static class WrapUnwrapKeyTestCases
     }
 
     /// <summary>
+    /// A secret key's <c>CKA_VALUE</c> is readable only when the key is neither sensitive nor unextractable
+    /// (PKCS#11 v3.2 §5.7), whatever combination the template asked for, and the flags read back as set.
+    /// </summary>
+    /// <remarks>
+    /// A module revealed the value of a non-sensitive but unextractable key, and its <c>C_CreateObject</c>
+    /// ignored the template's <c>CKA_SENSITIVE</c> and <c>CKA_EXTRACTABLE</c>.
+    /// </remarks>
+    /// <param name="backend">The backend under test.</param>
+    /// <param name="unextractableValueIsReadable">
+    /// Whether the token reveals the value of a non-sensitive key whatever its <c>CKA_EXTRACTABLE</c>, taking the
+    /// attribute to govern wrapping only. Pinned where a backend is known to, so a change shows here.
+    /// </param>
+    internal static void Assert_KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable(
+        IPkcs11Backend backend, bool unextractableValueIsReadable = false)
+    {
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        // Non-sensitive keys are a deliberately weakened template.
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        try
+        {
+            byte[] raw = RandomNumberGenerator.GetBytes(32);
+            foreach (var (sensitive, extractable) in ((bool, bool)[])[(false, false), (true, true), (false, true)])
+            {
+                using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                using var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+                using var t = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var s = new ObjectAttribute(CKA.CKA_SENSITIVE, sensitive);
+                using var x = new ObjectAttribute(CKA.CKA_EXTRACTABLE, extractable);
+                using var e = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+                using var v = new ObjectAttribute(CKA.CKA_VALUE, raw);
+                ObjectHandle key = session.CreateObject([c, k, t, s, x, e, v]);
+                try
+                {
+                    using var flags = session.GetAttributeValue(key, [CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE]);
+                    Assert.Equal(sensitive, flags.First(a => a.Type == CKA.CKA_SENSITIVE).GetValueAsBool());
+                    Assert.Equal(extractable, flags.First(a => a.Type == CKA.CKA_EXTRACTABLE).GetValueAsBool());
+
+                    using var value = session.GetAttributeValue(key, [CKA.CKA_VALUE]);
+                    if (sensitive || (!extractable && !unextractableValueIsReadable))
+                        Assert.True(value[0].CannotBeRead, $"CKA_VALUE of a key with CKA_SENSITIVE={sensitive}, CKA_EXTRACTABLE={extractable} was readable.");
+                    else
+                        Assert.Equal(raw, value[0].GetValueAsByteArray());
+                }
+                finally { session.DestroyObject(key); }
+            }
+        }
+        finally
+        {
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    /// <summary>
+    /// <c>CKM_AES_KEY_WRAP</c> wraps and unwraps a key longer than 256 bytes: a 320-byte HMAC key comes back
+    /// with the same value, which an HMAC computed on the token with the unwrapped key shows.
+    /// </summary>
+    /// <remarks>
+    /// A module unwrapped into a fixed 256-byte buffer, so it refused valid blobs for longer keys.
+    /// </remarks>
+    internal static void Assert_AesKeyWrap_KeyOver256Bytes_RoundTrips(IPkcs11Backend backend)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_AES_KEY_WRAP, f => f.Wrap && f.Unwrap, "CKF_WRAP and CKF_UNWRAP");
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
+            byte[] raw = RandomNumberGenerator.GetBytes(320);
+            ObjectHandle secret;
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY))
+            using (var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET))
+            using (var t = new ObjectAttribute(CKA.CKA_TOKEN, false))
+            using (var x = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true))
+            using (var s = new ObjectAttribute(CKA.CKA_SIGN, true))
+            using (var v = new ObjectAttribute(CKA.CKA_VALUE, raw))
+            {
+                try
+                {
+                    secret = session.CreateObject([c, k, t, x, s, v]);
+                }
+                catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_KEY_SIZE_RANGE or CKR.CKR_ATTRIBUTE_VALUE_INVALID)
+                {
+                    session.DestroyObject(kek);
+                    Assert.Skip($"The token does not hold a 320-byte generic secret ({ex.ReturnValue}).");
+                    throw; // unreachable: Assert.Skip throws
+                }
+            }
+            try
+            {
+                var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+                byte[] wrapped = session.WrapKey(wrapMech, kek, secret);
+                Assert.Equal(raw.Length + 8, wrapped.Length);
+
+                using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                using var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+                using var t = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var s = new ObjectAttribute(CKA.CKA_SIGN, true);
+                ObjectHandle unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, [c, k, t, s]);
+                try
+                {
+                    byte[] mac = session.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), unwrapped, "over 256 bytes"u8);
+                    Assert.Equal(HMACSHA256.HashData(raw, "over 256 bytes"u8), mac);
+                }
+                finally { session.DestroyObject(unwrapped); }
+            }
+            finally
+            {
+                session.DestroyObject(secret);
+                session.DestroyObject(kek);
+            }
+        }
+        finally
+        {
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    /// <summary>
     /// An EC private key whose PKCS#8 carries no public point, which RFC 5915 makes optional (and the
     /// parameters too, the AlgorithmIdentifier naming the curve), unwraps to a key that signs for that point.
     /// </summary>

@@ -104,4 +104,15 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [InlineData("secp224k1")]
     [InlineData("secp160r1")]
     public void SignHash_OrderLongerThanField_RoundTrips(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_OrderLongerThanField_RoundTrips(_backend, curve);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [InlineData("P-256")]
+    [InlineData("P-384")]
+    [InlineData("P-521")]
+    public void SignHash_VerifiesUnderBcl(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, curve);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ECDsaPkcs11TestCases.PointAtInfinityVectors), MemberType = typeof(ECDsaPkcs11TestCases))]
+    public void VerifyData_PointAtInfinityVector_ReturnsFalse(int tcId, string publicKey, string signature)
+        => ECDsaPkcs11TestCases.Assert_VerifyData_PointAtInfinityVector_ReturnsFalse(_backend, tcId, publicKey, signature);
 }

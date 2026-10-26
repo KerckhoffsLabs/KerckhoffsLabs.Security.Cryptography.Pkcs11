@@ -29,7 +29,7 @@ internal static class RSAPkcs11TestCases
     private static Pkcs11Key GenerateRsaKey(Pkcs11Session session, int modulusBits = 2048)
     {
         string label = $"rsa-prov-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().Encrypt().ModulusBits(modulusBits)
@@ -420,6 +420,42 @@ internal static class RSAPkcs11TestCases
             byte[] ct = OrSkipIfOaepHashUnsupported(() => rsa.Encrypt(plaintext, padding));
             byte[] recovered = rsa.Decrypt(ct, padding);
             Assert.Equal(plaintext, recovered);
+        });
+    }
+
+    // TryDecrypt into a destination the plaintext fits, smaller than the modulus. A module compared the
+    // caller's buffer with the modulus size rather than with the recovered plaintext, and refused it.
+    internal static void Assert_TryDecrypt_Oaep_IntoAPlaintextSizedDestination_Succeeds(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
+        WithRsa(backend, (_, rsa) =>
+        {
+            byte[] plaintext = Encoding.UTF8.GetBytes("a payload shorter than the modulus");
+            byte[] ct = OrSkipIfOaepHashUnsupported(() => rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA256));
+
+            foreach (byte[] destination in ((int[])[plaintext.Length, plaintext.Length + 8]).Select(size => new byte[size]))
+            {
+                Assert.True(rsa.TryDecrypt(ct, destination, RSAEncryptionPadding.OaepSHA256, out int written));
+                Assert.Equal(plaintext, destination.AsSpan(0, written).ToArray());
+            }
+        });
+    }
+
+    // OAEP fits k - 2hLen - 2 bytes of message. One more is refused with a CryptographicException, as by the
+    // BCL, and the session encrypts again afterwards. The limit is checked once a full-length message has
+    // round-tripped, so a token that refuses OAEP-SHA256 altogether skips instead of passing.
+    internal static void Assert_Encrypt_OaepMessageOverTheLimit_Throws_SessionReusable(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
+        WithRsa(backend, (_, rsa) =>
+        {
+            int limit = rsa.KeySize / 8 - 2 * 32 - 2;
+            byte[] plaintext = RandomNumberGenerator.GetBytes(limit);
+            byte[] ct = OrSkipIfOaepHashUnsupported(() => rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA256));
+            Assert.Equal(plaintext, rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA256));
+
+            Assert.ThrowsAny<CryptographicException>(() => rsa.Encrypt(new byte[limit + 1], RSAEncryptionPadding.OaepSHA256));
+            Assert.Equal(plaintext, rsa.Decrypt(rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA256), RSAEncryptionPadding.OaepSHA256));
         });
     }
 

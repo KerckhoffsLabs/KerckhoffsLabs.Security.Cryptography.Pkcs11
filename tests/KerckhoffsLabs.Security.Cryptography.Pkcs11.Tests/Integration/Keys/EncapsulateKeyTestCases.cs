@@ -1,4 +1,3 @@
-using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -18,6 +17,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 internal static class EncapsulateKeyTestCases
 {
     private static Pkcs11Session OpenSession(IPkcs11Backend backend) => backend.OpenSession();
+
+    // A token that lists the mechanism for encryption or derivation only says so through the absent
+    // CKF_ENCAPSULATE/CKF_DECAPSULATE flags, and answers C_EncapsulateKey with CKR_MECHANISM_INVALID.
+    private static void RequireEncapsulation(IPkcs11Backend backend, CKM mechanism) =>
+        backend.RequireMechanismFlags(
+            mechanism,
+            f => (f.Flags & (CKF.CKF_ENCAPSULATE | CKF.CKF_DECAPSULATE)) == (CKF.CKF_ENCAPSULATE | CKF.CKF_DECAPSULATE),
+            "CKF_ENCAPSULATE and CKF_DECAPSULATE");
 
     private static ObjectTemplate SharedSecretTemplate(bool onToken, bool valueLen = true)
     {
@@ -53,13 +60,14 @@ internal static class EncapsulateKeyTestCases
 
     internal static void Assert_RsaOaep_EncapsulateDecapsulate_RoundTrips(IPkcs11Backend backend)
     {
+        RequireEncapsulation(backend, CKM.CKM_RSA_PKCS_OAEP);
         using var session = OpenSession(backend);
         // Reading the shared secret back to compare is the extract-and-destroy path, gated by the
         // secure-defaults policy.
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"encap-rsa-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01])
             .Attribute(CKA.CKA_ENCAPSULATE, true).OnToken(backend.SupportsTokenObjects).Build();
@@ -86,13 +94,14 @@ internal static class EncapsulateKeyTestCases
 
     internal static void Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(IPkcs11Backend backend)
     {
+        RequireEncapsulation(backend, CKM.CKM_ECDH1_DERIVE);
         using var session = OpenSession(backend);
         // Reading the shared secret back to compare is the extract-and-destroy path, gated by the
         // secure-defaults policy.
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"encap-ecdh-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .Label(label).Id(id).EcParams(Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams())
             .Attribute(CKA.CKA_ENCAPSULATE, true).OnToken(backend.SupportsTokenObjects).Build();

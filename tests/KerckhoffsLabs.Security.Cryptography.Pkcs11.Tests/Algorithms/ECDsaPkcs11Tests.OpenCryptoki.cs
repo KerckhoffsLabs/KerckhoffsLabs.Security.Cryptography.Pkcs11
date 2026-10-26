@@ -62,4 +62,7 @@ public sealed class ECDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void GenerateKey_Throws() => ECDsaPkcs11TestCases.Assert_GenerateKey_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void SignHash_VerifiesUnderBcl() => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, "P-256");
 }

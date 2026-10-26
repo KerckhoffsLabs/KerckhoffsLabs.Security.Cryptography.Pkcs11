@@ -333,4 +333,74 @@ internal static class AesCcmPkcs11TestCases
             Assert.Equal(pt, dec);
         });
     }
+
+    // === Agreement with the BCL ===========================================
+
+    // The tag length is encoded in CCM's first block (B0), so a module that encoded it wrongly still
+    // round-trips with itself. For every nonce length, the token's ciphertext and tag equal the BCL's.
+    internal static void Assert_Encrypt_EveryNonceLength_MatchesBcl(IPkcs11Backend backend, int tagLen)
+    {
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
+        byte[] rawKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        byte[] plaintext = Iota(40);
+        byte[] aad = Iota(13);
+
+        using var session = OpenSession(backend);
+        using var lease = tagLen < 8 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null; // SecureOnly refuses MACs below 64 bits
+        string label = $"ccm-bcl-{Guid.NewGuid():N}";
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken().Build();
+        try
+        {
+            using var key = session.ImportKey(tpl);
+            using var ccm = new AesCcmPkcs11(key, tagLen);
+            using var bcl = new System.Security.Cryptography.AesCcm(rawKey);
+            for (int nonceLen = 7; nonceLen <= 13; nonceLen++)
+            {
+                byte[] nonce = Iota(nonceLen);
+                byte[] ciphertext = new byte[plaintext.Length];
+                byte[] tag = new byte[tagLen];
+                ccm.Encrypt(nonce, plaintext, ciphertext, tag, aad);
+
+                byte[] expectedCiphertext = new byte[plaintext.Length];
+                byte[] expectedTag = new byte[tagLen];
+                bcl.Encrypt(nonce, plaintext, expectedCiphertext, expectedTag, aad);
+                Assert.True(expectedCiphertext.AsSpan().SequenceEqual(ciphertext), $"ciphertext, {nonceLen}-byte nonce");
+                Assert.True(expectedTag.AsSpan().SequenceEqual(tag), $"tag, {nonceLen}-byte nonce");
+            }
+        }
+        finally { DestroyByLabel(session, label); }
+    }
+
+    // CCM encodes the associated data's length in 2 bytes below 0xFF00 and in 6 bytes from there on; a
+    // module refused anything over 4096 bytes. Both encodings agree with the BCL.
+    internal static void Assert_EncryptDecrypt_LargeAad_MatchesBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
+        byte[] rawKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        WithImportedCcm(backend, rawKey, ccm =>
+        {
+            using var bcl = new System.Security.Cryptography.AesCcm(rawKey);
+            foreach (int aadLength in (int[])[8192, 0xFF00])
+            {
+                byte[] nonce = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12);
+                byte[] plaintext = Iota(40);
+                byte[] aad = new byte[aadLength];
+                for (int i = 0; i < aad.Length; i++) aad[i] = (byte)(i % 251);
+                byte[] ciphertext = new byte[plaintext.Length];
+                byte[] tag = new byte[16];
+                ccm.Encrypt(nonce, plaintext, ciphertext, tag, aad);
+
+                byte[] expectedCiphertext = new byte[plaintext.Length];
+                byte[] expectedTag = new byte[16];
+                bcl.Encrypt(nonce, plaintext, expectedCiphertext, expectedTag, aad);
+                Assert.Equal(expectedCiphertext, ciphertext);
+                Assert.Equal(expectedTag, tag);
+
+                byte[] decrypted = new byte[plaintext.Length];
+                ccm.Decrypt(nonce, ciphertext, tag, decrypted, aad);
+                Assert.Equal(plaintext, decrypted);
+            }
+        });
+    }
 }

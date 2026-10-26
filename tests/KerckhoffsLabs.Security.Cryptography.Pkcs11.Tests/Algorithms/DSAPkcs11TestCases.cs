@@ -73,7 +73,7 @@ internal static class DSAPkcs11TestCases
 
         using var session = OpenSession(backend);
         string label = $"dsa-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_DSA)
             .Label(label).Id(id).Verify()
