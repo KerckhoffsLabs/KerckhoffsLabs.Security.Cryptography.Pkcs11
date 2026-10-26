@@ -43,4 +43,10 @@ public sealed class WrapUnwrapKeyTests_SoftHsm(SoftHsmBackendFixture f)
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Unwrap_EcPrivateKeyWithoutPublicPoint_Signs() => WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable() => WrapUnwrapKeyTestCases.Assert_KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void AesKeyWrap_KeyOver256Bytes_RoundTrips() => WrapUnwrapKeyTestCases.Assert_AesKeyWrap_KeyOver256Bytes_RoundTrips(_backend);
 }

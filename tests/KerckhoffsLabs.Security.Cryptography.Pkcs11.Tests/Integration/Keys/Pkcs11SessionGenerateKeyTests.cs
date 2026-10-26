@@ -1,4 +1,3 @@
-using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
@@ -34,7 +33,7 @@ internal static class SessionGenerateKeyTestCases
     public static void Assert_GenerateKey_Asymmetric_ReturnsKeyWithBothHandles(Pkcs11Session session)
     {
         string label = $"gen-pair-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().ModulusBits(2048)

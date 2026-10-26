@@ -48,7 +48,7 @@ internal static class Pkcs11KeyMechanismCases
     public static void Assert_RsaSignVerify_RoundTrips(Pkcs11Session session)
     {
         string label = $"sign-verify-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
         byte[] data = Encoding.UTF8.GetBytes("hello pkcs11");
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)

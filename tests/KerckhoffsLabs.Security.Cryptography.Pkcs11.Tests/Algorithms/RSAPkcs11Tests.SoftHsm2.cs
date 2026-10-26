@@ -152,4 +152,10 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void VerifyHash_Sha3_256Pkcs1_WycheproofVectors() => RSAPkcs11TestCases.Assert_VerifyHash_Sha3_256Pkcs1_WycheproofVectors(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void TryDecrypt_Oaep_IntoAPlaintextSizedDestination_Succeeds() => RSAPkcs11TestCases.Assert_TryDecrypt_Oaep_IntoAPlaintextSizedDestination_Succeeds(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void Encrypt_OaepMessageOverTheLimit_Throws_SessionReusable() => RSAPkcs11TestCases.Assert_Encrypt_OaepMessageOverTheLimit_Throws_SessionReusable(_backend);
 }

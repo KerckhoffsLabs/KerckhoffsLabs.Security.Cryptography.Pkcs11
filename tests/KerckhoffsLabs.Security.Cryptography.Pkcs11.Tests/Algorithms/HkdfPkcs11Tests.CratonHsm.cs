@@ -31,4 +31,7 @@ public sealed class HkdfPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void ByteResults_AreRefusedUnderTheDefaultPolicy() => HkdfPkcs11TestCases.Assert_ByteResults_AreRefusedUnderTheDefaultPolicy(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void DeriveKey_AtTheRfc5869Ceiling_MatchesBcl() => HkdfPkcs11TestCases.Assert_DeriveKey_AtTheRfc5869Ceiling_MatchesBcl(_backend);
 }

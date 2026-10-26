@@ -152,4 +152,10 @@ public sealed class RSAPkcs11Tests_Kryoptic(KryopticBackendFixture backend)
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void VerifyHash_Sha3_256Pkcs1_WycheproofVectors() => RSAPkcs11TestCases.Assert_VerifyHash_Sha3_256Pkcs1_WycheproofVectors(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void TryDecrypt_Oaep_IntoAPlaintextSizedDestination_Succeeds() => RSAPkcs11TestCases.Assert_TryDecrypt_Oaep_IntoAPlaintextSizedDestination_Succeeds(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void Encrypt_OaepMessageOverTheLimit_Throws_SessionReusable() => RSAPkcs11TestCases.Assert_Encrypt_OaepMessageOverTheLimit_Throws_SessionReusable(_backend);
 }

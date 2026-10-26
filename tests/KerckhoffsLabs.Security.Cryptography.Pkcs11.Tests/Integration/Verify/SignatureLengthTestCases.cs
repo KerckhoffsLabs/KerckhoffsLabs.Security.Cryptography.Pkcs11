@@ -50,7 +50,7 @@ internal static class SignatureLengthTestCases
 
         using var session = backend.OpenSession();
         string label = $"siglen-ec-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC).Label(label).Id(id).Verify().EcParams(TestKeys.EcP256Oid).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Label(label).Id(id).Sign().Build();
         using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
@@ -79,7 +79,7 @@ internal static class SignatureLengthTestCases
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
         using var session = backend.OpenSession();
         string label = $"siglen-rsa-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01]).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA).Label(label).Id(id).Sign().Build();

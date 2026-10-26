@@ -72,6 +72,27 @@ internal static class HkdfPkcs11TestCases
         WithKey(backend, Ikm, allowExport: true, (_, ikm) =>
             Assert.Equal(HKDF.DeriveKey(Sha256, Ikm, 42, Salt, Info), HkdfPkcs11.DeriveKey(Sha256, ikm, 42, Salt, Info)));
 
+    // RFC 5869 allows 255 x HashLen bytes of output (8160 for SHA-256); a module refused anything over 4096,
+    // a limit meant for another KDF. One byte more is refused before the token is called, as by the BCL. A
+    // token that caps the length of the secret it derives skips the ceiling.
+    internal static void Assert_DeriveKey_AtTheRfc5869Ceiling_MatchesBcl(IPkcs11Backend backend) =>
+        WithKey(backend, Ikm, allowExport: true, (_, ikm) =>
+        {
+            Assert.ThrowsAny<ArgumentException>(() => HkdfPkcs11.DeriveKey(Sha256, ikm, 255 * 32 + 1, Salt, Info));
+
+            byte[] derived;
+            try
+            {
+                derived = HkdfPkcs11.DeriveKey(Sha256, ikm, 255 * 32, Salt, Info);
+            }
+            catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_KEY_SIZE_RANGE or CKR.CKR_ATTRIBUTE_VALUE_INVALID or CKR.CKR_TEMPLATE_INCONSISTENT)
+            {
+                Assert.Skip($"The token does not derive a secret of 8160 bytes ({ex.ReturnValue}).");
+                throw; // unreachable: Assert.Skip throws
+            }
+            Assert.Equal(HKDF.DeriveKey(Sha256, Ikm, 255 * 32, Salt, Info), derived);
+        });
+
     internal static void Assert_DeriveKey_NullSalt_MatchesBcl(IPkcs11Backend backend) =>
         WithKey(backend, Ikm, allowExport: true, (_, ikm) =>
             Assert.Equal(HKDF.DeriveKey(Sha256, Ikm, 32, info: Info), HkdfPkcs11.DeriveKey(Sha256, ikm, 32, info: Info)));

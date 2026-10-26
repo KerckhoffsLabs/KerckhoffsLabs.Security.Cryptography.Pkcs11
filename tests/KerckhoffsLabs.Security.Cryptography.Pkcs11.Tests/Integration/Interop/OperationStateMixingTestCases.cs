@@ -57,6 +57,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// what "continuation, no Final follows" looks like for a block cipher).</description></item>
 /// <item><description>Craton HSM (not part of the three above): Encrypt-1 is enforced
 /// (<c>CKR_OPERATION_ACTIVE</c>, since craton-co/craton-hsm-core#87); it has no HMAC, so Sign-2 skips.</description></item>
+/// <item><description>FreeHSM (not part of the three above) does neither: a single-part call while a
+/// multi-part operation is active starts over, computes over its own input only, discards what the
+/// Updates fed, and ends the operation (the <c>*_SinglePartAfterUpdate_DiscardsTheUpdate</c> cases).
+/// Digest-2 is enforced.</description></item>
 /// <item><description>Decrypt-1: enforced on all three (naturally, via a padding/tag mismatch
 /// downstream of the malformed combined ciphertext — not because any of them checks operation state
 /// here either).</description></item>
@@ -159,6 +163,24 @@ internal static class OperationStateMixingTestCases
             _ = lowLevel.C_DigestFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
         });
 
+    // FreeHSM: the single-part call digests its own input only and ends the operation.
+    internal static void Assert_Digest_SinglePartAfterUpdate_DiscardsTheUpdate(IPkcs11Backend backend) =>
+        WithRawSession(backend, (lowLevel, sid, _) =>
+        {
+            using (var scope = new MechanismParameterScope())
+            {
+                CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256));
+                AssertOk(lowLevel.C_DigestInit(sid, in mech), "DigestInit");
+            }
+            AssertOk(lowLevel.C_DigestUpdate(sid, Data1), "DigestUpdate");
+
+            byte[] buf = new byte[64];
+            AssertOk(lowLevel.C_Digest(sid, Data2, buf, lengthOnly: false, out NativeCULong len), "Digest (illegal single-part call)");
+            Assert.Equal(System.Security.Cryptography.SHA256.HashData(Data2), buf.AsSpan(0, (int)len).ToArray());
+
+            Assert.Equal(CKR.CKR_OPERATION_NOT_INITIALIZED, lowLevel.C_DigestFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _));
+        });
+
     internal static void Assert_DigestUpdate_AfterCompletedDigest_Throws(IPkcs11Backend backend) =>
         WithRawSession(backend, (lowLevel, sid, _) =>
         {
@@ -237,6 +259,34 @@ internal static class OperationStateMixingTestCases
         });
     }
 
+    // FreeHSM: the single-part call MACs its own input only and ends the operation.
+    internal static void Assert_Sign_SinglePartAfterUpdate_DiscardsTheUpdate(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
+        WithRawSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = new byte[32];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(rawKey);
+            ObjectHandle key = CreateGenericSecret(session, rawKey);
+            try
+            {
+                using (var scope = new MechanismParameterScope())
+                {
+                    CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256_HMAC));
+                    AssertOk(lowLevel.C_SignInit(sid, in mech, (NativeCULong)key.ObjectId), "SignInit");
+                }
+                AssertOk(lowLevel.C_SignUpdate(sid, Data1), "SignUpdate");
+
+                byte[] buf = new byte[64];
+                AssertOk(lowLevel.C_Sign(sid, Data2, buf, lengthOnly: false, out NativeCULong len), "Sign (illegal single-part call)");
+                Assert.Equal(System.Security.Cryptography.HMACSHA256.HashData(rawKey, Data2), buf.AsSpan(0, (int)len).ToArray());
+
+                Assert.Equal(CKR.CKR_OPERATION_NOT_INITIALIZED, lowLevel.C_SignFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _));
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
     // === Encrypt / Decrypt ====================================================
 
     // Not enforced on NSS or SoftHSM2 — see the class remarks. Craton HSM, and Kryoptic since 1.5.4, enforce it
@@ -307,6 +357,33 @@ internal static class OperationStateMixingTestCases
                 // Ends the operation if it is still active. Its return code does not matter (the operation
                 // may already have ended); a failure comes back as one, not as an exception.
                 _ = lowLevel.C_EncryptFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
+            }
+            finally { session.DestroyObject(key); }
+        });
+
+    // FreeHSM: the single-part call encrypts its own input only, from the IV, and ends the operation.
+    internal static void Assert_Encrypt_SinglePartAfterUpdate_DiscardsTheUpdate(IPkcs11Backend backend) =>
+        WithRawSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = new byte[32];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(rawKey);
+            byte[] iv = new byte[16];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(iv);
+            ObjectHandle key = CreateAes(session, rawKey);
+            try
+            {
+                using (var scope = new MechanismParameterScope())
+                {
+                    CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_AES_CBC_PAD, iv));
+                    AssertOk(lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)key.ObjectId), "EncryptInit");
+                }
+                AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, new byte[64], lengthOnly: false, out NativeCULong _), "EncryptUpdate");
+
+                byte[] buf = new byte[64];
+                AssertOk(lowLevel.C_Encrypt(sid, Data2, buf, lengthOnly: false, out NativeCULong len), "Encrypt (illegal single-part call)");
+                Assert.Equal(CbcPadEncrypt(rawKey, iv, Data2), buf.AsSpan(0, (int)len).ToArray());
+
+                Assert.Equal(CKR.CKR_OPERATION_NOT_INITIALIZED, lowLevel.C_EncryptFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _));
             }
             finally { session.DestroyObject(key); }
         });

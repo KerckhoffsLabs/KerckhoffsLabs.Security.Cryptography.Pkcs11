@@ -84,4 +84,12 @@ public sealed class ECDsaPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
     [InlineData("secp224k1")]
     [InlineData("secp160r1")]
     public void SignHash_OrderLongerThanField_RoundTrips(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_OrderLongerThanField_RoundTrips(_backend, curve);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SignHash_VerifiesUnderBcl() => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, "P-256");
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(ECDsaPkcs11TestCases.PointAtInfinityVectors), MemberType = typeof(ECDsaPkcs11TestCases))]
+    public void VerifyData_PointAtInfinityVector_ReturnsFalse(int tcId, string publicKey, string signature)
+        => ECDsaPkcs11TestCases.Assert_VerifyData_PointAtInfinityVector_ReturnsFalse(_backend, tcId, publicKey, signature);
 }

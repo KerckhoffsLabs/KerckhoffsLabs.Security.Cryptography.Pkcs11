@@ -43,4 +43,10 @@ public sealed class ECDiffieHellmanPkcs11Tests_Kryoptic(KryopticBackendFixture f
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ImportParameters_NotSupported() => ECDiffieHellmanPkcs11TestCases.Assert_ImportParameters_NotSupported(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData("P-256")]
+    [InlineData("P-384")]
+    public void DeriveRawSecretAgreement_PeerXLooksLikeADerLength_MatchesBcl(string curve)
+        => ECDiffieHellmanPkcs11TestCases.Assert_DeriveRawSecretAgreement_PeerXLooksLikeADerLength_MatchesBcl(_backend, curve);
 }

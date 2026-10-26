@@ -74,4 +74,17 @@ public sealed class AesCcmPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void Encrypt_KnownAnswer_MatchesReferenceVector() => AesCcmPkcs11TestCases.Assert_Encrypt_KnownAnswer_MatchesReferenceVector(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [InlineData(4)]
+    [InlineData(6)]
+    [InlineData(8)]
+    [InlineData(10)]
+    [InlineData(12)]
+    [InlineData(14)]
+    [InlineData(16)]
+    public void Encrypt_EveryNonceLength_MatchesBcl(int tagLen) => AesCcmPkcs11TestCases.Assert_Encrypt_EveryNonceLength_MatchesBcl(_backend, tagLen);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void EncryptDecrypt_LargeAad_MatchesBcl() => AesCcmPkcs11TestCases.Assert_EncryptDecrypt_LargeAad_MatchesBcl(_backend);
 }

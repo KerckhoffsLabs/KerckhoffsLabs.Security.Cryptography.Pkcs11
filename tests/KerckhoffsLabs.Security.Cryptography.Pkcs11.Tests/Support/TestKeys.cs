@@ -13,6 +13,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 /// </summary>
 internal static class TestKeys
 {
+    /// <summary>
+    /// The <c>CKA_ID</c> for a test key labelled <paramref name="label"/>: the SHA-1 of the label, 20 bytes,
+    /// the size a key identifier conventionally has (the SHA-1 of the public key). PKCS#11 sets no limit
+    /// on the length, but tokens do: FreeHSM refuses an identifier over 32 bytes, which the label itself
+    /// (a prefix and a GUID) exceeds.
+    /// </summary>
+    public static byte[] IdFor(string label) => System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(label));
+
     public static ObjectHandle CreateAes256Key(Pkcs11SessionCore session, byte[] rawKey)
     {
         if (rawKey.Length != 32)

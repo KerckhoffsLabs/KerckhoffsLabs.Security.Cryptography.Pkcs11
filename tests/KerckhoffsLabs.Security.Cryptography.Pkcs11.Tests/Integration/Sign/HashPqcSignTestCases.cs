@@ -66,7 +66,7 @@ internal static class HashPqcSignTestCases
     {
         using var session = backend.OpenSession();
         string label = $"kl-hashpqc-{Guid.NewGuid():N}";
-        byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
         using var publicTemplate = ObjectTemplate.ForPublicKey(keyType)
             .Label(label).Id(id).Verify().Attribute(CKA.CKA_PARAMETER_SET, parameterSet).Build();
         using var privateTemplate = ObjectTemplate.ForPrivateKey(keyType).Label(label).Id(id).Sign().Build();

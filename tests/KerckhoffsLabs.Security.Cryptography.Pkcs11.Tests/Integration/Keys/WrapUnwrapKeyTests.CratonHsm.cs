@@ -49,4 +49,7 @@ public sealed class WrapUnwrapKeyTests_CratonHsm(CratonHsmBackendFixture backend
         _backend.RequireMechanism(wrapMechanism);
         WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend, wrapMechanism);
     }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void AesKeyWrap_KeyOver256Bytes_RoundTrips() => WrapUnwrapKeyTestCases.Assert_AesKeyWrap_KeyOver256Bytes_RoundTrips(_backend);
 }

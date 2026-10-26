@@ -52,4 +52,12 @@ public sealed class WrapUnwrapKeyTests_BouncyHsm(BouncyHsmBackendFixture backend
     // without it with CKR_ATTRIBUTE_VALUE_INVALID (UnwrapKeyHandler.SetKeyvalueForEcdsaPrivateKeyObject).
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Unwrap_EcPrivateKeyWithoutPublicPoint_Signs() => WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend, ecParamsInTemplate: true);
+
+    // BouncyHsm reveals the value of a non-sensitive key even when CKA_EXTRACTABLE is FALSE, where PKCS#11 v3.2 §5.7
+    // withholds the value of an unextractable key; it takes the attribute to govern wrapping only.
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable() => WrapUnwrapKeyTestCases.Assert_KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable(_backend, unextractableValueIsReadable: true);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AesKeyWrap_KeyOver256Bytes_RoundTrips() => WrapUnwrapKeyTestCases.Assert_AesKeyWrap_KeyOver256Bytes_RoundTrips(_backend);
 }

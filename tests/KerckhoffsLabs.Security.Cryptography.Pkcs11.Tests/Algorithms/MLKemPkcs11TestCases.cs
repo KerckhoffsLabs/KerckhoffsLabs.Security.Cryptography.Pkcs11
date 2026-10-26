@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -49,7 +48,7 @@ internal static class MLKemPkcs11TestCases
 
         using var session = OpenSession(backend);
         string label = $"mlkem-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
             .Label(label).Id(id)

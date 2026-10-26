@@ -314,4 +314,61 @@ internal static class AesGcmPkcs11TestCases
             Assert.Equal(pt, dec);
         });
     }
+
+    // === Agreement with the BCL ===========================================
+
+    // A module that ignored ulTagBits round-tripped with itself at every tag size. The token's ciphertext
+    // and truncated tag equal the BCL's.
+    internal static void Assert_Encrypt_TagSize_MatchesBcl(IPkcs11Backend backend, int tagLen)
+    {
+        if (tagLen < AesGcm.TagByteSizes.MinSize)
+            Assert.Skip($"Platform AesGcm minimum tag size is {AesGcm.TagByteSizes.MinSize} bytes.");
+        byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+        WithImportedGcm(backend, rawKey, gcm =>
+        {
+            byte[] nonce = RandomNumberGenerator.GetBytes(12);
+            byte[] plaintext = Iota(40);
+            byte[] aad = Iota(13);
+            byte[] ciphertext = new byte[plaintext.Length];
+            byte[] tag = new byte[tagLen];
+            gcm.Encrypt(nonce, plaintext, ciphertext, tag, aad);
+
+            using var bcl = new AesGcm(rawKey, tagLen);
+            byte[] expectedCiphertext = new byte[plaintext.Length];
+            byte[] expectedTag = new byte[tagLen];
+            bcl.Encrypt(nonce, plaintext, expectedCiphertext, expectedTag, aad);
+            Assert.Equal(expectedCiphertext, ciphertext);
+            Assert.Equal(expectedTag, tag);
+        }, tagLen);
+    }
+
+    // Associated data far larger than the tests otherwise use: 8 KiB and 0xFF00 bytes.
+    internal static void Assert_EncryptDecrypt_LargeAad_MatchesBcl(IPkcs11Backend backend)
+    {
+        byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+        WithImportedGcm(backend, rawKey, gcm =>
+        {
+            using var bcl = new AesGcm(rawKey, 16);
+            foreach (int aadLength in (int[])[8192, 0xFF00])
+            {
+                byte[] nonce = RandomNumberGenerator.GetBytes(12);
+                byte[] plaintext = Iota(40);
+                byte[] aad = new byte[aadLength];
+                for (int i = 0; i < aad.Length; i++) aad[i] = (byte)(i % 251);
+                byte[] ciphertext = new byte[plaintext.Length];
+                byte[] tag = new byte[16];
+                gcm.Encrypt(nonce, plaintext, ciphertext, tag, aad);
+
+                byte[] expectedCiphertext = new byte[plaintext.Length];
+                byte[] expectedTag = new byte[16];
+                bcl.Encrypt(nonce, plaintext, expectedCiphertext, expectedTag, aad);
+                Assert.Equal(expectedCiphertext, ciphertext);
+                Assert.Equal(expectedTag, tag);
+
+                byte[] decrypted = new byte[plaintext.Length];
+                gcm.Decrypt(nonce, ciphertext, tag, decrypted, aad);
+                Assert.Equal(plaintext, decrypted);
+            }
+        });
+    }
 }

@@ -32,7 +32,7 @@ internal static class ECDsaPkcs11TestCases
     private static Pkcs11Key GenerateEcKey(Pkcs11Session session, byte[] ecOid)
     {
         string label = $"ec-prov-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        byte[] id = TestKeys.IdFor(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .Label(label).Id(id).Verify().EcParams(ecOid).Build();
@@ -382,7 +382,7 @@ internal static class ECDsaPkcs11TestCases
         WithEcDsa(backend, "P-256", (ec, _) =>
             Assert.Throws<NotSupportedException>(() => ec.GenerateKey(BclECCurve.NamedCurves.nistP256)));
 
-    // === Curves whose group order is one bit longer than the field ===========================
+    // === Curves whose group order is one bit longer than the field ====================
     // On secp160r1 and secp224k1, n is just above 2^160 and 2^224, so r and s can take one byte more than a
     // coordinate. A DER signature is converted to r‖s sized from n for the token, not from KeySize (the
     // field size, as the BCL reports it). Valid signatures from the Wycheproof test vectors (C2SP/wycheproof),
@@ -550,6 +550,62 @@ internal static class ECDsaPkcs11TestCases
             using ECDsa? bcl = TryCreateBcl(ec.ExportParameters(includePrivateParameters: false));
             if (bcl is not null)
                 Assert.True(bcl.VerifyHash(hash, der, DSASignatureFormat.Rfc3279DerSequence));
+        }
+        finally
+        {
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
+        }
+    }
+
+    // Raw CKM_ECDSA signs the hash it is given. A module that digested it again verified its own signatures
+    // (verification digested too), so only a third party can tell: the BCL verifies the token's signature.
+    internal static void Assert_SignHash_VerifiesUnderBcl(IPkcs11Backend backend, string curve) =>
+        WithEcDsa(backend, curve, (ec, hash) =>
+        {
+            byte[] digest = hash.Name switch
+            {
+                "SHA256" => SHA256.HashData(Encoding.UTF8.GetBytes("raw ecdsa, checked elsewhere")),
+                "SHA384" => SHA384.HashData(Encoding.UTF8.GetBytes("raw ecdsa, checked elsewhere")),
+                _ => SHA512.HashData(Encoding.UTF8.GetBytes("raw ecdsa, checked elsewhere")),
+            };
+            byte[] signature = ec.SignHash(digest);
+
+            using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+            Assert.True(bcl.VerifyHash(digest, signature));
+        });
+
+    // Wycheproof ecdsa_secp256r1_sha256_p1363_test.json, tcId 169 ("point at infinity during verify") and
+    // tcId 208 ("comparison with point at infinity"): (public key, message, r||s). Verification reaches the
+    // point at infinity; the signature is invalid, so VerifyData returns false instead of throwing, as the
+    // BCL does. A module answered CKR_FUNCTION_FAILED here rather than CKR_SIGNATURE_INVALID.
+    public static TheoryData<int, string, string> PointAtInfinityVectors =>
+    [
+        (169, "04b533d4695dd5b8c5e07757e55e6e516f7e2c88fa0239e23f60e8ec07dd70f2871b134ee58cc583278456863f33c3a85d881f7d4a39850143e29d4eaf009afe47",
+            "7fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8555555550000000055555555555555553ef7a8e48d07df81a693439654210c70"),
+        (208, "04dd86d3b5f4a13e8511083b78002081c53ff467f11ebd98a51a633db76665d25045d5c8200c89f2fa10d849349226d21d8dfaed6ff8d5cb3e1b7e17474ebc18f7",
+            "555555550000000055555555555555553ef7a8e48d07df81a693439654210c703333333300000000333333333333333325c7cbbc549e52e763f1f55a327a3aa9"),
+    ];
+
+    internal static void Assert_VerifyData_PointAtInfinityVector_ReturnsFalse(IPkcs11Backend backend, int tcId, string publicKey, string signature)
+    {
+        if (!backend.Supports(CKM.CKM_ECDSA))
+            Assert.Skip("Backend does not advertise CKM_ECDSA.");
+        byte[] point = Convert.FromHexString(publicKey);
+        byte[] message = Convert.FromHexString("313233343030");
+        byte[] sig = Convert.FromHexString(signature);
+
+        using var session = OpenSession(backend);
+        using var template = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .Label($"ec-wycheproof-{tcId}-{Guid.NewGuid():N}").Verify().OnToken(false)
+            .EcParams(TestKeys.EcP256Oid)
+            .Attribute(CKA.CKA_EC_POINT, [0x04, (byte)point.Length, .. point])
+            .Build();
+        using var key = session.ImportKey(template);
+        try
+        {
+            using var ec = new ECDsaPkcs11(key);
+            Assert.False(ec.VerifyData(message, sig, HashAlgorithmName.SHA256));
+            Assert.False(ec.VerifyHash(SHA256.HashData(message), sig));
         }
         finally
         {
