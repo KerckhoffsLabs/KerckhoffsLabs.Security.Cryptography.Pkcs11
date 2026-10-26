@@ -53,10 +53,10 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     // As above, but hands the session to the body (for scoping to the AllowInsecure policy) and leaves the hash to
     // the caller — so the same key can be exercised across hash algorithms independent of the curve.
-    private static void WithEcDsa(string curve, Action<Pkcs11Session, ECDsaPkcs11> body)
+    private static void WithEcDsa(string curve, Action<Pkcs11Session, ECDsaPkcs11> body, ManagedSoftToken? token = null)
     {
         var (eccurve, _, _) = Spec(curve);
-        using var library = ManagedToken.NewLibrary();
+        using var library = (token ?? new ManagedSoftToken()).Load();
         using var session = ManagedToken.OpenSession(library);
         using var key = session.GenerateEcKeyPair(eccurve);
         using var ec = new ECDsaPkcs11(key);
@@ -502,4 +502,92 @@ public sealed class ECDsaPkcs11Tests_Managed
         using var ec = new ECDsaPkcs11(key);
         Assert.Equal(0, ec.KeySize);
     }
+
+    // === SHA-3 and SHA-224 in the span overloads' fallback hasher ==================================
+    // The token lists no combined CKM_ECDSA_* mechanism, so TrySignData and VerifyData(span) hash before
+    // raw CKM_ECDSA: SHA-3 with the BCL's, SHA-224 with the token's CKM_SHA224 digest when it has one.
+
+    private static readonly HashAlgorithmName Sha224 = new("SHA224");
+
+    // The managed token's SHA-224. The BCL has none to give it, so this is a stand-in: whatever it computes,
+    // a signature the adapter makes over SHA-224 is a signature over it.
+    private static byte[] StandInSha224(byte[] data) => SHA256.HashData(data)[..28];
+
+    private static byte[] TrySign(ECDsaPkcs11 ec, byte[] data, HashAlgorithmName hash)
+    {
+        byte[] destination = new byte[256];
+        Assert.True(ec.TrySignData(data, destination, hash, out int written));
+        return destination[..written];
+    }
+
+    public static TheoryData<string> Sha3Hashes() => ["SHA3-256", "SHA3-384", "SHA3-512"];
+
+    private static byte[] Sha3(string hashName, byte[] data) => hashName switch
+    {
+        "SHA3-256" => SHA3_256.HashData(data),
+        "SHA3-384" => SHA3_384.HashData(data),
+        _ => SHA3_512.HashData(data),
+    };
+
+    [Theory]
+    [MemberData(nameof(Sha3Hashes))]
+    public void SpanOverloads_Sha3_HashWithTheBcl(string hashName)
+    {
+        Assert.SkipUnless(SHA3_256.IsSupported, "The host BCL has no SHA-3.");
+        WithEcDsa("P-256", (_, ec) =>
+        {
+            var hash = new HashAlgorithmName(hashName);
+            byte[] data = Encoding.UTF8.GetBytes($"span overloads over {hashName}");
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+            using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+
+            Assert.True(bcl.VerifyHash(Sha3(hashName, data), TrySign(ec, data, hash)));
+
+            byte[] sig = ec.SignHash(Sha3(hashName, data));
+            Assert.True(ec.VerifyData(data.AsSpan(), sig, hash));
+            Assert.False(ec.VerifyData(tampered.AsSpan(), sig, hash));
+        });
+    }
+
+    [Fact]
+    public void SpanOverloads_Sha224_HashWithTheTokensDigest() => WithEcDsa("P-256", (session, ec) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("span overloads over the token's SHA-224");
+        byte[] tampered = [.. data];
+        tampered[0] ^= 0xFF;
+        using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+        using var policy = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+        Assert.True(bcl.VerifyHash(StandInSha224(data), TrySign(ec, data, Sha224)));
+
+        byte[] sig = ec.SignHash(StandInSha224(data));
+        Assert.True(ec.VerifyData(data.AsSpan(), sig, Sha224));
+        Assert.False(ec.VerifyData(tampered.AsSpan(), sig, Sha224));
+    }, token: new ManagedSoftToken { Sha224Digest = StandInSha224 });
+
+    // The hash is put to the session's policy before the token digests anything, as for every other hash.
+    [Fact]
+    public void SpanOverloads_Sha224_GatedByDefault_ThrowsBeforeTheTokenDigests()
+    {
+        int digests = 0;
+        var token = new ManagedSoftToken { Sha224Digest = data => { digests++; return StandInSha224(data); } };
+        WithEcDsa("P-256", (_, ec) =>
+        {
+            Assert.IsType<HashUseRequest>(Assert.Throws<CryptoPolicyViolationException>(
+                () => ec.TrySignData(LegacyData, new byte[256], Sha224, out int _)).Request);
+            Assert.IsType<HashUseRequest>(Assert.Throws<CryptoPolicyViolationException>(
+                () => ec.VerifyData(LegacyData.AsSpan(), new byte[64], Sha224)).Request);
+        }, token: token);
+        Assert.Equal(0, digests);
+    }
+
+    // With neither CKM_ECDSA_SHA224 nor the CKM_SHA224 digest, SHA-224 has no hash to sign over.
+    [Fact]
+    public void SpanOverloads_Sha224_WithoutTheTokensDigest_ThrowNotSupported() => WithEcDsa("P-256", (session, ec) =>
+    {
+        using var policy = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        Assert.Throws<NotSupportedException>(() => ec.TrySignData(LegacyData, new byte[256], Sha224, out int _));
+        Assert.Throws<NotSupportedException>(() => ec.VerifyData(LegacyData.AsSpan(), new byte[64], Sha224));
+    });
 }
