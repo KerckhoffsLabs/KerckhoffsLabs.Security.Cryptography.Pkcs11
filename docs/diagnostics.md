@@ -64,8 +64,8 @@ protocol suites. Use `ECDsaPkcs11`, or `MLDsaPkcs11` for post-quantum signatures
 ### KLPKCS11007 — Weak elliptic curve
 
 The named curve provides less than the 128-bit security baseline (NIST SP 800-57) — this covers
-P-192, P-224, secp192k1, secp224k1, and the Brainpool 160/192/224-bit curves. Use `NistP256`,
-`BrainpoolP256r1`, or stronger.
+P-192, P-224, the SEC 2 160-bit curves (secp160k1/r1/r2), secp192k1, secp224k1, and the Brainpool
+160/192/224-bit curves. Use `NistP256`, `BrainpoolP256r1`, or stronger.
 
 <a id="KLPKCS11008"></a>
 ### KLPKCS11008 — RSA encryption without OAEP

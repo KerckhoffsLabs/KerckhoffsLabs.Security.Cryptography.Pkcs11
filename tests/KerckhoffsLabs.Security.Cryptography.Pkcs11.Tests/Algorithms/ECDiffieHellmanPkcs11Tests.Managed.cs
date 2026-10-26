@@ -53,6 +53,12 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         catch (CryptographicException) { return false; }
     }
 
+    // secp160r1 (SEC 2) is in the built-in catalog, below the default policy's floor.
+    private const string Secp160r1Oid = "1.3.132.0.8";
+
+    // secp224k1: its order, like secp160r1's, takes one byte more than its field.
+    private const string Secp224k1Oid = "1.3.132.0.32";
+
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     // Maps a named-curve name to the production Pkcs11ECCurve (token side) and the BCL ECCurve (peer side).
@@ -488,6 +494,68 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(expectedBits, only.MinSize);
         Assert.Equal(expectedBits, only.MaxSize);
     });
+
+    // === Curves whose order takes one byte more than their field ================================
+    // On Windows, ExportParameters pads X and Y on the right to the order's length on these curves
+    // (dotnet/runtime#129003); the explicit export is correct. The library takes field-length coordinates only,
+    // so the comparisons with a BCL peer skip where its export is not field-length.
+
+    public static TheoryData<string, int> OrderLongerThanFieldCurves() => new()
+    {
+        { Secp160r1Oid, 20 },
+        { Secp224k1Oid, 28 },
+    };
+
+    // Skips where the platform's BCL lacks the curve (macOS) or exports it padded (Windows). The body gets bob's
+    // public key, with field-length coordinates.
+    private static void WithOrderLongerThanField(string oid, int fieldSizeBytes, Action<ECDiffieHellmanPkcs11, ECDiffieHellman, ECParameters> body)
+    {
+        Assert.SkipUnless(ProbeCurve(oid), $"The platform's BCL does not implement {oid}.");
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library);
+        using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(oid));
+        using var alice = new ECDiffieHellmanPkcs11(key);
+        using var bob = ECDiffieHellman.Create(BclECCurve.CreateFromValue(oid));
+
+        ECParameters bobPublic = bob.ExportParameters(includePrivateParameters: false);
+        Assert.SkipWhen(bobPublic.Q.X!.Length != fieldSizeBytes,
+            $"The platform's BCL exports {oid} with {bobPublic.Q.X.Length}-byte coordinates, not {fieldSizeBytes} (dotnet/runtime#129003).");
+        body(alice, bob, bobPublic);
+    }
+
+    // KeySize is the field size, as the BCL reports it, also on a curve whose group order is one bit longer;
+    // the raw secret is the field-length x-coordinate on both sides.
+    [Theory]
+    [MemberData(nameof(OrderLongerThanFieldCurves))]
+    public void KeySize_OrderLongerThanField_IsTheBclKeySize(string oid, int fieldSizeBytes) =>
+        WithOrderLongerThanField(oid, fieldSizeBytes, (alice, bob, bobPublic) =>
+        {
+            Assert.Equal(8 * fieldSizeBytes, alice.KeySize);
+            Assert.Equal(bob.KeySize, alice.KeySize);
+
+            byte[] secret = alice.DeriveRawSecretAgreement(new FixedPublicKey(bobPublic));
+            Assert.Equal(fieldSizeBytes, secret.Length);
+            Assert.Equal(bob.DeriveRawSecretAgreement(alice.PublicKey), secret);
+        });
+
+    // A peer's coordinates are the field's length: one byte more is refused, whichever end it is on.
+    [Theory]
+    [MemberData(nameof(OrderLongerThanFieldCurves))]
+    public void DeriveRawSecretAgreement_PeerCoordinatesOfTheOrdersLength_Throws(string oid, int fieldSizeBytes) =>
+        WithOrderLongerThanField(oid, fieldSizeBytes, (alice, _, bobPublic) =>
+        {
+            byte[] x = bobPublic.Q.X!, y = bobPublic.Q.Y!;
+            string expected = $"does not match the curve's {fieldSizeBytes}-byte field size";
+
+            foreach ((byte[] px, byte[] py) in ((byte[], byte[])[])[([0x00, .. x], [0x00, .. y]), ([.. x, 0x00], [.. y, 0x00])])
+            {
+                var peer = new FixedPublicKey(new ECParameters { Curve = bobPublic.Curve, Q = new ECPoint { X = px, Y = py } });
+                var ex = Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecretAgreement(peer));
+                Assert.Equal(CKR.CKR_ARGUMENTS_BAD, ex.ReturnValue);
+                Assert.Contains(expected, ex.Message, StringComparison.Ordinal);
+            }
+        });
 
     // A real token can't be coaxed into failing to read CKA_EC_PARAMS — it's a required attribute of
     // every EC key object — so this drives the fallback's error path via a fake library.

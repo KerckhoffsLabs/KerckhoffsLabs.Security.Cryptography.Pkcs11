@@ -590,4 +590,111 @@ public sealed class ECDsaPkcs11Tests_Managed
         Assert.Throws<NotSupportedException>(() => ec.TrySignData(LegacyData, new byte[256], Sha224, out int _));
         Assert.Throws<NotSupportedException>(() => ec.VerifyData(LegacyData.AsSpan(), new byte[64], Sha224));
     });
+
+    // === A curve outside the library's catalog ==============================================
+    // prime239v1 (X9.62) is outside the built-in catalog. Available wherever the BCL's backend implements it
+    // (OpenSSL does; CNG does not).
+    private const string Prime239v1Oid = "1.2.840.10045.3.1.4";
+
+    public static bool Prime239v1Supported { get; } = ProbeCurve(Prime239v1Oid);
+
+    private static bool ProbeCurve(string oid)
+    {
+        try
+        {
+            using (ECDsa.Create(BclECCurve.CreateFromValue(oid))) { }
+            return true;
+        }
+        catch (PlatformNotSupportedException) { return false; }
+        catch (CryptographicException) { return false; }
+    }
+
+    // AllowInsecure: the default policy refuses a key on a curve it doesn't list.
+    private static void WithPrime239v1(Pkcs11CurveCatalog? catalog, Action<ECDsaPkcs11> body)
+    {
+        using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { CurveCatalog = catalog });
+        using var session = ManagedToken.OpenSession(library);
+        using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(Prime239v1Oid));
+        using var ec = new ECDsaPkcs11(key);
+        body(ec);
+    }
+
+    // The token's r‖s signature re-encoded as DER, independently of the adapter.
+    private static byte[] ToDer(byte[] ieee)
+    {
+        var writer = new System.Formats.Asn1.AsnWriter(System.Formats.Asn1.AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteIntegerUnsigned(Minimal(ieee.AsSpan(0, ieee.Length / 2)));
+            writer.WriteIntegerUnsigned(Minimal(ieee.AsSpan(ieee.Length / 2)));
+        }
+        return writer.Encode();
+
+        static ReadOnlySpan<byte> Minimal(ReadOnlySpan<byte> value)
+        {
+            int i = value.IndexOfAnyExcept((byte)0);
+            return i < 0 ? value[^1..] : value[i..];
+        }
+    }
+
+    // Without the curve in the catalog, KeySize stays 0 and neither the field nor the order size is known, so
+    // a DER signature can't be converted for the token: it does not verify, as the BCL's own conversion
+    // returns false when it can't size a signature.
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void VerifyHash_DerSignature_CurveOutsideTheCatalog_ReturnsFalse() => WithPrime239v1(null, ec =>
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("prime239v1"));
+        byte[] ieee = ec.SignHash(hash);
+
+        Assert.Equal(0, ec.KeySize);
+        Assert.True(ec.VerifyHash(hash, ieee));
+        Assert.False(ec.VerifyHash(hash, ToDer(ieee), DSASignatureFormat.Rfc3279DerSequence));
+    });
+
+    // r = 0 and s = 0 (Wycheproof's "special case values" signature): the base class's conversion sized
+    // to zero bytes and threw IndexOutOfRangeException on the single zero byte of each INTEGER.
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void VerifyHash_DerZeroSignature_CurveOutsideTheCatalog_ReturnsFalse() => WithPrime239v1(null, ec =>
+    {
+        byte[] der = [0x30, 0x06, 0x02, 0x01, 0x00, 0x02, 0x01, 0x00];
+        byte[] data = Encoding.UTF8.GetBytes("123400");
+
+        Assert.False(ec.VerifyHash(SHA256.HashData(data), der, DSASignatureFormat.Rfc3279DerSequence));
+        Assert.False(ec.VerifyData(data, der, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+    });
+
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void VerifyHash_DerSignature_CurveInTheLibraryCatalog_Verifies() =>
+        WithPrime239v1(Pkcs11CurveCatalog.Default.With(new Pkcs11CurveInfo(Prime239v1Oid, "prime239v1", 239)), ec =>
+        {
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("prime239v1"));
+            byte[] der = ToDer(ec.SignHash(hash));
+
+            Assert.Equal(239, ec.KeySize);
+            Assert.True(ec.VerifyHash(hash, der, DSASignatureFormat.Rfc3279DerSequence));
+        });
+
+    // === The IEEE P1363 length is the order's ===============================================
+    // secp224k1's order is 225 bits, so r‖s is 58 bytes while KeySize is 224. The fake module refuses
+    // C_VerifyInit, so a signature that reaches the token throws; one of the wrong length returns false first.
+    [Theory]
+    [InlineData(56)]
+    [InlineData(57)]
+    [InlineData(59)]
+    public void VerifyHash_P1363_Secp224k1_LengthIsTheOrders(int wrongLength)
+    {
+        Assert.True(Pkcs11CurveCatalog.Default.TryGetByName("secp224k1", out Pkcs11CurveInfo? info));
+        byte[] ecParams = info.ToCurve().GetEcParams();
+        using var key = FakeKeys.Create(CKK.CKK_EC, ca => ca == CKA.CKA_EC_PARAMS
+            ? (CKR.CKR_OK, ecParams)
+            : (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null), CryptoPolicy.AllowInsecure, publicOnly: true);
+        using var ec = new ECDsaPkcs11(key);
+        Assert.Equal(224, ec.KeySize);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => ec.VerifyHash(new byte[32], new byte[58]));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
+        Assert.False(ec.VerifyHash(new byte[32], new byte[wrongLength]));
+        Assert.False(ec.VerifyData(new byte[3].AsSpan(), new byte[wrongLength], HashAlgorithmName.SHA256));
+    }
 }

@@ -8,7 +8,7 @@ public readonly partial struct Pkcs11ECCurve
     /// <summary>
     /// Named prime-field (Weierstrass) curves a PKCS#11 v3.2 token may support via
     /// <c>CKM_EC_KEY_PAIR_GEN</c>. Mirrors the BCL <c>Pkcs11ECCurve.NamedCurves</c> and extends it with the
-    /// curves PKCS#11 tokens additionally implement (NIST P-192/P-224, secp256k1, SM2).
+    /// curves PKCS#11 tokens additionally implement (NIST P-192/P-224, the SEC 2 160-bit curves, secp256k1, SM2).
     /// </summary>
     public static class NamedCurves
     {
@@ -32,6 +32,24 @@ public readonly partial struct Pkcs11ECCurve
         /// <summary>NIST P-521 / secp521r1.</summary>
         public static Pkcs11ECCurve NistP521 => Get(Oids.Curves.NistP521);
 
+        /// <summary>Koblitz curve secp160k1 (SEC 2).</summary>
+        [Obsolete("secp160k1 provides ~80-bit security and is unsafe for modern use. Use Secp256k1 or NistP256 or stronger. " +
+                  "Pkcs11Session.GenerateEcKeyPair throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect.",
+            DiagnosticId = DiagnosticIds.WeakEcCurve,
+            UrlFormat = DiagnosticIds.UrlFormat)]
+        public static Pkcs11ECCurve Secp160k1 => Get(Oids.Curves.Secp160k1);
+        /// <summary>Prime curve secp160r1 (SEC 2).</summary>
+        [Obsolete("secp160r1 provides ~80-bit security and is unsafe for modern use. Use Secp256k1 or NistP256 or stronger. " +
+                  "Pkcs11Session.GenerateEcKeyPair throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect.",
+            DiagnosticId = DiagnosticIds.WeakEcCurve,
+            UrlFormat = DiagnosticIds.UrlFormat)]
+        public static Pkcs11ECCurve Secp160r1 => Get(Oids.Curves.Secp160r1);
+        /// <summary>Prime curve secp160r2 (SEC 2).</summary>
+        [Obsolete("secp160r2 provides ~80-bit security and is unsafe for modern use. Use Secp256k1 or NistP256 or stronger. " +
+                  "Pkcs11Session.GenerateEcKeyPair throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect.",
+            DiagnosticId = DiagnosticIds.WeakEcCurve,
+            UrlFormat = DiagnosticIds.UrlFormat)]
+        public static Pkcs11ECCurve Secp160r2 => Get(Oids.Curves.Secp160r2);
         /// <summary>Koblitz curve secp192k1 (SEC 2).</summary>
         [Obsolete("secp192k1 provides ~96-bit security, below the 112-bit floor (NIST SP 800-57). Use Secp256k1 or NistP256 or stronger. " +
                   "Pkcs11Session.GenerateEcKeyPair throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect.",

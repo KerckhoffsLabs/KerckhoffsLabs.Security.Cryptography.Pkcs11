@@ -381,4 +381,191 @@ internal static class ECDsaPkcs11TestCases
     internal static void Assert_GenerateKey_Throws(IPkcs11Backend backend) =>
         WithEcDsa(backend, "P-256", (ec, _) =>
             Assert.Throws<NotSupportedException>(() => ec.GenerateKey(BclECCurve.NamedCurves.nistP256)));
+
+    // === Curves whose group order is one bit longer than the field ===========================
+    // On secp160r1 and secp224k1, n is just above 2^160 and 2^224, so r and s can take one byte more than a
+    // coordinate. A DER signature is converted to r‖s sized from n for the token, not from KeySize (the
+    // field size, as the BCL reports it). Valid signatures from the Wycheproof test vectors (C2SP/wycheproof),
+    // ecdsa_secp224k1_sha256_test.json and ecdsa_secp160r1_sha256_test.json, each with its own public key.
+
+    private sealed record WycheproofVector(string Curve, string Wx, string Wy, string Msg, string Sig);
+
+    private static readonly Dictionary<string, WycheproofVector> OrderVectors = new(StringComparer.Ordinal)
+    {
+        // tcId 352, "k*G has a large x-coordinate": s is 29 bytes.
+        ["secp224k1/352"] = new("secp224k1",
+            "2cad534f3a9b9f7af75ef6b52b34e98b39afca1f76cdb3a3478d5e04",
+            "05f4b39f0b8e0e89e4d21c43d7046501cbc5506344f717487860c76a",
+            "313233343030",
+            "303e021d00fffffffffffffffffffffffffffffffffffffffffffffffeffffe56c021d010000000000000000000000000001dce8d2ec6184caf0a971769fb1f4"),
+        // tcId 1, "valid pseudorandom signature": r is 28 bytes, s 28 bytes with its sign-padding zero.
+        ["secp224k1/1"] = new("secp224k1",
+            "2ef983fa542b64472e2bc405d9eedd861acc9a7f814fad8275ce6b9a",
+            "3459ba4ab52164883bd29eb6ac7e6d22ac7d302c053dc39684928ef9",
+            "",
+            "303d021c464bb0fb437b06922073e124528486e500b1394a05e86b0bf58aa70b021d00f2819cdd8f311adae3930586d1fb883ae071cc8d60435904ffb9d872"),
+        // tcId 351, "k*G has a large x-coordinate": s is 21 bytes.
+        ["secp160r1/351"] = new("secp160r1",
+            "9452cac89fd846036b3f4ddf995da4bc958e1911",
+            "5f8b30d6cca6988ab496ff2f17e24f08faac75b7",
+            "313233343030",
+            "302e021500ffffffffffffffffffffffffffffffff7ffffffc02150100000000000000000001f4c8f927aed3ca752254"),
+        // tcId 1, "valid pseudorandom signature".
+        ["secp160r1/1"] = new("secp160r1",
+            "b0046a56f874d30ea2ba7ac1a935fd9d754ee641",
+            "7b9a54d275806819ec30b15618f5625115241f46",
+            "",
+            "302c021449c9656cd8cbee4456548d63a7fc480791909c4202146ff78980793ee086a2e66e01a490bdfc03f2d302"),
+        // tcId 168, "Signature with special case values r=0 and s=0": invalid.
+        ["secp160r1/168"] = new("secp160r1",
+            "50cd6584a80522992ecc20c20280c358c15e5085",
+            "e0a12cbbb20fbec12ce194c0f90b72331db90fce",
+            "313233343030",
+            "3006020100020100"),
+    };
+
+    // r and s each take the group order's byte length in the token's r‖s form.
+    private static int SignatureFieldSize(string curve)
+    {
+        Assert.True(Pkcs11CurveCatalog.Default.TryGetByName(curve, out Pkcs11CurveInfo? info));
+        return (info.OrderSizeBits + 7) / 8;
+    }
+
+    // Imports the vector's public key and runs the body on it. The curves are below the default policy's
+    // floor, so the body runs under AllowInsecure. Tokens don't agree on the error for a curve they don't
+    // implement, so these cases are wired only into the backends that take secp160r1 and secp224k1.
+    private static void WithVectorKey(IPkcs11Backend backend, WycheproofVector v, Action<ECDsaPkcs11> body)
+    {
+        backend.RequireMechanism(CKM.CKM_ECDSA);
+        Assert.True(Pkcs11CurveCatalog.Default.TryGetByName(v.Curve, out Pkcs11CurveInfo? info));
+        using var session = OpenSession(backend);
+        using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var template = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .EcParams(info.ToCurve().GetEcParams())
+            .Attribute(CKA.CKA_EC_POINT, TestKeys.DerEcPoint(Convert.FromHexString(v.Wx), Convert.FromHexString(v.Wy)))
+            .Verify()
+            .OnToken(false)
+            .Build();
+        using var key = session.ImportKey(template);
+        using var ec = new ECDsaPkcs11(key);
+        body(ec);
+    }
+
+    internal static void Assert_VerifyHash_DerSignature_OrderLongerThanField_Verifies(IPkcs11Backend backend, string vector)
+    {
+        WycheproofVector v = OrderVectors[vector];
+        WithVectorKey(backend, v, ec =>
+        {
+            byte[] msg = Convert.FromHexString(v.Msg);
+            byte[] der = Convert.FromHexString(v.Sig);
+            byte[] hash = SHA256.HashData(msg);
+
+            Assert.True(ec.VerifyHash(hash, der, DSASignatureFormat.Rfc3279DerSequence));
+            Assert.True(ec.VerifyData(msg, der, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+
+            // The same signature in the token's r‖s form, r and s each as long as the order.
+            byte[] ieee = DssSignatureEncoding.DerToIeeeP1363(der, SignatureFieldSize(v.Curve))!;
+            Assert.True(ec.VerifyHash(hash, ieee));
+            Assert.True(ec.VerifyHash(hash, ieee, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+
+            byte[] tampered = [.. der];
+            tampered[^1] ^= 0x01;
+            Assert.False(ec.VerifyHash(hash, tampered, DSASignatureFormat.Rfc3279DerSequence));
+        });
+    }
+
+    // An r‖s signature's length is checked against the order's, not KeySize's: the vector's signature, 2 * 29
+    // bytes on secp224k1 and 2 * 21 on secp160r1, verifies through every IEEE P1363 entry point, and one
+    // of twice the field's length, or one byte off, does not.
+    internal static void Assert_VerifyHash_P1363_OrderLongerThanField_TakesTheOrdersLength(IPkcs11Backend backend, string vector)
+    {
+        WycheproofVector v = OrderVectors[vector];
+        WithVectorKey(backend, v, ec =>
+        {
+            const DSASignatureFormat p1363 = DSASignatureFormat.IeeeP1363FixedFieldConcatenation;
+            byte[] msg = Convert.FromHexString(v.Msg);
+            byte[] hash = SHA256.HashData(msg);
+            int fieldSize = SignatureFieldSize(v.Curve);
+            byte[] ieee = DssSignatureEncoding.DerToIeeeP1363(Convert.FromHexString(v.Sig), fieldSize)!;
+            Assert.Equal(2 * ((ec.KeySize + 7) / 8) + 2, ieee.Length);
+
+            Assert.True(ec.VerifyHash(hash, ieee));
+            Assert.True(ec.VerifyHash(hash.AsSpan(), ieee.AsSpan()));
+            Assert.True(ec.VerifyHash(hash, ieee, p1363));
+            Assert.True(ec.VerifyData(msg, ieee, HashAlgorithmName.SHA256));
+            Assert.True(ec.VerifyData(msg.AsSpan(), ieee.AsSpan(), HashAlgorithmName.SHA256));
+            Assert.True(ec.VerifyData(msg, ieee, HashAlgorithmName.SHA256, p1363));
+
+            // Each half's leading byte dropped: twice the field's length.
+            byte[] fieldLength = [.. ieee.AsSpan(1, fieldSize - 1), .. ieee.AsSpan(fieldSize + 1)];
+            foreach (byte[] wrong in (byte[][])[fieldLength, ieee[..^1], [.. ieee, 0x00]])
+            {
+                string length = $"a {wrong.Length}-byte signature";
+                Assert.False(ec.VerifyHash(hash, wrong), length);
+                Assert.False(ec.VerifyHash(hash, wrong, p1363), length);
+                Assert.False(ec.VerifyData(msg.AsSpan(), wrong.AsSpan(), HashAlgorithmName.SHA256), length);
+                Assert.False(ec.VerifyData(msg, wrong, HashAlgorithmName.SHA256, p1363), length);
+            }
+        });
+    }
+
+    internal static void Assert_VerifyHash_DerZeroSignature_ReturnsFalse(IPkcs11Backend backend)
+    {
+        WycheproofVector v = OrderVectors["secp160r1/168"];
+        WithVectorKey(backend, v, ec =>
+        {
+            byte[] msg = Convert.FromHexString(v.Msg);
+            byte[] der = Convert.FromHexString(v.Sig);
+
+            Assert.False(ec.VerifyHash(SHA256.HashData(msg), der, DSASignatureFormat.Rfc3279DerSequence));
+            Assert.False(ec.VerifyData(msg, der, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+        });
+    }
+
+    // A key generated on the curve: the token's r‖s takes the order's length for r and s, and a DER
+    // signature made from it verifies, under the BCL too.
+    internal static void Assert_SignHash_OrderLongerThanField_RoundTrips(IPkcs11Backend backend, string curve)
+    {
+        backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA);
+        Assert.True(Pkcs11CurveCatalog.Default.TryGetByName(curve, out Pkcs11CurveInfo? info));
+        using var session = OpenSession(backend);
+        using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var key = GenerateEcKey(session, info.ToCurve().GetEcParams());
+        try
+        {
+            using var ec = new ECDsaPkcs11(key);
+            Assert.Equal(info.FieldSizeBits, ec.KeySize);
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes($"ecdsa on {curve}"));
+
+            Assert.Equal(2 * SignatureFieldSize(curve), ec.SignHash(hash).Length);
+
+            byte[] der = ec.SignHash(hash, DSASignatureFormat.Rfc3279DerSequence);
+            Assert.True(ec.VerifyHash(hash, der, DSASignatureFormat.Rfc3279DerSequence));
+
+            byte[] data = Encoding.UTF8.GetBytes("signed data");
+            byte[] derData = ec.SignData(data, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+            Assert.True(ec.VerifyData(data, derData, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+
+            // Under the BCL too, where the platform implements the curve (macOS has neither).
+            using ECDsa? bcl = TryCreateBcl(ec.ExportParameters(includePrivateParameters: false));
+            if (bcl is not null)
+                Assert.True(bcl.VerifyHash(hash, der, DSASignatureFormat.Rfc3279DerSequence));
+        }
+        finally
+        {
+            try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
+        }
+    }
+
+    private static ECDsa? TryCreateBcl(ECParameters parameters)
+    {
+        try
+        {
+            return ECDsa.Create(parameters);
+        }
+        catch (Exception e) when (e is PlatformNotSupportedException or CryptographicException)
+        {
+            return null;
+        }
+    }
 }
