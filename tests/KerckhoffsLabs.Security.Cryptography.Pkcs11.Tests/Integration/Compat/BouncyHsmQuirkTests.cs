@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -50,31 +49,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
                 "C_Verify of an empty signature no longer gives CKR_ARGUMENTS_BAD " +
                 $"(got {ex?.GetType().Name ?? "no exception"}): set " +
                 "BouncyHsmBackendFixture.BouncyHsmAcceptsEmptySignature to true and delete this test.");
-        }
-        finally { key.Destroy(); }
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void NonZeroChaCha20Counter_QuirkStillPresent()
-    {
-        using var session = _backend.OpenSession();
-        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // raw CKM_CHACHA20 is gated by default
-        string label = $"quirk-chacha20-{Guid.NewGuid():N}";
-        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
-            .Label(label).Value(RandomNumberGenerator.GetBytes(32)).Encrypt().Decrypt().Build();
-        using var key = session.ImportKey(tpl);
-#pragma warning disable KLPKCS11009 // raw ChaCha20 is the mechanism under test; the session opts in above
-        var counterOne = new Mechanism(CKM.CKM_CHACHA20,
-            new CkmChaCha20Params(BitConverter.GetBytes(1u), 32, RandomNumberGenerator.GetBytes(12), 96));
-#pragma warning restore KLPKCS11009
-        try
-        {
-            var ex = Record.Exception(() => key.Encrypt(counterOne, "abc"u8));
-
-            Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_GENERAL_ERROR },
-                "harrison314/BouncyHsm#118 looks fixed (a non-zero ChaCha20 block counter no longer gives CKR_GENERAL_ERROR; got " +
-                $"{ex?.GetType().Name ?? "no exception"}): set " +
-                "BouncyHsmBackendFixture.BouncyHsmAcceptsNonZeroChaCha20Counter to true and delete this test.");
         }
         finally { key.Destroy(); }
     }

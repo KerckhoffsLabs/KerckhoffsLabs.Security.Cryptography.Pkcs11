@@ -15,4 +15,8 @@ public sealed class RawSalsa20Tests_BouncyHsm(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void TwoBlockMessage_MatchesReference_AndRoundTrips() =>
         RawSalsa20TestCases.Assert_TwoBlockMessage_MatchesReference_AndRoundTrips(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void NonZeroBlockCounter_StartsTheKeystreamThere() =>
+        RawSalsa20TestCases.Assert_NonZeroBlockCounter_StartsTheKeystreamThere(_backend);
 }
