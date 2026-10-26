@@ -11,7 +11,7 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tag="${1:-kerckhoffslabs/tpm2-pkcs11:local}"
 
-for module in json-glib libtpms swtpm tcg-tpm tpm2-abrmd tpm2-pkcs11 wolfssl wolftpm; do
+for module in ibmswtpm2 json-glib libtpms swtpm tcg-tpm tpm2-abrmd tpm2-pkcs11 wolfssl wolftpm; do
     if [[ ! -e "$repo/vendor/$module/.git" ]]; then
         echo "vendor/$module is not checked out: git submodule update --init vendor/$module" >&2
         exit 1
@@ -19,6 +19,7 @@ for module in json-glib libtpms swtpm tcg-tpm tpm2-abrmd tpm2-pkcs11 wolfssl wol
 done
 
 docker build \
+    --build-context ibmswtpm2="$repo/vendor/ibmswtpm2" \
     --build-context json-glib="$repo/vendor/json-glib" \
     --build-context libtpms="$repo/vendor/libtpms" \
     --build-context swtpm="$repo/vendor/swtpm" \

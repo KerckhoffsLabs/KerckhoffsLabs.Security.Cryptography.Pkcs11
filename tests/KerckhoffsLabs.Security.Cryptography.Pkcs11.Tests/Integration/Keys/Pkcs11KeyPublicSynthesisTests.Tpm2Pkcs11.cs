@@ -67,6 +67,8 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFi
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
     public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
     {
+        // The PKCS#1 v1.5 half signs a DigestInfo with CKM_RSA_PKCS
+        Tpm2Pkcs11BackendFixture.SkipUnlessTpmDoesUnpaddedRsa();
         using var session = OpenSession();
         string label = $"rsa-managedverify-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);

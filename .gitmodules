@@ -68,3 +68,8 @@
 	url = https://github.com/TrustedComputingGroup/TPM.git
 	shallow = true
 	ignore = untracked
+[submodule "vendor/ibmswtpm2"]
+	path = vendor/ibmswtpm2
+	url = https://github.com/kgoldman/ibmswtpm2.git
+	shallow = true
+	ignore = untracked

@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using System.Text.Json;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -10,7 +12,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// the TPM's storage hierarchy and runs RSA, ECDSA and HMAC on the TPM, through tpm2-tss.
 ///
 /// The TPM is a software one, private to the fixture, as <c>PKCS11_TEST_TPM</c> chooses: swtpm (the
-/// default) or the TCG's reference implementation (<c>tcgtpm</c>) behind the tpm2-abrmd resource manager,
+/// default, <c>swtpm-fips</c> with the profile a FIPS host allows, or <c>swtpm-min</c> with the fewest
+/// algorithms), the TCG's reference implementation
+/// (<c>tcgtpm</c>) or IBM's simulator (<c>ibmtpm</c>) behind the tpm2-abrmd resource manager,
 /// or wolfTPM's fwtpm_server (<c>fwtpm</c>), reached directly. <see cref="SoftwareTpm"/> starts it, and
 /// tpm2-abrmd and a D-Bus session bus for them where one is used, with the TPM's state in a temporary directory, so every run starts from a factory-state TPM and
 /// leaves nothing behind.
@@ -19,7 +23,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 ///
 /// The library and the programs come from the tpm2-pkcs11 image (build/tpm2-pkcs11/Dockerfile),
 /// which sets <see cref="Settings.Tpm2Pkcs11LibraryPath"/>, <see cref="Settings.SwtpmPath"/>,
-/// <see cref="Settings.FwtpmPath"/>, <see cref="Settings.TcgTpmPath"/>, <see cref="Settings.Tpm2AbrmdPath"/> and
+/// <see cref="Settings.FwtpmPath"/>, <see cref="Settings.TcgTpmPath"/>, <see cref="Settings.IbmTpmPath"/>,
+/// <see cref="Settings.Tpm2AbrmdPath"/> and
 /// <see cref="Settings.DbusDaemonPath"/>; the tests run inside
 /// it in CI. Elsewhere the variables are unset and the tests skip. Linux-only, like the image.
 ///
@@ -51,6 +56,35 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public bool TpmImplementsSha512 => Supports(CKM.CKM_SHA512_HMAC);
 
+    /// <summary>
+    /// Whether the TPM takes unpadded RSA (TPM2_RSA_Decrypt with the NULL scheme), which tpm2-pkcs11 builds
+    /// PKCS#1 v1.5 decryption, and <c>CKM_RSA_PKCS</c> signing of a caller's DigestInfo, on. A TPM restricted
+    /// to what a FIPS host allows refuses it (libtpms's <c>no-unpadded-encryption</c>, part of swtpm's
+    /// <c>fips-host</c> profile), and no capability says so, so this follows the TPM the fixture runs.
+    /// Signing with <c>CKM_SHA*_RSA_PKCS</c>, which the TPM pads itself (RSASSA), doesn't need it.
+    /// </summary>
+    public static bool TpmDoesUnpaddedRsa => TpmKind != SoftwareTpmKind.SwtpmFipsHost;
+
+    /// <summary>Skips a case that needs unpadded RSA on the TPM: see <see cref="TpmDoesUnpaddedRsa"/>.</summary>
+    internal static void SkipUnlessTpmDoesUnpaddedRsa()
+    {
+        if (!TpmDoesUnpaddedRsa)
+            Assert.Skip("The TPM refuses unpadded RSA (a FIPS-host profile), which tpm2-pkcs11 builds PKCS#1 v1.5 decryption and CKM_RSA_PKCS signing on.");
+    }
+
+    /// <summary>
+    /// Skips a case on a NIST curve the token's <c>CKM_EC_KEY_PAIR_GEN</c> key-size range leaves out: tpm2-pkcs11
+    /// states the range of the curves the TPM has, and a TPM needn't have P-521 (nor, on some, P-384).
+    /// </summary>
+    internal void SkipUnlessCurve(string curve) =>
+        ((IPkcs11Backend)this).RequireKeySize(CKM.CKM_EC_KEY_PAIR_GEN, curve switch
+        {
+            "P-256" => 256UL,
+            "P-384" => 384UL,
+            "P-521" => 521UL,
+            _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "A NIST curve name."),
+        });
+
     /// <summary>Skips a case that needs the TPM's SHA-512: see <see cref="TpmImplementsSha512"/>.</summary>
     internal void SkipUnlessTpmImplementsSha512(bool needsIt)
     {
@@ -70,7 +104,10 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     internal static SoftwareTpmKind TpmKind => Settings.Tpm2SoftwareTpm.ToLowerInvariant() switch
     {
         "fwtpm" => SoftwareTpmKind.Fwtpm,
+        "swtpm-fips" => SoftwareTpmKind.SwtpmFipsHost,
+        "swtpm-min" => SoftwareTpmKind.SwtpmMinimal,
         "tcgtpm" => SoftwareTpmKind.TcgReference,
+        "ibmtpm" => SoftwareTpmKind.Ibm,
         _ => SoftwareTpmKind.Swtpm,
     };
 
@@ -78,6 +115,7 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     {
         SoftwareTpmKind.Fwtpm => Settings.FwtpmPath,
         SoftwareTpmKind.TcgReference => Settings.TcgTpmPath,
+        SoftwareTpmKind.Ibm => Settings.IbmTpmPath,
         _ => Settings.SwtpmPath,
     };
 
@@ -245,6 +283,8 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
             SetEnv("TPM2_PKCS11_TCTI", _tpm.Tcti);
             SetEnv("TPM2_PKCS11_STORE", _storeDirectory);
             SetEnv("TPM2_PKCS11_LOG_LEVEL", Environment.GetEnvironmentVariable("TPM2_PKCS11_LOG_LEVEL") ?? "0");
+            if (Settings.Tpm2Pkcs11Backend.Equals("fapi", StringComparison.OrdinalIgnoreCase))
+                UseFapi(_storeDirectory, _tpm.Tcti);
 
             Library = Pkcs11Library.Load(LibraryPath);
             try
@@ -274,6 +314,55 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
             DeleteStore();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Points tpm2-pkcs11 at its FAPI backend: a FAPI configuration for the fixture's TPM, with its keystore in
+    /// <paramref name="directory"/> and no EK certificate (a software TPM has none), provisioned here with
+    /// <c>Fapi_Provision</c> as <c>tss2_provision</c> would. tpm2-pkcs11 then keeps its tokens under the
+    /// keystore's <c>/HS/SRK</c>.
+    /// </summary>
+    private static unsafe void UseFapi(string directory, string tcti)
+    {
+        string profiles = Settings.FapiProfileDirectory
+            ?? throw new InvalidOperationException("PKCS11_TEST_FAPI_PROFILES names no FAPI profile directory.");
+        string Dir(string name) => Directory.CreateDirectory(Path.Join(directory, name)).FullName;
+        string config = Path.Join(directory, "fapi-config.json");
+        File.WriteAllText(config, JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["profile_name"] = "P_ECCP256SHA256",
+            ["profile_dir"] = profiles,
+            ["user_dir"] = Dir("fapi-user"),
+            ["system_dir"] = Dir("fapi-system"),
+            ["log_dir"] = Dir("fapi-log"),
+            ["tcti"] = tcti,
+            ["system_pcrs"] = Array.Empty<int>(),
+            ["ek_cert_less"] = "yes",
+        }));
+        SetEnv("TSS2_FAPICONF", config);
+
+        IntPtr fapi = NativeLibrary.Load("libtss2-fapi.so.1");
+        try
+        {
+            var initialize = (delegate* unmanaged<IntPtr*, byte*, uint>)NativeLibrary.GetExport(fapi, "Fapi_Initialize");
+            var provision = (delegate* unmanaged<IntPtr, byte*, byte*, byte*, uint>)NativeLibrary.GetExport(fapi, "Fapi_Provision");
+            var finalize = (delegate* unmanaged<IntPtr*, void>)NativeLibrary.GetExport(fapi, "Fapi_Finalize");
+
+            IntPtr context = IntPtr.Zero;
+            uint rc = initialize(&context, null);
+            if (rc != 0)
+                throw new InvalidOperationException($"Fapi_Initialize failed: TSS2_RC 0x{rc:X}.");
+            rc = provision(context, null, null, null);
+            finalize(&context);
+            if (rc != 0)
+                throw new InvalidOperationException($"Fapi_Provision failed: TSS2_RC 0x{rc:X}.");
+        }
+        finally
+        {
+            NativeLibrary.Free(fapi);
+        }
+
+        SetEnv("TPM2_PKCS11_BACKEND", "fapi");
     }
 
     private static void SetEnv(string name, string value)

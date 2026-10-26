@@ -11,27 +11,43 @@ internal enum SoftwareTpmKind
     /// <summary>swtpm, over libtpms.</summary>
     Swtpm,
 
+    /// <summary>
+    /// swtpm with the profile a FIPS host restricts it to (<c>remove-disabled=fips-host</c>): no unpadded RSA
+    /// encryption, no RSAES-PKCS1-v1_5, no SHA-1 signatures, RSA keys of 2048 bits or more, ECC of 224 or more.
+    /// </summary>
+    SwtpmFipsHost,
+
+    /// <summary>
+    /// swtpm with the fewest algorithms libtpms allows, as many discrete TPMs have: RSA of 2048 bits or more,
+    /// ECC on P-256 and P-384 only, SHA-1, SHA-256 and SHA-384 (no SHA-512), and AES in CFB mode only.
+    /// </summary>
+    SwtpmMinimal,
+
     /// <summary>wolfTPM's firmware TPM (fwtpm_server), over wolfCrypt.</summary>
     Fwtpm,
 
     /// <summary>The TCG's TPM 2.0 reference implementation (tpm2-simulator), over OpenSSL.</summary>
     TcgReference,
+
+    /// <summary>IBM's TPM 2.0 simulator (ibmswtpm2's tpm_server), over OpenSSL.</summary>
+    Ibm,
 }
 
 /// <summary>
 /// One software TPM 2.0, private to its owner, as <see cref="BouncyHsmServer"/> is for BouncyHsm. For
-/// swtpm and the TCG reference implementation, three processes, each started once the one before it is
+/// swtpm, the TCG reference implementation and IBM's simulator, three processes, each started once the one before it is
 /// ready; for fwtpm_server, the first alone:
 /// <list type="number">
 /// <item>The TPM, listening on a freshly chosen pair of ports (the command port and, one above it, the
 /// control or platform port), past <c>TPM2_Startup</c>: swtpm on loopback only, started powered on and
 /// past it; wolfTPM's fwtpm_server, already powered on, which is sent <c>TPM2_Startup(CLEAR)</c>
-/// here; or the TCG reference implementation's tpm2-simulator, freshly manufactured, which the
-/// <c>mssim</c> TCTI powers on and tpm2-abrmd starts up. The first two take raw TPM commands on the
-/// command port, as the <c>swtpm</c> TCTI sends them; tpm2-simulator takes them framed for <c>mssim</c>.</item>
-/// <item>For swtpm and tpm2-simulator, a D-Bus session bus of its own, on a socket in the state
-/// directory, so nothing outside it is reached or needed.</item>
-/// <item>For swtpm and tpm2-simulator, tpm2-abrmd on that bus, connected to it. A TPM holds only three transient objects and a
+/// here; or the TCG reference implementation's tpm2-simulator or IBM's tpm_server, freshly
+/// manufactured, which the <c>mssim</c> TCTI powers on and tpm2-abrmd starts up. The first two take raw
+/// TPM commands on the command port, as the <c>swtpm</c> TCTI sends them; the last two take them framed
+/// for <c>mssim</c>.</item>
+/// <item>For all but fwtpm_server, a D-Bus session bus of its own, on a socket in the state directory, so
+/// nothing outside it is reached or needed.</item>
+/// <item>For all but fwtpm_server, tpm2-abrmd on that bus, connected to it. A TPM holds only three transient objects and a
 /// few sessions at a time; the resource manager swaps them in and out for its clients, as the
 /// kernel's <c>/dev/tpmrm0</c> does on a real machine, which tpm2-pkcs11 relies on. fwtpm_server can't
 /// sit behind one (its <c>TPM2_ContextSave</c> of an object keeps only a reference), so it is reached
@@ -91,9 +107,10 @@ internal sealed class SoftwareTpm : IDisposable
         {
             int port = FreeLoopbackPortPair();
             string tcti;
-            if (kind == SoftwareTpmKind.Swtpm)
+            if (kind is SoftwareTpmKind.Swtpm or SoftwareTpmKind.SwtpmFipsHost or SoftwareTpmKind.SwtpmMinimal)
             {
-                tpm.StartProcess("swtpm", tpmPath, SwtpmArguments(tpm._stateDirectory, port), environment: NoEnvironmentChanges,
+                tpm.StartProcess("swtpm", tpmPath, SwtpmArguments(tpm._stateDirectory, port, SwtpmProfile(kind)),
+                    environment: NoEnvironmentChanges,
                     isReady: _ => AcceptsConnections(port));
                 tcti = $"swtpm:host=127.0.0.1,port={port}";
             }
@@ -102,6 +119,14 @@ internal sealed class SoftwareTpm : IDisposable
                 // tpm2-simulator keeps its NV state in NVChip in its working directory, the state
                 // directory, and -m manufactures it afresh.
                 tpm.StartProcess("tpm2-simulator", tpmPath, TcgReferenceArguments(port), environment: NoEnvironmentChanges,
+                    isReady: _ => AcceptsConnections(port));
+                tcti = $"mssim:host=127.0.0.1,port={port}";
+            }
+            else if (kind == SoftwareTpmKind.Ibm)
+            {
+                // tpm_server keeps its NV state in NVChip in its working directory, the state directory,
+                // and -rm manufactures it afresh.
+                tpm.StartProcess("tpm_server", tpmPath, IbmArguments(port), environment: NoEnvironmentChanges,
                     isReady: _ => AcceptsConnections(port));
                 tcti = $"mssim:host=127.0.0.1,port={port}";
             }
@@ -151,15 +176,16 @@ internal sealed class SoftwareTpm : IDisposable
     // the first command is accepted. --profile name=custom,remove-disabled=check: the default profile
     // has Camellia and TDES, which an OpenSSL that disables them (Wolfi's, in the image, has neither)
     // makes swtpm refuse to start with; this profile drops whatever OpenSSL refuses, and tpm2-pkcs11
-    // uses neither. No --log: swtpm logs nothing by default.
-    internal static IReadOnlyList<string> SwtpmArguments(string stateDirectory, int port) =>
+    // uses neither. The other kinds' profiles are restricted further (see SwtpmProfile). No --log: swtpm
+    // logs nothing by default.
+    internal static IReadOnlyList<string> SwtpmArguments(string stateDirectory, int port, string profile = DefaultSwtpmProfile) =>
     [
         "socket", "--tpm2",
         "--tpmstate", $"dir={stateDirectory}",
         "--server", $"type=tcp,port={port},bindaddr=127.0.0.1",
         "--ctrl", $"type=tcp,port={port + 1},bindaddr=127.0.0.1",
         "--flags", "not-need-init,startup-clear",
-        "--profile", "name=custom,remove-disabled=check",
+        "--profile", profile,
     ];
 
     // The command port and, one above it, the platform port. fwtpm_server binds every interface; the
@@ -170,9 +196,28 @@ internal sealed class SoftwareTpm : IDisposable
         "--platform-port", $"{port + 1}",
     ];
 
+    private const string DefaultSwtpmProfile = "name=custom,remove-disabled=check";
+
+    // libtpms's algorithm names; P-256, P-384 and SHA-384 can't be removed.
+    private const string MinimalSwtpmProfile =
+        "profile={\"Name\":\"custom:minimal\",\"Algorithms\":\"rsa,rsa-min-size=2048,sha1,hmac,aes,aes-min-size=128," +
+        "mgf1,keyedhash,xor,sha256,sha384,null,rsassa,rsaes,rsapss,oaep,ecdsa,ecdh,ecc,ecc-min-size=256," +
+        "ecc-nist-p256,ecc-nist-p384,symcipher,cfb,kdf1-sp800-56a,kdf2,kdf1-sp800-108\"}";
+
+    private static string SwtpmProfile(SoftwareTpmKind kind) => kind switch
+    {
+        SoftwareTpmKind.SwtpmFipsHost => "name=custom,remove-disabled=fips-host",
+        SoftwareTpmKind.SwtpmMinimal => MinimalSwtpmProfile,
+        _ => DefaultSwtpmProfile,
+    };
+
     // The command port, and -m to manufacture the NV state. The platform port is always one above it.
     // tpm2-simulator binds every interface; the ports are freshly chosen and the test runs in a container.
     internal static IReadOnlyList<string> TcgReferenceArguments(int port) => [$"{port}", "-m"];
+
+    // The command port (the platform port is one above it), on loopback only, and -rm to manufacture the
+    // NV state.
+    internal static IReadOnlyList<string> IbmArguments(int port) => ["-port", $"{port}", "-ipaddr", "127.0.0.1", "-rm"];
 
     // TPM2_Startup(TPM_SU_CLEAR), as a raw command on the command port. TPM_RC_INITIALIZE says the TPM
     // was already started, which is as good.
