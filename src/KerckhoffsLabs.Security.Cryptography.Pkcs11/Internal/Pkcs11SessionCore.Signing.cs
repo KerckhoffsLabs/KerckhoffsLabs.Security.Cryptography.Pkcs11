@@ -408,18 +408,14 @@ internal sealed partial class Pkcs11SessionCore
                 => _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
             OpDecryptVerifyUpdate);
 
-        byte[]? lastPart = null;
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, default, lengthOnly: true, out NativeCULong lastPartLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
-
-        lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
+        byte[] lastPart = CallFinal(
+            (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, lengthOnly, out length),
+            OpDecryptFinal, bufferLength);
         try
         {
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, lengthOnly: false, out lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
             operation.End(CKF.CKF_DECRYPT);
 
-            outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
+            outputStream.Write(lastPart, 0, lastPart.Length);
         }
         finally
         {

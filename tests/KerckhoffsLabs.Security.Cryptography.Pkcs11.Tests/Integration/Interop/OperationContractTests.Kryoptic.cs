@@ -11,7 +11,9 @@ public sealed class OperationContractTests_Kryoptic(KryopticBackendFixture backe
 
     // No CbcPad_MultipartDecrypt_MatchesBcl: Kryoptic's C_DecryptFinal length query answers 0 for the
     // plaintext tail CBC-PAD holds back (decryption_len counts its own buffer, not the block the OpenSSL
-    // context holds), so a caller that allocates what was reported gets no tail.
+    // context holds; latchset/kryoptic#543), so a caller that allocates what was reported gets no tail.
+    // The case's raw half checks that query itself. The library's stream decryption gives the final part
+    // a block regardless, which DecryptAesTests_Kryoptic.AesCbcPad_StreamDecrypt_LastBlockComesFromFinal covers.
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationContractTestCases.BufferTooSmallOperations), MemberType = typeof(OperationContractTestCases))]
