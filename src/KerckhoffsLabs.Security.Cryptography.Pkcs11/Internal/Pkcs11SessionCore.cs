@@ -62,9 +62,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// a different thread calling while the lock is held fails immediately and
     /// <see cref="AcquireExclusive"/> throws.
     /// <para>
-    /// <see cref="Dispose(bool)"/> is the one exception: it waits for the lock instead of throwing,
-    /// because it cannot report contention by throwing and it must not close the session under an
-    /// in-flight native call. See the comment there.
+    /// <see cref="Dispose(bool)"/> and <see cref="LogoutAndDispose"/> are the exceptions: they wait for the
+    /// lock instead of throwing, because they cannot report contention by throwing and must not close the
+    /// session under an in-flight native call. See the comment there.
     /// </para>
     /// </remarks>
     private readonly object _busyLock = new();
@@ -671,24 +671,64 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     }
 
     /// <summary>
-    /// The logout an owning <see cref="Pkcs11Session"/> issues just before disposing this session.
-    /// Waits for the busy lock instead of going through <see cref="AcquireExclusive"/>, for the
-    /// reason <see cref="Dispose(bool)"/> does: it runs from a disposal, where throwing on
-    /// cross-thread contention would leave the session open and replace any exception a
-    /// surrounding <see langword="using"/> is unwinding. A session that is already disposed is left alone.
+    /// The disposal of an owning <see cref="Pkcs11Session"/>: logs out, then closes the session, under one
+    /// hold of the busy lock. Waits for that lock instead of going through <see cref="AcquireExclusive"/>,
+    /// for the reason <see cref="Dispose(bool)"/> does: throwing on cross-thread contention would leave the
+    /// session open and replace any exception a surrounding <see langword="using"/> is unwinding. A session
+    /// that is already disposed is left alone.
     /// </summary>
-    /// <exception cref="Pkcs11Exception">The token rejected the logout; the caller treats it as best-effort.</exception>
-    /// <exception cref="ObjectDisposedException">The library has already closed the session.</exception>
-    internal void LogoutForDispose()
+    /// <remarks>
+    /// <para>
+    /// One hold, so no call on another thread can run between the two: taking the lock once for the logout
+    /// and again for the close let such a call reach a session that was still open but logged out, where a
+    /// private object it used had become invisible (<c>CKR_OBJECT_HANDLE_INVALID</c>) instead of the call
+    /// finding the session disposed.
+    /// </para>
+    /// <para>
+    /// The logout is best-effort and the close is not. The token may answer the logout with an error (the
+    /// caller already logged out, <c>CKR_USER_NOT_LOGGED_IN</c>, or it rejects it during teardown), and a
+    /// library disposed meanwhile has already closed the session, which the logout's lease reports as
+    /// <see cref="ObjectDisposedException"/>; the session is closed regardless. <c>C_Logout</c> affects the
+    /// whole application's login state on the slot, which is the intended end-of-context behaviour for an
+    /// owned session.
+    /// </para>
+    /// </remarks>
+    internal void LogoutAndDispose()
     {
-        // Waits for the lock where AcquireExclusive would throw, then holds it the same way: the lease
-        // takes a reference on the session handle, so a library disposed meanwhile cannot close the
-        // session under the logout. A session the library has already closed throws
-        // ObjectDisposedException from Hold; there is nothing left to log out of.
+        bool lockTaken = false;
+        try
+        {
+            Monitor.Enter(_busyLock, ref lockTaken);
+            if (_disposed)
+                return;
+
+            try
+            {
+                LogoutForDispose();
+            }
+            catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException)
+            {
+                // Best-effort; see the remarks.
+            }
+
+            // Monitor is reentrant: the close runs inside the same hold as the logout.
+            Dispose();
+        }
+        finally
+        {
+            if (lockTaken)
+                Monitor.Exit(_busyLock);
+        }
+    }
+
+    // The logout of LogoutAndDispose, which already holds the lock. The lease takes it again (Monitor is
+    // reentrant) and a reference on the session handle, so a library disposed meanwhile cannot close the
+    // session under the logout; a session the library has already closed throws ObjectDisposedException
+    // from Hold.
+    private void LogoutForDispose()
+    {
         Monitor.Enter(_busyLock);
         using var lease = new ExclusiveLease(_busyLock);
-        if (_disposed)
-            return;
         lease.Hold(_sessionHandle);
 
         LogoutHeld();
@@ -706,7 +746,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         LogoutHeld();
     }
 
-    // The logout itself, shared by Logout and LogoutForDispose, which differ only in how they take the
+    // The logout itself, shared by Logout and LogoutAndDispose, which differ only in how they take the
     // session lease. The caller holds it.
     private void LogoutHeld()
     {

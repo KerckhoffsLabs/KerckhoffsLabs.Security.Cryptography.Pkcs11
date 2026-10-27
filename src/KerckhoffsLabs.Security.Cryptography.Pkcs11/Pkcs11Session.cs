@@ -113,25 +113,11 @@ public sealed partial class Pkcs11Session : IDisposable
     {
         if (_disposed) return;
 
-        // Explicitly log out before closing the session so the token's audit log records a
-        // logout, not just a session close. Best-effort: the caller may have already logged out
-        // (CKR_USER_NOT_LOGGED_IN), or the library/session may already be torn down — none of
-        // those should make disposal throw. C_Logout affects the whole application's login state
-        // on the slot, which is the intended end-of-context behaviour for an owned session.
-        // LogoutForDispose waits out a call in flight on another thread instead of throwing on
-        // the contention: the session close below must always be reached.
-        try
-        {
-            _core.LogoutForDispose();
-        }
-        catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException)
-        {
-            // Already logged out, session/library already gone (disposing the library closes every
-            // session it tracks, so the logout finds this one closed), or token rejected the logout
-            // during teardown — disposal proceeds regardless.
-        }
-
-        _core.Dispose();
+        // Explicitly log out before closing the session so the token's audit log records a logout, not
+        // just a session close. Both happen under one hold of the session's lock, so no call on another
+        // thread can reach the session once logged out but not yet closed; the logout is best-effort, the
+        // close always happens. See Pkcs11SessionCore.LogoutAndDispose.
+        _core.LogoutAndDispose();
         _disposed = true;
         GC.SuppressFinalize(this);
     }
