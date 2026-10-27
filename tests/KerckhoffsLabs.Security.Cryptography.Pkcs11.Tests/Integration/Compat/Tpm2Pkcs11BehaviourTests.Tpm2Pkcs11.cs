@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
@@ -12,7 +13,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // CKM_AES_CFB128 is the one AES mode every TPM here has: these cases end its operations, not use it.
-#pragma warning disable KLPKCS11009
+// CKM_RSA_PKCS is what the CKM_RSA_PKCS cases test.
+#pragma warning disable KLPKCS11008, KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 
@@ -397,6 +399,8 @@ public sealed unsafe class Tpm2Pkcs11BehaviourTests_Tpm2Pkcs11(Tpm2Pkcs11Backend
             Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, Rv(() => Derive(session, priv, raw, 32, keyType: CKK.CKK_AES)));
             // Only CKD_NULL.
             Assert.Equal(CKR.CKR_MECHANISM_PARAM_INVALID, Rv(() => Derive(session, priv, raw, 32, kdf: CKD.CKD_SHA256_KDF)));
+            // The derivation sets the value: one in the template would be what the key really holds.
+            Assert.Equal(CKR.CKR_TEMPLATE_INCONSISTENT, Rv(() => Derive(session, priv, raw, 32, value: new byte[32])));
         }
         finally
         {
@@ -426,7 +430,7 @@ public sealed unsafe class Tpm2Pkcs11BehaviourTests_Tpm2Pkcs11(Tpm2Pkcs11Backend
     }
 
     private static ObjectHandle Derive(Pkcs11SessionCore session, ObjectHandle priv, byte[] peer, ulong length,
-        CKO cls = CKO.CKO_SECRET_KEY, CKK keyType = CKK.CKK_GENERIC_SECRET, CKD kdf = CKD.CKD_NULL)
+        CKO cls = CKO.CKO_SECRET_KEY, CKK keyType = CKK.CKK_GENERIC_SECRET, CKD kdf = CKD.CKD_NULL, byte[]? value = null)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, cls);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, keyType);
@@ -434,8 +438,11 @@ public sealed unsafe class Tpm2Pkcs11BehaviourTests_Tpm2Pkcs11(Tpm2Pkcs11Backend
         using var sensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
         using var extractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
         using var len = new ObjectAttribute(CKA.CKA_VALUE_LEN, length);
-        return session.DeriveKey(new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(kdf, peer)), priv,
-            [c, t, token, sensitive, extractable, len]);
+        using var v = value is null ? null : new ObjectAttribute(CKA.CKA_VALUE, value);
+        List<ObjectAttribute> template = [c, t, token, sensitive, extractable, len];
+        if (v is not null)
+            template.Add(v);
+        return session.DeriveKey(new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(kdf, peer)), priv, template);
     }
 
     /// <summary><paramref name="raw"/> as a DER OCTET STRING, with a long-form length past 127 bytes.</summary>
@@ -650,6 +657,291 @@ public sealed unsafe class Tpm2Pkcs11BehaviourTests_Tpm2Pkcs11(Tpm2Pkcs11Backend
         }
     }
 
+    // ===== CKM_RSA_PKCS: the TPM's own schemes, and raw RSA for the rest ======================================
+
+    // A DigestInfo the TPM signs itself (RSASSA), so a TPM without unpadded RSA signs it too.
+    public static TheoryData<CKM, string> DigestInfoHashes => new()
+    {
+        { CKM.CKM_SHA256_RSA_PKCS, "SHA256" },
+        { CKM.CKM_SHA384_RSA_PKCS, "SHA384" },
+        { CKM.CKM_SHA512_RSA_PKCS, "SHA512" },
+    };
+
+    [Theory(SkipUnless = Available, SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + Available)]
+    [MemberData(nameof(DigestInfoHashes))]
+    public void RsaPkcs_DigestInfo_SignsAsItsHashMechanismDoes(CKM hashMechanism, string hash)
+    {
+        if (!_backend.Supports(hashMechanism))
+            Assert.Skip($"The TPM doesn't have {hash}.");
+        if (hashMechanism == CKM.CKM_SHA512_RSA_PKCS && !Tpm2Pkcs11BackendFixture.TpmSignsRsassaSha512)
+            Assert.Skip("The TPM's RSASSA SHA-512 signatures are wrong (wolfTPM's fwTPM, unreported).");
+        Pkcs11SessionCore session = OpenSession();
+        try
+        {
+            var (pub, priv) = GenerateRsaSignDecryptKeyPair(session);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            var name = new HashAlgorithmName(hash);
+            byte[] data = RandomNumberGenerator.GetBytes(100);
+            byte[] digestInfo = [.. DigestInfoPrefix(hash), .. CryptographicOperations.HashData(name, data)];
+
+            byte[] signature = session.Sign(new Mechanism(CKM.CKM_RSA_PKCS), priv, digestInfo);
+
+            // PKCS#1 v1.5 signatures are deterministic
+            Assert.Equal(session.Sign(new Mechanism(hashMechanism), priv, data), signature);
+            using RSA rsa = TokenRsa(session, pub);
+            Assert.True(rsa.VerifyData(data, signature, name, RSASignaturePadding.Pkcs1));
+        }
+        finally
+        {
+            Close(session);
+        }
+    }
+
+    // Anything else is padded in software and signed with unpadded RSA, which a FIPS-host TPM refuses.
+    [Fact(SkipUnless = Available, SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + Available)]
+    public void RsaPkcs_DataThatIsntADigestInfo_IsSignedWithUnpaddedRsa()
+    {
+        Pkcs11SessionCore session = OpenSession();
+        try
+        {
+            var (pub, priv) = GenerateRsaSignDecryptKeyPair(session);
+            byte[] data = RandomNumberGenerator.GetBytes(36); // an MD5 and SHA-1 pair, as TLS 1.0 signs
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+
+            if (!Tpm2Pkcs11BackendFixture.TpmDoesUnpaddedRsa)
+            {
+                // the TPM refuses the NULL scheme (TPM_RC_SCHEME)
+                Assert.Equal(CKR.CKR_FUNCTION_FAILED, Rv(() => session.Sign(new Mechanism(CKM.CKM_RSA_PKCS), priv, data)));
+                return;
+            }
+
+            byte[] signature = session.Sign(new Mechanism(CKM.CKM_RSA_PKCS), priv, data);
+
+            // s^e mod n is the EMSA-PKCS1-v1_5 block, 00 01 FF..FF 00 data (its leading zero dropped)
+            using RSA rsa = TokenRsa(session, pub);
+            RSAParameters key = rsa.ExportParameters(false);
+            var n = new BigInteger(key.Modulus, isUnsigned: true, isBigEndian: true);
+            var e = new BigInteger(key.Exponent, isUnsigned: true, isBigEndian: true);
+            byte[] block = BigInteger.ModPow(new BigInteger(signature, isUnsigned: true, isBigEndian: true), e, n)
+                .ToByteArray(isUnsigned: true, isBigEndian: true);
+            byte[] expected = [0x01, .. Enumerable.Repeat((byte)0xFF, key.Modulus!.Length - 3 - data.Length), 0x00, .. data];
+            Assert.Equal(expected, block);
+        }
+        finally
+        {
+            Close(session);
+        }
+    }
+
+    // Decryption uses the TPM's RSAES, or unpadded RSA without it; a FIPS-host TPM has neither.
+    [Fact(SkipUnless = Available, SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + Available)]
+    public void RsaPkcs_Decrypt_RecoversWhatDotNetEncrypted()
+    {
+        Pkcs11SessionCore session = OpenSession();
+        try
+        {
+            var (pub, priv) = GenerateRsaSignDecryptKeyPair(session);
+            byte[] secret = RandomNumberGenerator.GetBytes(32);
+            byte[] ciphertext;
+            using (RSA rsa = TokenRsa(session, pub))
+                ciphertext = rsa.Encrypt(secret, RSAEncryptionPadding.Pkcs1);
+
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            if (!Tpm2Pkcs11BackendFixture.TpmDecryptsPkcs1)
+            {
+                // neither RSAES nor the NULL scheme (TPM_RC_SCHEME)
+                Assert.Equal(CKR.CKR_FUNCTION_FAILED, Rv(() => session.Decrypt(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext)));
+                return;
+            }
+
+            Assert.Equal(secret, session.Decrypt(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext));
+        }
+        finally
+        {
+            Close(session);
+        }
+    }
+
+    private static byte[] DigestInfoPrefix(string hash) => hash switch
+    {
+        // RFC 8017 section 9.2, note 1
+        "SHA256" => Convert.FromHexString("3031300d060960864801650304020105000420"),
+        "SHA384" => Convert.FromHexString("3041300d060960864801650304020205000430"),
+        "SHA512" => Convert.FromHexString("3051300d060960864801650304020305000440"),
+        _ => throw new ArgumentOutOfRangeException(nameof(hash), hash, "Unknown hash."),
+    };
+
+    private static RSA TokenRsa(Pkcs11SessionCore session, ObjectHandle pub)
+    {
+        using var values = session.GetAttributeValue(pub, [CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT]);
+        return RSA.Create(new RSAParameters
+        {
+            Modulus = values[0].GetValueAsByteArray(),
+            Exponent = values[1].GetValueAsByteArray(),
+        });
+    }
+
+    private static (ObjectHandle pub, ObjectHandle priv) GenerateRsaSignDecryptKeyPair(Pkcs11SessionCore session)
+    {
+        using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var encrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var bits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, 2048UL);
+        using var pcls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var decrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
+            [cls, type, token, verify, encrypt, bits], [pcls, type, token, sign, decrypt], out var pub, out var priv);
+        return (pub, priv);
+    }
+
+    // ===== Empty data, and an empty signature, without a buffer ================================================
+
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable))]
+    public void EmptyDataOrSignatureWithoutABuffer_IsSignedAndVerified()
+    {
+        Pkcs11SessionCore session = OpenSession();
+        try
+        {
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            var sid = (NativeCULong)session.SessionId;
+            nuint s = (nuint)(ulong)session.SessionId;
+            var sign = (delegate* unmanaged<nuint, byte*, nuint, byte*, nuint*, nuint>)Export("C_Sign");
+            var verify = (delegate* unmanaged<nuint, byte*, nuint, byte*, nuint, nuint>)Export("C_Verify");
+            var verifySignatureInit = (delegate* unmanaged<nuint, CK_MECHANISM*, nuint, byte*, nuint, nuint>)Export("C_VerifySignatureInit");
+            var verifySignature = (delegate* unmanaged<nuint, byte*, nuint, nuint>)Export("C_VerifySignature");
+
+            var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+            using var scope = new MechanismParameterScope();
+            // CKM_ECDSA keeps the data, rather than hashing it as it comes
+            CK_MECHANISM ecdsa = ToNative(new Mechanism(CKM.CKM_ECDSA), scope);
+
+            // The empty message's digest, zero-padded, is all zeros, which some TPMs won't sign.
+            if (Tpm2Pkcs11BackendFixture.TpmSignsZeroEcdsaDigest)
+            {
+                byte[] signature = new byte[64];
+                nuint length = (nuint)signature.Length;
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_SignInit(sid, in ecdsa, Id(priv)));
+                fixed (byte* sig = signature)
+                    Assert.Equal(0u, (uint)sign(s, null, 0, sig, &length));
+                Assert.Equal(64u, (uint)length);
+
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_VerifyInit(sid, in ecdsa, Id(pub)));
+                fixed (byte* sig = signature)
+                    Assert.Equal(0u, (uint)verify(s, null, 0, sig, length));
+            }
+
+            // An empty signature is an invalid one, which C_VerifySignature says.
+            Assert.Equal(0u, (uint)verifySignatureInit(s, &ecdsa, (nuint)(ulong)pub.ObjectId, null, 0));
+            Assert.NotEqual(CKR.CKR_OK, (CKR)(ulong)verifySignature(s, null, 0));
+            Assert.Equal(CKR.CKR_OPERATION_NOT_INITIALIZED, lowLevel.C_VerifySignatureFinal(sid));
+        }
+        finally
+        {
+            Close(session);
+        }
+    }
+
+    // ===== Changing a key's attributes ==========================================================================
+
+    // The TPM's attributes are wider (an RSA signing key can decrypt), so a usage can be turned off, not on.
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable))]
+    public void SetAttributeValue_WideningAKey_IsRefused()
+    {
+        Pkcs11SessionCore session = OpenSession();
+        try
+        {
+            using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+            using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+            using var bits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, 2048UL);
+            using var pcls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+            using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+            using var noDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, false);
+            session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), [cls, type, token, verify, bits],
+                [pcls, type, token, sign, noDecrypt], out _, out var priv);
+
+            Assert.Equal(CKR.CKR_ATTRIBUTE_READ_ONLY, Rv(() => Set(session, priv, CKA.CKA_DECRYPT, true)));
+            Assert.Equal(CKR.CKR_ATTRIBUTE_READ_ONLY, Rv(() => Set(session, priv, CKA.CKA_EXTRACTABLE, true)));
+            Assert.Equal(CKR.CKR_ATTRIBUTE_READ_ONLY, Rv(() => Set(session, priv, CKA.CKA_SENSITIVE, false)));
+            // Narrowing it is fine, and then it stays narrow.
+            Assert.Equal(CKR.CKR_OK, Rv(() => Set(session, priv, CKA.CKA_SIGN, false)));
+            Assert.Equal(CKR.CKR_ATTRIBUTE_READ_ONLY, Rv(() => Set(session, priv, CKA.CKA_SIGN, true)));
+            Assert.Equal(CKR.CKR_OK, Rv(() => Set(session, priv, CKA.CKA_DECRYPT, false)));
+        }
+        finally
+        {
+            Close(session);
+        }
+    }
+
+    private static void Set(Pkcs11SessionCore session, ObjectHandle handle, CKA type, bool value)
+    {
+        using var a = new ObjectAttribute(type, value);
+        session.SetAttributeValue(handle, [a]);
+    }
+
+    // A generic secret that must be readable can't be in the TPM: it stays an object holding its value.
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable))]
+    public void CreateObject_ReadableGenericSecret_KeepsItsValue()
+    {
+        Pkcs11SessionCore session = OpenSession();
+        try
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKA_SENSITIVE=false
+            byte[] value = RandomNumberGenerator.GetBytes(24);
+            ObjectHandle handle = ImportHmac(session,
+                [(CKA.CKA_VALUE, value), (CKA.CKA_SENSITIVE, false), (CKA.CKA_EXTRACTABLE, true), (CKA.CKA_SIGN, null)]);
+
+            using var read = session.GetAttributeValue(handle, [CKA.CKA_VALUE]);
+            Assert.Equal(value, read[0].GetValueAsByteArray());
+        }
+        finally
+        {
+            Close(session);
+        }
+    }
+
+    // ===== A session object outlives its session while another uses it ===========================================
+
+    // It has no store: changing or destroying it once its session is gone works, on either backend.
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable))]
+    public void SessionObjectInUseWhenItsSessionCloses_CanBeChangedAndDestroyed()
+    {
+        Pkcs11SessionCore user = OpenSession();
+        Pkcs11SessionCore? creator = null;
+        try
+        {
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            var sid = (NativeCULong)user.SessionId;
+            nuint s = (nuint)(ulong)user.SessionId;
+            var signInit = (delegate* unmanaged<nuint, IntPtr, nuint, nuint>)Export("C_SignInit");
+
+            // a second session of the logged-in application, which needn't log in
+            creator = _backend.Library.GetSlotList().First(sl => (NativeCULong)sl.SlotId.Value == _backend.SlotId).OpenSessionCore();
+            var (_, priv) = TestKeys.GenerateEcP256KeyPair(creator);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM ecdsa = ToNative(new Mechanism(CKM.CKM_ECDSA_SHA256), scope);
+
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_SignInit(sid, in ecdsa, Id(priv)));
+            creator.Dispose();
+            creator = null;
+            Assert.Equal(0u, (uint)signInit(s, IntPtr.Zero, 0));
+
+            using var label = new ObjectAttribute(CKA.CKA_LABEL, "orphaned");
+            user.SetAttributeValue(priv, [label]);
+            user.DestroyObject(priv);
+        }
+        finally
+        {
+            creator?.Dispose();
+            Close(user);
+        }
+    }
+
     // ===== Using a key for what it doesn't allow ================================================================
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.DeriveOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.DeriveOnlyKeyPairsAvailable))]
@@ -738,6 +1030,11 @@ public sealed unsafe class Tpm2Pkcs11BehaviourTests_Tpm2Pkcs11(Tpm2Pkcs11Backend
         { "no value", CKR.CKR_TEMPLATE_INCOMPLETE, [(CKA.CKA_VALUE, null)] },
         { "an empty value", CKR.CKR_ATTRIBUTE_VALUE_INVALID, [(CKA.CKA_VALUE, Array.Empty<byte>())] },
         { "a CKA_VALUE_LEN that isn't the value's", CKR.CKR_TEMPLATE_INCONSISTENT, [(CKA.CKA_VALUE_LEN, 16UL)] },
+        // what only the token sets: an imported key was outside it
+        { "CKA_NEVER_EXTRACTABLE", CKR.CKR_ATTRIBUTE_READ_ONLY, [(CKA.CKA_NEVER_EXTRACTABLE, true)] },
+        { "CKA_ALWAYS_SENSITIVE", CKR.CKR_ATTRIBUTE_READ_ONLY, [(CKA.CKA_ALWAYS_SENSITIVE, true)] },
+        { "CKA_KEY_GEN_MECHANISM", CKR.CKR_ATTRIBUTE_READ_ONLY, [(CKA.CKA_KEY_GEN_MECHANISM, (ulong)CKM.CKM_GENERIC_SECRET_KEY_GEN)] },
+        { "CKA_LOCAL=true", CKR.CKR_ATTRIBUTE_VALUE_INVALID, [(CKA.CKA_LOCAL, true)] },
     };
 
     [Theory(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable))]

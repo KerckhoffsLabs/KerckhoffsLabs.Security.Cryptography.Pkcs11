@@ -84,7 +84,7 @@ public sealed class RSAPkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture backend)
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.RsaEncryptionAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 C_Encrypt answers a short buffer with CKR_GENERAL_ERROR, not CKR_BUFFER_TOO_SMALL")]
     public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips()
     {
-        Tpm2Pkcs11BackendFixture.SkipUnlessTpmDoesUnpaddedRsa();
+        Tpm2Pkcs11BackendFixture.SkipUnlessTpmDecryptsPkcs1();
         RSAPkcs11TestCases.Assert_EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips(_backend);
     }
 
@@ -103,7 +103,7 @@ public sealed class RSAPkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture backend)
     public void Decrypt_CiphertextNotBelowTheModulus_Throws(string padding)
     {
         if (padding == "Pkcs1")
-            Tpm2Pkcs11BackendFixture.SkipUnlessTpmDoesUnpaddedRsa();
+            Tpm2Pkcs11BackendFixture.SkipUnlessTpmDecryptsPkcs1();
         RSAPkcs11TestCases.Assert_Decrypt_CiphertextNotBelowTheModulus_Throws(_backend, padding);
     }
 
@@ -129,10 +129,5 @@ public sealed class RSAPkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture backend)
     public void SignHash_Pss_InteropsWithSignDataAndBcl() => RSAPkcs11TestCases.Assert_SignHash_Pss_InteropsWithSignDataAndBcl(_backend);
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
-    public void SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData()
-    {
-        // SignHash signs a DigestInfo with CKM_RSA_PKCS
-        Tpm2Pkcs11BackendFixture.SkipUnlessTpmDoesUnpaddedRsa();
-        RSAPkcs11TestCases.Assert_SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(_backend);
-    }
+    public void SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData() => RSAPkcs11TestCases.Assert_SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(_backend);
 }

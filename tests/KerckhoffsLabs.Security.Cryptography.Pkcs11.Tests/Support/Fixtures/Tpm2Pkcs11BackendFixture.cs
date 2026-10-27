@@ -57,19 +57,46 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     public bool TpmImplementsSha512 => Supports(CKM.CKM_SHA512_HMAC);
 
     /// <summary>
-    /// Whether the TPM takes unpadded RSA (TPM2_RSA_Decrypt with the NULL scheme), which tpm2-pkcs11 builds
-    /// PKCS#1 v1.5 decryption, and <c>CKM_RSA_PKCS</c> signing of a caller's DigestInfo, on. A TPM restricted
-    /// to what a FIPS host allows refuses it (libtpms's <c>no-unpadded-encryption</c>, part of swtpm's
-    /// <c>fips-host</c> profile), and no capability says so, so this follows the TPM the fixture runs.
-    /// Signing with <c>CKM_SHA*_RSA_PKCS</c>, which the TPM pads itself (RSASSA), doesn't need it.
+    /// Whether the TPM takes unpadded RSA (TPM2_RSA_Decrypt with the NULL scheme). tpm2-pkcs11 needs it to sign
+    /// with <c>CKM_RSA_PKCS</c> anything but a DigestInfo (which the TPM signs itself, with RSASSA), to sign PSS
+    /// with a hash-length salt on a TPM that salts RSAPSS to the maximum, and to decrypt PKCS#1 v1.5 on a TPM
+    /// without RSAES. A TPM restricted to what a FIPS host allows (swtpm's
+    /// <c>fips-host</c> profile) has neither unpadded RSA (libtpms's <c>no-unpadded-encryption</c>) nor RSAES,
+    /// and no capability says the first, so this follows the TPM the fixture runs.
     /// </summary>
     public static bool TpmDoesUnpaddedRsa => TpmKind != SoftwareTpmKind.SwtpmFipsHost;
+
+    /// <summary>
+    /// Whether the TPM decrypts PKCS#1 v1.5, with RSAES or unpadded RSA: every TPM here but one restricted to
+    /// what a FIPS host allows, which has neither (see <see cref="TpmDoesUnpaddedRsa"/>).
+    /// </summary>
+    public static bool TpmDecryptsPkcs1 => TpmDoesUnpaddedRsa;
+
+    /// <summary>
+    /// Whether the TPM's RSASSA signatures under SHA-512 are right: wolfTPM's fwTPM (v4.2.0 and master) puts the
+    /// digest three bytes early in the PKCS#1 v1.5 block, so <c>CKM_SHA512_RSA_PKCS</c>, and <c>CKM_RSA_PKCS</c>
+    /// over a SHA-512 DigestInfo (which tpm2-pkcs11 has the TPM sign), make signatures nothing verifies.
+    /// </summary>
+    public static bool TpmSignsRsassaSha512 => TpmKind is not (SoftwareTpmKind.Fwtpm);
+
+    /// <summary>
+    /// Whether the TPM signs an all-zero ECDSA digest (the empty message's, zero-padded), as ECDSA allows:
+    /// wolfTPM's fwTPM (v4.2.0 and master) answers TPM_RC_FAILURE.
+    /// </summary>
+    public static bool TpmSignsZeroEcdsaDigest => TpmKind is not (SoftwareTpmKind.Fwtpm);
 
     /// <summary>Skips a case that needs unpadded RSA on the TPM: see <see cref="TpmDoesUnpaddedRsa"/>.</summary>
     internal static void SkipUnlessTpmDoesUnpaddedRsa()
     {
         if (!TpmDoesUnpaddedRsa)
-            Assert.Skip("The TPM refuses unpadded RSA (a FIPS-host profile), which tpm2-pkcs11 builds PKCS#1 v1.5 decryption and CKM_RSA_PKCS signing on.");
+            Assert.Skip("The TPM refuses unpadded RSA (a FIPS-host profile).");
+    }
+
+    /// <summary>Skips a case that decrypts PKCS#1 v1.5: see <see cref="TpmDecryptsPkcs1"/>.</summary>
+    internal static void SkipUnlessTpmDecryptsPkcs1()
+    {
+        if (!TpmDecryptsPkcs1)
+            Assert.Skip("The TPM has neither RSAES nor unpadded RSA (a FIPS-host profile), so it doesn't decrypt PKCS#1 v1.5.");
     }
 
     /// <summary>
