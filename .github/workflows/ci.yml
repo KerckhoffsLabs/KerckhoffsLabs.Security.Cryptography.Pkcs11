@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.402' # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
+          global-json-file: global.json # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
       - run: dotnet restore KerckhoffsLabs.sln --locked-mode
 
@@ -79,7 +79,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.402' # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
+          global-json-file: global.json # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
           # macOS runners are Apple Silicon: use the native arm64 SDK. Forcing x64 there runs
           # dotnet under Rosetta, so the pkcs11-mock build script's `uname -m` reports x86_64
           # (places the lib under osx-x64) while the testhost resolves osx-arm64 — a mismatch that
@@ -386,7 +386,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.402' # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
+          global-json-file: global.json # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
       # Native AOT links with clang against zlib; build-essential also provides the gcc/make
       # that build-pkcs11-mock.sh uses to compile the mock module below. macOS runners already
@@ -508,7 +508,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.402' # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
+          global-json-file: global.json # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
       # Points the backend's fixture at the staged module, and arms its compliance tests, which fail
       # the leg if the module is not actually pre-v3.0.
