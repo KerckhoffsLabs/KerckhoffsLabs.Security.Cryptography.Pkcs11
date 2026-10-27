@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
@@ -60,6 +61,18 @@ internal readonly record struct ObjectHandle
     /// <see langword="true"/> when this handle equals <see cref="CK.CK_INVALID_HANDLE"/> (i.e. <see langword="default"/>).
     /// </summary>
     public bool IsInvalid => ObjectId == CK.CK_INVALID_HANDLE;
+
+    /// <summary>
+    /// A handle the module returned with <c>CKR_OK</c> for an object it created or found.
+    /// <see cref="CK.CK_INVALID_HANDLE"/> names no object, so a module that returns it has failed
+    /// without saying so; that is refused here, where the handle comes back, rather than passed on.
+    /// </summary>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_GENERAL_ERROR"/> when <paramref name="objectId"/> is <see cref="CK.CK_INVALID_HANDLE"/>.</exception>
+    internal static ObjectHandle FromModule(NativeCULong objectId, string function)
+        => (ulong)objectId != CK.CK_INVALID_HANDLE
+            ? new ObjectHandle((ulong)objectId)
+            : throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+                $"{function} (the module returned CKR_OK with CK_INVALID_HANDLE)");
 
     /// <inheritdoc />
     public override string ToString() => $"ObjectHandle(0x{ObjectId:X})";

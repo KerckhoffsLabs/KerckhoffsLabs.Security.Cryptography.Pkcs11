@@ -237,6 +237,10 @@ public sealed class Pkcs11Slot
 
         CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, out NativeCULong sessionId);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpOpenSession);
+        // CK_INVALID_HANDLE names no session, so there is nothing to close either.
+        if ((ulong)sessionId == CK.CK_INVALID_HANDLE)
+            throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+                $"{Pkcs11Operations.OpOpenSession} (the module returned CKR_OK with CK_INVALID_HANDLE)");
 
         // Owned before any consumer code (the logger) runs, so a throw there closes the session
         // rather than leaving it open with nothing to close it.
