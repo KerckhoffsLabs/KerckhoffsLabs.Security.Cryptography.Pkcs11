@@ -72,7 +72,7 @@ public sealed class Pkcs11SessionCoreMessageAndMiscTests
     public void MessageEncrypt_ShortGcmTag_IsRefusedByThePolicy_BeforeTheToken()
     {
         using var fake = new MessageFake();
-        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.SecureOnly);
+        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.Recommended);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 8);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
@@ -86,7 +86,7 @@ public sealed class Pkcs11SessionCoreMessageAndMiscTests
     public void MessageDecrypt_ShortCcmMac_IsRefusedByThePolicy_BeforeTheToken()
     {
         using var fake = new MessageFake();
-        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.SecureOnly);
+        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.Recommended);
         var p = CkmCcmMessageParams.ForDecrypt(2, new byte[12], new byte[4]);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
@@ -100,7 +100,7 @@ public sealed class Pkcs11SessionCoreMessageAndMiscTests
     public void MessageEncrypt_FullGcmTag_IsAllowedByThePolicy()
     {
         using var fake = new MessageFake { Ciphertext = [1, 2] };
-        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.SecureOnly);
+        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.Recommended);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
         Assert.Equal(new byte[] { 1, 2 },

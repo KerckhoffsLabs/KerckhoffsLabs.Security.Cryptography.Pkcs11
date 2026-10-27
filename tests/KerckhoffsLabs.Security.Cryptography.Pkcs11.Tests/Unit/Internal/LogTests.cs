@@ -127,10 +127,10 @@ public sealed class LogTests
     public void SessionOpened_IsInformation()
     {
         var log = new CapturingLogger();
-        Log.SessionOpened(log, "read-write", 7, 1, "SecureOnly");
+        Log.SessionOpened(log, "read-write", 7, 1, "Recommended");
         var e = Only(log);
         Assert.Equal(LogLevel.Information, e.Level);
-        Assert.Equal("Opened read-write session 7 with token in slot 1 under SecureOnly policy", e.Message);
+        Assert.Equal("Opened read-write session 7 with token in slot 1 under Recommended policy", e.Message);
     }
 
     [Fact]

@@ -11,8 +11,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 // not what this test pins, so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11008
 // SHA-1 mechanisms are used on purpose: the synthesis tests cover every mapped mechanism, and the
-// policy tests pin that the managed fallback refuses them under SecureOnly (and allows legacy
-// verification under FipsOnly), and that PKCS#1 v1.5 over a SHA-1 digest is refused.
+// policy tests pin that the managed fallback refuses them under Recommended (and allows legacy
+// verification under NistApproved), and that PKCS#1 v1.5 over a SHA-1 digest is refused.
 #pragma warning disable KLPKCS11009, KLPKCS11010
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -318,7 +318,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     [Theory]
     [InlineData(CKM.CKM_SHA1_RSA_PKCS)]
     [InlineData(CKM.CKM_SHA1_RSA_PKCS_PSS)]
-    public void ManagedFallback_UnderSecureOnly_RefusesSha1RsaVerification(CKM mechanismType)
+    public void ManagedFallback_UnderRecommended_RefusesSha1RsaVerification(CKM mechanismType)
     {
         var (hash, padding) = HashAndPaddingFor(mechanismType);
         using var rsa = RSA.Create(2048);
@@ -328,12 +328,12 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => key.Verify(new Mechanism(mechanismType), Data, signature));
-        Assert.Equal("SecureOnly", ex.PolicyName);
+        Assert.Equal("Recommended", ex.PolicyName);
         Assert.Equal(mechanismType, ex.Mechanism);
     }
 
     [Fact]
-    public void ManagedFallback_UnderSecureOnly_AllowsSha256RsaVerification()
+    public void ManagedFallback_UnderRecommended_AllowsSha256RsaVerification()
     {
         using var rsa = RSA.Create(2048);
         byte[] signature = rsa.SignData(Data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
@@ -344,7 +344,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     }
 
     // PKCS#1 v1.5 over a caller's digest takes the same fallback on a private-only key, judged as the
-    // combined mechanism: allowed for SHA-256 under SecureOnly, refused for SHA-1.
+    // combined mechanism: allowed for SHA-256 under Recommended, refused for SHA-1.
     [Fact]
     public void ManagedFallback_Pkcs1DigestVerification_IsJudgedAsTheCombinedMechanism()
     {
@@ -364,7 +364,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     }
 
     [Fact]
-    public void ManagedFallback_UnderSecureOnly_RefusesAnUnlistedVendorMechanism()
+    public void ManagedFallback_UnderRecommended_RefusesAnUnlistedVendorMechanism()
     {
         using var rsa = RSA.Create(2048);
         using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
@@ -374,21 +374,21 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
             () => key.Verify(new Mechanism((CKM)0x8000_1234UL), Data, new byte[256]));
     }
 
-    // FipsOnly allows SHA-1 RSA signatures only for Verify (legacy use): proves the fallback reports
+    // NistApproved allows SHA-1 RSA signatures only for Verify (legacy use): proves the fallback reports
     // the verification direction, not just that it consults the policy.
     [Fact]
-    public void ManagedFallback_UnderFipsOnly_AllowsLegacySha1RsaVerification()
+    public void ManagedFallback_UnderNistApproved_AllowsLegacySha1RsaVerification()
     {
         using var rsa = RSA.Create(2048);
         byte[] signature = rsa.SignData(Data, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
-        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), CryptoPolicy.FipsOnly);
+        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), CryptoPolicy.NistApproved);
         Pkcs11Key key = fake;
 
         Assert.True(key.Verify(new Mechanism(CKM.CKM_SHA1_RSA_PKCS), Data, signature));
     }
 
     [Fact]
-    public void ManagedFallback_UnderSecureOnly_RefusesSha1EcdsaVerification()
+    public void ManagedFallback_UnderRecommended_RefusesSha1EcdsaVerification()
     {
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         ECParameters pub = ec.ExportParameters(includePrivateParameters: false);

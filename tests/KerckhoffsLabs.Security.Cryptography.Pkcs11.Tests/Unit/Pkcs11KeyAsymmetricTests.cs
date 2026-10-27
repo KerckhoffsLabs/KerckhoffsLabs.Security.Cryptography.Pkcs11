@@ -349,7 +349,7 @@ public sealed class Pkcs11KeyAsymmetricTests
     private static readonly byte[] HkdfInfo = "mac key"u8.ToArray();
     private static readonly byte[] ProbeMessage = "probe"u8.ToArray();
 
-    public static TheoryData<string> Policies => ["SecureOnly", "FipsOnly"];
+    public static TheoryData<string> Policies => ["Recommended", "NistApproved"];
 
     // The whole key schedule on the token under a default policy: agree into Z, HKDF Z into an HMAC key,
     // MAC a probe. No secret byte is read; the BCL peer computes the same MAC from its own Z.
@@ -358,7 +358,7 @@ public sealed class Pkcs11KeyAsymmetricTests
     public void DeriveSecretAgreement_ThenHkdfOnTheToken_MatchesBcl(string policy)
     {
         using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy == "FipsOnly" ? CryptoPolicy.FipsOnly : CryptoPolicy.SecureOnly);
+        using var session = ManagedToken.OpenSession(library, policy == "NistApproved" ? CryptoPolicy.NistApproved : CryptoPolicy.Recommended);
         using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 

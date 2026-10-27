@@ -9,16 +9,16 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security;
 
 /// <summary>
-/// Backend-agnostic checks of <see cref="CryptoPolicy.FipsOnly"/> on a real token: approved mechanisms
+/// Backend-agnostic checks of <see cref="CryptoPolicy.NistApproved"/> on a real token: approved mechanisms
 /// reach the module and work, and refused ones are stopped before it.
 /// </summary>
-internal static class FipsOnlyPolicyTestCases
+internal static class NistApprovedPolicyTestCases
 {
-    // A FipsOnly session over the backend's own authentication model (no login on NSS's public token).
+    // A NistApproved session over the backend's own authentication model (no login on NSS's public token).
     private static Pkcs11Session OpenFips(IPkcs11Backend backend) =>
         backend.RequiresUserLogin
-            ? backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span), CryptoPolicy.FipsOnly)
-            : backend.Library.OpenSessionWithoutLogin(backend.TokenLabel, CryptoPolicy.FipsOnly);
+            ? backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span), CryptoPolicy.NistApproved)
+            : backend.Library.OpenSessionWithoutLogin(backend.TokenLabel, CryptoPolicy.NistApproved);
 
     internal static void Assert_AesGcm_RoundTrips(IPkcs11Backend backend)
     {
@@ -56,7 +56,7 @@ internal static class FipsOnlyPolicyTestCases
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => key.Encrypt(new Mechanism(CKM.CKM_CHACHA20_POLY1305), [1]));
 
-        Assert.Equal("FipsOnly", ex.PolicyName);
+        Assert.Equal("NistApproved", ex.PolicyName);
         Assert.Equal(CKM.CKM_CHACHA20_POLY1305, ex.Mechanism);
     }
 
@@ -69,6 +69,6 @@ internal static class FipsOnlyPolicyTestCases
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => key.Encrypt(new Mechanism(CKM.CKM_RSA_PKCS), [1]));
 
-        Assert.Equal("FipsOnly", ex.PolicyName);
+        Assert.Equal("NistApproved", ex.PolicyName);
     }
 }

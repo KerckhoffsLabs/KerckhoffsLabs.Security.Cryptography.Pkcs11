@@ -550,7 +550,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
     /// <param name="pin">The PIN. The session does not retain the PIN past construction.</param>
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> or <paramref name="pin"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
@@ -586,7 +586,7 @@ public sealed class Pkcs11Library : IDisposable
     /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
@@ -619,7 +619,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing spaces).</param>
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>

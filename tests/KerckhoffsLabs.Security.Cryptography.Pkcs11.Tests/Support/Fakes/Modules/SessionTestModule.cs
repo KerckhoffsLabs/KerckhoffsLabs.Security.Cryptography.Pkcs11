@@ -26,7 +26,7 @@ internal abstract class SessionTestModule : FakeModule
     /// <summary>A session on slot 0 of this module, as the library would hand out after <c>C_OpenSession</c>.</summary>
     /// <param name="sessionId">The session's handle; a fresh one that routes to this module when omitted.</param>
     /// <param name="loggerFactory">Passed to the session.</param>
-    /// <param name="policy">The session's policy; <see cref="CryptoPolicy.SecureOnly"/> when omitted.</param>
+    /// <param name="policy">The session's policy; <see cref="CryptoPolicy.Recommended"/> when omitted.</param>
     public Pkcs11SessionCore CreateSession(ulong? sessionId = null, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
         => new(LowLevel, slotId: default, sessionId ?? (ulong)NewSessionHandle(), loggerFactory, policy);
 

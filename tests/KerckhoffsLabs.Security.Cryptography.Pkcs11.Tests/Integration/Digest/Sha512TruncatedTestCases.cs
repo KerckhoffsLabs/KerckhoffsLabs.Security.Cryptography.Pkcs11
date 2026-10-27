@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// SHA-512/224 and its HMAC are refused under SecureOnly; they are the mechanisms under test.
+// SHA-512/224 and its HMAC are refused under Recommended; they are the mechanisms under test.
 #pragma warning disable KLPKCS11009, KLPKCS11010
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Digest;
@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Digest;
 /// Backend-agnostic known-answer tests for SHA-512/224 and SHA-512/256 (FIPS 180-4 §6.7), as digests and as
 /// HMACs. The BCL has neither, so the expected values are NIST's published "abc" examples and values computed
 /// with OpenSSL 3.0.13 (<c>openssl dgst -sha512-224 / -sha512-256</c>, with <c>-mac HMAC</c> for the HMACs).
-/// The session runs under <see cref="CryptoPolicy.AllowInsecure"/>, since SecureOnly refuses SHA-512/224.
+/// The session runs under <see cref="CryptoPolicy.AllowInsecure"/>, since Recommended refuses SHA-512/224.
 /// </summary>
 internal static class Sha512TruncatedTestCases
 {

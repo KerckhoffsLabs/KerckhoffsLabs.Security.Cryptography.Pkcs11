@@ -62,7 +62,7 @@ public sealed class RSAPkcs11Tests_Managed
     }
 
     // === Key sizes: sign/verify round-trips scale with the modulus =========
-    // RSA < 2048 is refused under SecureOnly (NIST SP 800-131A), so the 1024 case generates under an
+    // RSA < 2048 is refused under Recommended (NIST SP 800-131A), so the 1024 case generates under an
     // opt-in scope; 2048/3072/4096 need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
 
     [Theory]
@@ -654,7 +654,7 @@ public sealed class RSAPkcs11Tests_Managed
     public void Decrypt_Pkcs1_GatedByDefault_ThrowsBeforeTheCiphertextIsChecked()
     {
         int decrypts = 0, reads = 0;
-        using var key = LenientRsaKey(() => decrypts++, CryptoPolicy.SecureOnly, ca =>
+        using var key = LenientRsaKey(() => decrypts++, CryptoPolicy.Recommended, ca =>
         {
             reads++;
             return (CKR.CKR_DEVICE_ERROR, null);
@@ -739,7 +739,7 @@ public sealed class RSAPkcs11Tests_Managed
     [Fact]
     public void Decrypt_CiphertextNotFromTheKey_DisposedKey_ThrowsObjectDisposed()
     {
-        using var key = LenientRsaKey(() => { }, CryptoPolicy.SecureOnly);
+        using var key = LenientRsaKey(() => { }, CryptoPolicy.Recommended);
         using var rsa = new RSAPkcs11(key);
         rsa.Decrypt(FakeCiphertext, RSAEncryptionPadding.OaepSHA256);
         key.Key.Dispose();

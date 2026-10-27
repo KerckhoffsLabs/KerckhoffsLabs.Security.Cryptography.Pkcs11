@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// Raw CKM_SALSA20 is refused under SecureOnly (no integrity protection); it is the mechanism under test.
+// Raw CKM_SALSA20 is refused under Recommended (no integrity protection); it is the mechanism under test.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 /// (256-bit key, 64-bit nonce). The expected keystreams come from an independent
 /// implementation: the eSTREAM 256-bit set 1 vector 0, and a two-block vector computed with
 /// PyCryptodome 3.23.0, whose Salsa20 reproduces that eSTREAM vector. The session runs under
-/// <see cref="CryptoPolicy.AllowInsecure"/>, since SecureOnly refuses raw Salsa20.
+/// <see cref="CryptoPolicy.AllowInsecure"/>, since Recommended refuses raw Salsa20.
 /// </summary>
 internal static class RawSalsa20TestCases
 {

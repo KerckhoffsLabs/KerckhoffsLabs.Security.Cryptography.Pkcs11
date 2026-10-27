@@ -102,13 +102,13 @@ insecure is rejected before any call reaches the token.
 Every session enforces a **crypto policy**, chosen when it is opened:
 
 ```csharp
-// Default: SecureOnly — refuses broken algorithms, weak keys, and plaintext key export.
+// Default: Recommended — refuses broken algorithms, weak keys, and plaintext key export.
 using var session = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin);
 
 // FIPS: only NIST-approved functions; overrides are refused for the session's lifetime.
-using var fips = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin, CryptoPolicy.FipsOnly);
+using var fips = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin, CryptoPolicy.NistApproved);
 
-// Legacy interop for one operation (not available on a FipsOnly session):
+// Legacy interop for one operation (not available on a NistApproved session):
 using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
 ```
 
@@ -119,12 +119,12 @@ request kinds added in later versions fail closed.
 Both restrictive policies are **allow-lists that deny by default**: every mechanism, hash, curve,
 key-agreement KDF and KDF PRF they permit — with its rationale — plus the documented, non-enforcing deny
 list (reason and alternative), is generated straight from the policy source into
-[`docs/policies/secure-only.md`](docs/policies/secure-only.md) and
-[`docs/policies/fips-only.md`](docs/policies/fips-only.md). Anything not listed on those pages is refused.
+[`docs/policies/recommended.md`](docs/policies/recommended.md) and
+[`docs/policies/nist-approved.md`](docs/policies/nist-approved.md). Anything not listed on those pages is refused.
 
-> **`FipsOnly` is not FIPS certification.** It restricts what this library sends to the token. FIPS 140-3
+> **`NistApproved` is not FIPS certification.** It restricts what this library sends to the token. FIPS 140-3
 > compliance also requires a validated cryptographic module operating in its approved mode. Under
-> `FipsOnly`, AES key wrapping is approved only via KW/KWP (`CKM_AES_KEY_WRAP`, `CKM_AES_KEY_WRAP_KWP`)
+> `NistApproved`, AES key wrapping is approved only via KW/KWP (`CKM_AES_KEY_WRAP`, `CKM_AES_KEY_WRAP_KWP`)
 > or the GCM/CCM modes; other AES modes encrypt and decrypt data but may not wrap or unwrap keys.
 > AES-GCM tags must be 96 to 128 bits (SP 800-38D §5.2.1.2) and AES-CCM MACs at least 64 bits
 > (SP 800-38C Appendix B.2).
@@ -135,14 +135,14 @@ list (reason and alternative), is generated straight from the policy source into
 
 - They check mechanisms, parameters and *requested* key sizes/curves. They do not inspect the size or curve
   of existing keys — using an RSA-1024 or Brainpool key already on the token is not refused. (For ECDH, the
-  existing key's *type* is checked: `FipsOnly` refuses an X25519/X448 key.)
+  existing key's *type* is checked: `NistApproved` refuses an X25519/X448 key.)
 - Raw `CKM_ECDSA`, `CKM_RSA_PKCS` and `CKM_RSA_PKCS_PSS` sign a caller-computed digest; the policy cannot
   see which hash produced it.
-- `SecureOnly` allows `CKM_AES_KEY_WRAP_PAD`, but its meaning is vendor-dependent: RFC 5649 (KWP) on some
+- `Recommended` allows `CKM_AES_KEY_WRAP_PAD`, but its meaning is vendor-dependent: RFC 5649 (KWP) on some
   tokens, KW over PKCS#7-padded input on others, so wrapped keys may not move between tokens. Prefer
   `CKM_AES_KEY_WRAP_KWP` where the token supports it.
 
-The default `SecureOnly` policy allows each mechanism only for the operations it is meant for —
+The default `Recommended` policy allows each mechanism only for the operations it is meant for —
 `CKM_AES_GCM` encrypts, decrypts, wraps and unwraps but does not sign; `CKM_SHA256` digests but does not
 sign — and **denies every vendor-defined or unreviewed mechanism by default**, including ones it has no
 specific objection to. Refusals it documents include unauthenticated symmetric modes (ECB, CBC, CTR, …),
@@ -152,24 +152,30 @@ sub-128-bit EC curves, SHA-1 KDF PRFs, and AES-GCM tags under 96 bits or AES-CCM
 [analyzers](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html)
 (`KLPKCS11001`–`KLPKCS11010`) surface it as a build warning too.
 
-When `SecureOnly` refuses something you need, there are two remedies:
+When `Recommended` refuses something you need, there are two remedies:
 
 ```csharp
-// A mechanism you have reviewed (here a vendor-defined one): a new, wider policy named
-// "SecureOnly+custom". It only adds; CryptoPolicy.SecureOnly itself is unchanged.
-SecureOnlyPolicy reviewed = CryptoPolicy.SecureOnly.WithAllowedMechanism(
-    0x8000_1001UL,                                    // your vendor's CK_MECHANISM_TYPE
-    [CryptoOperation.Sign, CryptoOperation.Verify],
-    "Vendor HSM signature scheme, reviewed for our release signing.");
+// A mechanism you have reviewed (here a vendor-defined one): your own policy, derived from
+// Recommended and named "MyApp". It copies every rule; CryptoPolicy.Recommended itself is unchanged.
+ComposedCryptoPolicy reviewed = CryptoPolicy.Recommended.ToBuilder("MyApp")
+    .AllowMechanism(
+        (CKM)0x8000_1001UL,                           // your vendor's CK_MECHANISM_TYPE
+        [CryptoOperation.Sign, CryptoOperation.Verify],
+        "Vendor HSM signature scheme, reviewed for our release signing.")
+    .Build();
 using var session = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin, reviewed);
 
 // One-off legacy interop: lift the policy for a single, scoped operation.
 using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy archive */ }
 ```
 
-Hashes, curves and key-agreement KDFs cannot be added this way. The generated
-[`secure-only.md`](docs/policies/secure-only.md) and [`fips-only.md`](docs/policies/fips-only.md) pages
-list exactly what each policy allows, for which operations, and why.
+The same builder allows a hash, curve or key-agreement KDF (`AllowHash`, `AllowCurve`,
+`AllowKeyAgreementKdf`), tightens a copy (`RemoveMechanism`, `WithRsaKeyGenerationRule`), or starts a policy
+from scratch (`new CryptoPolicyBuilder(name)`); see
+[Using crypto policies](docs/crypto-policies.md).
+The generated [`recommended.md`](docs/policies/recommended.md) and
+[`nist-approved.md`](docs/policies/nist-approved.md) pages list exactly what each policy allows, for which
+operations, and why.
 
 **SHA-224 is refused for a different reason than the broken hashes above: it isn't cryptographically
 weak.** It's FIPS 180-4-approved — just a truncated SHA-256 with no `HashAlgorithmName` constant in

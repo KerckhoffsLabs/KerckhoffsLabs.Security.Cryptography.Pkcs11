@@ -16,10 +16,10 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
         _backend.Library.OpenSessionWithPin(_backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span), policy);
 
     [Fact]
-    public void NullPolicy_MeansSecureOnly()
+    public void NullPolicy_MeansRecommended()
     {
         using var session = Open(null);
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
         using var session = Open(null);
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Same(CryptoPolicy.AllowInsecure, session.Policy);
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
     [Fact]
@@ -43,11 +43,11 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     {
         using var session = Open(null);
         var outer = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        var inner = session.UsePolicy(CryptoPolicy.SecureOnly);
+        var inner = session.UsePolicy(CryptoPolicy.Recommended);
         inner.Dispose();
         Assert.Same(CryptoPolicy.AllowInsecure, session.Policy);
         outer.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
     [Fact]
@@ -55,11 +55,11 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     {
         using var session = Open(null);
         var outer = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        var inner = session.UsePolicy(CryptoPolicy.SecureOnly);
+        var inner = session.UsePolicy(CryptoPolicy.Recommended);
         outer.Dispose();                                           // inner is still open: its policy stays in force
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
         inner.Dispose();                                           // no lease left: back to the base policy
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
     [Fact]
@@ -67,14 +67,14 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     {
         using var session = Open(null);
         var outer = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        var inner = session.UsePolicy(CryptoPolicy.SecureOnly);
+        var inner = session.UsePolicy(CryptoPolicy.Recommended);
         outer.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
         // A second dispose of the outer lease must not resurrect or re-pop anything.
         outer.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
         inner.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     {
         using var session = Open(null);
         var first = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        var middle = session.UsePolicy(CryptoPolicy.SecureOnly);
+        var middle = session.UsePolicy(CryptoPolicy.Recommended);
         var top = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         middle.Dispose();
@@ -92,7 +92,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
         Assert.Same(CryptoPolicy.AllowInsecure, session.Policy); // first is now the most recent lease
 
         first.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);    // base
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);    // base
     }
 
     [Fact]
@@ -101,16 +101,16 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
         using var session = Open(null);
         var first = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var middle = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        var top = session.UsePolicy(CryptoPolicy.SecureOnly);
+        var top = session.UsePolicy(CryptoPolicy.Recommended);
 
         middle.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
 
         top.Dispose();
         Assert.Same(CryptoPolicy.AllowInsecure, session.Policy);
 
         first.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
     [Fact]
@@ -148,22 +148,22 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     {
         using var session = Open(new NoOverridePolicy());
         Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.SecureOnly));
+        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.Recommended));
     }
 
     private sealed class NoOverridePolicy : ICryptoPolicy
     {
         public string Name => "NoOverride";
         public bool AllowsOverride => false;
-        public PolicyDecision Evaluate(PolicyRequest request) => CryptoPolicy.SecureOnly.Evaluate(request);
+        public PolicyDecision Evaluate(PolicyRequest request) => CryptoPolicy.Recommended.Evaluate(request);
     }
 
     [Fact]
-    public void FipsOnlySession_RefusesEveryOverride()
+    public void NistApprovedSession_RefusesEveryOverride()
     {
-        using var session = Open(CryptoPolicy.FipsOnly);
+        using var session = Open(CryptoPolicy.NistApproved);
         Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.SecureOnly));
-        Assert.Same(CryptoPolicy.FipsOnly, session.Policy);
+        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.Recommended));
+        Assert.Same(CryptoPolicy.NistApproved, session.Policy);
     }
 }

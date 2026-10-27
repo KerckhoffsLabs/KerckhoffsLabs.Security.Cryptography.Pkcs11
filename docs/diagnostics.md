@@ -2,7 +2,7 @@
 
 Weak and legacy cryptography stays available for interoperability, but it is never silent: each
 such API is `[Obsolete]` with its own **diagnostic id**, and is additionally refused at runtime by
-the default `SecureOnly` crypto policy (which throws `CryptoPolicyViolationException`).
+the default `Recommended` crypto policy (which throws `CryptoPolicyViolationException`).
 
 The per-API ids exist so that a deliberate, documented use of one legacy primitive does not blind
 you to every other obsoletion in your codebase. Suppress the specific id — never the blanket
@@ -74,14 +74,14 @@ Reported by an analyzer rather than `[Obsolete]`, because the insecure choice he
 a symbol: there is nothing to mark obsolete when a consumer writes
 `rsa.Encrypt(data, RSAEncryptionPadding.Pkcs1)` (a BCL padding singleton passed to a BCL override) or
 `new Mechanism(CKM.CKM_RSA_PKCS)`. Both routes select RSAES-PKCS#1 v1.5 or raw RSA, where the
-Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `SecureOnly`
+Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `Recommended`
 policy check. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
 
 > **RSA *signatures* are a different story.** RSASSA-PKCS#1 v1.5 with a strong hash
 > (`CKM_SHA256_RSA_PKCS` and friends) is **allowed by default** and is *not* reported: it is
 > FIPS 186-5-approved and required by JWT RS256, TLS 1.2 CertificateVerify, X.509, and code signing.
 > Only *encryption* and the raw `CKM_RSA_PKCS` / `CKM_RSA_X_509` mechanisms carry the padding-oracle
-> exposure. `SecureOnly` allows these signature mechanisms for both Sign and Verify, so third-party
+> exposure. `Recommended` allows these signature mechanisms for both Sign and Verify, so third-party
 > signatures keep verifying.
 
 <a id="KLPKCS11009"></a>
@@ -90,7 +90,7 @@ policy check. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
 Also an analyzer, for the same reason as KLPKCS11008: the legacy primitives have `[Obsolete]` façade
 types, but the *mechanisms* underneath are reachable as values — `new Mechanism(CKM.CKM_DES3_CBC)`,
 or `aes.Mode = CipherMode.CBC` — where there is no symbol to mark. Covers the mechanisms on
-`SecureOnly`'s documented deny list ([`secure-only.md`](policies/secure-only.md)) apart from the RSA pair
+`Recommended`'s documented deny list ([`recommended.md`](policies/recommended.md)) apart from the RSA pair
 above. Mechanisms that are merely not on the allow-list — vendor-defined or not yet reviewed — are refused
 at run time too, but are not reported:
 
@@ -112,9 +112,10 @@ token as a *value*: `rsa.SignData(data, HashAlgorithmName.SHA1, …)`,
 SHA-256 or stronger.
 
 Note that **verifying** an existing SHA-1 signature is refused too: SHA-1 signature mechanisms are not on
-the `SecureOnly` allow-list for any operation, so legacy verification under `SecureOnly` needs an
-override (`UsePolicy(CryptoPolicy.AllowInsecure)`, or `CryptoPolicy.SecureOnly.WithAllowedMechanism(...)`
-for Verify only); `FipsOnly` permits SP 800-131A legacy verification.
+the `Recommended` allow-list for any operation, so legacy verification under `Recommended` needs an
+override (`UsePolicy(CryptoPolicy.AllowInsecure)`, or a policy derived with
+`CryptoPolicy.Recommended.ToBuilder(name).AllowMechanismForLegacyUse(...)` for Verify only); `NistApproved`
+permits SP 800-131A legacy verification.
 
 <a id="KLPKCS11011"></a>
 ### KLPKCS11011 — Rfc2898DeriveBytesPkcs11 constructors
@@ -137,9 +138,9 @@ configuration, a `CKM` variable, or a hash name computed at run time — cannot 
 rejected only when the operation executes, with a `CryptoPolicyViolationException` naming the
 mechanism.
 
-The analyzers above mirror the default `SecureOnly` policy only. Under `FipsOnly`, a mechanism can be
+The analyzers above mirror the default `Recommended` policy only. Under `NistApproved`, a mechanism can be
 refused — or permitted, for example SP 800-131A legacy-use verification — without a matching
-diagnostic: `FipsOnly` is a separate allow-list the analyzers do not model.
+diagnostic: `NistApproved` is a separate allow-list the analyzers do not model.
 
 These policies are inherently runtime-only, because they depend on values rather than symbols:
 

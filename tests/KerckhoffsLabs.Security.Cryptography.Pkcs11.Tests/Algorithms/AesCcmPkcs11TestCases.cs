@@ -217,7 +217,7 @@ internal static class AesCcmPkcs11TestCases
             ccm.Decrypt(nonce, ciphertext, tag, decrypted, aad);
 
             Assert.Equal(plaintext, decrypted);
-        }, tagLen, tagLen < 8 ? CryptoPolicy.AllowInsecure : null); // SecureOnly refuses MACs below 64 bits
+        }, tagLen, tagLen < 8 ? CryptoPolicy.AllowInsecure : null); // Recommended refuses MACs below 64 bits
     }
 
     internal static void Assert_EncryptDecrypt_EmptyPlaintext_RoundTrips(IPkcs11Backend backend)
@@ -346,7 +346,7 @@ internal static class AesCcmPkcs11TestCases
         byte[] aad = Iota(13);
 
         using var session = OpenSession(backend);
-        using var lease = tagLen < 8 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null; // SecureOnly refuses MACs below 64 bits
+        using var lease = tagLen < 8 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null; // Recommended refuses MACs below 64 bits
         string label = $"ccm-bcl-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken().Build();

@@ -6,7 +6,7 @@ In scope:
 
 - the `KerckhoffsLabs.Security.Cryptography.Pkcs11` package: the library, and the security analyzers
   and source generators it ships;
-- its secure defaults: a mechanism, key attribute or parameter that the `SecureOnly` or `FipsOnly`
+- its secure defaults: a mechanism, key attribute or parameter that the `Recommended` or `NistApproved`
   policy should reject but lets through, or a private key that becomes extractable without the caller
   opting in;
 - memory safety at the native boundary: marshalling, buffer sizing, handle lifetime and the zeroizing

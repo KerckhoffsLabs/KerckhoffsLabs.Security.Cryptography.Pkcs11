@@ -113,7 +113,7 @@ public sealed class AesPkcs11 : Aes
     /// <remarks>
     /// Wraps with the token's <c>CKM_AES_KEY_WRAP_KWP</c> in one encryption, which the built-in policies
     /// allow. The base class instead runs RFC 5649 in managed code over raw AES-ECB block operations,
-    /// which the policy judges, and <c>SecureOnly</c> refuses, as ECB; that remains the path for a token
+    /// which the policy judges, and <c>Recommended</c> refuses, as ECB; that remains the path for a token
     /// that does not advertise the mechanism, or advertises it without <c>CKF_ENCRYPT</c> (for
     /// <c>C_WrapKey</c> only, as Craton HSM does).
     /// </remarks>

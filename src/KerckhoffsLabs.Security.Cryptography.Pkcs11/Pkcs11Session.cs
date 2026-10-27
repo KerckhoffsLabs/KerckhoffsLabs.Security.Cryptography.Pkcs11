@@ -88,7 +88,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="policy"/> is null.</exception>
     /// <exception cref="InvalidOperationException">The session was opened under a policy whose
-    /// <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.FipsOnly</c>).</exception>
+    /// <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.NistApproved</c>).</exception>
     public IDisposable UsePolicy(ICryptoPolicy policy)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

@@ -180,7 +180,7 @@ internal static class WrapUnwrapCurve25519TestCases
         backend.RequireMechanismFlags(CKM.CKM_AES_CBC_PAD, f => f.Wrap && f.Unwrap, "CKF_WRAP and CKF_UNWRAP");
 
     // The session runs under AllowInsecure: CBC wrapping, extractable private keys and a raw CKD_NULL
-    // agreement are what is under test, and SecureOnly refuses all three.
+    // agreement are what is under test, and Recommended refuses all three.
     private static void RunInSession(IPkcs11Backend backend, Action<Pkcs11SessionCore> body)
     {
         using var session = TestKeys.OpenLoggedInSession(backend);

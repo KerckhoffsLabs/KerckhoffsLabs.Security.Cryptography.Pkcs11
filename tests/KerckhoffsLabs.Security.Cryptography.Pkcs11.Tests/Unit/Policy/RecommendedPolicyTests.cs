@@ -2,15 +2,16 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 
 #pragma warning disable KLPKCS11007, KLPKCS11008, KLPKCS11009, KLPKCS11010 // weak inputs are the subject under test
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
-public sealed class SecureOnlyPolicyTests
+public sealed class RecommendedPolicyTests
 {
-    private static readonly SecureOnlyPolicy Policy = CryptoPolicy.SecureOnly;
+    private static readonly ComposedCryptoPolicy Policy = CryptoPolicy.Recommended;
 
     private static bool Allowed(PolicyRequest r) => Policy.Evaluate(r).IsAllowed;
 
@@ -31,9 +32,9 @@ public sealed class SecureOnlyPolicyTests
     [Fact]
     public void Identity()
     {
-        Assert.Equal("SecureOnly", Policy.Name);
+        Assert.Equal("Recommended", Policy.Name);
         Assert.True(Policy.AllowsOverride);
-        Assert.Same(CryptoPolicy.SecureOnly, Policy);
+        Assert.Same(CryptoPolicy.Recommended, Policy);
     }
 
     // === Deny by default ===================================================
@@ -86,7 +87,7 @@ public sealed class SecureOnlyPolicyTests
         _ => new Mechanism(mech),
     };
 
-    // Golden list: SecureOnly's allowed mechanisms and their exact operations. Adding, removing or
+    // Golden list: Recommended's allowed mechanisms and their exact operations. Adding, removing or
     // widening an entry must be a deliberate edit here. OAEP and ECDH also carry Encapsulate /
     // Decapsulate (their PKCS#11 v3.2 KEM use).
     private static readonly Dictionary<CKM, CryptoOperations> ExpectedAllowList = BuildExpectedAllowList();
@@ -186,24 +187,24 @@ public sealed class SecureOnlyPolicyTests
     public void Denied_OutsideItsOperations_WithTheOperationRestrictedWording(CKM mech, CryptoOperation op)
     {
         string? reason = Reason(mech, op);
-        Assert.StartsWith($"{mech} is allowed under SecureOnly only for ", reason, StringComparison.Ordinal);
+        Assert.StartsWith($"{mech} is allowed under Recommended only for ", reason, StringComparison.Ordinal);
         Assert.Contains($"; {op} is not.", reason, StringComparison.Ordinal);
-        Assert.DoesNotContain("WithAllowedMechanism", reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToBuilder(", reason, StringComparison.Ordinal);
     }
 
     // PKCS#11 v3.2 KEM use of the classical key-transport / key-agreement mechanisms: allowed under
-    // SecureOnly (the OAEP parameter check still applies), not under FipsOnly.
+    // Recommended (the OAEP parameter check still applies), not under NistApproved.
     [Theory]
     [InlineData(CKM.CKM_RSA_PKCS_OAEP)]
     [InlineData(CKM.CKM_ECDH1_DERIVE)]
     [InlineData(CKM.CKM_ECDH1_COFACTOR_DERIVE)]
-    public void ClassicalKem_IsAllowedForEncapsulation_UnderSecureOnlyOnly(CKM mech)
+    public void ClassicalKem_IsAllowedForEncapsulation_UnderRecommendedOnly(CKM mech)
     {
         Mechanism m = ValidMechanismFor(mech);
         foreach (CryptoOperation op in (CryptoOperation[])[CryptoOperation.Encapsulate, CryptoOperation.Decapsulate])
         {
-            Assert.True(Allowed(m, op), $"SecureOnly {mech} {op}");
-            Assert.False(CryptoPolicy.FipsOnly.Evaluate(new MechanismUseRequest(m, op)).IsAllowed, $"FipsOnly {mech} {op}");
+            Assert.True(Allowed(m, op), $"Recommended {mech} {op}");
+            Assert.False(CryptoPolicy.NistApproved.Evaluate(new MechanismUseRequest(m, op)).IsAllowed, $"NistApproved {mech} {op}");
         }
         if (mech == CKM.CKM_RSA_PKCS_OAEP)
             Assert.False(Allowed(new Mechanism(mech), CryptoOperation.Encapsulate));
@@ -253,8 +254,8 @@ public sealed class SecureOnlyPolicyTests
     {
         Assert.False(Policy.Catalogue.DocumentedRefusedMechanisms.ContainsKey(CKM.CKM_CAMELLIA_CBC));
         Assert.Equal(
-            "CKM_CAMELLIA_CBC is not on the SecureOnly allow-list (not reviewed). " +
-            "If you have reviewed it, add it with CryptoPolicy.SecureOnly.WithAllowedMechanism(...).",
+            "CKM_CAMELLIA_CBC is not on the Recommended allow-list (not reviewed). " +
+            RecommendedDefinition.UnlistedMechanismHint(new PolicyIdentity("Recommended", "CryptoPolicy.Recommended")),
             Reason(CKM.CKM_CAMELLIA_CBC, CryptoOperation.Encrypt));
     }
 
@@ -262,11 +263,11 @@ public sealed class SecureOnlyPolicyTests
     public void VendorMechanism_SaysNotReviewed_AndNamesTheExtensionPoint()
     {
         string? reason = Reason(new MechanismUseRequest(new Mechanism((CKM)0x8000_1234UL), CryptoOperation.Sign));
-        Assert.StartsWith("vendor mechanism 0x80001234 is not on the SecureOnly allow-list (not reviewed).", reason, StringComparison.Ordinal);
-        Assert.Contains("WithAllowedMechanism", reason, StringComparison.Ordinal);
+        Assert.StartsWith("vendor mechanism 0x80001234 is not on the Recommended allow-list (not reviewed).", reason, StringComparison.Ordinal);
+        Assert.Contains("ToBuilder(", reason, StringComparison.Ordinal);
     }
 
-    // WithAllowedMechanism adds mechanisms only, so unlisted hashes, curves and KDFs must not point at it.
+    // The hint points at allowing a mechanism, so unlisted hashes, curves and KDFs must not carry it.
     [Fact]
     public void UnlistedHashCurveAndKdf_DoNotNameTheExtensionPoint()
     {
@@ -278,8 +279,8 @@ public sealed class SecureOnlyPolicyTests
         ];
         Assert.All(reasons, reason =>
         {
-            Assert.EndsWith("is not on the SecureOnly allow-list (not reviewed).", reason, StringComparison.Ordinal);
-            Assert.DoesNotContain("WithAllowedMechanism", reason, StringComparison.Ordinal);
+            Assert.EndsWith("is not on the Recommended allow-list (not reviewed).", reason, StringComparison.Ordinal);
+            Assert.DoesNotContain("ToBuilder(", reason, StringComparison.Ordinal);
         });
     }
 
@@ -322,6 +323,12 @@ public sealed class SecureOnlyPolicyTests
         Assert.True(Allowed(new Mechanism(CKM.CKM_SHA384_RSA_PKCS_PSS, new CkmRsaPkcsPssParams(CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, 48)), CryptoOperation.Sign));
         Assert.False(Allowed(new Mechanism(CKM.CKM_SHA384_RSA_PKCS_PSS, new CkmRsaPkcsPssParams(CKM.CKM_SHA224, CKG.CKG_MGF1_SHA224, 28)), CryptoOperation.Sign));
     }
+
+    // Raw parameter bytes are parameters the check cannot read: passing them would skip the hash and salt checks.
+    [Fact]
+    public void HashBoundPss_WithRawParameterBytes_IsDenied() =>
+        Assert.Equal("RSA-PSS parameters must be CkmRsaPkcsPssParams.",
+            Reason(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new byte[24]), CryptoOperation.Sign));
 
     // A short AEAD tag raises the odds that one forged message verifies. Both the single-part and
     // the message-based parameter types carry it, so the floor must hold for each.
@@ -577,7 +584,7 @@ public sealed class SecureOnlyPolicyTests
         Assert.False(Allowed(new EcKeyGenerationRequest(Pkcs11ECCurve.NamedCurves.BrainpoolP224r1)));
         Assert.False(Allowed(new EcKeyGenerationRequest(Pkcs11ECCurve.NamedCurves.Sm2)));
         // An unknown OID is not reviewed, so it is denied.
-        Assert.Contains("not on the SecureOnly allow-list",
+        Assert.Contains("not on the Recommended allow-list",
             Reason(new EcKeyGenerationRequest(Pkcs11ECCurve.CreateFromValue("1.3.6.1.4.1.99999.1"))), StringComparison.Ordinal);
     }
 
@@ -618,7 +625,7 @@ public sealed class SecureOnlyPolicyTests
         Assert.False(Allowed(new HashUseRequest(HashAlgorithmName.SHA1, CryptoOperation.Verify)));
         Assert.False(Allowed(new HashUseRequest(HashAlgorithmName.MD5, CryptoOperation.Verify)));
         Assert.False(Allowed(new HashUseRequest(new HashAlgorithmName("SHA224"), CryptoOperation.Sign)));
-        Assert.Contains("not on the SecureOnly allow-list",
+        Assert.Contains("not on the Recommended allow-list",
             Reason(new HashUseRequest(new HashAlgorithmName("BLAKE2B"), CryptoOperation.Sign)), StringComparison.Ordinal);
     }
 
