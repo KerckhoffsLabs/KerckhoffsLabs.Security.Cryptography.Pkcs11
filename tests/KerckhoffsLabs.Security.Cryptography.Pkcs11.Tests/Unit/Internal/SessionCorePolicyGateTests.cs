@@ -19,7 +19,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 [Collection(FakeModuleCollection.Name)]
 public sealed class SessionCorePolicyGateTests
 {
-    // Refused for every operation under SecureOnly: unlisted, and documented as broken.
+    // Refused for every operation under Recommended: unlisted, and documented as broken.
     private static readonly Mechanism Refused = new(CKM.CKM_DES_ECB);
 
     // Allowed for both halves of the dual-function calls, so only the other half can refuse.
@@ -76,7 +76,7 @@ public sealed class SessionCorePolicyGateTests
     public void RefusedMechanism_IsStoppedBeforeTheModule(string call)
     {
         using var module = new GateModule();
-        using Pkcs11SessionCore session = module.CreateSession(policy: CryptoPolicy.SecureOnly);
+        using Pkcs11SessionCore session = module.CreateSession(policy: CryptoPolicy.Recommended);
 
         using var input = new MemoryStream([1]);
         using var output = new MemoryStream();

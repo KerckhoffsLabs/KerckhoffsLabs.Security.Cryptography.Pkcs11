@@ -225,7 +225,7 @@ public sealed class Pkcs11Slot
     /// read-only session — token-object creation will fail per PKCS#11 spec.
     /// </param>
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>The opened session.</returns>
     internal Pkcs11SessionCore OpenSessionCore(bool readWrite = true, ICryptoPolicy? policy = null)
     {
@@ -244,7 +244,7 @@ public sealed class Pkcs11Slot
         try
         {
             Log.SessionOpened(_logger, readWrite ? "read-write" : "read-only", (ulong)sessionId, (ulong)_slotId,
-                (policy ?? CryptoPolicy.SecureOnly).Name);
+                (policy ?? CryptoPolicy.Recommended).Name);
 
             return new Pkcs11SessionCore(_pkcs11Library, _slotId, sessionHandle, _loggerFactory, policy);
         }

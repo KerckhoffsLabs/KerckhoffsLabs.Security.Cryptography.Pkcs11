@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
 /// Exercises <see cref="CatalogueEvaluator"/> against a small, hand-built <see cref="PolicyCatalogue"/> —
-/// independent of the real FipsOnly/SecureOnly catalogues — so these tests pin the shared evaluation and
+/// independent of the real NistApproved/Recommended catalogues — so these tests pin the shared evaluation and
 /// denial-wording rules rather than any one policy's content.
 /// </summary>
 public sealed class CatalogueEvaluatorTests
@@ -52,6 +52,7 @@ public sealed class CatalogueEvaluatorTests
     private static readonly PolicyDecision ParamCheckDenial = PolicyDecision.Deny("param check denial");
 
     private static PolicyCatalogue BuildCatalogue(
+        string? unlistedMechanismHint = null,
         Action<Dictionary<CKM, MechanismRule>>? editMechanisms = null,
         Action<Dictionary<ulong, MechanismRule>>? editVendorMechanisms = null) => new()
         {
@@ -59,7 +60,7 @@ public sealed class CatalogueEvaluatorTests
             {
                 [AllowedMechanism] = new(CryptoOperations.Encrypt | CryptoOperations.Decrypt, CryptoOperations.None, null, "TEST-ALLOWED"),
                 [LegacyOnlyMechanism] = new(CryptoOperations.None, CryptoOperations.Verify, null, "TEST-LEGACY"),
-                [ParamCheckedMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, (_, _) => ParamCheckDenial, "TEST-PARAM"),
+                [ParamCheckedMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, MechanismCheck.FromDelegate((_, _) => ParamCheckDenial, "TEST-PARAM-CHECK"), "TEST-PARAM"),
                 [DualMechanism] = new(CryptoOperations.Sign, CryptoOperations.None, null, "TEST-DUAL"),
                 [RsaKeyGenMechanism] = new(CryptoOperations.GenerateKeyPair, CryptoOperations.None, null, "TEST-RSA-KEYGEN"),
                 [NonRsaKeyGenMechanism] = new(CryptoOperations.GenerateKeyPair, CryptoOperations.None, null, "TEST-EC-KEYGEN"),
@@ -84,15 +85,12 @@ public sealed class CatalogueEvaluatorTests
             {
                 [CKK.CKK_EC] = "TEST-KEYTYPE-ALLOWED",
             }.ToFrozenDictionary(),
-            Rules = new PolicyRules(
-            RsaKeyGeneration: r => r.ModulusBits < 1024
-                ? PolicyDecision.Deny("RSA modulus too small")
-                : PolicyDecision.Allow,
-            KeyTemplate: _ => PolicyDecision.Deny("template rule fired"),
-            KeyMaterialExport: _ => PolicyDecision.Deny("export rule fired"),
-            RsaKeyGenerationRationale: "TEST-RSA-KEYGEN-RULE",
-            KeyTemplateRationale: "TEST-TEMPLATE-RULE",
-            KeyMaterialExportRationale: "TEST-EXPORT-RULE"),
+            RsaKeyGeneration = RsaKeyGenerationRule.FromDelegate(
+                r => r.ModulusBits < 1024 ? PolicyDecision.Deny("RSA modulus too small") : PolicyDecision.Allow,
+                "TEST-RSA-KEYGEN-RULE"),
+            KeyTemplate = KeyTemplateRule.FromDelegate(_ => PolicyDecision.Deny("template rule fired"), "TEST-TEMPLATE-RULE"),
+            KeyMaterialExport = KeyMaterialExportRule.FromDelegate(_ => PolicyDecision.Deny("export rule fired"), "TEST-EXPORT-RULE"),
+            UnlistedMechanismHint = unlistedMechanismHint is null ? null : _ => unlistedMechanismHint,
             DocumentedRefusedMechanisms = new Dictionary<CKM, DocumentedRefusal>
             {
                 [DocumentedRefusedMechanism] = new("it is cryptographically broken", "SHA256"),
@@ -126,14 +124,14 @@ public sealed class CatalogueEvaluatorTests
         return rules;
     }
 
-    // Stands in for a policy's extension hint (SecureOnly passes its WithAllowedMechanism sentence).
+    // Stands in for a policy's unlisted-mechanism hint (Recommended's points at how to allow a mechanism).
     private const string Hint = "TEST-HINT.";
 
     private static PolicyDecision Evaluate(PolicyRequest request, string? extensionHint = null)
-        => CatalogueEvaluator.Evaluate(BuildCatalogue(), PolicyName, extensionHint, request);
+        => CatalogueEvaluator.Evaluate(BuildCatalogue(extensionHint), PolicyName, request);
 
     private static PolicyDecision Evaluate(PolicyCatalogue catalogue, PolicyRequest request)
-        => CatalogueEvaluator.Evaluate(catalogue, PolicyName, extensionHint: null, request);
+        => CatalogueEvaluator.Evaluate(catalogue, PolicyName, request);
 
     // --- Mechanisms ---
 
@@ -290,7 +288,8 @@ public sealed class CatalogueEvaluatorTests
     public void VendorMechanism_ParameterCheckDenial_Propagates()
     {
         PolicyCatalogue catalogue = BuildCatalogue(editVendorMechanisms: vendor =>
-            vendor[(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, (_, _) => ParamCheckDenial, "TEST-VENDOR-PARAM"));
+            vendor[(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None,
+                MechanismCheck.FromDelegate((_, _) => ParamCheckDenial, "TEST-VENDOR-PARAM-CHECK"), "TEST-VENDOR-PARAM"));
 
         PolicyDecision d = Evaluate(catalogue, new MechanismUseRequest(new Mechanism(VendorMechanism), CryptoOperation.Encrypt));
         Assert.False(d.IsAllowed);
@@ -303,12 +302,12 @@ public sealed class CatalogueEvaluatorTests
         Mechanism? seenMechanism = null;
         CryptoOperation? seenOperation = null;
         PolicyCatalogue catalogue = BuildCatalogue(editVendorMechanisms: vendor =>
-            vendor[(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.Decrypt, (m, op) =>
+            vendor[(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.Decrypt, MechanismCheck.FromDelegate((m, op) =>
             {
                 seenMechanism = m;
                 seenOperation = op;
                 return PolicyDecision.Allow;
-            }, "TEST-VENDOR-PARAM"));
+            }, "TEST-VENDOR-PARAM-CHECK"), "TEST-VENDOR-PARAM"));
         var mechanism = new Mechanism(VendorMechanism);
 
         Assert.True(Evaluate(catalogue, new MechanismUseRequest(mechanism, CryptoOperation.Decrypt)).IsAllowed);

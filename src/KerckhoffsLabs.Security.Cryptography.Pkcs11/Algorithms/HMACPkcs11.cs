@@ -50,7 +50,7 @@ public sealed class HMACPkcs11 : HMAC
     /// SHA-224 is accepted here (it merely determines the HMAC output size); the
     /// session's crypto policy gate for it fires later, at the actual
     /// <c>CKM_SHA224_HMAC</c> sign call inside <see cref="HashFinal"/> — see
-    /// <c>SecureOnlyPolicy</c>. The token applies the HMAC key schedule itself, including hashing a key
+    /// <c>CryptoPolicy.Recommended</c>. The token applies the HMAC key schedule itself, including hashing a key
     /// longer than the hash's block size (136, 104 and 72 bytes for SHA3-256, SHA3-384 and SHA3-512).
     /// </remarks>
     public HMACPkcs11(Pkcs11Key key, HashAlgorithmName hashAlgorithm)

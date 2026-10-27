@@ -624,7 +624,7 @@ public sealed class DSAPkcs11Tests_Managed
     [Fact]
     public void P1363Verify_SignatureOfTheWrongLength_GatedByDefault_Throws()
     {
-        using var key = OneByteSubprimeKey(CryptoPolicy.SecureOnly);
+        using var key = OneByteSubprimeKey(CryptoPolicy.Recommended);
         using var dsa = new DSAPkcs11(key);
 
         Assert.Throws<CryptoPolicyViolationException>(() => dsa.VerifySignature(new byte[32], new byte[3]));
@@ -641,7 +641,7 @@ public sealed class DSAPkcs11Tests_Managed
         {
             reads++;
             return (CKR.CKR_DEVICE_ERROR, null);
-        }, CryptoPolicy.SecureOnly, publicOnly: true);
+        }, CryptoPolicy.Recommended, publicOnly: true);
         using var dsa = new DSAPkcs11(key);
         reads = 0; // The constructor reads the key's size.
 

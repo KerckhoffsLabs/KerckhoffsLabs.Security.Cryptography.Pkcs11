@@ -43,11 +43,11 @@ public sealed class Pkcs11SessionCorePolicyTests
     private static readonly ObjectHandle AnyKey = new(0);
 
     [Fact]
-    public void DefaultPolicy_IsSecureOnly()
+    public void DefaultPolicy_IsRecommended()
     {
         using var module = new BareModule();
         using var session = module.CreateSession(1);
-        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class Pkcs11SessionCorePolicyTests
             () => session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. tpl.Attributes]));
 
         var entry = Assert.Single(logger.Entries, e => e.Level == Microsoft.Extensions.Logging.LogLevel.Warning);
-        Assert.Contains("SecureOnly", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("Recommended", entry.Message, StringComparison.Ordinal);
         Assert.Contains("key template", entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("do-not-log-me", entry.Message, StringComparison.Ordinal);
     }
@@ -155,17 +155,17 @@ public sealed class Pkcs11SessionCorePolicyTests
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() => session.Enforce(request));
 
-        Assert.Equal("SecureOnly", ex.PolicyName);
+        Assert.Equal("Recommended", ex.PolicyName);
         Assert.Same(request, ex.Request);
         Assert.False(session.IsPermitted(request));
     }
 
     [Fact]
-    public void FipsOnly_AesCbcEmptyInput_ShortCircuits_WithoutTouchingTheToken()
+    public void NistApproved_AesCbcEmptyInput_ShortCircuits_WithoutTouchingTheToken()
     {
         var token = new Support.Fakes.SoftToken.ManagedSoftToken();
         using var library = token.Load();
-        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library, CryptoPolicy.FipsOnly);
+        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library, CryptoPolicy.NistApproved);
         using var key = session.GenerateAesKey(256);
         using var aes = new AesPkcs11(key);
 
@@ -202,14 +202,14 @@ public sealed class Pkcs11SessionCorePolicyTests
     {
         var logger = new CapturingLogger();
         using var module = new BareModule();
-        using var session = module.CreateSession(1, new CapturingLoggerFactory(logger), CryptoPolicy.SecureOnly);
+        using var session = module.CreateSession(1, new CapturingLoggerFactory(logger), CryptoPolicy.Recommended);
 
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             var entry = Assert.Single(logger.Entries, e => e.Level == Microsoft.Extensions.Logging.LogLevel.Warning);
-            Assert.Contains("SecureOnly", entry.Message, StringComparison.Ordinal);
+            Assert.Contains("Recommended", entry.Message, StringComparison.Ordinal);
             Assert.Contains("AllowInsecure", entry.Message, StringComparison.Ordinal);
-            Assert.True(entry.Message.IndexOf("SecureOnly", StringComparison.Ordinal)
+            Assert.True(entry.Message.IndexOf("Recommended", StringComparison.Ordinal)
                 < entry.Message.IndexOf("AllowInsecure", StringComparison.Ordinal), "from-policy precedes to-policy");
         }
     }
@@ -219,13 +219,13 @@ public sealed class Pkcs11SessionCorePolicyTests
     {
         var logger = new CapturingLogger();
         using var module = new BareModule();
-        using var session = module.CreateSession(1, new CapturingLoggerFactory(logger), CryptoPolicy.SecureOnly);
+        using var session = module.CreateSession(1, new CapturingLoggerFactory(logger), CryptoPolicy.Recommended);
 
         session.UsePolicy(CryptoPolicy.AllowInsecure).Dispose();
 
         var restore = Assert.Single(logger.Entries, e => e.Message.Contains("restored", StringComparison.Ordinal));
         Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Information, restore.Level);
-        Assert.Contains("AllowInsecure -> SecureOnly", restore.Message, StringComparison.Ordinal);
+        Assert.Contains("AllowInsecure -> Recommended", restore.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -262,15 +262,15 @@ public sealed class Pkcs11SessionCorePolicyTests
     }
 
     [Fact]
-    public void Pbkdf2Key_RaisesNoExportCheck_AndReachesTheTokenUnderSecureOnly()
+    public void Pbkdf2Key_RaisesNoExportCheck_AndReachesTheTokenUnderRecommended()
     {
-        var policy = new RecordingPolicy(CryptoPolicy.SecureOnly.Evaluate);
+        var policy = new RecordingPolicy(CryptoPolicy.Recommended.Evaluate);
         using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
         using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library, policy);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
 
         // The managed soft token does not implement CKM_PKCS5_PBKD2, so a token error (not a policy
-        // refusal) is the proof that every SecureOnly check passed and the call reached C_GenerateKey.
+        // refusal) is the proof that every Recommended check passed and the call reached C_GenerateKey.
         var ex = Record.Exception(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(
             session, "placeholder-password"u8, new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, template));
 
@@ -281,7 +281,7 @@ public sealed class Pkcs11SessionCorePolicyTests
     }
 
     [Fact]
-    public void Pbkdf2Key_Sha1Prf_IsRefusedUnderSecureOnly()
+    public void Pbkdf2Key_Sha1Prf_IsRefusedUnderRecommended()
     {
         using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
         using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);

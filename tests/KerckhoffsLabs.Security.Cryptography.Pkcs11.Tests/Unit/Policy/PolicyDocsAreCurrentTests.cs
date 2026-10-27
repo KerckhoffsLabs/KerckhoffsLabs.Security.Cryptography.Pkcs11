@@ -4,9 +4,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
-/// Keeps the generated policy catalogue documentation — <c>docs/policies/secure-only.md</c>
-/// and <c>docs/policies/fips-only.md</c> — byte-for-byte in sync with what <see cref="PolicyCatalogueMarkdown"/>
-/// renders from the real <c>SecureOnly</c>/<c>FipsOnly</c> catalogues.
+/// Keeps the generated policy catalogue documentation — <c>docs/policies/recommended.md</c>
+/// and <c>docs/policies/nist-approved.md</c> — byte-for-byte in sync with what <see cref="PolicyCatalogueMarkdown"/>
+/// renders from the real <c>Recommended</c>/<c>NistApproved</c> catalogues.
 /// </summary>
 /// <remarks>
 /// Run with the <c>UPDATE_POLICY_DOCS=1</c> environment variable set to regenerate the committed files
@@ -20,14 +20,14 @@ public sealed class PolicyDocsAreCurrentTests
 
     public static TheoryData<string, string> Pages => new()
     {
-        { "SecureOnly", "docs/policies/secure-only.md" },
-        { "FipsOnly", "docs/policies/fips-only.md" },
+        { "Recommended", "docs/policies/recommended.md" },
+        { "NistApproved", "docs/policies/nist-approved.md" },
     };
 
     private static PolicyCatalogue CatalogueFor(string policyName) => policyName switch
     {
-        "SecureOnly" => CryptoPolicy.SecureOnly.Catalogue,
-        "FipsOnly" => FipsOnlyPolicy.Catalogue,
+        "Recommended" => CryptoPolicy.Recommended.Catalogue,
+        "NistApproved" => CryptoPolicy.NistApproved.Catalogue,
         _ => throw new ArgumentOutOfRangeException(nameof(policyName)),
     };
 

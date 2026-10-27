@@ -1,6 +1,6 @@
-# SecureOnly policy catalogue
+# Recommended policy catalogue
 
-*Generated from the `SecureOnly` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
+*Generated from the `Recommended` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
 
 An allow-list of reviewed, modern mechanisms, hashes, curves, key-agreement KDFs and KDF PRFs. Anything not on the list below — including every vendor-defined mechanism — is denied by default, whether or not it also appears in the documented deny list further down this page.
 
@@ -329,10 +329,10 @@ Documentation only: every item below is refused because it is absent from the al
 | `CKM_CONCATENATE_BASE_AND_KEY` | This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. | — |
 | `CKM_CONCATENATE_DATA_AND_BASE` | This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. | — |
 | `CKM_EXTRACT_KEY_FROM_KEY` | This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. | — |
-| `CKM_IKE1_EXTENDED_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
-| `CKM_IKE1_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
-| `CKM_IKE2_PRF_PLUS_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
-| `CKM_IKE_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
+| `CKM_IKE1_EXTENDED_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
+| `CKM_IKE1_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
+| `CKM_IKE2_PRF_PLUS_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
+| `CKM_IKE_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
 | `CKM_MD2_KEY_DERIVATION` | MD2 is a broken hash function. | CKM_SHA256 or stronger |
 | `CKM_MD5_KEY_DERIVATION` | MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. | CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger |
 | `CKM_SHA1_KEY_DERIVATION` | MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. | CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger |
@@ -502,7 +502,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 ## Extension point
 
-`CryptoPolicy.SecureOnly.WithAllowedMechanism(...)` returns a new, wider `SecureOnlyPolicy` (named `SecureOnly+custom`) that also allows one more mechanism, for the operations and reason you supply — including a mechanism listed under Documented refusals above, and any vendor-defined mechanism. It only adds: an already-allowed mechanism keeps its operations and parameter check. It never modifies `CryptoPolicy.SecureOnly` itself or any other instance; call it on the returned policy to add more.
+`CryptoPolicy.Recommended.ToBuilder(name)` returns a `CryptoPolicyBuilder` holding a copy of every rule on this page; `AllowMechanism(...)` on it allows one more mechanism for the operations and reason you supply — including a mechanism listed under Documented refusals above, and any vendor-defined mechanism — and `Build()` returns the new policy under your name. Allowing an already-allowed mechanism adds operations and keeps its parameter check. `AllowHash(...)`, `AllowCurve(...)` and `AllowKeyAgreementKdf(...)` likewise allow one hash, one EC curve or one key-agreement KDF. `ToBuilder` never modifies `CryptoPolicy.Recommended` itself.
 
 ## Known limits
 

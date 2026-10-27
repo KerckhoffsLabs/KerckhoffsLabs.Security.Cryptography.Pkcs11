@@ -144,7 +144,7 @@ public sealed class ECDsaPkcs11 : ECDsa
 
     // The BCL routes these verification overloads through the protected HashData overrides, which are
     // shared with SignData and cannot tell which direction called them. Overriding them here lets the
-    // pre-hash report CryptoOperation.Verify, so a direction-sensitive policy (FipsOnly allows SHA-1
+    // pre-hash report CryptoOperation.Verify, so a direction-sensitive policy (NistApproved allows SHA-1
     // only for legacy verification) sees the same verdict whichever overload the caller picks. The
     // hashing and the digest verification are otherwise exactly what the base class does.
 
@@ -286,7 +286,7 @@ public sealed class ECDsaPkcs11 : ECDsa
         return _key.Sign(raw, hash);
     }
 
-    // Submits the hash choice to the wrapped key's session policy, mirroring SecureOnlyPolicy's
+    // Submits the hash choice to the wrapped key's session policy, mirroring CryptoPolicy.Recommended's
     // rejection of the combined CKM_ECDSA_SHA1 mechanism. Gating here (the managed-side pre-hash)
     // closes the gap for tokens that lack the combined mechanism. Every entry point that knows the hash
     // algorithm is gated with its own direction: the verification overloads above hash with Verify, the

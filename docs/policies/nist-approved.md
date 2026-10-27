@@ -1,10 +1,10 @@
-# FipsOnly policy catalogue
+# NistApproved policy catalogue
 
-*Generated from the `FipsOnly` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
+*Generated from the `NistApproved` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
 
 An allow-list of NIST-approved security functions, per a fixed snapshot of NIST guidance (see the baseline below). Anything not on the list below — including every vendor-defined mechanism — is denied by default, whether or not it also appears in the documented deny list further down this page.
 
-> **`FipsOnly` is not a FIPS 140-3 certification.** It restricts what this library sends to the token; FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
+> **`NistApproved` is not a FIPS 140-3 certification.** It restricts what this library sends to the token; FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
 >
 > Baseline: SP 800-131A Rev.2; SP 800-140C Rev.2 / SP 800-140D Rev.2 (CMVP lists of 2026-08-21); FIPS 186-5; SP 800-186; FIPS 203/204/205
 
@@ -322,7 +322,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 | Mechanism | Reason | Alternative |
 |---|---|---|
-| `CKM_EC_MONTGOMERY_KEY_PAIR_GEN` | SP 800-186 lists no Montgomery curves; X25519/X448 key generation has no FIPS 186-5 / SP 800-186 approval. | CKM_EC_KEY_PAIR_GEN (a NIST prime curve) or CKM_EC_EDWARDS_KEY_PAIR_GEN |
+| `CKM_EC_MONTGOMERY_KEY_PAIR_GEN` | SP 800-186 specifies Curve25519 and Curve448, but FIPS 186-5 approves them only for EdDSA (Ed25519/Ed448) and SP 800-56A Rev.3 has no X25519/X448 key-agreement scheme, so X25519/X448 key generation has no approval. | CKM_EC_KEY_PAIR_GEN (a NIST prime curve) or CKM_EC_EDWARDS_KEY_PAIR_GEN |
 
 #### Legacy ciphers
 
@@ -446,7 +446,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 | Key type | Reason | Alternative |
 |---|---|---|
-| `CKK_EC_MONTGOMERY` | SP 800-56A Rev.3 specifies no X25519/X448 scheme and SP 800-186 lists no Montgomery curves, so key agreement with an existing X25519/X448 key has no approval. | ECDH with a CKK_EC key on a NIST prime curve |
+| `CKK_EC_MONTGOMERY` | SP 800-56A Rev.3 specifies no key-agreement scheme over Curve25519 or Curve448 (X25519/X448), so key agreement with an existing X25519/X448 key has no approval. | ECDH with a CKK_EC key on a NIST prime curve |
 
 ### KDF PRFs
 
@@ -459,7 +459,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 - The size and curve of keys already on the token are not inspected: using an existing key that would not pass generation (a short RSA modulus, a weak curve, …) is not refused. Only an ECDH key's type is checked.
 - Raw `CKM_ECDSA`, `CKM_RSA_PKCS` and `CKM_RSA_PKCS_PSS` sign a caller-computed digest; the hash that produced it is not visible to the policy.
-- FipsOnly restricts what this library sends to the token. FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
+- NistApproved restricts what this library sends to the token. FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
 
 ---
 

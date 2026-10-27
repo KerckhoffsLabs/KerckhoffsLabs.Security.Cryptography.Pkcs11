@@ -276,7 +276,7 @@ internal sealed partial class Pkcs11SessionCore
     /// </summary>
     /// <summary>
     /// Submits the type of the key an ECDH derivation or KEM will use, so a policy can refuse key
-    /// agreement with a key it would never have let the caller generate (FipsOnly: X25519/X448). The
+    /// agreement with a key it would never have let the caller generate (NistApproved: X25519/X448). The
     /// mechanism alone cannot tell: <c>CKM_ECDH1_DERIVE</c> serves both Weierstrass and Montgomery keys.
     /// </summary>
     /// <remarks>

@@ -86,9 +86,9 @@ public sealed class DerivationOnlySecretTests
 
     // ---- The rule in the default policies ----------------------------------------------------------
 
-    public static TheoryData<string> DefaultPolicies => ["SecureOnly", "FipsOnly"];
+    public static TheoryData<string> DefaultPolicies => ["Recommended", "NistApproved"];
 
-    private static ICryptoPolicy Policy(string name) => name == "FipsOnly" ? CryptoPolicy.FipsOnly : CryptoPolicy.SecureOnly;
+    private static ICryptoPolicy Policy(string name) => name == "NistApproved" ? CryptoPolicy.NistApproved : CryptoPolicy.Recommended;
 
     [Theory]
     [MemberData(nameof(DefaultPolicies))]

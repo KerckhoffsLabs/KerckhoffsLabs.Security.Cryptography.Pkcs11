@@ -5,7 +5,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 
 /// <summary>
 /// The shared allow-list evaluation engine behind every restrictive <see cref="ICryptoPolicy"/>
-/// (<c>FipsOnly</c>, <c>SecureOnly</c>): evaluates a request against a policy-supplied
+/// (<c>NistApproved</c>, <c>Recommended</c>): evaluates a request against a policy-supplied
 /// <see cref="PolicyCatalogue"/> and words the denial.
 /// </summary>
 /// <remarks>
@@ -19,13 +19,8 @@ internal static class CatalogueEvaluator
     /// <summary>Evaluates one request against a catalogue.</summary>
     /// <param name="catalogue">The policy's allow-list and rules.</param>
     /// <param name="policyName">The policy's <see cref="ICryptoPolicy.Name"/>, used in denial wording.</param>
-    /// <param name="extensionHint">
-    /// A sentence appended to an "unlisted mechanism" denial, pointing at the policy's extension point
-    /// (the SecureOnly family's <c>WithAllowedMechanism</c>), or <see langword="null"/> for none. Never
-    /// appended to hash, curve or KDF denials: the extension point adds mechanisms only.
-    /// </param>
     /// <param name="request">The request being evaluated.</param>
-    public static PolicyDecision Evaluate(PolicyCatalogue catalogue, string policyName, string? extensionHint, PolicyRequest request)
+    public static PolicyDecision Evaluate(PolicyCatalogue catalogue, string policyName, PolicyRequest request)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(policyName);
@@ -33,40 +28,40 @@ internal static class CatalogueEvaluator
 
         return request switch
         {
-            MechanismUseRequest r => EvaluateMechanism(catalogue, policyName, extensionHint, r.Mechanism, r.Operation),
+            MechanismUseRequest r => EvaluateMechanism(catalogue, policyName, r.Mechanism, r.Operation),
             HashUseRequest r => EvaluateHash(catalogue, policyName, r.Hash, r.Operation),
-            RsaKeyGenerationRequest r => EvaluateRsaKeyGeneration(catalogue, policyName, extensionHint, r),
+            RsaKeyGenerationRequest r => EvaluateRsaKeyGeneration(catalogue, policyName, r),
             EcKeyGenerationRequest r => EvaluateCurve(catalogue, policyName, r.Curve),
-            KeyTemplateRequest r => catalogue.Rules.KeyTemplate(r),
+            KeyTemplateRequest r => catalogue.KeyTemplate.Evaluate(r),
             // CKD_NULL keeps Z as is. Refused into a working key (SP 800-56A forbids using Z directly),
             // allowed into a derivation-only secret: Z stays in the module and only an approved KDF
             // (the catalogue's CKM_HKDF_DERIVE / CKM_SP800_108_*_KDF) can turn it into keys.
             KeyAgreementKdfRequest { Kdf: CKD.CKD_NULL, ResultIsDerivationOnlySecret: true } => PolicyDecision.Allow,
             KeyAgreementKdfRequest r => EvaluateKdf(catalogue, policyName, r.Kdf),
             KeyAgreementKeyRequest r => EvaluateKeyAgreementKeyType(catalogue, policyName, r.KeyType),
-            KeyMaterialExportRequest r => catalogue.Rules.KeyMaterialExport(r),
+            KeyMaterialExportRequest r => catalogue.KeyMaterialExport.Evaluate(r),
             _ => PolicyDecision.Deny($"{policyName} has no rule for {request.GetType().Name}."),
         };
     }
 
-    private static PolicyDecision EvaluateMechanism(PolicyCatalogue c, string name, string? extensionHint, Mechanism mechanism, CryptoOperation operation)
+    private static PolicyDecision EvaluateMechanism(PolicyCatalogue c, string name, Mechanism mechanism, CryptoOperation operation)
     {
         CKM type = mechanism.Type;
         string item = MechanismNames.Describe(type);
 
         if (c.AllowedMechanisms.TryGetValue(type, out MechanismRule? rule))
             return Covers(rule, operation)
-                ? rule.ParameterCheck?.Invoke(mechanism, operation) ?? PolicyDecision.Allow
+                ? rule.ParameterCheck?.Evaluate(mechanism, operation, c) ?? PolicyDecision.Allow
                 : DenyOperationNotPermitted(item, name, rule.Operations | rule.LegacyOperations, rule.Rationale, operation);
 
         if (c.AllowedVendorMechanisms.TryGetValue((ulong)type, out MechanismRule? vendorRule))
             return Covers(vendorRule, operation)
-                ? vendorRule.ParameterCheck?.Invoke(mechanism, operation) ?? PolicyDecision.Allow
+                ? vendorRule.ParameterCheck?.Evaluate(mechanism, operation, c) ?? PolicyDecision.Allow
                 : DenyOperationNotPermitted(item, name, vendorRule.Operations | vendorRule.LegacyOperations, vendorRule.Rationale, operation);
 
         return c.DocumentedRefusedMechanisms.TryGetValue(type, out DocumentedRefusal? refusal)
             ? DenyDocumented(item, refusal)
-            : DenyUnlisted(item, name, extensionHint);
+            : DenyUnlisted(item, new PolicyIdentity(name, c.BuiltInReference), c.UnlistedMechanismHint);
     }
 
     private static bool Covers(MechanismRule rule, CryptoOperation operation)
@@ -87,7 +82,7 @@ internal static class CatalogueEvaluator
                 return DenyDocumented(item, refusal);
         }
 
-        return DenyUnlisted(item, name, extensionHint: null);
+        return DenyUnlisted(item, new PolicyIdentity(name, c.BuiltInReference), extensionHint: null);
     }
 
     private static PolicyDecision EvaluateCurve(PolicyCatalogue c, string name, Pkcs11ECCurve curve)
@@ -103,7 +98,7 @@ internal static class CatalogueEvaluator
                 return DenyDocumented(item, refusal);
         }
 
-        return DenyUnlisted(item, name, extensionHint: null);
+        return DenyUnlisted(item, new PolicyIdentity(name, c.BuiltInReference), extensionHint: null);
     }
 
     private static PolicyDecision EvaluateKdf(PolicyCatalogue c, string name, CKD kdf)
@@ -114,7 +109,7 @@ internal static class CatalogueEvaluator
         string item = kdf.ToString();
         return c.DocumentedRefusedKdfs.TryGetValue(kdf, out DocumentedRefusal? refusal)
             ? DenyDocumented(item, refusal)
-            : DenyUnlisted(item, name, extensionHint: null);
+            : DenyUnlisted(item, new PolicyIdentity(name, c.BuiltInReference), extensionHint: null);
     }
 
     private static PolicyDecision EvaluateKeyAgreementKeyType(PolicyCatalogue c, string name, CKK keyType)
@@ -125,7 +120,7 @@ internal static class CatalogueEvaluator
         string item = $"Key agreement with a {KeyTypeNames.Of(keyType)} key";
         return c.DocumentedRefusedKeyAgreementKeyTypes.TryGetValue(keyType, out DocumentedRefusal? refusal)
             ? DenyDocumented(item, refusal)
-            : DenyUnlisted(item, name, extensionHint: null);
+            : DenyUnlisted(item, new PolicyIdentity(name, c.BuiltInReference), extensionHint: null);
     }
 
     /// <summary>
@@ -136,7 +131,7 @@ internal static class CatalogueEvaluator
     private static bool IsRsaKeyPairGenerationMechanism(CKM mechanism)
         => mechanism is CKM.CKM_RSA_PKCS_KEY_PAIR_GEN or CKM.CKM_RSA_X9_31_KEY_PAIR_GEN;
 
-    private static PolicyDecision EvaluateRsaKeyGeneration(PolicyCatalogue c, string name, string? extensionHint, RsaKeyGenerationRequest request)
+    private static PolicyDecision EvaluateRsaKeyGeneration(PolicyCatalogue c, string name, RsaKeyGenerationRequest request)
     {
         if (!IsRsaKeyPairGenerationMechanism(request.Mechanism))
             return PolicyDecision.Deny(
@@ -147,12 +142,12 @@ internal static class CatalogueEvaluator
 
         if (c.AllowedMechanisms.TryGetValue(request.Mechanism, out MechanismRule? rule))
             return Covers(rule, CryptoOperation.GenerateKeyPair)
-                ? c.Rules.RsaKeyGeneration(request)
+                ? c.RsaKeyGeneration.Evaluate(request)
                 : DenyOperationNotPermitted(item, name, rule.Operations | rule.LegacyOperations, rule.Rationale, CryptoOperation.GenerateKeyPair);
 
         return c.DocumentedRefusedMechanisms.TryGetValue(request.Mechanism, out DocumentedRefusal? refusal)
             ? DenyDocumented(item, refusal)
-            : DenyUnlisted(item, name, extensionHint);
+            : DenyUnlisted(item, new PolicyIdentity(name, c.BuiltInReference), c.UnlistedMechanismHint);
     }
 
     private static PolicyDecision DenyDocumented(string item, DocumentedRefusal refusal)
@@ -162,10 +157,10 @@ internal static class CatalogueEvaluator
         return PolicyDecision.Deny($"{item} is not allowed: {refusal.Reason}{tail}");
     }
 
-    private static PolicyDecision DenyUnlisted(string item, string policyName, string? extensionHint)
+    private static PolicyDecision DenyUnlisted(string item, PolicyIdentity policy, Func<PolicyIdentity, string>? extensionHint)
     {
-        string reason = $"{item} is not on the {policyName} allow-list (not reviewed).";
-        return PolicyDecision.Deny(extensionHint is null ? reason : $"{reason} {extensionHint}");
+        string reason = $"{item} is not on the {policy.Name} allow-list (not reviewed).";
+        return PolicyDecision.Deny(extensionHint is null ? reason : $"{reason} {extensionHint(policy)}");
     }
 
     /// <summary>

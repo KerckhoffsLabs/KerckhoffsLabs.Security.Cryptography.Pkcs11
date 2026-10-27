@@ -41,10 +41,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// non-extractable by default) and needs no override.
 /// </para>
 /// <para>
-/// The PRF is checked too: the default <see cref="Policy.CryptoPolicy.SecureOnly"/> policy refuses
+/// The PRF is checked too: the default <see cref="Policy.CryptoPolicy.Recommended"/> policy refuses
 /// <c>CKM_PKCS5_PBKD2</c> with the HMAC-SHA-1 PRF (<see cref="HashAlgorithmName.SHA1"/>) and allows
-/// SHA-256, SHA-384 and SHA-512. <see cref="Policy.CryptoPolicy.FipsOnly"/>'s PRF check accepts HMAC-SHA-1
-/// (SP 800-132), but FipsOnly refuses the key-material read-back and any override, so this type cannot
+/// SHA-256, SHA-384 and SHA-512. <see cref="Policy.CryptoPolicy.NistApproved"/>'s PRF check accepts HMAC-SHA-1
+/// (SP 800-132), but NistApproved refuses the key-material read-back and any override, so this type cannot
 /// run under it.
 /// </para>
 /// </remarks>
@@ -336,9 +336,9 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// </summary>
     /// <remarks>
     /// Nothing derived leaves the token, so this is the path to use under the default
-    /// <see cref="Policy.CryptoPolicy.SecureOnly"/> policy: the key is sensitive and non-extractable
+    /// <see cref="Policy.CryptoPolicy.Recommended"/> policy: the key is sensitive and non-extractable
     /// unless <paramref name="template"/> says otherwise. The PRF is still checked, so HMAC-SHA-1 is
-    /// refused under SecureOnly. <paramref name="password"/> is borrowed, not copied: the token reads
+    /// refused under Recommended. <paramref name="password"/> is borrowed, not copied: the token reads
     /// it from per-call memory that is zeroed before this returns.
     /// </remarks>
     /// <example>

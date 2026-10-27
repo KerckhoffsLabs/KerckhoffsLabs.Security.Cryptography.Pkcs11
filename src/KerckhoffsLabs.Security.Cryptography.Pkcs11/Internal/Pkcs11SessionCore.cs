@@ -468,7 +468,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <see langword="null"/> for no logging.
     /// </param>
     /// <param name="policy">
-    /// The policy to enforce on this session; <see langword="null"/> means <see cref="CryptoPolicy.SecureOnly"/>.
+    /// The policy to enforce on this session; <see langword="null"/> means <see cref="CryptoPolicy.Recommended"/>.
     /// </param>
     internal Pkcs11SessionCore(LowLevelPkcs11Library pkcs11Library, NativeCULong slotId, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
         : this(pkcs11Library, slotId, OwnSession(pkcs11Library, sessionId), loggerFactory, policy)
@@ -492,7 +492,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11SessionCore>();
             Log.SessionTrace(_logger, (ulong)sessionHandle.SessionId, "ctor");
 
-            _basePolicy = policy ?? CryptoPolicy.SecureOnly;
+            _basePolicy = policy ?? CryptoPolicy.Recommended;
             _effectivePolicy = _basePolicy;
             _pkcs11Library = pkcs11Library;
             _slotId = slotId;
