@@ -478,6 +478,63 @@ public sealed class BuildMarshalableTests
         AssertBlockHolds(s.InitiatorEphemeral, initiatorEphemeral);
     }
 
+    // The struct carries no lengths for its byte fields, so an absent one can only be a null pointer.
+    [Fact]
+    public void X3dhRespondParams_EmptyBuffers_MarshalAsNullPointers()
+    {
+        using var keys = new ParameterKeys();
+        var p = new CkmX3dhRespondParams(
+            kdf: CKM.CKM_SHA256_HMAC, default, [], ReadOnlySpan<byte>.Empty, initiatorIdentity: keys.PublicOnly(9), default);
+        using var scope = keys.NewScope();
+
+        var s = p.BuildMarshalable(scope).Read<CK_X3DH_RESPOND_PARAMS>();
+
+        Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.Kdf);
+        Assert.Equal(9UL, (ulong)s.InitiatorIdentity);
+        Assert.Equal(IntPtr.Zero, s.IdentityId);
+        Assert.Equal(IntPtr.Zero, s.PrekeyId);
+        Assert.Equal(IntPtr.Zero, s.OnetimeId);
+        Assert.Equal(IntPtr.Zero, s.InitiatorEphemeral);
+    }
+
+    // The constructor copies each buffer, so changing the caller's arrays afterwards changes nothing sent.
+    [Fact]
+    public void X3dhRespondParams_CopiesItsBuffersAtConstruction()
+    {
+        byte[] identityId = [0x71, 0x72];
+        byte[] prekeyId = [0x81, 0x82, 0x83];
+        byte[] onetimeId = [0x91, 0x92, 0x93, 0x94];
+        byte[] initiatorEphemeral = [0xA1, 0xA2, 0xA3, 0xA4, 0xA5];
+        using var keys = new ParameterKeys();
+        var p = new CkmX3dhRespondParams(
+            kdf: CKM.CKM_SHA384_HMAC, identityId, prekeyId, onetimeId, initiatorIdentity: keys.PublicOnly(7), initiatorEphemeral);
+        foreach (byte[] b in new[] { identityId, prekeyId, onetimeId, initiatorEphemeral })
+            b.AsSpan().Clear();
+        using var scope = keys.NewScope();
+
+        var s = p.BuildMarshalable(scope).Read<CK_X3DH_RESPOND_PARAMS>();
+
+        AssertBlockHolds(s.IdentityId, [0x71, 0x72]);
+        AssertBlockHolds(s.PrekeyId, [0x81, 0x82, 0x83]);
+        AssertBlockHolds(s.OnetimeId, [0x91, 0x92, 0x93, 0x94]);
+        AssertBlockHolds(s.InitiatorEphemeral, [0xA1, 0xA2, 0xA3, 0xA4, 0xA5]);
+    }
+
+    // CK_ULONG is 32 bits on Windows: a vendor KDF tag wider than that is refused as the kdf argument,
+    // not sent with its high half masked off.
+    [Fact]
+    public void X3dhRespondParams_KdfWiderThanCkULong_IsRefusedAsKdf()
+    {
+        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 4, "CK_ULONG is 64 bits on this platform.");
+        using var keys = new ParameterKeys();
+        var p = new CkmX3dhRespondParams(
+            kdf: (CKM)((ulong)uint.MaxValue + 2), [0x01], [0x02], [0x03], initiatorIdentity: keys.PublicOnly(7), [0x04]);
+        using var scope = keys.NewScope();
+
+        var e = Assert.Throws<ArgumentOutOfRangeException>(() => p.BuildMarshalable(scope));
+        Assert.Equal("kdf", e.ParamName);
+    }
+
     // ---------------------------------------------------------------------------------------------
     // The in/out AEAD message types: built ForDecrypt so the tag/MAC field carries caller-supplied,
     // non-zero bytes — an encrypt fixture's zero-filled output buffer wouldn't distinguish a dropped
