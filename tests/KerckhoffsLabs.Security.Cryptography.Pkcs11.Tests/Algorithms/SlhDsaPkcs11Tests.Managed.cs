@@ -182,6 +182,66 @@ public sealed class SlhDsaPkcs11Tests_Managed
             // own ArgumentException would fire; both derive from ArgumentException.
             Assert.ThrowsAny<ArgumentException>(() => slhdsa.SignData(new byte[4], new byte[256])));
 
+    // === Pre-hash — unsupported on PKCS#11 v3.2 ==========================
+    //
+    // The BCL's pre-hash wrappers validate the destination, context and hash length first, and only a
+    // well-formed request reaches our *Core overrides. They throw before any token call, so a fake key
+    // serves.
+
+    private const string Sha512Oid = "2.16.840.1.101.3.4.2.3";
+
+    [Fact]
+    public void SignPreHash_WellFormedRequest_ThrowsNotSupported()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_SLH_DSA, _ => (CKR.CKR_OK, UlongAttr((ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128F)));
+        using var slhdsa = new SlhDsaPkcs11(key);
+
+        var ex = Assert.Throws<NotSupportedException>(() => slhdsa.SignPreHash(new byte[64], Sha512Oid));
+        Assert.Contains("HashSLH-DSA", ex.Message, StringComparison.Ordinal);
+
+        byte[] destination = new byte[slhdsa.Algorithm.SignatureSizeInBytes];
+        Assert.Throws<NotSupportedException>(() =>
+            slhdsa.SignPreHash(new byte[64], destination, Sha512Oid, "ctx"u8));
+    }
+
+    [Fact]
+    public void VerifyPreHash_WellFormedRequest_ThrowsNotSupported()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_SLH_DSA, _ => (CKR.CKR_OK, UlongAttr((ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128F)));
+        using var slhdsa = new SlhDsaPkcs11(key);
+        byte[] signature = new byte[slhdsa.Algorithm.SignatureSizeInBytes];
+
+        var ex = Assert.Throws<NotSupportedException>(() => slhdsa.VerifyPreHash(new byte[64], signature, Sha512Oid));
+        Assert.Contains("HashSLH-DSA", ex.Message, StringComparison.Ordinal);
+    }
+
+    // === A token signature of the wrong length ===========================
+
+    // A signature of another length than the parameter set's is the token's fault: it is refused rather
+    // than truncated or padded into the caller's buffer.
+    [Theory(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void SignData_TokenSignatureOfTheWrongLength_ThrowsPkcs11Exception(int lengthDelta)
+    {
+        var token = new ManagedSoftToken
+        {
+            SignatureOverride = sig => lengthDelta < 0 ? sig[..^1] : [.. sig, 0x00],
+        };
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_SLH_DSA)
+            .Verify().Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128F).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_SLH_DSA).Sign().Build();
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_SLH_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var slhdsa = new SlhDsaPkcs11(key);
+        int expected = SlhDsaAlgorithm.SlhDsaSha2_128f.SignatureSizeInBytes;
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => slhdsa.SignData([1, 2, 3]));
+        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+        Assert.Contains($"{expected + lengthDelta}-byte", ex.Message, StringComparison.Ordinal);
+    }
+
     // === Private-key export is refused ===================================
 
     [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
