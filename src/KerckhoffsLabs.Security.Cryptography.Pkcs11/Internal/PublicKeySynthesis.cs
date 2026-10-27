@@ -68,6 +68,8 @@ internal static class PublicKeySynthesis
         ]);
         if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
             return null;
-        return EcPointEncoding.TryParsePublicKey(attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
+        return EcPointEncoding.TryParsePublicKey(attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray(), out ECParameters ec)
+            ? ec
+            : null;
     }
 }

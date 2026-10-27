@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
 // SlhDsa (FIPS 205) is an evaluation-only BCL type in .NET 10 (SYSLIB5006), so this adapter is itself
 // marked [Experimental("SYSLIB5006")] (see the class) to propagate that status to its consumers —
@@ -154,23 +155,9 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
             throw new ArgumentException(
                 "SLH-DSA key's CKA_PARAMETER_SET is not readable.", nameof(key));
 
-        return (CkpSlhDsa)attrs[0].GetValueAsUlong() switch
-        {
-            CkpSlhDsa.CKP_SLH_DSA_SHA2_128S => SlhDsaAlgorithm.SlhDsaSha2_128s,
-            CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S => SlhDsaAlgorithm.SlhDsaShake128s,
-            CkpSlhDsa.CKP_SLH_DSA_SHA2_128F => SlhDsaAlgorithm.SlhDsaSha2_128f,
-            CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F => SlhDsaAlgorithm.SlhDsaShake128f,
-            CkpSlhDsa.CKP_SLH_DSA_SHA2_192S => SlhDsaAlgorithm.SlhDsaSha2_192s,
-            CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S => SlhDsaAlgorithm.SlhDsaShake192s,
-            CkpSlhDsa.CKP_SLH_DSA_SHA2_192F => SlhDsaAlgorithm.SlhDsaSha2_192f,
-            CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F => SlhDsaAlgorithm.SlhDsaShake192f,
-            CkpSlhDsa.CKP_SLH_DSA_SHA2_256S => SlhDsaAlgorithm.SlhDsaSha2_256s,
-            CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S => SlhDsaAlgorithm.SlhDsaShake256s,
-            CkpSlhDsa.CKP_SLH_DSA_SHA2_256F => SlhDsaAlgorithm.SlhDsaSha2_256f,
-            CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F => SlhDsaAlgorithm.SlhDsaShake256f,
-            var unknown => throw new ArgumentException(
-                $"Unrecognized SLH-DSA parameter set 0x{(ulong)unknown:X}.", nameof(key)),
-        };
+        ulong parameterSet = attrs[0].GetValueAsUlong();
+        return PostQuantumParameterSets.AlgorithmOf<SlhDsaAlgorithm>(CKK.CKK_SLH_DSA, parameterSet)
+            ?? throw new ArgumentException($"Unrecognized SLH-DSA parameter set 0x{parameterSet:X}.", nameof(key));
     }
 
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)
