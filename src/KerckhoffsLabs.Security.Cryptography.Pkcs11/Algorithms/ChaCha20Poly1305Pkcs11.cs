@@ -105,12 +105,7 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         // v2.40 fallback: ciphertext || tag concatenated.
         var legacyMech = new Mechanism(CKM.CKM_CHACHA20_POLY1305,
             new CkmSalsa20ChaCha20Poly1305Params(nonce, associatedData));
-        byte[] result = _key.Encrypt(legacyMech, plaintext);
-        if (result.Length != plaintext.Length + tag.Length)
-            throw new InvalidOperationException(
-                $"ChaCha20-Poly1305 encrypt returned {result.Length} bytes; expected {plaintext.Length + tag.Length}.");
-        result.AsSpan(0, plaintext.Length).CopyTo(ciphertext);
-        result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
+        AeadEncryption.EncryptConcatenated(_key, legacyMech, plaintext, ciphertext, tag, "ChaCha20-Poly1305 encrypt");
     }
 
     /// <summary>
@@ -164,20 +159,6 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
         var legacyMech = new Mechanism(CKM.CKM_CHACHA20_POLY1305,
             new CkmSalsa20ChaCha20Poly1305Params(nonce, associatedData));
-        byte[] combined = new byte[ciphertext.Length + tag.Length];
-        ciphertext.CopyTo(combined);
-        tag.CopyTo(combined.AsSpan(ciphertext.Length));
-        byte[] result = AeadDecryption.Decrypt(_key, legacyMech, combined, plaintext);
-        try
-        {
-            if (result.Length != plaintext.Length)
-                throw new InvalidOperationException(
-                    $"ChaCha20-Poly1305 decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
-            result.CopyTo(plaintext);
-        }
-        finally
-        {
-            System.Security.Cryptography.CryptographicOperations.ZeroMemory(result);
-        }
+        AeadDecryption.DecryptConcatenated(_key, legacyMech, ciphertext, tag, plaintext, "ChaCha20-Poly1305 decrypt");
     }
 }
