@@ -133,10 +133,22 @@ public sealed class AesPkcs11 : Aes
 
     /// <inheritdoc/>
     /// <remarks>
+    /// <para>
     /// Unwraps with the token's <c>CKM_AES_KEY_WRAP_KWP</c>, as <see cref="EncryptKeyWrapPaddedCore"/>
     /// wraps. A ciphertext whose integrity check fails throws <see cref="CryptographicException"/>, as the
-    /// BCL does, with the token's error as the inner exception. A token whose mechanism lacks
-    /// <c>CKF_DECRYPT</c> unwraps through the base class, judged as ECB.
+    /// BCL does, with the token's error as the inner exception, when the token reports the failure as
+    /// <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/> or <see cref="CKR.CKR_ENCRYPTED_DATA_LEN_RANGE"/> (NSS
+    /// does). A token whose mechanism lacks <c>CKF_DECRYPT</c> unwraps through the base class, judged as ECB.
+    /// </para>
+    /// <para>
+    /// Kryoptic reports a failed integrity check as <see cref="CKR.CKR_DEVICE_ERROR"/>, the code it gives
+    /// any failure of the unwrap underneath. That code is deliberately not mapped, as the AEAD adapters
+    /// (<see cref="AesGcmPkcs11"/>, <see cref="AesCcmPkcs11"/>) do not map it for a failed tag check:
+    /// nothing tells it apart from a
+    /// genuine module fault, and reporting a fault as tampering would mislead the caller. On such a token
+    /// the ciphertext is still refused, as the token's <see cref="Pkcs11Exception"/>, which is a
+    /// <see cref="CryptographicException"/> too.
+    /// </para>
     /// </remarks>
     protected override int DecryptKeyWrapPaddedCore(ReadOnlySpan<byte> source, Span<byte> destination)
     {

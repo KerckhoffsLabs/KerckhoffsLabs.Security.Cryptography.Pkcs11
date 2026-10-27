@@ -186,21 +186,21 @@ public sealed class AesPkcs11_Managed
 
     // === Key wrap with padding (RFC 5649) ==================================================
 
-    // Imports Key256 on a managed token that advertises CKM_AES_KEY_WRAP_KWP or not, with the given
-    // C_GetMechanismInfo flags for it.
-    private static void WithKwpToken(bool advertisesKwp, Action<ManagedSoftToken, Pkcs11Session, AesPkcs11> body, ulong? kwpFlags = null)
+    // Imports keyValue (Key256 by default) on a managed token that advertises CKM_AES_KEY_WRAP_KWP or not,
+    // with the given C_GetMechanismInfo flags for it.
+    private static void WithKwpToken(bool advertisesKwp, Action<ManagedSoftToken, Pkcs11Session, AesPkcs11> body, ulong? kwpFlags = null, byte[]? keyValue = null)
     {
         var token = new ManagedSoftToken { AdvertisesAesKeyWrapKwp = advertisesKwp };
         if (kwpFlags is { } flags)
             token.AesKeyWrapKwpFlags = flags;
-        WithToken(token, body);
+        WithToken(token, body, keyValue);
     }
 
-    private static void WithToken(ManagedSoftToken token, Action<ManagedSoftToken, Pkcs11Session, AesPkcs11> body)
+    private static void WithToken(ManagedSoftToken token, Action<ManagedSoftToken, Pkcs11Session, AesPkcs11> body, byte[]? keyValue = null)
     {
         using var library = token.Load();
         using var session = ManagedToken.OpenSession(library);
-        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(Key256).Encrypt().Decrypt().Build();
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(keyValue ?? Key256).Encrypt().Decrypt().Build();
         using var key = session.ImportKey(tpl);
         using var aes = new AesPkcs11(key);
         body(token, session, aes);
@@ -237,6 +237,38 @@ public sealed class AesPkcs11_Managed
         var e = Assert.Throws<CryptographicException>(() => aes.DecryptKeyWrapPadded(wrapped));
         Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, Assert.IsAssignableFrom<Pkcs11Exception>(e.InnerException).ReturnValue);
     });
+
+    // So does each of the shared Wycheproof invalid wraps.
+    [Theory]
+    [MemberData(nameof(AesPkcs11TestCases.InvalidKeyWrapVectors), MemberType = typeof(AesPkcs11TestCases))]
+    public void DecryptKeyWrapPadded_InvalidWrap_Throws(string keyHex, string ciphertextHex) => WithKwpToken(advertisesKwp: true, (_, _, aes) =>
+    {
+        var e = Assert.Throws<CryptographicException>(() => aes.DecryptKeyWrapPadded(Convert.FromHexString(ciphertextHex)));
+        Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, Assert.IsAssignableFrom<Pkcs11Exception>(e.InnerException).ReturnValue);
+    }, keyValue: Convert.FromHexString(keyHex));
+
+    // And so does the managed RFC 5649 a token without the mechanism falls back to, once ECB is allowed.
+    [Theory]
+    [MemberData(nameof(AesPkcs11TestCases.InvalidKeyWrapVectors), MemberType = typeof(AesPkcs11TestCases))]
+    public void DecryptKeyWrapPadded_InvalidWrap_WithoutKwp_Throws(string keyHex, string ciphertextHex) => WithKwpToken(advertisesKwp: false, (_, session, aes) =>
+    {
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            Assert.Throws<CryptographicException>(() => aes.DecryptKeyWrapPadded(Convert.FromHexString(ciphertextHex)));
+    }, keyValue: Convert.FromHexString(keyHex));
+
+    // A token that reports the failed check with a generic code, as Kryoptic does with CKR_DEVICE_ERROR, is
+    // not taken as tampering: nothing tells the code apart from a module fault, so the token's
+    // Pkcs11Exception, itself a CryptographicException, propagates as it is.
+    [Fact]
+    public void DecryptKeyWrapPadded_Tampered_GenericTokenError_IsNotMapped() =>
+        WithToken(new ManagedSoftToken { DecryptFailureResult = CKR.CKR_DEVICE_ERROR }, (_, _, aes) =>
+        {
+            byte[] wrapped = aes.EncryptKeyWrapPadded(new byte[20]);
+            wrapped[^1] ^= 0x01;
+
+            var e = Assert.ThrowsAny<Pkcs11Exception>(() => aes.DecryptKeyWrapPadded(wrapped));
+            Assert.Equal(CKR.CKR_DEVICE_ERROR, e.ReturnValue);
+        });
 
     // A token without the mechanism keeps the base class's managed RFC 5649 over AES-ECB, which the
     // policy judges as ECB: refused by default, the same output once ECB is allowed.
