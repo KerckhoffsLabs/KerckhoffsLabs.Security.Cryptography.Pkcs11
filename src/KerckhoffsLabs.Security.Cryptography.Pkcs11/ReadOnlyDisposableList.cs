@@ -30,6 +30,11 @@ public sealed class ReadOnlyDisposableList<T> : IReadOnlyList<T>, IDisposable wh
     private bool _disposed;
 
     /// <summary>An empty list. Disposing it does nothing.</summary>
+    /// <remarks>
+    /// This is one instance shared by every caller, so disposing it must not mark it disposed:
+    /// otherwise one <see langword="using"/> on it would make every other holder's reads throw
+    /// <see cref="ObjectDisposedException"/> for the rest of the process. It has no elements to release.
+    /// </remarks>
     public static ReadOnlyDisposableList<T> Empty { get; } = new([]);
 
     /// <summary>
@@ -113,7 +118,8 @@ public sealed class ReadOnlyDisposableList<T> : IReadOnlyList<T>, IDisposable wh
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
+        // Empty is shared, so it never latches; see its remarks.
+        if (_disposed || ReferenceEquals(this, Empty)) return;
         _disposed = true;
 
         foreach (T item in _items)

@@ -136,6 +136,33 @@ public sealed class ReadOnlyDisposableListTests
         Assert.Null(Record.Exception(ReadOnlyDisposableList<Spy>.Empty.Dispose));
     }
 
+    /// <summary>
+    /// <see cref="ReadOnlyDisposableList{T}.Empty"/> is one shared instance, so disposing it must leave it
+    /// readable for every other holder.
+    /// </summary>
+    [Fact]
+    public void Empty_StaysReadableAfterDispose()
+    {
+        ReadOnlyDisposableList<Spy> empty = ReadOnlyDisposableList<Spy>.Empty;
+        empty.Dispose();
+        empty.Dispose();
+
+        int count = ReadOnlyDisposableList<Spy>.Empty.Count;
+        Assert.Equal(0, count);
+        Assert.Empty(ReadOnlyDisposableList<Spy>.Empty);
+        Assert.Empty(ReadOnlyDisposableList<Spy>.Empty.DisposalFailures);
+    }
+
+    /// <summary>Only the shared instance is exempt: an empty list the caller made still latches.</summary>
+    [Fact]
+    public void EmptyOwnedList_ThrowsAfterDispose()
+    {
+        var list = new ReadOnlyDisposableList<Spy>([]);
+        list.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => list.Count);
+    }
+
     /// <summary>The snapshot is the ownership boundary: later changes to the source are not adopted.</summary>
     [Fact]
     public void Ctor_SnapshotsAGrowableSource()

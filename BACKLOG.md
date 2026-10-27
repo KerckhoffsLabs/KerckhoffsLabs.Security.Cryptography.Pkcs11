@@ -4,8 +4,8 @@ _Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist d
 
 ## Summary
 
-- Total items: 167 (87 resolved, 80 open, 23 of them partially resolved)
-- Critical: 0 | High: 32 (8 open, 24 resolved) | Medium: 87 (48 open, 39 resolved) | Low: 48 (24 open, 24 resolved; includes the two Info entries, BL-158 and BL-159)
+- Total items: 167 (88 resolved, 79 open, 23 of them partially resolved)
+- Critical: 0 | High: 32 (8 open, 24 resolved) | Medium: 87 (47 open, 40 resolved) | Low: 48 (24 open, 24 resolved; includes the two Info entries, BL-158 and BL-159)
 - Headline risks:
   - **The advertised streaming surface does not exist, and the previous coverage matrix said it did.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer — `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099). Two matrix rows have been corrected below.
   - **Nine public-API decisions are cheap now and SemVer-major later — all nine now settled.** Exceptions did not derive from `CryptographicException`, so `catch (CryptographicException)` around the BCL-shaped façades silently failed; they now do (BL-063, resolved); `ECCurve` collided with `System.Security.Cryptography.ECCurve` and is now `Pkcs11ECCurve`, with a reflection guard against the next such clash (BL-066, resolved); 96 `CKF`/`CK`/`CKZ` constants published the platform-width-dependent third-party `NativeCULong` and are now `ulong`, with that package gone from the public surface entirely (BL-067, resolved); every `CK_VERSION` reached the API as a lossy string in which a v3.1 module rendered as `"3.01"` and is now a comparable `System.Version` (BL-068, resolved); `LoadStaticallyLinked()` could not work on any shipped RID because `__Internal` is Mono-only, and now resolves against the entry-point module instead (BL-064, resolved); the secure-defaults key generators granted conflicting roles on one key and are now split into role-specific helpers (BL-070, resolved); and `CloseAllSessions()`'s bookkeeping gap was closed by removing the method from the public surface, its only legitimate use being narrow enough that disposing tracked sessions/sessions is the supported path (BL-071, resolved). `AdditionalDerivedKeys` now returns hydrated `Pkcs11Key` instances instead of raw `ulong` handles (BL-069, resolved). `Verify` now returns `false` for a wrong-length signature instead of throwing, as the BCL does (BL-065, resolved). The set is BL-063 – BL-071.
@@ -844,7 +844,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** .NET Engineer A, Cryptographer A
 - **Spec / References:** PKCS#11 v3.0 §2.3.5 (`CKK_EC_MONTGOMERY`)
 
-### [BL-093] `ReadOnlyDisposableList<T>.Empty` is a process-wide singleton that a documented-as-safe `Dispose()` permanently poisons
+### [BL-093] ✅ RESOLVED — `ReadOnlyDisposableList<T>.Empty` is a process-wide singleton that a documented-as-safe `Dispose()` permanently poisons
+- **Status:** Resolved 2026-10-27. `Dispose()` returns without marking the list disposed when it is the shared `Empty` instance, so `Count`, the indexer and enumeration keep working for every other holder. Other lists, empty ones included, still latch and throw `ObjectDisposedException` after disposal. `ReadOnlyDisposableListTests.Empty_StaysReadableAfterDispose` disposes `Empty` twice and then reads it; `EmptyOwnedList_ThrowsAfterDispose` pins that the exemption covers only the shared instance.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** S
