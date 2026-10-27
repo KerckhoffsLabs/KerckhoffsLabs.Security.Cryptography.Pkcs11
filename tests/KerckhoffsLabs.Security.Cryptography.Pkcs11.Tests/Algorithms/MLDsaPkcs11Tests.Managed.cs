@@ -146,9 +146,40 @@ public sealed class MLDsaPkcs11Tests_Managed
 
     // === External-mu / pre-hash — unsupported on PKCS#11 v3.2 =============
     //
-    // HashML-DSA pre-hash (SignPreHash/VerifyPreHash) is intentionally not tested: the BCL's
-    // evaluation-only pre-hash wrappers validate/short-circuit before reaching our *Core overrides, so a
-    // test would assert BCL behaviour, not ours. External-mu reaches our overrides and is asserted here.
+    // The BCL's pre-hash wrappers validate the hash OID, its length and the signature length first, and
+    // only a well-formed request reaches our *Core overrides: these use a SHA-512 digest, strong enough
+    // for every parameter set. They throw before any token call, so a fake key serves.
+
+    private const string Sha512Oid = "2.16.840.1.101.3.4.2.3";
+
+    [Theory]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
+    public void SignPreHash_WellFormedRequest_ThrowsNotSupported(CkpMlDsa parameterSet)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_OK, UlongAttr((ulong)parameterSet)));
+        using var mldsa = new MLDsaPkcs11(key);
+
+        var ex = Assert.Throws<NotSupportedException>(() => mldsa.SignPreHash(new byte[64], Sha512Oid));
+        Assert.Contains("HashML-DSA", ex.Message, StringComparison.Ordinal);
+
+        byte[] destination = new byte[mldsa.Algorithm.SignatureSizeInBytes];
+        Assert.Throws<NotSupportedException>(() =>
+            mldsa.SignPreHash(new byte[64], destination, Sha512Oid, "ctx"u8));
+    }
+
+    [Theory]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
+    public void VerifyPreHash_WellFormedRequest_ThrowsNotSupported(CkpMlDsa parameterSet)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_OK, UlongAttr((ulong)parameterSet)));
+        using var mldsa = new MLDsaPkcs11(key);
+        byte[] signature = new byte[mldsa.Algorithm.SignatureSizeInBytes];
+
+        var ex = Assert.Throws<NotSupportedException>(() => mldsa.VerifyPreHash(new byte[64], signature, Sha512Oid));
+        Assert.Contains("HashML-DSA", ex.Message, StringComparison.Ordinal);
+    }
 
     [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
     public void SignMu_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
@@ -245,6 +276,31 @@ public sealed class MLDsaPkcs11Tests_Managed
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
         Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+    }
+
+    // A signature of another length than the parameter set's is the token's fault: it is refused rather
+    // than truncated or padded into the caller's buffer.
+    [Theory(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void SignData_TokenSignatureOfTheWrongLength_ThrowsPkcs11Exception(int lengthDelta)
+    {
+        var token = new ManagedSoftToken
+        {
+            SignatureOverride = sig => lengthDelta < 0 ? sig[..^1] : [.. sig, 0x00],
+        };
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_DSA)
+            .Verify().Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlDsa.CKP_ML_DSA_44).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA).Sign().Build();
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var mldsa = new MLDsaPkcs11(key);
+        int expected = MLDsaAlgorithm.MLDsa44.SignatureSizeInBytes;
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.SignData([1, 2, 3]));
+        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+        Assert.Contains($"{expected + lengthDelta}-byte", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
