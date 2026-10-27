@@ -163,9 +163,9 @@ public sealed class AesCcmPkcs11Tests_Managed
         WithImportedCcm(key, ccm =>
         {
             byte[] tag = new byte[16];
-            ccm.Encrypt(nonce, [], [], tag, aad);
+            ccm.Encrypt(nonce, Array.Empty<byte>(), Array.Empty<byte>(), tag, aad);
             Assert.Equal(bclTag, tag); // tag authenticates the AAD over an empty message
-            ccm.Decrypt(nonce, [], tag, [], aad); // must not throw
+            ccm.Decrypt(nonce, Array.Empty<byte>(), tag, Array.Empty<byte>(), aad); // must not throw
         });
     }
 
@@ -398,6 +398,16 @@ public sealed class AesCcmPkcs11Tests_Managed
         Assert.Throws<ObjectDisposedException>(() =>
             ccm.Decrypt(new byte[12], new byte[8], new byte[16], new byte[8]));
     });
+
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
+    public void ByteArrayOverloads_NullArguments_FailAsBcl() => WithAnyCcm(AesCcmPkcs11TestCases.AssertNullArgumentsFailAsBcl);
+
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
+    public void ByteArrayOverloads_MatchBcl()
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        WithImportedCcm(key, ccm => AesCcmPkcs11TestCases.AssertArrayOverloadsMatchBcl(ccm, key));
+    }
 
     /// <summary>
     /// A failed tag check clears the plaintext destination before throwing, as the BCL does, so a

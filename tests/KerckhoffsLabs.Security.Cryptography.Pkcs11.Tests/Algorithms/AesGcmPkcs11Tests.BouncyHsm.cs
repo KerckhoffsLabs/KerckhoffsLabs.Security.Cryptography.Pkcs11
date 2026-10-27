@@ -46,6 +46,12 @@ public sealed class AesGcmPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
     public void Decrypt_AfterDispose_Throws() => AesGcmPkcs11TestCases.Assert_Decrypt_AfterDispose_Throws(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void ByteArrayOverloads_NullArguments_FailAsBcl() => AesGcmPkcs11TestCases.Assert_ByteArrayOverloads_NullArguments_FailAsBcl(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void ByteArrayOverloads_MatchBcl() => AesGcmPkcs11TestCases.Assert_ByteArrayOverloads_MatchBcl(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void EncryptDecrypt_RoundTrips_WithAad() => AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_WithAad(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
