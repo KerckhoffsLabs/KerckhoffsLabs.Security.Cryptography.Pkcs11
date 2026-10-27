@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
@@ -181,14 +182,9 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
             throw new ArgumentException(
                 "ML-DSA key's CKA_PARAMETER_SET is not readable.", nameof(key));
 
-        return (CkpMlDsa)attrs[0].GetValueAsUlong() switch
-        {
-            CkpMlDsa.CKP_ML_DSA_44 => MLDsaAlgorithm.MLDsa44,
-            CkpMlDsa.CKP_ML_DSA_65 => MLDsaAlgorithm.MLDsa65,
-            CkpMlDsa.CKP_ML_DSA_87 => MLDsaAlgorithm.MLDsa87,
-            var unknown => throw new ArgumentException(
-                $"Unrecognized ML-DSA parameter set 0x{(ulong)unknown:X}.", nameof(key)),
-        };
+        ulong parameterSet = attrs[0].GetValueAsUlong();
+        return PostQuantumParameterSets.AlgorithmOf<MLDsaAlgorithm>(CKK.CKK_ML_DSA, parameterSet)
+            ?? throw new ArgumentException($"Unrecognized ML-DSA parameter set 0x{parameterSet:X}.", nameof(key));
     }
 
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)

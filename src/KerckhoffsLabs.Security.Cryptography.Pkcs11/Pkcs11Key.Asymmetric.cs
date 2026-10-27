@@ -63,7 +63,7 @@ public sealed partial class Pkcs11Key
     private byte[] ExportEc(bool spki)
     {
         ECParameters ec = Pkcs11PublicKeyView.ReadEcPublicKey(this, ExportOperation);
-        return spki ? SubjectPublicKeyInfoEncoding.EncodeEc(ec) : [0x04, .. ec.Q.X!, .. ec.Q.Y!];
+        return spki ? SubjectPublicKeyInfoEncoding.EncodeEc(ec) : EcPointEncoding.EncodeUncompressedPoint(ec.Q.X, ec.Q.Y);
     }
 
     private byte[] ExportRsa(bool spki)

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -201,14 +202,9 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
             throw new ArgumentException(
                 "ML-KEM key's CKA_PARAMETER_SET is not readable.", nameof(key));
 
-        return (CkpMlKem)attrs[0].GetValueAsUlong() switch
-        {
-            CkpMlKem.CKP_ML_KEM_512 => MLKemAlgorithm.MLKem512,
-            CkpMlKem.CKP_ML_KEM_768 => MLKemAlgorithm.MLKem768,
-            CkpMlKem.CKP_ML_KEM_1024 => MLKemAlgorithm.MLKem1024,
-            var unknown => throw new ArgumentException(
-                $"Unrecognized ML-KEM parameter set 0x{(ulong)unknown:X}.", nameof(key)),
-        };
+        ulong parameterSet = attrs[0].GetValueAsUlong();
+        return PostQuantumParameterSets.AlgorithmOf<MLKemAlgorithm>(CKK.CKK_ML_KEM, parameterSet)
+            ?? throw new ArgumentException($"Unrecognized ML-KEM parameter set 0x{parameterSet:X}.", nameof(key));
     }
 
     // includeValueLen: encapsulate creates the shared secret via C_DeriveKey-style semantics

@@ -34,29 +34,28 @@ public sealed class EcPointEncodingTests
         byte[] ecParams = curve.GetEcParams();
         byte[] ecPoint = EcPoint(coordLen);
 
-        ECParameters? parsed = EcPointEncoding.TryParsePublicKey(ecPoint, ecParams);
+        Assert.True(EcPointEncoding.TryParsePublicKey(ecPoint, ecParams, out ECParameters parsed));
 
-        Assert.NotNull(parsed);
-        Assert.True(parsed!.Value.Curve.IsNamed);
-        Assert.Equal(curve.Oid, parsed!.Value.Curve.Oid.Value);
-        Assert.Equal(coordLen, parsed!.Value.Q.X!.Length);
-        Assert.Equal(coordLen, parsed!.Value.Q.Y!.Length);
+        Assert.True(parsed.Curve.IsNamed);
+        Assert.Equal(curve.Oid, parsed.Curve.Oid.Value);
+        Assert.Equal(coordLen, parsed.Q.X!.Length);
+        Assert.Equal(coordLen, parsed.Q.Y!.Length);
     }
 
     [Fact]
-    public void TryParsePublicKey_MalformedEcParams_ReturnsNull()
+    public void TryParsePublicKey_MalformedEcParams_ReturnsFalse()
     {
         byte[] ecPoint = EcPoint(coordLen: 32);
-        Assert.Null(EcPointEncoding.TryParsePublicKey(ecPoint, [0x01, 0x02, 0x03]));
+        Assert.False(EcPointEncoding.TryParsePublicKey(ecPoint, [0x01, 0x02, 0x03], out _));
     }
 
     [Fact]
-    public void TryParsePublicKey_NonUncompressedPoint_ReturnsNull()
+    public void TryParsePublicKey_NonUncompressedPoint_ReturnsFalse()
     {
         // 0x02-prefixed compressed point is not supported by the uncompressed-only parser.
         byte[] ecParams = Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams();
         byte[] compressed = [0x04, 0x21, 0x02, .. new byte[32]];
-        Assert.Null(EcPointEncoding.TryParsePublicKey(compressed, ecParams));
+        Assert.False(EcPointEncoding.TryParsePublicKey(compressed, ecParams, out _));
     }
 
     [Theory]
@@ -95,8 +94,8 @@ public sealed class EcPointEncodingTests
     public void TryParsePublicKey_NullArguments_Throw()
     {
         byte[] ecParams = Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams();
-        Assert.Equal("ecPoint", Assert.Throws<ArgumentNullException>(() => EcPointEncoding.TryParsePublicKey(null!, ecParams)).ParamName);
-        Assert.Equal("ecParams", Assert.Throws<ArgumentNullException>(() => EcPointEncoding.TryParsePublicKey(EcPoint(32), null!)).ParamName);
+        Assert.Equal("ecPoint", Assert.Throws<ArgumentNullException>(() => EcPointEncoding.TryParsePublicKey(null!, ecParams, out _)).ParamName);
+        Assert.Equal("ecParams", Assert.Throws<ArgumentNullException>(() => EcPointEncoding.TryParsePublicKey(EcPoint(32), null!, out _)).ParamName);
     }
 
     [Fact]
@@ -198,4 +197,55 @@ public sealed class EcPointEncodingTests
     [InlineData(new byte[] { 0x05, 0x01, 0x02, 0x03 })] // neither an OCTET STRING nor a point header
     public void TryGetCoordinateLength_Malformed_ReturnsFalse(byte[] ecPoint)
         => Assert.False(EcPointEncoding.TryGetCoordinateLength(ecPoint, out _));
+
+    // === The bare uncompressed point ==========================================
+
+    [Fact]
+    public void EncodeUncompressedPoint_PrefixesTheHeaderToBothCoordinates()
+        => Assert.Equal(new byte[] { 0x04, 0x01, 0x02, 0x03, 0x04 }, EcPointEncoding.EncodeUncompressedPoint([0x01, 0x02], [0x03, 0x04]));
+
+    [Theory]
+    [InlineData(1)]   // the shortest point: one byte per coordinate
+    [InlineData(66)]  // P-521
+    public void TrySplitUncompressedPoint_RoundTripsEncodeUncompressedPoint(int coordLen)
+    {
+        byte[] x = [.. Enumerable.Range(1, coordLen).Select(i => (byte)i)];
+        byte[] y = [.. Enumerable.Range(100, coordLen).Select(i => (byte)i)];
+
+        Assert.True(EcPointEncoding.TrySplitUncompressedPoint(EcPointEncoding.EncodeUncompressedPoint(x, y), out byte[] splitX, out byte[] splitY));
+        Assert.Equal(x, splitX);
+        Assert.Equal(y, splitY);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { })]
+    [InlineData(new byte[] { 0x04 })]                   // header only
+    [InlineData(new byte[] { 0x04, 0x01 })]             // odd number of coordinate bytes
+    [InlineData(new byte[] { 0x04, 0x01, 0x02, 0x03 })] // odd number of coordinate bytes
+    [InlineData(new byte[] { 0x02, 0x01 })]             // compressed, which TryGetCoordinateLength alone accepts
+    [InlineData(new byte[] { 0x03, 0x01, 0x02 })]       // compressed, even with an even tail
+    [InlineData(new byte[] { 0x05, 0x01, 0x02 })]       // no point header
+    public void TrySplitUncompressedPoint_NotAnUncompressedPoint_ReturnsFalse(byte[] point)
+    {
+        Assert.False(EcPointEncoding.TrySplitUncompressedPoint(point, out byte[] x, out byte[] y));
+        Assert.Empty(x);
+        Assert.Empty(y);
+    }
+
+    // CKA_EC_PARAMS and an EC SubjectPublicKeyInfo's parameters resolve through the same path.
+    [Fact]
+    public void TryResolveNamedCurve_ResolvesACatalogCurve()
+    {
+        Assert.True(EcPointEncoding.TryResolveNamedCurve(Pkcs11ECCurve.NamedCurves.BrainpoolP256r1.GetEcParams(), out ECCurve curve));
+        Assert.True(curve.IsNamed);
+        Assert.Equal(Pkcs11ECCurve.NamedCurves.BrainpoolP256r1.Oid, curve.Oid.Value);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { })]                                     // absent
+    [InlineData(new byte[] { 0x05, 0x00 })]                          // NULL
+    [InlineData(new byte[] { 0x30, 0x00 })]                          // explicit parameters
+    [InlineData(new byte[] { 0x06, 0x03, 0x2A, 0x86, 0x48, 0x00 })]  // trailing byte
+    public void TryResolveNamedCurve_NotOneDerOid_ReturnsFalse(byte[] ecParams)
+        => Assert.False(EcPointEncoding.TryResolveNamedCurve(ecParams, out _));
 }

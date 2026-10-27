@@ -1,5 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Formats.Asn1;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
@@ -24,13 +26,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 /// </remarks>
 internal static class SubjectPublicKeyInfoEncoding
 {
+    private static readonly byte[] DerNull = [0x05, 0x00];
+
     /// <summary>Encodes a named-curve EC public key.</summary>
     internal static byte[] EncodeEc(ECParameters ec)
-        => Encode(Oids.KeyAlgorithms.EcPublicKey, w => w.WriteObjectIdentifier(ec.Curve.Oid.Value!), [0x04, .. ec.Q.X!, .. ec.Q.Y!]);
+        => Encode(Oids.KeyAlgorithms.EcPublicKey, Pkcs11ECCurve.FromECCurve(ec.Curve).GetEcParams(), EcPointEncoding.EncodeUncompressedPoint(ec.Q.X, ec.Q.Y));
 
     /// <summary>Encodes an RSA public key from its unsigned big-endian modulus and public exponent.</summary>
     internal static byte[] EncodeRsa(ReadOnlySpan<byte> modulus, ReadOnlySpan<byte> exponent)
-        => Encode(Oids.KeyAlgorithms.RsaEncryption, w => w.WriteNull(), EncodeRsaPublicKey(modulus, exponent));
+        => Encode(Oids.KeyAlgorithms.RsaEncryption, DerNull, EncodeRsaPublicKey(modulus, exponent));
 
     /// <summary>
     /// The PKCS#1 <c>RSAPublicKey ::= SEQUENCE { modulus INTEGER, publicExponent INTEGER }</c>, what
@@ -51,21 +55,19 @@ internal static class SubjectPublicKeyInfoEncoding
 
     /// <summary>Encodes a public key whose algorithm takes no parameters (ML-DSA, SLH-DSA, ML-KEM).</summary>
     internal static byte[] EncodeWithoutParameters(string algorithmOid, ReadOnlySpan<byte> publicKey)
-        => Encode(algorithmOid, static _ => { }, publicKey);
+        => Encode(algorithmOid, null, publicKey);
 
     /// <summary>Encodes a DSA public key from its unsigned big-endian domain parameters and public value.</summary>
     internal static byte[] EncodeDsa(ReadOnlySpan<byte> p, ReadOnlySpan<byte> q, ReadOnlySpan<byte> g, ReadOnlySpan<byte> y)
     {
-        byte[] pBytes = p.ToArray(), qBytes = q.ToArray(), gBytes = g.ToArray();
-        return Encode(Oids.KeyAlgorithms.Dsa, w =>
+        var parameters = new AsnWriter(AsnEncodingRules.DER);
+        using (parameters.PushSequence())
         {
-            using (w.PushSequence())
-            {
-                w.WriteIntegerUnsigned(TrimLeadingZeros(pBytes));
-                w.WriteIntegerUnsigned(TrimLeadingZeros(qBytes));
-                w.WriteIntegerUnsigned(TrimLeadingZeros(gBytes));
-            }
-        }, EncodeDsaPublicKey(y));
+            parameters.WriteIntegerUnsigned(TrimLeadingZeros(p));
+            parameters.WriteIntegerUnsigned(TrimLeadingZeros(q));
+            parameters.WriteIntegerUnsigned(TrimLeadingZeros(g));
+        }
+        return Encode(Oids.KeyAlgorithms.Dsa, parameters.Encode(), EncodeDsaPublicKey(y));
     }
 
     /// <summary>The DSA public value as RFC 3279's <c>DSAPublicKey ::= INTEGER</c>.</summary>
@@ -76,25 +78,19 @@ internal static class SubjectPublicKeyInfoEncoding
         return writer.Encode();
     }
 
-    private static byte[] Encode(string algorithmOid, Action<AsnWriter> writeParameters, ReadOnlySpan<byte> subjectPublicKey)
-    {
-        var writer = new AsnWriter(AsnEncodingRules.DER);
-        using (writer.PushSequence())
-        {
-            using (writer.PushSequence())
-            {
-                writer.WriteObjectIdentifier(algorithmOid);
-                writeParameters(writer);
-            }
-            writer.WriteBitString(subjectPublicKey);
-        }
-        return writer.Encode();
-    }
+    // The BCL writes the outer structure. parameters is the encoded AlgorithmIdentifier parameters, or
+    // null to leave them absent, as the post-quantum algorithms need; RSA's NULL is passed as 05 00.
+    private static byte[] Encode(string algorithmOid, byte[]? parameters, ReadOnlySpan<byte> subjectPublicKey)
+        => new PublicKey(
+            new Oid(algorithmOid, null),
+            parameters is null ? null : new AsnEncodedData(parameters),
+            new AsnEncodedData(subjectPublicKey)).ExportSubjectPublicKeyInfo();
 
+    // An all-zero or empty value is the INTEGER 0.
     private static ReadOnlySpan<byte> TrimLeadingZeros(ReadOnlySpan<byte> value)
     {
         int i = value.IndexOfAnyExcept((byte)0);
-        return i < 0 ? value[^1..] : value[i..];
+        return i < 0 ? [0] : value[i..];
     }
 
     /// <summary>
@@ -112,59 +108,49 @@ internal static class SubjectPublicKeyInfoEncoding
     internal static bool TryDecodeEc(ReadOnlySpan<byte> spki, out ECParameters ec)
     {
         ec = default;
-        if (!TryRead(spki, out string? algorithm, out ReadOnlyMemory<byte>? parameters, out byte[]? key)
-            || algorithm != Oids.KeyAlgorithms.EcPublicKey || parameters is not { } p)
+        if (!TryRead(spki, out string? algorithm, out ReadOnlySpan<byte> parameters, out byte[]? key)
+            || algorithm != Oids.KeyAlgorithms.EcPublicKey
+            || !EcPointEncoding.TryResolveNamedCurve(parameters, out ECCurve curve)
+            || !EcPointEncoding.TrySplitUncompressedPoint(key, out byte[] x, out byte[] y))
             return false;
 
-        string curveOid;
-        try
-        {
-            var reader = new AsnReader(p, AsnEncodingRules.DER);
-            curveOid = reader.ReadObjectIdentifier();
-            reader.ThrowIfNotEmpty();
-        }
-        catch (AsnContentException)
-        {
-            return false;
-        }
-
-        if (key is not [0x04, ..] || key.Length < 3 || key.Length % 2 == 0)
-            return false;
-        int coordinateLength = (key.Length - 1) / 2;
-        ec = new ECParameters
-        {
-            Curve = ECCurve.CreateFromValue(curveOid),
-            Q = new ECPoint { X = key[1..(1 + coordinateLength)], Y = key[(1 + coordinateLength)..] },
-        };
+        ec = new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } };
         return true;
     }
 
-    private static bool TryRead(ReadOnlySpan<byte> spki, out string? algorithm, out ReadOnlyMemory<byte>? parameters, out byte[]? key)
+    // Not PublicKey.CreateFromSubjectPublicKeyInfo: it ignores the BIT STRING's unused-bits count, and a
+    // peer key is caller input. Every level must be consumed exactly. parameters is empty when absent: a
+    // present one is at least a tag and a length.
+    private static bool TryRead(
+        ReadOnlySpan<byte> spki, [NotNullWhen(true)] out string? algorithm, out ReadOnlySpan<byte> parameters, [NotNullWhen(true)] out byte[]? key)
     {
         algorithm = null;
-        parameters = null;
+        parameters = default;
         key = null;
         try
         {
-            var outer = new AsnReader(spki.ToArray(), AsnEncodingRules.DER);
-            AsnReader info = outer.ReadSequence();
-            outer.ThrowIfNotEmpty();
-
-            AsnReader algorithmIdentifier = info.ReadSequence();
-            algorithm = algorithmIdentifier.ReadObjectIdentifier();
-            if (algorithmIdentifier.HasData)
-                parameters = algorithmIdentifier.ReadEncodedValue();
-            algorithmIdentifier.ThrowIfNotEmpty();
-
-            key = info.ReadBitString(out int unusedBits);
-            info.ThrowIfNotEmpty();
-            if (unusedBits != 0)
+            AsnDecoder.ReadSequence(spki, AsnEncodingRules.DER, out int offset, out int length, out int consumed);
+            if (consumed != spki.Length)
                 return false;
-            return true;
+            ReadOnlySpan<byte> info = spki.Slice(offset, length);
+
+            AsnDecoder.ReadSequence(info, AsnEncodingRules.DER, out offset, out length, out consumed);
+            ReadOnlySpan<byte> algorithmIdentifier = info.Slice(offset, length);
+            info = info[consumed..];
+            algorithm = AsnDecoder.ReadObjectIdentifier(algorithmIdentifier, AsnEncodingRules.DER, out consumed);
+            parameters = algorithmIdentifier[consumed..];
+            if (!parameters.IsEmpty)
+            {
+                AsnDecoder.ReadEncodedValue(parameters, AsnEncodingRules.DER, out _, out _, out consumed);
+                if (consumed != parameters.Length)
+                    return false;
+            }
+
+            key = AsnDecoder.ReadBitString(info, AsnEncodingRules.DER, out int unusedBits, out consumed);
+            return consumed == info.Length && unusedBits == 0;
         }
         catch (AsnContentException)
         {
-            algorithm = null;
             return false;
         }
     }

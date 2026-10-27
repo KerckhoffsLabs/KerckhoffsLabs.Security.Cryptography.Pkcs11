@@ -24,7 +24,7 @@ internal static class EcPointEncoding
     internal static byte[] Encode(byte[] x, byte[] y)
     {
         var writer = new AsnWriter(AsnEncodingRules.DER);
-        writer.WriteOctetString([0x04, .. x, .. y]);
+        writer.WriteOctetString(EncodeUncompressedPoint(x, y));
         return writer.Encode();
     }
 
@@ -35,32 +35,63 @@ internal static class EcPointEncoding
     internal static bool TryDecode(byte[] ecPoint, out byte[] x, out byte[] y)
     {
         x = y = [];
-        if (!TryReadOctetString(ecPoint, out byte[]? point) || point is not [0x04, ..]) return false;
+        return TryReadOctetString(ecPoint, out byte[]? point) && TrySplitUncompressedPoint(point, out x, out y);
+    }
 
-        int coordLen = PointCoordinateLength(point);
-        if (coordLen == 0) return false;
+    /// <summary>The bare uncompressed point <c>0x04 ‖ X ‖ Y</c> (SEC 1 §2.3.3), without the OCTET STRING.</summary>
+    internal static byte[] EncodeUncompressedPoint(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y) => [0x04, .. x, .. y];
 
-        x = point[1..(1 + coordLen)];
-        y = point[(1 + coordLen)..];
+    /// <summary>
+    /// The inverse of <see cref="EncodeUncompressedPoint"/>. Returns <see langword="false"/> unless
+    /// <paramref name="point"/> is <c>0x04</c> followed by two non-empty coordinates of equal length.
+    /// </summary>
+    internal static bool TrySplitUncompressedPoint(ReadOnlySpan<byte> point, out byte[] x, out byte[] y)
+    {
+        x = y = [];
+        if (point is not [0x04, ..] || PointCoordinateLength(point) is not (> 0 and var coordinateLength)) return false;
+
+        x = point.Slice(1, coordinateLength).ToArray();
+        y = point[(1 + coordinateLength)..].ToArray();
         return true;
     }
 
     /// <summary>
     /// Parses raw <c>CKA_EC_POINT</c> + <c>CKA_EC_PARAMS</c> bytes into an <see cref="ECParameters"/>
     /// for a named curve (any curve in <see cref="Pkcs11ECCurve.NamedCurves"/>, and any other named-curve
-    /// OID the host BCL recognises). Returns <see langword="null"/> when the inputs don't decode as an
+    /// OID the host BCL recognises). Returns <see langword="false"/> when the inputs don't decode as an
     /// OCTET-STRING-wrapped uncompressed point or <c>CKA_EC_PARAMS</c> isn't a DER-encoded curve OID.
     /// </summary>
     /// <param name="ecPoint">Raw <c>CKA_EC_POINT</c> bytes (OCTET STRING containing the uncompressed point).</param>
     /// <param name="ecParams">Raw <c>CKA_EC_PARAMS</c> bytes (DER-encoded named-curve OID).</param>
-    internal static ECParameters? TryParsePublicKey(byte[] ecPoint, byte[] ecParams)
+    /// <param name="ec">The public key, when the method returns <see langword="true"/>.</param>
+    internal static bool TryParsePublicKey(byte[] ecPoint, byte[] ecParams, out ECParameters ec)
     {
         ArgumentNullException.ThrowIfNull(ecPoint);
         ArgumentNullException.ThrowIfNull(ecParams);
 
-        if (!TryDecode(ecPoint, out byte[] x, out byte[] y)) return null;
-        if (ResolveNamedCurve(ecParams) is not { } curve) return null;
-        return new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } };
+        ec = default;
+        if (!TryDecode(ecPoint, out byte[] x, out byte[] y) || !TryResolveNamedCurve(ecParams, out ECCurve curve)) return false;
+        ec = new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } };
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves a <c>CKA_EC_PARAMS</c> value, or an EC <c>SubjectPublicKeyInfo</c>'s <i>namedCurve</i>
+    /// parameters (the same DER-encoded OID), to a BCL named curve over that OID. Returns
+    /// <see langword="false"/> unless the bytes are exactly one DER-encoded OID.
+    /// </summary>
+    internal static bool TryResolveNamedCurve(ReadOnlySpan<byte> ecParams, out ECCurve curve)
+    {
+        try
+        {
+            curve = Pkcs11ECCurve.FromEcParams(ecParams).ToECCurve();
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            curve = default;
+            return false;
+        }
     }
 
     /// <summary>
@@ -111,21 +142,6 @@ internal static class EcPointEncoding
         {
             content = null;
             return false;
-        }
-    }
-
-    // CKA_EC_PARAMS for a named curve is the DER-encoded curve OID; bridge it to a BCL named curve
-    // over that OID. Covers the whole Pkcs11ECCurve.NamedCurves catalog (NIST, secp256k1, Brainpool, SM2),
-    // not just the NIST primes. Returns null when the bytes aren't a DER-encoded OID.
-    private static ECCurve? ResolveNamedCurve(byte[] derOid)
-    {
-        try
-        {
-            return Pkcs11ECCurve.FromEcParams(derOid).ToECCurve();
-        }
-        catch (ArgumentException)
-        {
-            return null;
         }
     }
 }

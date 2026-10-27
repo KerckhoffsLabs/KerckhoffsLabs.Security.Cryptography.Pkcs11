@@ -14,6 +14,7 @@ public sealed class SubjectPublicKeyInfoEncodingTests
     private const string EcPublicKeyOid = "1.2.840.10045.2.1";
     private const string RsaEncryptionOid = "1.2.840.113549.1.1.1";
     private const string NistP256Oid = "1.2.840.10045.3.1.7";
+    private const string SlhDsaSha2_128sOid = "2.16.840.1.101.3.4.3.20";
 
     // SEQUENCE { SEQUENCE { algorithm, parameters... }, BIT STRING key }, with optional extra bytes at
     // each level to build the non-canonical inputs.
@@ -50,10 +51,13 @@ public sealed class SubjectPublicKeyInfoEncodingTests
 
     // === Encoding matches the BCL ============================================
 
-    [Fact]
-    public void EncodeEc_MatchesTheBcl()
+    [Theory]
+    [InlineData("nistP256")]
+    [InlineData("nistP384")]
+    [InlineData("nistP521")]
+    public void EncodeEc_MatchesTheBcl(string curveName)
     {
-        using var ec = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var ec = ECDsa.Create(ECCurve.CreateFromFriendlyName(curveName));
         Assert.Equal(ec.ExportSubjectPublicKeyInfo(), SubjectPublicKeyInfoEncoding.EncodeEc(ec.ExportParameters(false)));
     }
 
@@ -65,6 +69,46 @@ public sealed class SubjectPublicKeyInfoEncodingTests
         Assert.Equal(rsa.ExportSubjectPublicKeyInfo(), SubjectPublicKeyInfoEncoding.EncodeRsa(p.Modulus, p.Exponent));
         Assert.Equal(rsa.ExportRSAPublicKey(), SubjectPublicKeyInfoEncoding.EncodeRsaPublicKey(p.Modulus, p.Exponent));
     }
+
+    // rsaEncryption carries an explicit NULL as its parameters (RFC 3279 §2.3.1): 05 00 after the OID.
+    [Fact]
+    public void EncodeRsa_WritesExplicitNullParameters()
+        => Assert.Equal(
+            new byte[]
+            {
+                0x30, 0x1E,
+                0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00,
+                0x03, 0x0D, 0x00, 0x30, 0x0A, 0x02, 0x03, 0x00, 0xC1, 0x02, 0x02, 0x03, 0x01, 0x00, 0x01,
+            },
+            SubjectPublicKeyInfoEncoding.EncodeRsa([0xC1, 0x02], [0x01, 0x00, 0x01]));
+
+    // The post-quantum algorithms take no parameters at all (FIPS 203/204/205 SPKI profiles): nothing
+    // follows the OID, not even a NULL.
+    [Fact]
+    public void EncodeWithoutParameters_OmitsTheParameters()
+    {
+        byte[] publicKey = [.. Enumerable.Range(1, 32).Select(i => (byte)i)];
+        byte[] expected =
+        [
+            0x30, 0x30,
+            0x30, 0x0B, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x14,
+            0x03, 0x21, 0x00, .. publicKey,
+        ];
+        Assert.Equal(expected, SubjectPublicKeyInfoEncoding.EncodeWithoutParameters(SlhDsaSha2_128sOid, publicKey));
+    }
+
+    // Dss-Parms ::= SEQUENCE { p, q, g } as the parameters, each INTEGER minimal, and y as the key.
+    [Fact]
+    public void EncodeDsa_WritesDssParmsAndTheMinimalPublicValue()
+        => Assert.Equal(
+            new byte[]
+            {
+                0x30, 0x1D,
+                0x30, 0x15, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x38, 0x04, 0x01,
+                0x30, 0x0A, 0x02, 0x02, 0x00, 0x87, 0x02, 0x01, 0x05, 0x02, 0x01, 0x02,
+                0x03, 0x04, 0x00, 0x02, 0x01, 0x03,
+            },
+            SubjectPublicKeyInfoEncoding.EncodeDsa([0x00, 0x87], [0x05], [0x00, 0x02], [0x00, 0x00, 0x03]));
 
     // PKCS#11 big integers may carry leading zero bytes; DER INTEGERs are minimal.
     [Fact]
@@ -85,6 +129,11 @@ public sealed class SubjectPublicKeyInfoEncodingTests
     [Fact]
     public void EncodeDsaPublicKey_KeepsANonZeroLeadingByte()
         => Assert.Equal(new byte[] { 0x02, 0x02, 0x01, 0x02 }, SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey([0x01, 0x02]));
+
+    // The callers refuse an empty integer first; should one get through, it encodes as 0, like an all-zero one.
+    [Fact]
+    public void EncodeDsaPublicKey_EmptyValue_IsIntegerZero()
+        => Assert.Equal(new byte[] { 0x02, 0x01, 0x00 }, SubjectPublicKeyInfoEncoding.EncodeDsaPublicKey([]));
 
     // === TryDecodeEc ==========================================================
 
@@ -147,5 +196,9 @@ public sealed class SubjectPublicKeyInfoEncodingTests
         { "data after the key", Spki(RsaEncryptionOid, w => w.WriteNull(), [0x00], afterKey: DerNull) },
         { "data after the SubjectPublicKeyInfo", Spki(RsaEncryptionOid, w => w.WriteNull(), [0x00], afterSpki: DerNull) },
         { "unused bits in the key", Spki(RsaEncryptionOid, w => w.WriteNull(), [0x00], unusedBits: 1) },
+        { "BER: a long-form length under 128", [0x30, 0x81, 0x13, .. Spki(RsaEncryptionOid, w => w.WriteNull(), [0x00])[2..]] },
+        { "BER: indefinite length", [0x30, 0x80, .. Spki(RsaEncryptionOid, w => w.WriteNull(), [0x00])[2..], 0x00, 0x00] },
+        { "BER: a constructed BIT STRING", [0x30, 0x15, .. Spki(RsaEncryptionOid, w => w.WriteNull(), [0x00])[2..17], 0x23, 0x04, 0x03, 0x02, 0x00, 0x00] },
+        { "truncated", Spki(RsaEncryptionOid, w => w.WriteNull(), [0x00])[..^1] },
     };
 }
