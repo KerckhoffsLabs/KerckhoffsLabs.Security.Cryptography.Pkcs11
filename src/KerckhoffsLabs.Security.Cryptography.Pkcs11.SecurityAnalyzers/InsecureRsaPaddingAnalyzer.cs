@@ -44,8 +44,10 @@ public sealed class InsecureRsaPaddingAnalyzer : DiagnosticAnalyzer
         description:
             "RSAES-PKCS#1 v1.5 and raw RSA encryption are refused at runtime by the default Recommended " +
             "crypto policy (Pkcs11Session.Policy). Suppress this diagnostic only alongside a documented " +
-            "reason to keep the legacy padding; RSASSA-PKCS#1 v1.5 signatures with a strong hash are " +
-            "unaffected and remain allowed.",
+            "reason to keep the legacy padding, and never treat the success or failure of PKCS#1 v1.5 " +
+            "decryption as a signal: tokens that implement implicit rejection return a synthetic " +
+            "plaintext for invalid padding instead of failing. RSASSA-PKCS#1 v1.5 signatures with a " +
+            "strong hash are unaffected and remain allowed.",
         helpLinkUri:
             "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11008");
 

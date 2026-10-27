@@ -517,6 +517,10 @@ public sealed class RSAPkcs11Tests_Managed
     });
 
     [Fact]
+    public void Decrypt_Pkcs1InvalidPadding_NeverReturnsTheMessage() =>
+        WithTransportRsa(RSAPkcs11TestCases.AssertPkcs1InvalidPaddingNeverReturnsTheMessage);
+
+    [Fact]
     public void Encrypt_Pkcs1_WithoutAllowInsecure_Throws() => WithTransportRsa((_, rsa) =>
         Assert.Throws<CryptoPolicyViolationException>(() =>
             rsa.Encrypt(Encoding.UTF8.GetBytes("nope"), RSAEncryptionPadding.Pkcs1)));
