@@ -2,6 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -106,6 +107,141 @@ public sealed class Pkcs11SessionDisposeRaceTests
     // the test instead of ending the process.
     private static Task OnItsOwnThread(Action action)
         => Task.Factory.StartNew(action, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+    /// <summary>
+    /// Holds <c>C_Logout</c> until another thread has tried a call on the session, and records the order of
+    /// the calls that reach it.
+    /// </summary>
+    private sealed class GatedLogoutFake : FakeModule
+    {
+        internal readonly ManualResetEventSlim LoggingOut = new(false);
+        internal readonly ManualResetEventSlim Attempted = new(false);
+
+        private readonly List<string> _calls = [];
+
+        internal string[] CallOrder
+        {
+            get { lock (_calls) return [.. _calls]; }
+        }
+
+        private void Record(string call)
+        {
+            lock (_calls) _calls.Add(call);
+        }
+
+        protected override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+        {
+            Record("C_GenerateRandom");
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_Logout(NativeCULong session)
+        {
+            Record("C_Logout");
+            LoggingOut.Set();
+            Attempted.Wait(Generous, TestContext.Current.CancellationToken);
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_CloseSession(NativeCULong session)
+        {
+            Record("C_CloseSession");
+            return CKR.CKR_OK;
+        }
+
+        protected override void Disposing()
+        {
+            LoggingOut.Dispose();
+            Attempted.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Holds the session core's "Dispose1" trace, logged as its close begins, until <see cref="Tried"/> is
+    /// set: a call tried then runs before the close if the close is not under the logout's lock hold.
+    /// </summary>
+    private sealed class CloseGate : ILogger, ILoggerFactory
+    {
+        internal readonly ManualResetEventSlim Closing = new(false);
+        internal readonly ManualResetEventSlim Tried = new(false);
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (!formatter(state, exception).EndsWith("::Dispose1", StringComparison.Ordinal))
+                return;
+            Closing.Set();
+            Tried.Wait(Generous, TestContext.Current.CancellationToken);
+        }
+
+        IDisposable? ILogger.BeginScope<TState>(TState state) => null;
+        public ILogger CreateLogger(string categoryName) => this;
+        public void AddProvider(ILoggerProvider provider) { }
+
+        public void Dispose()
+        {
+            Closing.Dispose();
+            Tried.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Dispose logs out and closes under one hold of the session's lock. Taken twice, a call on another
+    /// thread could run between the two, on a session still open but logged out, where a private key it
+    /// used had become invisible (<c>CKR_OBJECT_HANDLE_INVALID</c>). A call racing Dispose is refused as
+    /// concurrent while Dispose holds the lock, and finds the session disposed after; none reaches the
+    /// module once the logout has.
+    /// </summary>
+    [Fact]
+    public async Task Dispose_CallRacingTheLogout_NeverRunsBetweenTheLogoutAndTheClose()
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        using var fake = new GatedLogoutFake();
+        using var library = fake.Load();
+        using var lowLevel = fake.LoadLowLevel();
+        using var gate = new CloseGate();
+        var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11SessionCore(lowLevel, slotId: default, SessionId, gate));
+
+        Task disposer = OnItsOwnThread(session.Dispose);
+        Assert.True(fake.LoggingOut.Wait(Generous, token), "Dispose never reached C_Logout");
+
+        // One call while C_Logout is in the module, one as the close begins, one after Dispose returns.
+        var outcomes = new List<string>();
+        Task caller = OnItsOwnThread(() =>
+        {
+            outcomes.Add(TryCall(session));
+            fake.Attempted.Set();
+            Assert.True(gate.Closing.Wait(Generous, token), "Dispose never began the close");
+            outcomes.Add(TryCall(session));
+            gate.Tried.Set();
+        });
+
+        await caller.WaitAsync(Generous, token);
+        await disposer.WaitAsync(Generous, token);
+        outcomes.Add(TryCall(session));
+
+        Assert.Equal(["concurrent", "concurrent", "disposed"], outcomes);
+        Assert.Equal(["C_Logout", "C_CloseSession"], fake.CallOrder);
+    }
+
+    private static string TryCall(Pkcs11Session session)
+    {
+        try
+        {
+            _ = session.GenerateRandom(8);
+            return "ran";
+        }
+        catch (InvalidOperationException e) when (e.Message.Contains("Concurrent access", StringComparison.Ordinal))
+        {
+            return "concurrent";
+        }
+        catch (ObjectDisposedException)
+        {
+            return "disposed";
+        }
+    }
 
     /// <summary>
     /// A token that rejects the logout (already logged out, or one that never had a login — NSS's
