@@ -79,6 +79,6 @@ updates:
 #   (NSS_3_132_RTM, BouncyHsm v2.3.3) or a reviewed commit just past one. Dependabot can only move a
 #   submodule to the tip of a branch, which would replace each of those choices with whatever the
 #   development branch holds that day.
-# - dotnet-sdk. global.json names 10.0.100 with rollForward: latestFeature, and CI installs the latest
-#   10.0.x, so builds already use the newest SDK; raising the floor would only stop older 10.0 SDKs
-#   from building the repository.
+# - dotnet-sdk. global.json pins the exact SDK the lock files were restored with (see the library's
+#   .csproj), so a bump must regenerate the lock files in the same commit. Dependabot changes only
+#   global.json, which would fail the locked-mode restore in every workflow.

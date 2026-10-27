@@ -56,7 +56,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.402' # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
+          global-json-file: global.json # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
       # The Sonar analysis engine is JVM-based; the .NET scanner shells out to it.
       - name: Setup Java

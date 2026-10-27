@@ -4,8 +4,8 @@ _Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist d
 
 ## Summary
 
-- Total items: 167 (86 resolved, 81 open, 23 of them partially resolved)
-- Critical: 0 | High: 32 (8 open, 24 resolved) | Medium: 87 (49 open, 38 resolved) | Low: 48 (24 open, 24 resolved; includes the two Info entries, BL-158 and BL-159)
+- Total items: 167 (87 resolved, 80 open, 23 of them partially resolved)
+- Critical: 0 | High: 32 (8 open, 24 resolved) | Medium: 87 (48 open, 39 resolved) | Low: 48 (24 open, 24 resolved; includes the two Info entries, BL-158 and BL-159)
 - Headline risks:
   - **The advertised streaming surface does not exist, and the previous coverage matrix said it did.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer — `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099). Two matrix rows have been corrected below.
   - **Nine public-API decisions are cheap now and SemVer-major later — all nine now settled.** Exceptions did not derive from `CryptographicException`, so `catch (CryptographicException)` around the BCL-shaped façades silently failed; they now do (BL-063, resolved); `ECCurve` collided with `System.Security.Cryptography.ECCurve` and is now `Pkcs11ECCurve`, with a reflection guard against the next such clash (BL-066, resolved); 96 `CKF`/`CK`/`CKZ` constants published the platform-width-dependent third-party `NativeCULong` and are now `ulong`, with that package gone from the public surface entirely (BL-067, resolved); every `CK_VERSION` reached the API as a lossy string in which a v3.1 module rendered as `"3.01"` and is now a comparable `System.Version` (BL-068, resolved); `LoadStaticallyLinked()` could not work on any shipped RID because `__Internal` is Mono-only, and now resolves against the entry-point module instead (BL-064, resolved); the secure-defaults key generators granted conflicting roles on one key and are now split into role-specific helpers (BL-070, resolved); and `CloseAllSessions()`'s bookkeeping gap was closed by removing the method from the public surface, its only legitimate use being narrow enough that disposing tracked sessions/sessions is the supported path (BL-071, resolved). `AdditionalDerivedKeys` now returns hydrated `Pkcs11Key` instances instead of raw `ulong` handles (BL-069, resolved). `Verify` now returns `false` for a wrong-length signature instead of throwing, as the BCL does (BL-065, resolved). The set is BL-063 – BL-071.
@@ -1351,7 +1351,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** QA C
 
-### [BL-137] The SDK and compiler version used to produce the released package is not pinned
+### [BL-137] ✅ RESOLVED — The SDK and compiler version used to produce the released package is not pinned
+- **Status:** Resolved 2026-10-27. #213 made every `setup-dotnet` step install exactly SDK 10.0.402, but `global.json` still named 10.0.100 with `rollForward: latestFeature`, so a newer SDK preinstalled on the runner was picked over it. That happened on 2026-10-27, when the runner images gained 10.0.403: its `Microsoft.NET.ILLink.Tasks` 10.0.14 no longer matched the lock files, and every locked-mode restore failed with NU1004. `global.json` now names 10.0.402 with `rollForward: patch`, which selects that exact SDK whenever it is installed, and every workflow installs it with `global-json-file: global.json`, so the version lives in one place.
 - **Area:** Release Eng
 - **Severity:** Medium
 - **Effort:** S

@@ -19,11 +19,12 @@
     <!-- Every project restores from a committed packages.lock.json, in locked mode in CI. IsAotCompatible
          here (and PublishAot in tests/AotSmoke) make the SDK add Microsoft.NET.ILLink.Tasks and
          Microsoft.DotNet.ILCompiler, which the lock files record at the version of the SDK that
-         restored them. CI therefore installs one exact SDK (dotnet-version in the workflows). To move to
-         a newer SDK, change dotnet-version in every workflow, then, with that SDK installed, run
-         `dotnet restore KerckhoffsLabs.sln` with its force-evaluate switch to regenerate the lock files;
-         commit both together. A local build with another SDK rewrites these lock files: do not commit
-         that change. -->
+         restored them. global.json therefore names one exact SDK, with rollForward "patch" so that a
+         newer SDK preinstalled on a CI runner is not picked over it, and every workflow installs that
+         SDK from global.json. To move to a newer SDK, change the version in global.json, then, with that
+         SDK installed, run `dotnet restore KerckhoffsLabs.sln` with its force-evaluate switch to
+         regenerate the lock files; commit both together. A local build with another SDK rewrites these
+         lock files: do not commit that change. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RuntimeIdentifiers>win-x86;win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <LangVersion>13.0</LangVersion>
