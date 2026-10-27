@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
@@ -268,6 +269,140 @@ public sealed class MLKemPkcs11Tests_Managed
         }
     }
 
+    // === A token that misbehaves =========================================
+
+    // Opens a session over the given managed token under AllowInsecure, generates an ML-KEM-768 key
+    // pair, and runs the body with a ciphertext for the key made off the token.
+    private static void WithMisbehavingToken(ManagedSoftToken token, Action<Pkcs11Session, MLKemPkcs11, byte[]> body)
+    {
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var key = GenerateMlKem(session, CkpMlKem.CKP_ML_KEM_768);
+        using var mlkem = new MLKemPkcs11(key);
+        body(session, mlkem, BclCiphertextFor(mlkem));
+    }
+
+    // A filled buffer, so a test can tell that a failure zeroed it.
+    private static byte[] Filled(int length) => [.. Enumerable.Repeat((byte)0xA5, length)];
+
+    // SoftHSM refuses CKA_VALUE_LEN on the decapsulated secret's template. The first decapsulation
+    // retries without it and records that on the library; the next one goes straight to that form.
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void Decapsulate_TokenRefusesValueLen_RetriesWithoutIt_AndRemembers() =>
+        WithMisbehavingToken(new ManagedSoftToken { DecapsulateRejectsValueLen = true }, (session, mlkem, _) =>
+        {
+            mlkem.Encapsulate(out byte[] ciphertext, out byte[] sharedSecret);
+            Assert.Null(session.Library.MlKemDecapsulateOmitsValueLen);
+
+            Assert.Equal(sharedSecret, mlkem.Decapsulate(ciphertext));
+            Assert.True(session.Library.MlKemDecapsulateOmitsValueLen);
+
+            Assert.Equal(sharedSecret, mlkem.Decapsulate(ciphertext));
+            Assert.True(session.Library.MlKemDecapsulateOmitsValueLen);
+        });
+
+    [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SharedSecretUnreadable_ThrowsPkcs11Exception_AndHandsBackNoSecret(bool encapsulate) =>
+        WithMisbehavingToken(new ManagedSoftToken { KemWithholdsSharedSecret = true }, (session, mlkem, ciphertext) =>
+        {
+            byte[] sharedSecret = Filled(mlkem.Algorithm.SharedSecretSizeInBytes);
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            {
+                if (encapsulate)
+                    mlkem.Encapsulate(new byte[mlkem.Algorithm.CiphertextSizeInBytes], sharedSecret);
+                else
+                    mlkem.Decapsulate(ciphertext, sharedSecret);
+            });
+            Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+            Assert.Contains("unreadable", ex.Message, StringComparison.Ordinal);
+            Assert.All(sharedSecret, b => Assert.Equal(0, b));
+            Assert.Equal(0, SecretKeyCount(session));
+        });
+
+    // A shared secret shorter or longer than the parameter set's 32 bytes is refused, never copied in part.
+    [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    [InlineData(true, -1)]
+    [InlineData(true, 1)]
+    [InlineData(false, -1)]
+    [InlineData(false, 1)]
+    public void SharedSecretOfTheWrongLength_ThrowsPkcs11Exception_AndHandsBackNoSecret(bool encapsulate, int lengthDelta)
+    {
+        var token = new ManagedSoftToken
+        {
+            KemSharedSecretOverride = ss => lengthDelta < 0 ? ss[..^1] : [.. ss, 0x00],
+        };
+        WithMisbehavingToken(token, (session, mlkem, ciphertext) =>
+        {
+            byte[] sharedSecret = Filled(mlkem.Algorithm.SharedSecretSizeInBytes);
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            {
+                if (encapsulate)
+                    mlkem.Encapsulate(new byte[mlkem.Algorithm.CiphertextSizeInBytes], sharedSecret);
+                else
+                    mlkem.Decapsulate(ciphertext, sharedSecret);
+            });
+            Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+            Assert.Contains($"{32 + lengthDelta}-byte shared secret", ex.Message, StringComparison.Ordinal);
+            Assert.All(sharedSecret, b => Assert.Equal(0, b));
+            Assert.Equal(0, SecretKeyCount(session));
+        });
+    }
+
+    // A short ciphertext is the token's fault. The secret was already copied out when the ciphertext is
+    // checked, so the failure must zero it again.
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void Encapsulate_TokenCiphertextTooShort_ThrowsPkcs11Exception_AndHandsBackNoSecret() =>
+        WithMisbehavingToken(new ManagedSoftToken { KemCiphertextOverride = ct => ct[..^1] }, (session, mlkem, _) =>
+        {
+            int expected = mlkem.Algorithm.CiphertextSizeInBytes;
+            byte[] ciphertext = new byte[expected];
+            byte[] sharedSecret = Filled(mlkem.Algorithm.SharedSecretSizeInBytes);
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mlkem.Encapsulate(ciphertext, sharedSecret));
+            Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+            Assert.Contains($"{expected - 1}-byte buffer", ex.Message, StringComparison.Ordinal);
+            Assert.All(sharedSecret, b => Assert.Equal(0, b));
+            Assert.Equal(0, SecretKeyCount(session));
+        });
+
+    // When the token also fails to destroy the secret object, the failure that stopped the operation is
+    // still the one reported: the cleanup is best-effort on that path, and the object is a session object
+    // the token drops at C_CloseSession.
+    [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void FailedOperation_WhenDestroyAlsoFails_ReportsTheOriginalFailure(bool encapsulate)
+    {
+        var token = new ManagedSoftToken { KemSharedSecretOverride = ss => ss[..^1] };
+        WithMisbehavingToken(token, (_, mlkem, ciphertext) =>
+        {
+            byte[] sharedSecret = Filled(mlkem.Algorithm.SharedSecretSizeInBytes);
+            token.DestroyObjectResultOverride = CKR.CKR_FUNCTION_FAILED;
+            try
+            {
+                var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+                {
+                    if (encapsulate)
+                        mlkem.Encapsulate(new byte[mlkem.Algorithm.CiphertextSizeInBytes], sharedSecret);
+                    else
+                        mlkem.Decapsulate(ciphertext, sharedSecret);
+                });
+                Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+                Assert.Contains("31-byte shared secret", ex.Message, StringComparison.Ordinal);
+                Assert.All(sharedSecret, b => Assert.Equal(0, b));
+            }
+            finally
+            {
+                token.DestroyObjectResultOverride = null;
+            }
+        });
+    }
+
     // === Key material export ==============================================
 
     [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
@@ -306,6 +441,41 @@ public sealed class MLKemPkcs11Tests_Managed
     {
         var ex = Assert.Throws<ArgumentNullException>(() => new MLKemPkcs11(null!));
         Assert.Equal("key", ex.ParamName);
+    }
+
+    private static byte[] UlongAttr(ulong value) =>
+        BitConverter.GetBytes(value).AsSpan(0, UnmanagedMemory.NativeULongSize).ToArray();
+
+    // A real token can't be coaxed into hiding CKA_PARAMETER_SET or reporting one it never advertises on
+    // a well-formed ML-KEM key, so a fake key drives these.
+    [Theory]
+    [MemberData(nameof(ParameterSets))]
+    public void Ctor_ResolvesAlgorithm_ForEveryParameterSet(CkpMlKem parameterSet)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_KEM, _ => (CKR.CKR_OK, UlongAttr((ulong)parameterSet)));
+        using var mlkem = new MLKemPkcs11(key);
+
+        Assert.Equal(BclAlgorithm(parameterSet), mlkem.Algorithm);
+    }
+
+    [Fact]
+    public void Ctor_ParameterSetAttributeSensitive_ThrowsArgumentException()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_KEM, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+
+        var ex = Assert.Throws<ArgumentException>(() => new MLKemPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+        Assert.Contains("not readable", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Ctor_UnrecognizedParameterSet_ThrowsArgumentException()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_KEM, _ => (CKR.CKR_OK, UlongAttr(0xFFFF)));
+
+        var ex = Assert.Throws<ArgumentException>(() => new MLKemPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+        Assert.Contains("Unrecognized ML-KEM parameter set 0xFFFF", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

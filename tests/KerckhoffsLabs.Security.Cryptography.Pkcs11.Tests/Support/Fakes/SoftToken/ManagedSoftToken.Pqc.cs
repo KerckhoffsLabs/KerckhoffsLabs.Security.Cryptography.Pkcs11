@@ -76,6 +76,22 @@ internal sealed partial class ManagedSoftToken
 
     // === ML-KEM encapsulate / decapsulate ================================
 
+    /// <summary>When set, <c>C_DecapsulateKey</c> refuses a template carrying <c>CKA_VALUE_LEN</c>
+    /// with <c>CKR_ATTRIBUTE_READ_ONLY</c>, as SoftHSM does.</summary>
+    public bool DecapsulateRejectsValueLen { get; set; }
+
+    /// <summary>When set, <c>C_EncapsulateKey</c> and <c>C_DecapsulateKey</c> store the shared secret
+    /// without its <c>CKA_VALUE</c>, so it cannot be read back.</summary>
+    public bool KemWithholdsSharedSecret { get; set; }
+
+    /// <summary>When set, replaces the shared secret <c>C_EncapsulateKey</c> and <c>C_DecapsulateKey</c>
+    /// store — lets tests exercise a token whose secret is not the length the parameter set fixes.</summary>
+    public Func<byte[], byte[]>? KemSharedSecretOverride { get; set; }
+
+    /// <summary>When set, replaces the ciphertext <c>C_EncapsulateKey</c> returns. It must be no longer
+    /// than the parameter set's.</summary>
+    public Func<byte[], byte[]>? KemCiphertextOverride { get; set; }
+
     protected override CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
         ciphertextLen = (NativeCULong)0;
@@ -90,6 +106,7 @@ internal sealed partial class ManagedSoftToken
         }
 
         kem.Encapsulate(out byte[] ct, out byte[] sharedSecret);
+        if (KemCiphertextOverride is { } replace) ct = replace(ct);
         ct.AsSpan(0, ct.Length).CopyTo(ciphertext.Span);
         ciphertextLen = (NativeCULong)(ulong)ct.Length;
         derivedKey = (NativeCULong)StoreSharedSecret(template, sharedSecret);
@@ -100,6 +117,8 @@ internal sealed partial class ManagedSoftToken
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         if (!_asymKeys.TryGetValue((ulong)privateKey, out var k) || k is not MLKem kem) return CKR.CKR_KEY_HANDLE_INVALID;
+        if (DecapsulateRejectsValueLen && ReadTemplate(template).ContainsKey((ulong)CKA.CKA_VALUE_LEN))
+            return CKR.CKR_ATTRIBUTE_READ_ONLY;
 
         byte[] ct = ciphertext.ToArray();
         byte[] sharedSecret = kem.Decapsulate(ct);
@@ -110,7 +129,9 @@ internal sealed partial class ManagedSoftToken
     private ulong StoreSharedSecret(ReadOnlySpan<CK_ATTRIBUTE> template, byte[] sharedSecret)
     {
         var attrs = ReadTemplate(template);
-        attrs[(ulong)CKA.CKA_VALUE] = sharedSecret;
+        if (KemSharedSecretOverride is { } replace) sharedSecret = replace(sharedSecret);
+        if (!KemWithholdsSharedSecret)
+            attrs[(ulong)CKA.CKA_VALUE] = sharedSecret;
         attrs.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
         return Store(attrs);
     }

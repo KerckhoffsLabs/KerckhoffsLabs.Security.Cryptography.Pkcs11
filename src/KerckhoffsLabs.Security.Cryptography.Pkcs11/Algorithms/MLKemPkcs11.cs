@@ -66,18 +66,23 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         using EncapsulationResult encapsulated =
             _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes);
 
+        bool destroyAttempted = false;
         try
         {
             ReadAndCopySecret(encapsulated.SharedSecret, sharedSecret);
             CopyExact(encapsulated.Ciphertext, ciphertext, Algorithm.CiphertextSizeInBytes);
             // Destroy the extracted, extractable shared-secret object now that we hold its bytes.
             // Surfaced (not swallowed): a failure here would leave the secret lingering on-token.
+            destroyAttempted = true;
             DestroyExtractedSecret(encapsulated.SharedSecret);
         }
         catch
         {
             // Never hand back a shared secret alongside a failure (copy or cleanup).
             CryptographicOperations.ZeroMemory(sharedSecret);
+            // Nor leave the extractable object behind when the read or the ciphertext failed.
+            if (!destroyAttempted)
+                DestroyExtractedSecret(encapsulated.SharedSecret, operationFailed: true);
             throw;
         }
     }
@@ -104,15 +109,19 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
             null => DecapsulateProbing(mech, ciphertext, library),
         };
 
+        bool destroyAttempted = false;
         try
         {
             ReadAndCopySecret(sharedKey, sharedSecret);
             // Surfaced (not swallowed): a destroy failure would leave the secret lingering on-token.
+            destroyAttempted = true;
             DestroyExtractedSecret(sharedKey);
         }
         catch
         {
             CryptographicOperations.ZeroMemory(sharedSecret);
+            if (!destroyAttempted)
+                DestroyExtractedSecret(sharedKey, operationFailed: true);
             throw;
         }
     }
@@ -249,13 +258,23 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     /// Unlike a fully best-effort cleanup, a destroy failure is surfaced to the caller: if the
     /// object cannot be destroyed, an extractable copy of the shared secret lingers on-token, which
     /// the callers must not silently ignore. Disposal of the managed <see cref="Pkcs11Key"/> wrapper
-    /// is handled by the callers' <see langword="finally"/>.
+    /// is handled by the callers' <see langword="using"/>.
     /// </summary>
-    private static void DestroyExtractedSecret(Pkcs11Key sharedKey)
+    /// <remarks>
+    /// When <paramref name="operationFailed"/>, the caller is already unwinding with the exception
+    /// that matters, and a throw here would replace it: the destroy failure is swallowed on that path
+    /// only, as <c>DerivedKeyMaterial.DestroyEphemeral</c> does. The object is a session object
+    /// either way, so the token collects it at <c>C_CloseSession</c>.
+    /// </remarks>
+    private static void DestroyExtractedSecret(Pkcs11Key sharedKey, bool operationFailed = false)
     {
         try
         {
             sharedKey.Destroy();
+        }
+        catch (Pkcs11Exception) when (operationFailed)
+        {
+            // Deliberately swallowed: see the remarks. The primary exception is the useful one.
         }
         catch (Pkcs11Exception ex)
         {
