@@ -255,6 +255,126 @@ public sealed class Pkcs11SessionCoreLifecycleTests
         Assert.ThrowsAny<Pkcs11Exception>(() => s.SeedRandom([1]));
     }
 
+    // A collection expression binds to the span overload, so these name the array overload with an array.
+    [Fact]
+    public void SeedRandom_Array_Ok_PassesSeed()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        byte[] seed = [0xBE, 0xEF, 0x01];
+        s.SeedRandom(seed);
+        Assert.Equal([0xBE, 0xEF, 0x01], fake.CapturedSeed);
+        Assert.Equal(1, fake.CallCount("C_SeedRandom"));
+    }
+
+    [Fact]
+    public void SeedRandom_Array_Error_ThrowsWithTheReturnValue()
+    {
+        using var fake = new LifecycleFake { SeedRv = CKR.CKR_RANDOM_SEED_NOT_SUPPORTED };
+        using var s = fake.CreateSession(SessionId);
+        byte[] seed = [1];
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => s.SeedRandom(seed));
+        Assert.Equal(CKR.CKR_RANDOM_SEED_NOT_SUPPORTED, e.ReturnValue);
+        Assert.Equal("C_SeedRandom", e.Method);
+    }
+
+    [Fact]
+    public void SeedRandom_Span_Error_ThrowsWithTheReturnValue()
+    {
+        using var fake = new LifecycleFake { SeedRv = CKR.CKR_RANDOM_NO_RNG };
+        using var s = fake.CreateSession(SessionId);
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => s.SeedRandom([1]));
+        Assert.Equal(CKR.CKR_RANDOM_NO_RNG, e.ReturnValue);
+        Assert.Equal("C_SeedRandom", e.Method);
+    }
+
+    // The trace names the operation only: the seed is entropy for the token and never reaches a log.
+    [Fact]
+    public void SeedRandom_LogsTheOperationButNotTheSeed()
+    {
+        var log = new CapturingLogger();
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId, new CapturingLoggerFactory(log));
+        log.Clear();
+        byte[] seed = [0xC0, 0xFF, 0xEE];
+
+        s.SeedRandom(seed);
+        s.SeedRandom(seed.AsSpan());
+
+        Assert.Equal(["Session(11)::SeedRandom", "Session(11)::SeedRandom"], log.Entries.Select(e => e.Message));
+    }
+
+    [Fact]
+    public void GenerateRandom_Length_ReturnsTheTokensBytes()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.Equal([1, 2, 3, 4, 5], s.GenerateRandom(5));
+    }
+
+    // The public session checks the length first; the core's own check is what any other caller gets.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    public void GenerateRandom_NonPositiveLength_IsRefusedBeforeTheModule(int length)
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        var e = Assert.Throws<ArgumentException>(() => s.GenerateRandom(length));
+        Assert.Equal("length", e.ParamName);
+        Assert.Equal(0, fake.CallCount("C_GenerateRandom"));
+    }
+
+    [Fact]
+    public void GenerateRandom_Length_Error_ThrowsWithTheReturnValue()
+    {
+        using var fake = new LifecycleFake { GenRandomRv = CKR.CKR_RANDOM_NO_RNG };
+        using var s = fake.CreateSession(SessionId);
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => s.GenerateRandom(8));
+        Assert.Equal(CKR.CKR_RANDOM_NO_RNG, e.ReturnValue);
+        Assert.Equal("C_GenerateRandom", e.Method);
+    }
+
+    [Fact]
+    public void GenerateRandom_Span_Error_ThrowsWithTheReturnValue()
+    {
+        using var fake = new LifecycleFake { GenRandomRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
+        byte[] buffer = new byte[4];
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => s.GenerateRandom(buffer.AsSpan()));
+        Assert.Equal(CKR.CKR_DEVICE_ERROR, e.ReturnValue);
+        Assert.Equal("C_GenerateRandom", e.Method);
+    }
+
+    // RandomNumberGenerator.Fill does nothing for an empty span either; the module is not asked.
+    [Fact]
+    public void GenerateRandom_Span_Empty_DoesNotCallTheModule()
+    {
+        using var fake = new LifecycleFake();
+        using var s = fake.CreateSession(SessionId);
+        s.GenerateRandom(Span<byte>.Empty);
+        Assert.Equal(0, fake.CallCount("C_GenerateRandom"));
+    }
+
+    // Each entry point takes the session before anything else, so a closed one is reported as such
+    // even for an argument the method would otherwise refuse.
+    [Fact]
+    public void Random_AfterDispose_ThrowsObjectDisposedWithoutCallingTheModule()
+    {
+        using var fake = new LifecycleFake();
+        var s = fake.CreateSession(SessionId);
+        s.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => s.SeedRandom([1]));
+        Assert.Throws<ObjectDisposedException>(() => s.SeedRandom((byte[])null!));
+        Assert.Throws<ObjectDisposedException>(() => s.GenerateRandom(new byte[4].AsSpan()));
+        Assert.Throws<ObjectDisposedException>(() => s.GenerateRandom(Span<byte>.Empty));
+        Assert.Throws<ObjectDisposedException>(() => s.GenerateRandom(0));
+        Assert.Equal(0, fake.CallCount("C_SeedRandom"));
+        Assert.Equal(0, fake.CallCount("C_GenerateRandom"));
+    }
+
     // === Legacy parallel-function stubs (always map their CKR to an exception) ===
 
     [Fact]
