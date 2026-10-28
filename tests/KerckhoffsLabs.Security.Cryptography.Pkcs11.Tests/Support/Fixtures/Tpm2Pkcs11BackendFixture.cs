@@ -57,7 +57,7 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     public bool TpmImplementsSha512 => Supports(CKM.CKM_SHA512_HMAC);
 
     /// <summary>
-    /// Whether the TPM takes unpadded RSA (TPM2_RSA_Decrypt with the NULL scheme). tpm2-pkcs11 1.10.1 pads
+    /// Whether the TPM takes unpadded RSA (TPM2_RSA_Decrypt with the NULL scheme). tpm2-pkcs11 pads
     /// <c>CKM_RSA_PKCS</c> on the host and has the TPM apply the key with unpadded RSA, to sign (a DigestInfo too)
     /// and to decrypt, and needs it to sign PSS with a hash-length salt on a TPM that salts RSAPSS to the maximum.
     /// A TPM restricted to what a FIPS host allows (swtpm's <c>fips-host</c> profile) refuses unpadded RSA
@@ -148,8 +148,9 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
 
     private static bool Exists(string? path) => path is not null && File.Exists(path);
 
-    // What tpm2-pkcs11 1.10.1 doesn't do, or does wrong, that the shared cases run into. Each flag is false
-    // while it stands, and its gate below skips the cases it breaks; set it to true once fixed upstream.
+    // What tpm2-pkcs11 at the vendored commit (master a5156c5, after 1.10.1) doesn't do, or does wrong, that
+    // the shared cases run into. Each flag is false while it stands, and its gate below skips the cases it
+    // breaks; set it to true once fixed upstream.
 
     /// <summary>
     /// False while tpm2-pkcs11 maps a public key template's <c>CKA_VERIFY</c> onto the TPM key's decrypt
