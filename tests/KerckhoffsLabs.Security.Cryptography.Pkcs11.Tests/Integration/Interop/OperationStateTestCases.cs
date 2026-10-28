@@ -1,0 +1,540 @@
+using System.Security.Cryptography;
+using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
+
+// The cases reach CKM_AES_CBC through the raw dispatch, past the session's policy, which the compile-time
+// policy analyzer cannot see, so its warning is suppressed for this file only.
+#pragma warning disable KLPKCS11009
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
+
+/// <summary>
+/// The return codes a module gives for calls that break the operation state machine or misuse a mechanism,
+/// a key or a handle, checked on every real backend through the raw dispatch: an operation that was never
+/// started (<c>CKR_OPERATION_NOT_INITIALIZED</c>), one started twice (<c>CKR_OPERATION_ACTIVE</c>), a
+/// mechanism of the wrong kind (<c>CKR_MECHANISM_INVALID</c>), a key of the wrong type, a destroyed key,
+/// input that is not a whole number of blocks, and the session's cancel functions.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The library maps these codes to its exceptions and, for some of them, recovers: it cancels an operation a
+/// module kept after an error, and it reads an operation's absence from <c>CKR_OPERATION_NOT_INITIALIZED</c>.
+/// A module that answers with another code, or with <c>CKR_OK</c>, breaks that reading; each wrapper names
+/// the code its backend gives where it differs from the specification.
+/// </para>
+/// <para>
+/// Every case runs in a session of its own, which it closes, so no operation it leaves active reaches the next.
+/// </para>
+/// </remarks>
+internal static class OperationStateTestCases
+{
+    private static readonly byte[] Message = "the quick brown fox jumps over the lazy dog"u8.ToArray();
+    // Not all zeros: Craton HSM refuses an all-zero CBC IV with CKR_MECHANISM_PARAM_INVALID.
+    private static readonly byte[] Iv = [.. Enumerable.Range(1, 16).Select(i => (byte)i)];
+
+    private static void WithSession(IPkcs11Backend backend, Action<LowLevelPkcs11Library, NativeCULong, Pkcs11SessionCore> body)
+    {
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            body(backend.Library.LowLevelLibrary!, (NativeCULong)session.SessionId, session);
+        }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
+    }
+
+    private static void AssertRv(CKR expected, CKR actual, string call) =>
+        Assert.True(actual == expected, $"{call} was expected to return {expected} but returned {actual}.");
+
+    private static void AssertRvIn(CKR[] expected, CKR actual, string call) =>
+        Assert.True(expected.Contains(actual), $"{call} was expected to return one of {string.Join(", ", expected)} but returned {actual}.");
+
+    private delegate CKR KeyedInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key);
+
+    private static CKR Init(KeyedInit init, NativeCULong sid, Mechanism mechanism, ObjectHandle key)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        return init(sid, in mech, (NativeCULong)key.ObjectId);
+    }
+
+    private static CKR DigestInit(LowLevelPkcs11Library lowLevel, NativeCULong sid, Mechanism mechanism)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        return lowLevel.C_DigestInit(sid, in mech);
+    }
+
+    // After a case, the session can still run an operation: the call under test did not leave one behind.
+    private static void AssertDigestStillRuns(LowLevelPkcs11Library lowLevel, NativeCULong sid)
+    {
+        AssertRv(CKR.CKR_OK, DigestInit(lowLevel, sid, new Mechanism(CKM.CKM_SHA256)), "C_DigestInit afterwards");
+        byte[] digest = new byte[32];
+        AssertRv(CKR.CKR_OK, lowLevel.C_Digest(sid, Message, digest, lengthOnly: false, out _), "C_Digest afterwards");
+        Assert.Equal(SHA256.HashData(Message), digest);
+    }
+
+    // === CKR_OPERATION_NOT_INITIALIZED ==========================================
+
+    public static TheoryData<string> CallsWithoutInit =>
+    [
+        "C_Digest", "C_DigestUpdate", "C_DigestFinal",
+        "C_Encrypt", "C_EncryptUpdate", "C_EncryptFinal",
+        "C_Decrypt", "C_DecryptUpdate", "C_DecryptFinal",
+        "C_Sign", "C_SignUpdate", "C_SignFinal",
+        "C_Verify", "C_VerifyUpdate", "C_VerifyFinal",
+        "C_FindObjects", "C_FindObjectsFinal",
+    ];
+
+    // A call that continues or ends an operation the session never started answers
+    // CKR_OPERATION_NOT_INITIALIZED (PKCS#11 v3.1 §5.2). The library takes that code, after a module ended an
+    // operation on an error, as the signal to start it again.
+    internal static void Assert_CallWithoutInit_IsOperationNotInitialized(IPkcs11Backend backend, string call, CKR expected = CKR.CKR_OPERATION_NOT_INITIALIZED)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] output = new byte[64];
+            byte[] signature = new byte[64];
+            NativeCULong[] handles = new NativeCULong[4];
+            CKR rv = call switch
+            {
+                "C_Digest" => lowLevel.C_Digest(sid, Message, output, lengthOnly: false, out _),
+                "C_DigestUpdate" => lowLevel.C_DigestUpdate(sid, Message),
+                "C_DigestFinal" => lowLevel.C_DigestFinal(sid, output, lengthOnly: false, out _),
+                "C_Encrypt" => lowLevel.C_Encrypt(sid, Message, output, lengthOnly: false, out _),
+                "C_EncryptUpdate" => lowLevel.C_EncryptUpdate(sid, Message, output, lengthOnly: false, out _),
+                "C_EncryptFinal" => lowLevel.C_EncryptFinal(sid, output, lengthOnly: false, out _),
+                "C_Decrypt" => lowLevel.C_Decrypt(sid, output, output, lengthOnly: false, out _),
+                "C_DecryptUpdate" => lowLevel.C_DecryptUpdate(sid, output, output, lengthOnly: false, out _),
+                "C_DecryptFinal" => lowLevel.C_DecryptFinal(sid, output, lengthOnly: false, out _),
+                "C_Sign" => lowLevel.C_Sign(sid, Message, signature, lengthOnly: false, out _),
+                "C_SignUpdate" => lowLevel.C_SignUpdate(sid, Message),
+                "C_SignFinal" => lowLevel.C_SignFinal(sid, signature, lengthOnly: false, out _),
+                "C_Verify" => lowLevel.C_Verify(sid, Message, signature),
+                "C_VerifyUpdate" => lowLevel.C_VerifyUpdate(sid, Message),
+                "C_VerifyFinal" => lowLevel.C_VerifyFinal(sid, signature),
+                "C_FindObjects" => lowLevel.C_FindObjects(sid, handles, out _),
+                "C_FindObjectsFinal" => lowLevel.C_FindObjectsFinal(sid),
+                _ => throw new ArgumentOutOfRangeException(nameof(call), call, null),
+            };
+            AssertRv(expected, rv, call + " without an Init");
+            AssertDigestStillRuns(lowLevel, sid);
+        });
+    }
+
+    // Once C_DigestFinal returns the digest, the operation is over: a further C_DigestUpdate has nothing to
+    // continue.
+    internal static void Assert_UpdateAfterFinal_IsOperationNotInitialized(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            AssertRv(CKR.CKR_OK, DigestInit(lowLevel, sid, new Mechanism(CKM.CKM_SHA256)), "C_DigestInit");
+            AssertRv(CKR.CKR_OK, lowLevel.C_DigestUpdate(sid, Message), "C_DigestUpdate");
+            byte[] digest = new byte[32];
+            AssertRv(CKR.CKR_OK, lowLevel.C_DigestFinal(sid, digest, lengthOnly: false, out _), "C_DigestFinal");
+            Assert.Equal(SHA256.HashData(Message), digest);
+
+            AssertRv(CKR.CKR_OPERATION_NOT_INITIALIZED, lowLevel.C_DigestUpdate(sid, Message), "C_DigestUpdate after C_DigestFinal");
+        });
+    }
+
+    // An operation belongs to the session that started it: another session of the same token has none.
+    internal static void Assert_Operation_BelongsToItsSession(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            AssertRv(CKR.CKR_OK, DigestInit(lowLevel, sid, new Mechanism(CKM.CKM_SHA256)), "C_DigestInit");
+            AssertRv(CKR.CKR_OK, lowLevel.C_DigestUpdate(sid, Message), "C_DigestUpdate");
+
+            var slot = backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
+            using (var other = slot.OpenSessionCore())
+            {
+                var otherId = (NativeCULong)other.SessionId;
+                AssertRv(CKR.CKR_OPERATION_NOT_INITIALIZED, lowLevel.C_DigestUpdate(otherId, Message), "C_DigestUpdate in another session");
+            }
+
+            byte[] digest = new byte[32];
+            AssertRv(CKR.CKR_OK, lowLevel.C_DigestFinal(sid, digest, lengthOnly: false, out _), "C_DigestFinal in the first session");
+            Assert.Equal(SHA256.HashData(Message), digest);
+        });
+    }
+
+    // === CKR_OPERATION_ACTIVE ==================================================
+
+    public static TheoryData<string> SecondInits => ["Digest", "Encrypt", "Decrypt", "Sign", "Verify", "FindObjects"];
+
+    // A second Init of the same kind while one is active answers CKR_OPERATION_ACTIVE (§5.2) and leaves the
+    // first operation as it was.
+    internal static void Assert_SecondInit_IsOperationActive(IPkcs11Backend backend, string operation, CKR expected = CKR.CKR_OPERATION_ACTIVE)
+    {
+        CKM[] needed = operation switch
+        {
+            "Digest" => [CKM.CKM_SHA256],
+            "Encrypt" or "Decrypt" => [CKM.CKM_AES_CBC],
+            "Sign" or "Verify" => [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA],
+            _ => [],
+        };
+        backend.RequireMechanisms(needed);
+
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            switch (operation)
+            {
+                case "Digest":
+                    {
+                        var sha256 = new Mechanism(CKM.CKM_SHA256);
+                        AssertRv(CKR.CKR_OK, DigestInit(lowLevel, sid, sha256), "C_DigestInit");
+                        AssertRv(expected, DigestInit(lowLevel, sid, sha256), "a second C_DigestInit");
+                        byte[] digest = new byte[32];
+                        AssertRv(CKR.CKR_OK, lowLevel.C_Digest(sid, Message, digest, lengthOnly: false, out _), "C_Digest of the first operation");
+                        Assert.Equal(SHA256.HashData(Message), digest);
+                        break;
+                    }
+                case "Encrypt":
+                case "Decrypt":
+                    {
+                        byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+                        ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+                        try
+                        {
+                            var cbc = new Mechanism(CKM.CKM_AES_CBC, Iv);
+                            KeyedInit init = operation == "Encrypt" ? lowLevel.C_EncryptInit : lowLevel.C_DecryptInit;
+                            AssertRv(CKR.CKR_OK, Init(init, sid, cbc, key), $"C_{operation}Init");
+                            AssertRv(expected, Init(init, sid, cbc, key), $"a second C_{operation}Init");
+
+                            using var aes = Aes.Create();
+                            aes.Key = rawKey;
+                            byte[] block = Message.AsSpan(0, 16).ToArray();
+                            byte[] input = operation == "Encrypt" ? block : aes.EncryptCbc(block, Iv, PaddingMode.None);
+                            byte[] expectedOutput = operation == "Encrypt" ? aes.EncryptCbc(block, Iv, PaddingMode.None) : block;
+                            byte[] output = new byte[16];
+                            CKR rv = operation == "Encrypt"
+                                ? lowLevel.C_Encrypt(sid, input, output, lengthOnly: false, out _)
+                                : lowLevel.C_Decrypt(sid, input, output, lengthOnly: false, out _);
+                            AssertRv(CKR.CKR_OK, rv, $"C_{operation} of the first operation");
+                            Assert.Equal(expectedOutput, output);
+                        }
+                        finally { session.DestroyObject(key); }
+                        break;
+                    }
+                case "Sign":
+                case "Verify":
+                    {
+                        var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+                        try
+                        {
+                            var ecdsa = new Mechanism(CKM.CKM_ECDSA);
+                            byte[] digest = SHA256.HashData(Message);
+                            byte[] signature = session.Sign(ecdsa, priv, digest);
+                            KeyedInit init = operation == "Sign" ? lowLevel.C_SignInit : lowLevel.C_VerifyInit;
+                            ObjectHandle key = operation == "Sign" ? priv : pub;
+                            AssertRv(CKR.CKR_OK, Init(init, sid, ecdsa, key), $"C_{operation}Init");
+                            AssertRv(expected, Init(init, sid, ecdsa, key), $"a second C_{operation}Init");
+
+                            if (operation == "Sign")
+                            {
+                                byte[] produced = new byte[64];
+                                AssertRv(CKR.CKR_OK, lowLevel.C_Sign(sid, digest, produced, lengthOnly: false, out _), "C_Sign of the first operation");
+                                Assert.True(session.Verify(ecdsa, pub, digest, produced));
+                            }
+                            else
+                            {
+                                AssertRv(CKR.CKR_OK, lowLevel.C_Verify(sid, digest, signature), "C_Verify of the first operation");
+                            }
+                        }
+                        finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                        break;
+                    }
+                default:
+                    {
+                        AssertRv(CKR.CKR_OK, lowLevel.C_FindObjectsInit(sid, []), "C_FindObjectsInit");
+                        AssertRv(expected, lowLevel.C_FindObjectsInit(sid, []), "a second C_FindObjectsInit");
+                        AssertRv(CKR.CKR_OK, lowLevel.C_FindObjects(sid, new NativeCULong[4], out _), "C_FindObjects of the first search");
+                        AssertRv(CKR.CKR_OK, lowLevel.C_FindObjectsFinal(sid), "C_FindObjectsFinal");
+                        AssertRv(CKR.CKR_OK, lowLevel.C_FindObjectsInit(sid, []), "C_FindObjectsInit after C_FindObjectsFinal");
+                        AssertRv(CKR.CKR_OK, lowLevel.C_FindObjectsFinal(sid), "C_FindObjectsFinal");
+                        break;
+                    }
+            }
+        });
+    }
+
+    // === CKR_MECHANISM_INVALID =================================================
+
+    public static TheoryData<string> MechanismsOfTheWrongKind =>
+        ["digest with CKM_AES_KEY_GEN", "encrypt with CKM_SHA256", "sign with CKM_SHA256", "generate a key with CKM_SHA256", "generate a key pair with CKM_AES_KEY_GEN"];
+
+    // A mechanism that exists but does not do what the function asks of it answers CKR_MECHANISM_INVALID
+    // ("an invalid mechanism was specified to the cryptographic operation", §5.1.6): a key generator is no
+    // digest, a digest is no cipher. The call creates nothing and starts nothing.
+    internal static void Assert_MechanismOfTheWrongKind_IsMechanismInvalid(IPkcs11Backend backend, string misuse, CKR[]? alsoAccepted = null)
+    {
+        backend.RequireMechanisms([CKM.CKM_SHA256, CKM.CKM_AES_KEY_GEN]);
+        CKR[] accepted = [CKR.CKR_MECHANISM_INVALID, .. alsoAccepted ?? []];
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                using var scope = new MechanismParameterScope();
+                CKR rv;
+                switch (misuse)
+                {
+                    case "digest with CKM_AES_KEY_GEN":
+                        rv = DigestInit(lowLevel, sid, new Mechanism(CKM.CKM_AES_KEY_GEN));
+                        break;
+                    case "encrypt with CKM_SHA256":
+                        rv = Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_SHA256), key);
+                        break;
+                    case "sign with CKM_SHA256":
+                        rv = Init(lowLevel.C_SignInit, sid, new Mechanism(CKM.CKM_SHA256), key);
+                        break;
+                    case "generate a key with CKM_SHA256":
+                        {
+                            CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256).Marshal(scope, out _);
+                            rv = lowLevel.C_GenerateKey(sid, in mech, [], out NativeCULong generated);
+                            if (rv == CKR.CKR_OK)
+                                lowLevel.C_DestroyObject(sid, generated);
+                            break;
+                        }
+                    default:
+                        {
+                            CK_MECHANISM mech = new Mechanism(CKM.CKM_AES_KEY_GEN).Marshal(scope, out _);
+                            rv = lowLevel.C_GenerateKeyPair(sid, in mech, [], [], out NativeCULong pub, out NativeCULong priv);
+                            if (rv == CKR.CKR_OK)
+                            {
+                                lowLevel.C_DestroyObject(sid, priv);
+                                lowLevel.C_DestroyObject(sid, pub);
+                            }
+                            break;
+                        }
+                }
+                AssertRvIn(accepted, rv, misuse);
+                AssertDigestStillRuns(lowLevel, sid);
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    // === A key of the wrong type ===============================================
+
+    public static TheoryData<string> KeysOfTheWrongType => ["ECDSA sign with an AES key", "ECDSA verify with an AES key", "AES-CBC encrypt with an EC public key"];
+
+    // Init with a key the mechanism cannot use answers CKR_KEY_TYPE_INCONSISTENT (§5.1.6). A module may answer
+    // CKR_KEY_FUNCTION_NOT_PERMITTED instead, since the key also lacks the usage the mechanism needs. The
+    // library checks no mechanism against a key before the call, so the module is the only guard.
+    internal static void Assert_KeyOfTheWrongType_IsRefused(IPkcs11Backend backend, string misuse, CKR[]? alsoAccepted = null)
+    {
+        backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA, CKM.CKM_AES_CBC]);
+        CKR[] accepted = [CKR.CKR_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED, .. alsoAccepted ?? []];
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            ObjectHandle aesKey = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+            try
+            {
+                CKR rv = misuse switch
+                {
+                    "ECDSA sign with an AES key" => Init(lowLevel.C_SignInit, sid, new Mechanism(CKM.CKM_ECDSA), aesKey),
+                    "ECDSA verify with an AES key" => Init(lowLevel.C_VerifyInit, sid, new Mechanism(CKM.CKM_ECDSA), aesKey),
+                    _ => Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_AES_CBC, Iv), pub),
+                };
+                AssertRvIn(accepted, rv, misuse);
+                AssertDigestStillRuns(lowLevel, sid);
+            }
+            finally
+            {
+                session.DestroyObject(priv);
+                session.DestroyObject(pub);
+                session.DestroyObject(aesKey);
+            }
+        });
+    }
+
+    // === A destroyed key =======================================================
+
+    public static TheoryData<string> UsesOfADestroyedKey => ["C_EncryptInit", "C_DecryptInit", "C_GetAttributeValue", "C_DestroyObject"];
+
+    // A handle whose object is gone answers CKR_KEY_HANDLE_INVALID where it names a key for an operation, and
+    // CKR_OBJECT_HANDLE_INVALID where it names an object (§5.1.6). Most modules answer an operation's Init
+    // with CKR_OBJECT_HANDLE_INVALID as well, which the library maps to the same exception family. No object is created between the destroy and
+    // the call, so a module that hands out handles again has nothing to give the old one to.
+    internal static void Assert_DestroyedKey_IsRefused(IPkcs11Backend backend, string use, CKR? expected = null)
+    {
+        backend.RequireMechanism(CKM.CKM_AES_CBC);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            ObjectHandle key = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            AssertRv(CKR.CKR_OK, lowLevel.C_DestroyObject(sid, (NativeCULong)key.ObjectId), "C_DestroyObject");
+
+            var cbc = new Mechanism(CKM.CKM_AES_CBC, Iv);
+            CKR rv;
+            switch (use)
+            {
+                case "C_EncryptInit":
+                    rv = Init(lowLevel.C_EncryptInit, sid, cbc, key);
+                    break;
+                case "C_DecryptInit":
+                    rv = Init(lowLevel.C_DecryptInit, sid, cbc, key);
+                    break;
+                case "C_GetAttributeValue":
+                    {
+                        CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_KEY_TYPE }];
+                        rv = lowLevel.C_GetAttributeValue(sid, (NativeCULong)key.ObjectId, template);
+                        break;
+                    }
+                default:
+                    rv = lowLevel.C_DestroyObject(sid, (NativeCULong)key.ObjectId);
+                    break;
+            }
+            CKR[] spec = use is "C_EncryptInit" or "C_DecryptInit"
+                ? [CKR.CKR_KEY_HANDLE_INVALID, CKR.CKR_OBJECT_HANDLE_INVALID]
+                : [CKR.CKR_OBJECT_HANDLE_INVALID];
+            AssertRvIn(expected is { } e ? [e] : spec, rv, use + " with a destroyed key");
+            AssertDigestStillRuns(lowLevel, sid);
+        });
+    }
+
+    // === Input that is not a whole number of blocks ============================
+
+    public static TheoryData<CKM, int> PartialBlockEncryptions => new()
+    {
+        { CKM.CKM_AES_ECB, 15 }, { CKM.CKM_AES_ECB, 17 }, { CKM.CKM_AES_CBC, 1 }, { CKM.CKM_AES_CBC, 31 },
+    };
+
+    // AES-ECB and AES-CBC without padding take whole blocks: a plaintext of another length answers
+    // CKR_DATA_LEN_RANGE (§5.1.6) and produces no ciphertext. A module that pads or truncates it instead
+    // returns ciphertext that decrypts to something else. The error ends the operation (§5.2), so the next
+    // C_EncryptInit succeeds; keepsTheOperation records a backend that keeps it active instead, which the
+    // library ends with C_SessionCancel.
+    internal static void Assert_PartialBlock_Encrypt_IsDataLenRange(IPkcs11Backend backend, CKM mechanism, int length,
+        CKR expected = CKR.CKR_DATA_LEN_RANGE, bool keepsTheOperation = false)
+    {
+        backend.RequireMechanismFlags(mechanism, f => f.Encrypt, "CKF_ENCRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            ObjectHandle key = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            try
+            {
+                var m = mechanism == CKM.CKM_AES_CBC ? new Mechanism(mechanism, Iv) : new Mechanism(mechanism);
+                AssertRv(CKR.CKR_OK, Init(lowLevel.C_EncryptInit, sid, m, key), "C_EncryptInit");
+                byte[] output = new byte[64];
+                AssertRv(expected, lowLevel.C_Encrypt(sid, Message.AsSpan(0, length), output, lengthOnly: false, out _),
+                    $"C_Encrypt of {length} bytes with {mechanism}");
+                AssertRv(keepsTheOperation ? CKR.CKR_OPERATION_ACTIVE : CKR.CKR_OK, Init(lowLevel.C_EncryptInit, sid, m, key),
+                    "C_EncryptInit after the refused C_Encrypt");
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    public static TheoryData<CKM, int> PartialBlockDecryptions => new()
+    {
+        { CKM.CKM_AES_ECB, 15 }, { CKM.CKM_AES_ECB, 17 }, { CKM.CKM_AES_CBC, 1 }, { CKM.CKM_AES_CBC, 31 },
+    };
+
+    // The same for decryption: a ciphertext that is not a whole number of blocks answers
+    // CKR_ENCRYPTED_DATA_LEN_RANGE.
+    internal static void Assert_PartialBlock_Decrypt_IsEncryptedDataLenRange(IPkcs11Backend backend, CKM mechanism, int length,
+        CKR expected = CKR.CKR_ENCRYPTED_DATA_LEN_RANGE, bool keepsTheOperation = false)
+    {
+        backend.RequireMechanismFlags(mechanism, f => f.Decrypt, "CKF_DECRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            ObjectHandle key = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            try
+            {
+                var m = mechanism == CKM.CKM_AES_CBC ? new Mechanism(mechanism, Iv) : new Mechanism(mechanism);
+                AssertRv(CKR.CKR_OK, Init(lowLevel.C_DecryptInit, sid, m, key), "C_DecryptInit");
+                byte[] output = new byte[64];
+                AssertRv(expected, lowLevel.C_Decrypt(sid, new byte[length], output, lengthOnly: false, out _),
+                    $"C_Decrypt of {length} bytes with {mechanism}");
+                AssertRv(keepsTheOperation ? CKR.CKR_OPERATION_ACTIVE : CKR.CKR_OK, Init(lowLevel.C_DecryptInit, sid, m, key),
+                    "C_DecryptInit after the refused C_Decrypt");
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    // === Cancelling ============================================================
+
+    // The legacy parallel-function calls answer CKR_FUNCTION_NOT_PARALLEL from every module that does not
+    // run functions in parallel (§5.21), which is every module this library supports.
+    internal static void Assert_LegacyParallelFunctions_AreNotParallel(IPkcs11Backend backend, CKR expected = CKR.CKR_FUNCTION_NOT_PARALLEL)
+    {
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            AssertRv(expected, lowLevel.C_GetFunctionStatus(sid), "C_GetFunctionStatus");
+            AssertRv(expected, lowLevel.C_CancelFunction(sid), "C_CancelFunction");
+        });
+    }
+
+    // C_SessionCancel (v3.0) ends the operations its flags name and no other: flags of 0 name none, so the
+    // digest is still active, and CKF_DIGEST ends it, so the next C_DigestInit succeeds. The library ends an
+    // operation a module kept after an error this way.
+    internal static void Assert_SessionCancel_EndsTheOperationsItNames(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            var sha256 = new Mechanism(CKM.CKM_SHA256);
+            AssertRv(CKR.CKR_OK, DigestInit(lowLevel, sid, sha256), "C_DigestInit");
+            CKR rv = lowLevel.C_SessionCancel(sid, (NativeCULong)0UL);
+            if (rv == CKR.CKR_FUNCTION_NOT_SUPPORTED)
+                Assert.Skip("The module has no C_SessionCancel (PKCS#11 v3.0).");
+            AssertRv(CKR.CKR_OK, rv, "C_SessionCancel(0)");
+            AssertRv(CKR.CKR_OPERATION_ACTIVE, DigestInit(lowLevel, sid, sha256), "C_DigestInit after C_SessionCancel(0)");
+
+            AssertRv(CKR.CKR_OK, lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_DIGEST), "C_SessionCancel(CKF_DIGEST)");
+            AssertDigestStillRuns(lowLevel, sid);
+        });
+    }
+
+    public static TheoryData<string> WrongLengthSignatures => ["C_Verify, one byte short", "C_Verify, one byte long", "C_VerifyFinal, one byte short"];
+
+    // A C_Verify or C_VerifyFinal given a signature of the wrong length answers CKR_SIGNATURE_LEN_RANGE and
+    // ends the operation (§5.2), as every C_Verify that does not return CKR_BUFFER_TOO_SMALL does. The library
+    // does not rely on that: it cancels a verify that returned anything but a verdict. keepsTheOperation
+    // records a backend that keeps it active, so that a module that changes its behaviour fails here.
+    internal static void Assert_Verify_WrongLengthSignature_EndsTheOperation(IPkcs11Backend backend, string shape,
+        CKR[]? expected = null, bool keepsTheOperation = false)
+    {
+        backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256]);
+        CKR[] accepted = expected ?? [CKR.CKR_SIGNATURE_LEN_RANGE, CKR.CKR_SIGNATURE_INVALID];
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+            try
+            {
+                var ecdsa = new Mechanism(CKM.CKM_ECDSA_SHA256);
+                byte[] signature = session.Sign(ecdsa, priv, Message);
+                byte[] wrong = shape.Contains("long", StringComparison.Ordinal) ? [.. signature, 0x00] : signature[..^1];
+
+                AssertRv(CKR.CKR_OK, Init(lowLevel.C_VerifyInit, sid, ecdsa, pub), "C_VerifyInit");
+                CKR rv;
+                if (shape.StartsWith("C_VerifyFinal", StringComparison.Ordinal))
+                {
+                    AssertRv(CKR.CKR_OK, lowLevel.C_VerifyUpdate(sid, Message), "C_VerifyUpdate");
+                    rv = lowLevel.C_VerifyFinal(sid, wrong);
+                }
+                else
+                {
+                    rv = lowLevel.C_Verify(sid, Message, wrong);
+                }
+                AssertRvIn(accepted, rv, shape);
+
+                CKR next = Init(lowLevel.C_VerifyInit, sid, ecdsa, pub);
+                AssertRv(keepsTheOperation ? CKR.CKR_OPERATION_ACTIVE : CKR.CKR_OK, next, "C_VerifyInit after the refused signature");
+                if (next == CKR.CKR_OK)
+                    AssertRv(CKR.CKR_OK, lowLevel.C_Verify(sid, Message, signature), "C_Verify of the right signature");
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+}
