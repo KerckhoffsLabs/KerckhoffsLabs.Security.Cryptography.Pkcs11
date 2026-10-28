@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -37,10 +38,14 @@ internal static class AesCcmPkcs11TestCases
         }
     }
 
+    // A null tag size takes the constructor that reads the size from each call's tag.
+    private static AesCcmPkcs11 NewCcm(Pkcs11Key key, int? tagSizeInBytes) =>
+        tagSizeInBytes is int size ? new AesCcmPkcs11(key, size) : new AesCcmPkcs11(key);
+
     // Generates an ephemeral AES-256 key, wraps it as AesCcmPkcs11, runs the body, then destroys it.
     // Does not require CCM — argument-validation cases use this and throw before any native call.
     private static void WithCcm(
-        IPkcs11Backend backend, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16, ICryptoPolicy? policy = null)
+        IPkcs11Backend backend, Action<AesCcmPkcs11> body, int? tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
         using var session = OpenSession(backend);
         using var lease = policy is null ? null : session.UsePolicy(policy);
@@ -53,22 +58,24 @@ internal static class AesCcmPkcs11TestCases
         try
         {
             using var key = session.OpenKey(label);
-            using var ccm = new AesCcmPkcs11(key, tagSizeInBytes);
+            using var ccm = NewCcm(key, tagSizeInBytes);
             body(ccm);
         }
         finally { DestroyByLabel(session, label); }
     }
 
-    private static void WithImportedCcm(IPkcs11Backend backend, byte[] rawKey, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16)
+    private static void WithImportedCcm(
+        IPkcs11Backend backend, byte[] rawKey, Action<AesCcmPkcs11> body, int? tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
         using var session = OpenSession(backend);
+        using var lease = policy is null ? null : session.UsePolicy(policy);
         string label = $"ccm-kat-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken().Build();
         try
         {
             using var key = session.ImportKey(tpl);
-            using var ccm = new AesCcmPkcs11(key, tagSizeInBytes);
+            using var ccm = NewCcm(key, tagSizeInBytes);
             body(ccm);
         }
         finally { DestroyByLabel(session, label); }
@@ -160,6 +167,33 @@ internal static class AesCcmPkcs11TestCases
             Assert.Throws<ObjectDisposedException>(() =>
                 ccm.Decrypt(new byte[12], new byte[8], new byte[16], new byte[8]));
         });
+
+    // === Tag size: fixed at construction, or taken from each call ==========
+
+    // The fixed-size constructor refuses a tag of another legal size, in both directions.
+    internal static void Assert_FixedTagSize_TagOfAnotherLegalSize_Throws(IPkcs11Backend backend) =>
+        WithCcm(backend, ccm =>
+        {
+            var enc = Assert.Throws<ArgumentException>(() =>
+                ccm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[8]));
+            Assert.Equal("tag", enc.ParamName);
+            var dec = Assert.Throws<ArgumentException>(() =>
+                ccm.Decrypt(new byte[12], new byte[8], new byte[8], new byte[8]));
+            Assert.Equal("tag", dec.ParamName);
+        });
+
+    // Without a fixed size, a tag outside TagByteSizes is refused as AesCcm refuses it.
+    internal static void Assert_PerCallTagSize_IllegalTagLength_Throws(IPkcs11Backend backend, int tagLength) =>
+        WithCcm(backend, ccm =>
+        {
+            Assert.Null(ccm.TagSizeInBytes);
+            var enc = Assert.Throws<ArgumentException>(() =>
+                ccm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
+            Assert.Equal("tag", enc.ParamName);
+            var dec = Assert.Throws<ArgumentException>(() =>
+                ccm.Decrypt(new byte[12], new byte[8], new byte[tagLength], new byte[8]));
+            Assert.Equal("tag", dec.ParamName);
+        }, tagSizeInBytes: null);
 
     // === Real crypto (requires a CCM-capable token) =======================
 
@@ -306,6 +340,36 @@ internal static class AesCcmPkcs11TestCases
             byte[] dest = new byte[plaintext.Length];
             AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_CCM, () => ccm.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
+    }
+
+    // Without a fixed size, one instance writes and verifies a tag of the size each call hands it, the
+    // same bytes AesCcm computes from the same key.
+    internal static void Assert_PerCallTagSize_MatchesBcl_AndRoundTrips(IPkcs11Backend backend, int tagLen)
+    {
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
+        Assert.SkipUnless(AesCcm.IsSupported, "Requires AesCcm.IsSupported for the reference output");
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        byte[] nonce = Iota(12);
+        byte[] aad = Iota(13);
+        byte[] pt = Iota(40);
+
+        byte[] bclCt = new byte[pt.Length];
+        byte[] bclTag = new byte[tagLen];
+        using (var bcl = new AesCcm(key))
+            bcl.Encrypt(nonce, pt, bclCt, bclTag, aad);
+
+        WithImportedCcm(backend, key, ccm =>
+        {
+            byte[] ct = new byte[pt.Length];
+            byte[] tag = new byte[tagLen];
+            ccm.Encrypt(nonce, pt, ct, tag, aad);
+            Assert.Equal(bclCt, ct);
+            Assert.Equal(bclTag, tag);
+
+            byte[] dec = new byte[pt.Length];
+            ccm.Decrypt(nonce, ct, tag, dec, aad);
+            Assert.Equal(pt, dec);
+        }, tagSizeInBytes: null, tagLen < 8 ? CryptoPolicy.AllowInsecure : null); // SecureOnly refuses MACs below 64 bits
     }
 
     // Known-answer test: expected bytes pinned from the BCL AesCcm primitive (NIST SP 800-38C semantics)

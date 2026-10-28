@@ -69,9 +69,6 @@ public sealed class BclApiParityTests
     private const string ByteArrayAead =
         "The byte[] overload is missing. Arrays bind to the span overload instead, so a null array is taken as empty: a null " +
         "plaintext and ciphertext encrypt nothing without error, where the BCL throws ArgumentNullException.";
-    private const string CcmTagSizePerCall =
-        "AesCcm takes the tag size from each call's tag; AesCcmPkcs11's only constructor fixes it, and refuses a tag of " +
-        "another legal size.";
     private const string KdfStaticKeyBytes = "Takes the key as bytes; derive through an instance over the token key.";
     private const string Pbkdf2Session = "Takes the session that runs PBKDF2 (CKM_PKCS5_PBKD2) as its first argument.";
     private const string ObsoleteDefaults =
@@ -105,8 +102,8 @@ public sealed class BclApiParityTests
         },
         [nameof(AesCcmPkcs11)] = new(StringComparer.Ordinal)
         {
-            ["ctor(Byte[])"] = new Gap(CcmTagSizePerCall),
-            ["ctor(ReadOnlySpan<Byte>)"] = new Gap(CcmTagSizePerCall),
+            ["ctor(Byte[])"] = As("ctor(Pkcs11Key)", TokenKey),
+            ["ctor(ReadOnlySpan<Byte>)"] = As("ctor(Pkcs11Key)", TokenKey),
             ["Void Encrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"] =
                 Same("Void Encrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"),
             ["Void Decrypt(ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, ReadOnlySpan<Byte>, Span<Byte>, ReadOnlySpan<Byte>)"] =
@@ -235,8 +232,9 @@ public sealed class BclApiParityTests
         [nameof(AesGcmPkcs11)] = new(StringComparer.Ordinal),
         [nameof(AesCcmPkcs11)] = new(StringComparer.Ordinal)
         {
-            ["ctor(Pkcs11Key, Int32)"] = "Takes the token key and fixes the tag size, as AesGcm does; see the AesCcm constructor gap.",
-            ["Int32 TagSizeInBytes { get; }"] = "The tag size the constructor fixed, as AesGcm reports its own.",
+            ["ctor(Pkcs11Key, Int32)"] = "Takes the token key and fixes the tag size, as AesGcm does, so Decrypt refuses a tag of any other length.",
+            ["Int32? TagSizeInBytes { get; }"] =
+                "The tag size the constructor fixed, as AesGcm reports its own; null when the size comes from each call's tag.",
         },
         [nameof(ChaCha20Poly1305Pkcs11)] = new(StringComparer.Ordinal)
         {
