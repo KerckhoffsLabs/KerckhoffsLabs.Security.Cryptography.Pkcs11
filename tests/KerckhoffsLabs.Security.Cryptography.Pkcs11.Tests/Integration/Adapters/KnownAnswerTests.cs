@@ -226,6 +226,7 @@ internal static class KnownAnswerTestCases
         byte[] keyData = H("00112233445566778899aabbccddeeff000102030405060708090a0b0c0d0e0f");
         byte[] expected = H("28c9f404c4b810f4cbccb35cfb87f8263f5786e2d80ed326cbc7f0e71a99f43bfb988b9b7a02dd21");
 
+        backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP);
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {

@@ -43,6 +43,21 @@ internal static class Pkcs11BackendExtensions
     }
 
     /// <summary>
+    /// Skips the test when the backend's <c>C_GetMechanismInfo</c> for <paramref name="mechanism"/> reports a
+    /// key-size range that leaves out <paramref name="keySize"/> (in the mechanism's unit: bits for RSA).
+    /// A maximum of 0 is taken as no stated limit. <paramref name="mechanism"/> is checked first via
+    /// <see cref="RequireMechanism"/>.
+    /// </summary>
+    internal static void RequireKeySize(this IPkcs11Backend backend, CKM mechanism, ulong keySize)
+    {
+        backend.RequireMechanism(mechanism);
+        Pkcs11Slot slot = backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)backend.SlotId);
+        MechanismInfo info = slot.GetMechanismInfo(mechanism);
+        if (info.MaxKeySize != 0 && (keySize < info.MinKeySize || keySize > info.MaxKeySize))
+            Assert.Skip($"Backend's {mechanism} key-size range [{info.MinKeySize}, {info.MaxKeySize}] leaves out {keySize}.");
+    }
+
+    /// <summary>
     /// Skips the test unless the backend's <c>CKM_ML_KEM_KEY_PAIR_GEN</c> mechanism info reports a
     /// min/max key-size range (in encapsulation-key bytes) covering <paramref name="encapsulationKeySizeInBytes"/>.
     /// ML-KEM has exactly three discrete parameter sets, so this range doubles as a per-parameter-set

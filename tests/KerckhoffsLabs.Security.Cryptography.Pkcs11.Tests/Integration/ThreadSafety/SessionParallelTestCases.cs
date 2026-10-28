@@ -147,7 +147,19 @@ internal static class SessionParallelTestCases
         for (int r = 0; r < rounds; r++)
         {
             var session = backend.OpenSession();
-            var key = session.GenerateAesKey();
+            Pkcs11Key key;
+            try
+            {
+                key = session.GenerateAesKey();
+            }
+            catch
+            {
+                // Disposed here only when the round can't start: a session left open stays logged in,
+                // and where login is shared by every session of the application (as PKCS#11 has it),
+                // the next test's C_Login then fails with CKR_USER_ALREADY_LOGGED_IN.
+                session.Dispose();
+                throw;
+            }
 
             using var started = new ManualResetEventSlim(false);
             Task worker = OnItsOwnThread(() =>

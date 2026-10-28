@@ -36,3 +36,43 @@
 	path = vendor/freehsm
 	url = https://github.com/afchine1337/freehsm.git
 	ignore = untracked
+[submodule "vendor/libtpms"]
+	path = vendor/libtpms
+	url = https://github.com/stefanberger/libtpms.git
+	ignore = untracked
+[submodule "vendor/swtpm"]
+	path = vendor/swtpm
+	url = https://github.com/stefanberger/swtpm.git
+	ignore = untracked
+[submodule "vendor/tpm2-pkcs11"]
+	path = vendor/tpm2-pkcs11
+	url = https://github.com/tpm2-software/tpm2-pkcs11.git
+	ignore = untracked
+[submodule "vendor/json-glib"]
+	path = vendor/json-glib
+	url = https://gitlab.gnome.org/GNOME/json-glib.git
+	ignore = untracked
+[submodule "vendor/tpm2-abrmd"]
+	path = vendor/tpm2-abrmd
+	url = https://github.com/tpm2-software/tpm2-abrmd.git
+	ignore = untracked
+[submodule "vendor/wolftpm"]
+	path = vendor/wolftpm
+	url = https://github.com/wolfSSL/wolfTPM.git
+	shallow = true
+	ignore = untracked
+[submodule "vendor/wolfssl"]
+	path = vendor/wolfssl
+	url = https://github.com/wolfSSL/wolfssl.git
+	shallow = true
+	ignore = untracked
+[submodule "vendor/tcg-tpm"]
+	path = vendor/tcg-tpm
+	url = https://github.com/TrustedComputingGroup/TPM.git
+	shallow = true
+	ignore = untracked
+[submodule "vendor/ibmswtpm2"]
+	path = vendor/ibmswtpm2
+	url = https://github.com/kgoldman/ibmswtpm2.git
+	shallow = true
+	ignore = untracked

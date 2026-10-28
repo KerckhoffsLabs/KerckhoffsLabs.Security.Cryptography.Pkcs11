@@ -1,0 +1,123 @@
+using System.Security.Cryptography;
+using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
+
+[Collection("Tpm2Pkcs11")]
+public sealed class Pkcs11KeyPublicSynthesisTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture backend)
+{
+    private readonly Tpm2Pkcs11BackendFixture _backend = backend;
+
+
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
+            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
+    public void Rsa_PrivateOnly_HasSynthesizedPublicView()
+    {
+        using var session = OpenSession();
+
+        string label = $"rsa-test-{Guid.NewGuid():N}";
+        byte[] id = Encoding.ASCII.GetBytes(label);
+
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Verify().ModulusBits(2048)
+            .PublicExponent([0x01, 0x00, 0x01])
+            .Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Sign()
+            .Build();
+
+        session.Core.GenerateKeyPair(
+            new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
+            [.. pubTpl.Attributes],
+            [.. privTpl.Attributes],
+            out var pubHandle,
+            out var privHandle);
+
+        try
+        {
+            // Destroy the public-key object so only the private-side survives.
+            session.Core.DestroyObject(pubHandle);
+
+            // Now OpenKey by label — it should find ONLY the private and synthesize the public view.
+            using var key = session.OpenKey(label);
+
+            Assert.False(key.PrivateHandle.IsInvalid);
+            Assert.True(key.PublicHandle.IsInvalid); // no CKO_PUBLIC_KEY companion left
+
+            var rsaParams = key.GetSynthesizedRsaParameters();
+            Assert.NotNull(rsaParams);
+            Assert.Equal(2048 / 8, rsaParams!.Value.Modulus!.Length);
+        }
+        finally
+        {
+            session.Core.DestroyObject(privHandle);
+        }
+    }
+
+    // A private-only RSA key (no CKO_PUBLIC_KEY companion) must still verify via the synthesized
+    // public params in managed code, for both PKCS#1 v1.5 (already supported) and RSA-PSS (the
+    // mechanism map previously rejected the PSS combined mechanism).
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
+    public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
+    {
+        // The PSS half: a TPM that doesn't say FIPS 140-2 mode salts RSAPSS to the maximum, so tpm2-pkcs11
+        // pads a hash-length salt itself and signs it with unpadded RSA, which a FIPS-host TPM refuses
+        Tpm2Pkcs11BackendFixture.SkipUnlessTpmDoesUnpaddedRsa();
+        using var session = OpenSession();
+        string label = $"rsa-managedverify-{Guid.NewGuid():N}";
+        byte[] id = Encoding.ASCII.GetBytes(label);
+
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Verify().ModulusBits(2048)
+            .PublicExponent([0x01, 0x00, 0x01]).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Sign().Build();
+
+        session.Core.GenerateKeyPair(
+            new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
+            [.. pubTpl.Attributes], [.. privTpl.Attributes],
+            out var pubHandle, out var privHandle);
+        try
+        {
+            session.Core.DestroyObject(pubHandle); // leave only the private-side
+            using var key = session.OpenKey(label);
+            Assert.True(key.PublicHandle.IsInvalid);
+
+            using var rsa = new RSAPkcs11(key);
+            byte[] data = Encoding.UTF8.GetBytes("managed verify over a private-only RSA key");
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+
+            // RSA-PSS: signed on the token, verified in managed code via synthesized public params.
+            byte[] pss = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+            Assert.True(rsa.VerifyData(data, pss, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+            Assert.False(rsa.VerifyData(tampered, pss, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+            // PKCS#1 v1.5: still works through the same managed path.
+            byte[] pkcs1 = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            Assert.True(rsa.VerifyData(data, pkcs1, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+            Assert.False(rsa.VerifyData(tampered, pkcs1, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+        }
+        finally
+        {
+            session.Core.DestroyObject(privHandle);
+        }
+    }
+
+    // Note: a previous Ec_PrivateOnly_SynthesizesWhenEcPointPresent test lived here and
+    // assumed CKA_EC_POINT was readable from a CKO_PRIVATE_KEY object. SoftHSM 2.x stores
+    // only CKA_EC_PARAMS + CKA_VALUE on the EC private object (see vendor/softhsmv2
+    // P11Objects.cpp P11ECPrivateKeyObj::init), and PKCS#11 v2.40 places CKA_EC_POINT on
+    // public objects only. Synthesizing the public point from a private-only object would
+    // require either reading the (sensitive) private scalar or doing an on-token point
+    // multiplication — neither of which the library can do without compromising the
+    // non-extractable posture. The RSA-equivalent test passes because CKA_MODULUS and
+    // CKA_PUBLIC_EXPONENT are stored on RSA private objects.
+}
