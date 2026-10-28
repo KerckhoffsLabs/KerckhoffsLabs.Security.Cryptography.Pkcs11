@@ -32,4 +32,8 @@ public sealed class OperationContractTests_FreeHsm(FreeHsmBackendFixture backend
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(OperationContractTestCases.MultipartHmacs), MemberType = typeof(OperationContractTestCases))]
     public void Hmac_Multipart_MatchesBcl(CKM mechanism) => OperationContractTestCases.Assert_Hmac_Multipart_MatchesBcl(_backend, mechanism);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(OperationContractTestCases.UnpaddedStreamModes), MemberType = typeof(OperationContractTestCases))]
+    public void UnpaddedBlockMode_StreamRoundTrip_MatchesBcl(CKM mode) => OperationContractTestCases.Assert_UnpaddedBlockMode_StreamRoundTrip_MatchesBcl(_backend, mode);
 }

@@ -35,4 +35,8 @@ public sealed class OperationContractTests_Kryoptic(KryopticBackendFixture backe
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationContractTestCases.MultipartHmacs), MemberType = typeof(OperationContractTestCases))]
     public void Hmac_Multipart_MatchesBcl(CKM mechanism) => OperationContractTestCases.Assert_Hmac_Multipart_MatchesBcl(_backend, mechanism);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(OperationContractTestCases.UnpaddedStreamModes), MemberType = typeof(OperationContractTestCases))]
+    public void UnpaddedBlockMode_StreamRoundTrip_MatchesBcl(CKM mode) => OperationContractTestCases.Assert_UnpaddedBlockMode_StreamRoundTrip_MatchesBcl(_backend, mode);
 }

@@ -325,6 +325,52 @@ internal static class OperationContractTestCases
         });
     }
 
+    // === Unpadded block modes through the stream overloads ====================
+
+    public static TheoryData<CKM> UnpaddedStreamModes => [CKM.CKM_AES_CBC, CKM.CKM_AES_ECB];
+
+    // A block mode without padding writes every block as its update consumes it, so its final has nothing
+    // to write. The stream overloads still ask the final for its length; a module whose length query ends
+    // the operation then has the final answer CKR_OPERATION_NOT_INITIALIZED, which completes the stream
+    // rather than failing it. Whole-block pieces, so that every module takes each update.
+    internal static void Assert_UnpaddedBlockMode_StreamRoundTrip_MatchesBcl(IPkcs11Backend backend, CKM mode)
+    {
+        backend.RequireMechanismFlags(mode, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT and CKF_DECRYPT");
+        WithSession(backend, (_, _, session) =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                using var aes = Aes.Create();
+                aes.Key = rawKey;
+                foreach (int length in (int[])[16, 48, 4112])
+                {
+                    byte[] plaintext = RandomNumberGenerator.GetBytes(length);
+                    foreach (int bufferLength in (int[])[16, 48, 4096])
+                    {
+                        // A fresh IV for every encryption: Craton HSM refuses to encrypt twice under one key and IV.
+                        byte[] iv = RandomNumberGenerator.GetBytes(16);
+                        var mechanism = mode == CKM.CKM_AES_CBC ? new Mechanism(mode, iv) : new Mechanism(mode);
+                        byte[] expected = mode == CKM.CKM_AES_CBC ? aes.EncryptCbc(plaintext, iv, PaddingMode.None) : aes.EncryptEcb(plaintext, PaddingMode.None);
+
+                        using var encrypted = new MemoryStream();
+                        using (var input = new MemoryStream(plaintext))
+                            session.Encrypt(mechanism, key, input, encrypted, bufferLength);
+                        Assert.True(expected.AsSpan().SequenceEqual(encrypted.ToArray()), $"{length} bytes encrypted in {bufferLength}-byte pieces");
+
+                        using var decrypted = new MemoryStream();
+                        using (var input = new MemoryStream(expected))
+                            session.Decrypt(mechanism, key, input, decrypted, bufferLength);
+                        Assert.True(plaintext.AsSpan().SequenceEqual(decrypted.ToArray()), $"{length} bytes decrypted in {bufferLength}-byte pieces");
+                    }
+                }
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
     // === Multi-part digests and MACs =========================================
 
     public static TheoryData<CKM> MultipartDigests =>

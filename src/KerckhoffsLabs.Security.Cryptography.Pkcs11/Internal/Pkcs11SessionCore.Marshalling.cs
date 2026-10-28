@@ -215,6 +215,13 @@ internal sealed partial class Pkcs11SessionCore
         => mechanism is CKM.CKM_AES_GCM or CKM.CKM_AES_CCM or CKM.CKM_CHACHA20_POLY1305;
 
     /// <summary>
+    /// Whether a multi-part transform with this mechanism writes a tag in its final, whatever its updates
+    /// gave back.
+    /// </summary>
+    private static bool FinalCarriesATag(CKM mechanism)
+        => mechanism is CKM.CKM_AES_GCM or CKM.CKM_AES_CCM or CKM.CKM_CHACHA20_POLY1305 or CKM.CKM_SALSA20_POLY1305;
+
+    /// <summary>
     /// One <c>C_*Update</c> call of a multi-part transform. Every such entry point in Cryptoki has
     /// this shape — input, output, bytes written — which is what lets the five streaming loops share
     /// <see cref="PumpStreamThrough"/>.
@@ -239,7 +246,9 @@ internal sealed partial class Pkcs11SessionCore
     /// active so the same block can be resubmitted, which is why the retry passes the same input
     /// again. A grown buffer is kept for the following blocks rather than re-grown each time.
     /// </remarks>
-    private static void PumpStreamThrough(
+    /// <returns>Whether the updates gave back every byte they were given, so the transform holds nothing
+    /// back for its final.</returns>
+    private static bool PumpStreamThrough(
         Stream inputStream,
         Stream outputStream,
         int bufferLength,
@@ -248,6 +257,7 @@ internal sealed partial class Pkcs11SessionCore
     {
         byte[] input = new byte[bufferLength];
         byte[] output = new byte[bufferLength];
+        long consumed = 0, produced = 0;
         try
         {
             int bytesRead;
@@ -272,8 +282,12 @@ internal sealed partial class Pkcs11SessionCore
                 }
                 Pkcs11Exception.ThrowIfError(rv, operation);
 
-                outputStream.Write(output, 0, ReportedLength.Written(outputLen, output.Length, operation));
+                int written = ReportedLength.Written(outputLen, output.Length, operation);
+                outputStream.Write(output, 0, written);
+                consumed += bytesRead;
+                produced += written;
             }
+            return produced == consumed;
         }
         finally
         {
@@ -300,14 +314,24 @@ internal sealed partial class Pkcs11SessionCore
     /// buffer of that size fails and ends the operation. A <c>CKR_BUFFER_TOO_SMALL</c> grows the buffer,
     /// as <see cref="PumpStreamThrough"/> does. A failed, refused or trimmed buffer is zeroized, since
     /// for a decryption it holds plaintext.
+    /// <para>
+    /// The length query must not end the operation (§5.2), but NSS softoken's does whenever the final has
+    /// nothing to write: it answers 0 and the final itself then returns <c>CKR_OPERATION_NOT_INITIALIZED</c>.
+    /// When <paramref name="nothingHeldBack"/> says the final can have nothing to write (every input byte
+    /// has already come out of the updates, and the mechanism writes no tag in its final), that answer
+    /// completes the transform with no last part. Otherwise it is an error: a module that held back a
+    /// block or a tag and lost it must not look like a shorter output.
+    /// </para>
     /// </remarks>
-    private static byte[] CallFinal(LengthProbedCall final, string operation, int bufferLength)
+    private static byte[] CallFinal(LengthProbedCall final, string operation, int bufferLength, bool nothingHeldBack)
     {
         CKR rv = final(default, lengthOnly: true, out NativeCULong reported);
         Pkcs11Exception.ThrowIfError(rv, operation);
 
         byte[] buffer = new byte[Math.Max(ReportedLength.ForAllocation(reported, operation), Math.Max(bufferLength, FinalPartMargin))];
         rv = final(buffer, lengthOnly: false, out NativeCULong written);
+        if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED && nothingHeldBack && (ulong)reported == 0)
+            return [];
         for (int grown = 0; rv == CKR.CKR_BUFFER_TOO_SMALL && grown < MaxUnreportedGrowth; grown++)
         {
             int length = (ulong)written > (ulong)buffer.Length
@@ -373,10 +397,11 @@ internal sealed partial class Pkcs11SessionCore
         rv = transform.Init(in ckTransformMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(transform.CancelFlag, rv, transform.InitOperation);
 
-        PumpStreamThrough(inputStream, outputStream, bufferLength, transform.Update, transform.UpdateOperation);
+        bool nothingHeldBack = PumpStreamThrough(inputStream, outputStream, bufferLength, transform.Update, transform.UpdateOperation)
+            && !FinalCarriesATag(transformMechanism.Type);
 
         // Whatever the transform held back — a partial block, or an AEAD tag.
-        byte[] lastPart = CallFinal(transform.Final, transform.FinalOperation, bufferLength);
+        byte[] lastPart = CallFinal(transform.Final, transform.FinalOperation, bufferLength, nothingHeldBack);
         try
         {
             operation.End(transform.CancelFlag);

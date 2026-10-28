@@ -164,14 +164,14 @@ internal sealed partial class Pkcs11SessionCore
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_ENCRYPT, rv, OpEncryptInit);
 
-        PumpStreamThrough(inputStream, outputStream, bufferLength,
+        bool nothingHeldBack = PumpStreamThrough(inputStream, outputStream, bufferLength,
             (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                 => _pkcs11Library.C_EncryptUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
-            OpEncryptUpdate);
+            OpEncryptUpdate) && !FinalCarriesATag(mechanism.Type);
 
         byte[] lastEncryptedPart = CallFinal(
             (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, lengthOnly, out length),
-            OpEncryptFinal, bufferLength);
+            OpEncryptFinal, bufferLength, nothingHeldBack);
         operation.Completed();
 
         mechanism.AbsorbOutput(mechParams);
@@ -466,14 +466,14 @@ internal sealed partial class Pkcs11SessionCore
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
-        PumpStreamThrough(inputStream, outputStream, bufferLength,
+        bool nothingHeldBack = PumpStreamThrough(inputStream, outputStream, bufferLength,
             (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                 => _pkcs11Library.C_DecryptUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
-            OpDecryptUpdate);
+            OpDecryptUpdate) && !FinalCarriesATag(mechanism.Type);
 
         byte[] lastPart = CallFinal(
             (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, lengthOnly, out length),
-            OpDecryptFinal, bufferLength);
+            OpDecryptFinal, bufferLength, nothingHeldBack);
         try
         {
             operation.Completed();
