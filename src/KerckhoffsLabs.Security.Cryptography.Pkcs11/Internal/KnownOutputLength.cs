@@ -46,7 +46,8 @@ internal static class KnownOutputLength
     /// EdDSA is guessed rather than queried because NSS cannot be queried for it. Its softoken answers the
     /// length query with an ECDSA-sized 144 bytes, then refuses any buffer that is not exactly 64 bytes long
     /// with <c>CKR_ARGUMENTS_BAD</c> (<c>ED_SignMessage</c> in freebl's <c>ec.c</c>), so a client that sizes
-    /// the buffer from the query can never sign Ed25519 there. The guess costs nothing elsewhere: an Ed25519
+    /// the buffer from the query can never sign Ed25519 there
+    /// (https://bugzilla.mozilla.org/show_bug.cgi?id=2075850). The guess costs nothing elsewhere: an Ed25519
     /// signature is always 64 bytes, and an Ed448 one (114 bytes) is answered with
     /// <c>CKR_BUFFER_TOO_SMALL</c> and the length, then signed on the second call, as many calls as the query
     /// takes. A module that refuses the guess without reporting the length (opencryptoki's <c>ec_sign</c>) is
