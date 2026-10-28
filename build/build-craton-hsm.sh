@@ -52,8 +52,18 @@ echo "Building Craton HSM for ${RID}..."
 # `rsa` crate (RUSTSEC-2023-0071); `insecure-rustcrypto-rsa-private-ops` is the development-only
 # switch upstream provides for interoperability tests like these, so the RSA test cases run instead
 # of skipping. Never ship this build as an HSM.
+#
+# The test suite generates more RSA key pairs in one process than Craton HSM's RSA key caches hold
+# (RSA_KEY_CACHE_MAX, 64 per cache), so this build raises the capacity to 128. The source file is
+# restored after the build, and the build fails if upstream changes the line.
+CACHE_SRC="src/crypto/sign.rs"
+CACHE_LINE="const RSA_KEY_CACHE_MAX: usize = 64;"
 (
   cd "${SRC_DIR}"
+  trap 'git checkout -- "${CACHE_SRC}"' EXIT
+  grep -qxF "${CACHE_LINE}" "${CACHE_SRC}" \
+    || { echo "build-craton-hsm.sh: '${CACHE_LINE}' not found in ${CACHE_SRC}; update this script" >&2; exit 1; }
+  sed -i "s/^${CACHE_LINE}\$/const RSA_KEY_CACHE_MAX: usize = 128;/" "${CACHE_SRC}"
   cargo build --release --lib --features insecure-rustcrypto-rsa-private-ops
 ) 2>&1
 
