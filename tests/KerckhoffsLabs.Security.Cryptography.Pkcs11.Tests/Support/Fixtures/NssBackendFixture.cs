@@ -162,6 +162,25 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the RSA PKCS#1 v1.5 encryption round-trip case.</summary>
     public static bool RsaPkcs1EncryptAvailable => NssAvailable && SupportsRsaPkcs1Encrypt;
 
+    /// <summary>False while softoken refuses <c>C_VerifyInit</c> for <c>CKM_AES_CMAC</c> with
+    /// <see cref="CKR.CKR_MECHANISM_INVALID"/>, although the mechanism advertises <c>CKF_VERIFY</c> and
+    /// <c>C_SignInit</c> takes it (https://bugzilla.mozilla.org/show_bug.cgi?id=2075845). Signing works.
+    /// NssQuirkTests.CmacVerify_QuirkStillPresent fails once it is fixed.</summary>
+    public static bool SupportsCmacVerify => false;
+
+    /// <summary>Gate for the AES-CMAC verify cases.</summary>
+    public static bool CmacVerifyAvailable => NssAvailable && SupportsCmacVerify;
+
+    /// <summary>False while softoken sets <c>CKA_LOCAL</c> to <see langword="false"/> on keys it generates with
+    /// <c>C_GenerateKey</c> or <c>C_GenerateKeyPair</c>, where PKCS#11 has <see langword="true"/>
+    /// (https://bugzilla.mozilla.org/show_bug.cgi?id=2075840). An imported key reports
+    /// <see langword="false"/>, as it should. NssQuirkTests.GeneratedKeyLocal_QuirkStillPresent fails once it
+    /// is fixed.</summary>
+    public static bool SupportsLocalOnGeneratedKeys => false;
+
+    /// <summary>Gate for the cases that check <c>CKA_LOCAL</c> on a generated key.</summary>
+    public static bool LocalOnGeneratedKeysAvailable => NssAvailable && SupportsLocalOnGeneratedKeys;
+
     public NssBackendFixture()
     {
         string? libPath = Settings.NssLibraryPath ?? BuiltLibraryPath();

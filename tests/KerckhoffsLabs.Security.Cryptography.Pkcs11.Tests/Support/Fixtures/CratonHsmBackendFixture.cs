@@ -65,6 +65,15 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
         (Settings.CratonHsmLibraryPath is { } p && File.Exists(p)) ||
         BuiltLibraryPath() is not null;
 
+    /// <summary>False while Craton HSM does not keep <c>CKA_LOCAL</c>: its <c>read_attribute</c>
+    /// (<c>store/attributes.rs</c>) has no case for it, so <c>C_GetAttributeValue</c> answers
+    /// <see cref="CKR.CKR_ATTRIBUTE_TYPE_INVALID"/> on every key, where PKCS#11 v3.2 §4.4 has every key carry
+    /// it. CratonHsmQuirkTests.LocalAttribute_QuirkStillPresent fails once it is fixed.</summary>
+    public static bool SupportsLocalAttribute => false;
+
+    /// <summary>Gate for the <c>CKA_LOCAL</c> cases.</summary>
+    public static bool LocalAttributeAvailable => CratonHsmAvailable && SupportsLocalAttribute;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

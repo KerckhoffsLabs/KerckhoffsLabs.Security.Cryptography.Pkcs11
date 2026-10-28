@@ -8,7 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 /// EdDSA key pair on the token (NSS rejects *importing* EdDSA keys, but advertises
 /// CKM_EC_EDWARDS_KEY_PAIR_GEN), so the round-trip exercises on-token keygen + sign + verify. Gated on
 /// the live mechanism list (CKM_EDDSA from NSS 3.125). NSS can only be signed with through a buffer of
-/// exactly 64 bytes, which KnownOutputLength.OfSignature sizes it at.
+/// exactly 64 bytes, which KnownOutputLength.OfSignature sizes it at
+/// (https://bugzilla.mozilla.org/show_bug.cgi?id=2075850).
 /// </summary>
 [Collection("Nss")]
 public sealed class SignEdDsaTests_Nss(NssBackendFixture backend)
