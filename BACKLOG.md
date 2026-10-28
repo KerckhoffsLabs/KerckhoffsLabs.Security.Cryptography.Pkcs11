@@ -186,7 +186,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Native/` (no SharpFuzz, FsCheck or CsCheck anywhere; coverage is example-based, e.g. `ReportedLengthTests`, `AttributeLengthClampTests`)
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Native/` (no SharpFuzz harness; CsCheck drives the BCL differential tests and FsCheck the algorithm laws of the `Algorithms` adapters, not this layer, whose coverage is example-based, e.g. `ReportedLengthTests`, `AttributeLengthClampTests`)
 - **Problem:** The highest-risk direction — a buggy/hostile token controlling returned lengths in the two-call probe and attribute read-back — is covered only by example-based tests.
 - **Proposed action:** Add a SharpFuzz harness over (1) `CK_ATTRIBUTE[]` template build/read-back and (2) length-probe read-back with adversarial `ulValueLen`. Pairs with BL-013.
 - **Breaks public API?** No

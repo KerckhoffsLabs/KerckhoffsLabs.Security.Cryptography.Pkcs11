@@ -73,7 +73,9 @@ internal sealed partial class ManagedSoftToken
     // CKM_SP800_108_COUNTER_KDF: the adapter emits the data-param sequence
     // counter, label, 0x00 separator, context, [L], leaving out an empty label or context. We take
     // the byte arrays either side of the separator as label/context and run the same NIST
-    // counter-mode KDF via the BCL.
+    // counter-mode KDF via the BCL. A label that is itself the single byte 0x00 looks like the
+    // separator, so each side is the concatenation of every array on it: wherever the first [0x00]
+    // falls, label || 0x00 || context is the same input the token was given.
     //
     // Additional derived keys (PKCS#11 v3.0 §2.42) are not independently re-derived -- they share
     // one continuous derived-key-material stream with the primary key, sliced sequentially in
@@ -95,8 +97,8 @@ internal sealed partial class ManagedSoftToken
                 byteArrays.Add(PrfBytes(Param(i)));
         }
         int separator = byteArrays.FindIndex(static b => b is [0x00]);
-        byte[] label = separator > 0 ? byteArrays[separator - 1] : [];
-        byte[] context = separator >= 0 && separator + 1 < byteArrays.Count ? byteArrays[separator + 1] : [];
+        byte[] label = separator > 0 ? [.. byteArrays.Take(separator).SelectMany(static b => b)] : [];
+        byte[] context = separator >= 0 ? [.. byteArrays.Skip(separator + 1).SelectMany(static b => b)] : [];
         HashAlgorithmName prf = PrfHash((CKM)(ulong)p.PrfType);
 
         int additionalCount = (int)p.AdditionalDerivedKeys;
