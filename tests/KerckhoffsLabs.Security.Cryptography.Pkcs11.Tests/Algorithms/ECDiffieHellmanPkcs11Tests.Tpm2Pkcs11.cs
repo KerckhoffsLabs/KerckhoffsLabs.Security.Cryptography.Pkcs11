@@ -27,7 +27,11 @@ public sealed class ECDiffieHellmanPkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixtu
     public void DeriveRawSecretAgreement_MatchesBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveRawSecretAgreement_MatchesBcl(_backend);
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.DeriveOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#663: CKA_DERIVE is not mapped, so an ECDH key pair is refused")]
-    public void DeriveRawSecretAgreement_P521_MatchesBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveRawSecretAgreement_P521_MatchesBcl(_backend);
+    public void DeriveRawSecretAgreement_P521_MatchesBcl()
+    {
+        _backend.SkipUnlessCurve("P-521");
+        ECDiffieHellmanPkcs11TestCases.Assert_DeriveRawSecretAgreement_P521_MatchesBcl(_backend);
+    }
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.DeriveOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#663: CKA_DERIVE is not mapped, so an ECDH key pair is refused")]
     public void DeriveKeyMaterial_AgreesWithBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveKeyMaterial_AgreesWithBcl(_backend);

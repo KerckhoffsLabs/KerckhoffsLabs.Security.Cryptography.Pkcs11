@@ -18,13 +18,24 @@ public sealed class ECDsaPkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture f)
     [InlineData("P-521", "SHA256")]
     [InlineData("P-521", "SHA384")]
     [InlineData("P-521", "SHA512")]
-    public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName) => ECDsaPkcs11TestCases.Assert_SignVerifyData_CurveHashMatrix_RoundTrips(_backend, curve, hashName);
+    public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName)
+    {
+        _backend.SkipUnlessCurve(curve);
+        _backend.SkipUnlessTpmImplementsSha512(curve == "P-521" && hashName == "SHA512");
+        ECDsaPkcs11TestCases.Assert_SignVerifyData_CurveHashMatrix_RoundTrips(_backend, curve, hashName);
+    }
 
     [Theory(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
     [InlineData("P-256")]
     [InlineData("P-384")]
     [InlineData("P-521")]
-    public void TrySignData_Span_VerifyData_Span_RoundTrips(string curve) => ECDsaPkcs11TestCases.Assert_TrySignData_Span_VerifyData_Span_RoundTrips(_backend, curve);
+    public void TrySignData_Span_VerifyData_Span_RoundTrips(string curve)
+    {
+        _backend.SkipUnlessCurve(curve);
+        // P-521 signs with SHA-512
+        _backend.SkipUnlessTpmImplementsSha512(curve == "P-521");
+        ECDsaPkcs11TestCases.Assert_TrySignData_Span_VerifyData_Span_RoundTrips(_backend, curve);
+    }
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
     public void TrySignData_Sha224_UnderAllowInsecure_RoundTrips() => ECDsaPkcs11TestCases.Assert_TrySignData_Sha224_UnderAllowInsecure_RoundTrips(_backend, "P-256");
@@ -36,13 +47,23 @@ public sealed class ECDsaPkcs11Tests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture f)
     [InlineData("P-256")]
     [InlineData("P-384")]
     [InlineData("P-521")]
-    public void ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(string curve) => ECDsaPkcs11TestCases.Assert_ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(_backend, curve);
+    public void ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(string curve)
+    {
+        _backend.SkipUnlessCurve(curve);
+        ECDsaPkcs11TestCases.Assert_ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(_backend, curve);
+    }
 
     [Theory(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
     [InlineData("P-256")]
     [InlineData("P-384")]
     [InlineData("P-521")]
-    public void SignData_VerifiesUnderBclFromExportedPublicKey(string curve) => ECDsaPkcs11TestCases.Assert_SignData_VerifiesUnderBclFromExportedPublicKey(_backend, curve);
+    public void SignData_VerifiesUnderBclFromExportedPublicKey(string curve)
+    {
+        _backend.SkipUnlessCurve(curve);
+        // P-521 signs with SHA-512
+        _backend.SkipUnlessTpmImplementsSha512(curve == "P-521");
+        ECDsaPkcs11TestCases.Assert_SignData_VerifiesUnderBclFromExportedPublicKey(_backend, curve);
+    }
 
     [Theory(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
     [InlineData("SHA3-256")]

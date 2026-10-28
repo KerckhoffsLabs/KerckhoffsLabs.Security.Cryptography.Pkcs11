@@ -26,7 +26,7 @@ public sealed class DeriveSharedSecretEcdhTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixt
 
     // Two parties run ECDH1 (CKD_NULL) over P-256; the derived on-token AES keys must be identical,
     // proven by a cross-party AES-GCM encrypt-with-Alice / decrypt-with-Bob round-trip.
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SessionKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#921: key pairs can only be token objects")]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.DerivedAesKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 derives only generic secrets, held as values, and has no AES-GCM")]
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var session = OpenSession();
@@ -72,7 +72,7 @@ public sealed class DeriveSharedSecretEcdhTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixt
 
     // === ECParameters overload: validates the peer, then agrees exactly like the raw-span form ===
 
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SessionKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#921: key pairs can only be token objects")]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.DerivedAesKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 derives only generic secrets, held as values, and has no AES-GCM")]
     public void TwoParties_DeriveMatchingAesKey_ViaECParametersOverload()
     {
         using var session = OpenSession();

@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
@@ -20,12 +21,20 @@ public sealed class KnownAnswerTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture backend
     public static bool Tpm2Pkcs11AvailableWithChaCha20Poly1305 => Tpm2Pkcs11Available;
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 cannot use a secret key from C_CreateObject (no CKA_ALLOWED_MECHANISMS)")]
-    public void AesGcm_Kat() => KnownAnswerTestCases.Assert_AesGcm_Kat(_backend);
+    public void AesGcm_Kat()
+    {
+        Assert.SkipUnless(_backend.Supports(CKM.CKM_AES_GCM), "Backend does not advertise CKM_AES_GCM.");
+        KnownAnswerTestCases.Assert_AesGcm_Kat(_backend);
+    }
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 cannot use a secret key from C_CreateObject (no CKA_ALLOWED_MECHANISMS)")]
-    public void AesGcm_Multipart_Kat() => KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat(_backend);
+    public void AesGcm_Multipart_Kat()
+    {
+        Assert.SkipUnless(_backend.Supports(CKM.CKM_AES_GCM), "Backend does not advertise CKM_AES_GCM.");
+        KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat(_backend);
+    }
 
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 cannot use a secret key from C_CreateObject (no CKA_ALLOWED_MECHANISMS)")]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.LongHmacKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "A TPM holds at most 128 bytes of key; RFC 4231 case 6 uses 131")]
     public void HmacSha256_Kat() => KnownAnswerTestCases.Assert_HmacSha256_Kat(_backend);
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11Available), Skip = "Requires " + nameof(Tpm2Pkcs11Available))]
@@ -34,10 +43,10 @@ public sealed class KnownAnswerTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture backend
     [Fact(SkipUnless = nameof(Tpm2Pkcs11AvailableWithChaCha20Poly1305), Skip = "Requires " + nameof(Tpm2Pkcs11AvailableWithChaCha20Poly1305))]
     public void ChaCha20Poly1305_Kat() => KnownAnswerTestCases.Assert_ChaCha20Poly1305_Kat(_backend);
 
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 cannot use a secret key from C_CreateObject (no CKA_ALLOWED_MECHANISMS)")]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.LongHmacKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "A TPM holds at most 128 bytes of key; RFC 4231 case 6 uses 131")]
     public void HmacSha384_Kat() => KnownAnswerTestCases.Assert_HmacSha384_Kat(_backend);
 
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 cannot use a secret key from C_CreateObject (no CKA_ALLOWED_MECHANISMS)")]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.LongHmacKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "A TPM holds at most 128 bytes of key; RFC 4231 case 6 uses 131")]
     public void HmacSha512_Kat() => KnownAnswerTestCases.Assert_HmacSha512_Kat(_backend);
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11Available), Skip = "Requires " + nameof(Tpm2Pkcs11Available))]

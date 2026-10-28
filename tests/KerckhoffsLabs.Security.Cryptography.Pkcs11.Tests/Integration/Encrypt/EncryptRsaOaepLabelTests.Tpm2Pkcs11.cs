@@ -8,7 +8,7 @@ public sealed class EncryptRsaOaepLabelTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture
 {
     private readonly Tpm2Pkcs11BackendFixture _backend = backend;
 
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SessionKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#921: key pairs can only be token objects")]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.OaepAnyLabelAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "A TPM decrypts RSA-OAEP only with a label that ends with a zero byte")]
     public void OaepWithLabel_RoundTrips() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepWithLabel_RoundTrips(_backend);
 

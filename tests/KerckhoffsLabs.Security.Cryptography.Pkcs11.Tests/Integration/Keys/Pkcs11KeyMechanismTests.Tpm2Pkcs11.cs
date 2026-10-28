@@ -23,11 +23,12 @@ public sealed class Pkcs11KeyMechanismTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SecretKeyGenerationAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#564: C_GenerateKey is not implemented")]
     public void AesCbc_EncryptDecrypt_RoundTrip()
     {
+        Assert.SkipUnless(_backend.Supports(CKM.CKM_AES_CBC), "Backend does not advertise CKM_AES_CBC (wolfTPM's fwTPM has no TPM2_ALG_CBC).");
         using var session = OpenSession();
         Pkcs11KeyMechanismCases.Assert_AesCbcEncryptDecrypt_RoundTrips(session);
     }
 
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SecretKeyGenerationAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#564: C_GenerateKey is not implemented")]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.KeyWrappingAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 has no key wrapping")]
     public void AesKeyWrap_WrapUnwrap_RoundTrip()
     {
         using var session = OpenSession();
