@@ -110,7 +110,7 @@ public sealed class MechanismTests
     [Fact]
     public void Marshal_ByteArrayParameter_CopiesTheBytesIntoTheScope()
     {
-        byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0];
+        byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0xE0, 0xF0, 0xFF];
         var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
         using var scope = new MechanismParameterScope();
 
@@ -132,7 +132,7 @@ public sealed class MechanismTests
     [Fact]
     public void Marshal_ByteArrayParameter_IgnoresLaterChangesToTheCallersArray()
     {
-        byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0];
+        byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0xE0, 0xF0, 0xFF];
         byte[] expected = [.. iv];
         var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
         using var scope = new MechanismParameterScope();
@@ -167,7 +167,7 @@ public sealed class MechanismTests
     [Fact]
     public void Marshal_SpanParameter_CopiesTheBytesAtConstruction()
     {
-        byte[] source = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0];
+        byte[] source = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0xE0, 0xF0, 0xFF];
         byte[] expected = [.. source];
         var mech = new Mechanism(CKM.CKM_AES_CBC, new ReadOnlySpan<byte>(source));
         using var scope = new MechanismParameterScope();
@@ -179,6 +179,57 @@ public sealed class MechanismTests
         Assert.Equal((ulong)expected.Length, (ulong)marshalled.ParameterLen);
         Assert.Equal(expected, UnmanagedMemory.Read(marshalled.Parameter, expected.Length));
         Assert.Null(mechParams);
+    }
+
+    public static TheoryData<CKM, int> IvMechanisms => new()
+    {
+        { CKM.CKM_AES_CBC, 16 }, { CKM.CKM_AES_CBC_PAD, 16 }, { CKM.CKM_AES_OFB, 16 },
+        { CKM.CKM_AES_CFB8, 16 }, { CKM.CKM_AES_CFB64, 16 }, { CKM.CKM_AES_CFB128, 16 },
+        { CKM.CKM_DES_CBC, 8 }, { CKM.CKM_DES_CBC_PAD, 8 }, { CKM.CKM_DES3_CBC, 8 }, { CKM.CKM_DES3_CBC_PAD, 8 },
+        { CKM.CKM_DES_OFB8, 8 }, { CKM.CKM_DES_OFB64, 8 }, { CKM.CKM_DES_CFB8, 8 }, { CKM.CKM_DES_CFB64, 8 },
+    };
+
+    // A mechanism whose parameter is an IV of the cipher's block size takes exactly that many bytes. A
+    // token reading a block regardless of the length it is given would read past a shorter IV, so the
+    // mechanism refuses one, and a longer one or none, before any call is made.
+    [Theory]
+    [MemberData(nameof(IvMechanisms))]
+    public void Ctor_IvOfTheWrongLength_Throws(CKM type, int ivLength)
+    {
+        foreach (int length in (int[])[0, 1, ivLength - 1, ivLength + 1, 2 * ivLength])
+        {
+            var ex = Assert.Throws<ArgumentException>(() => new Mechanism(type, new byte[length]));
+            Assert.Equal("parameter", ex.ParamName);
+            Assert.Contains($"{ivLength}-byte IV", ex.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(IvMechanisms))]
+    public void Ctor_IvOfTheBlockSize_MarshalsIt(CKM type, int ivLength)
+    {
+        byte[] iv = [.. Enumerable.Range(1, ivLength).Select(i => (byte)i)];
+        var mech = new Mechanism(type, iv);
+        using var scope = new MechanismParameterScope();
+
+        CK_MECHANISM marshalled = mech.Marshal(scope, out _);
+
+        Assert.Equal((ulong)ivLength, (ulong)marshalled.ParameterLen);
+        Assert.Equal(iv, UnmanagedMemory.Read(marshalled.Parameter, ivLength));
+    }
+
+    // Any other mechanism keeps its raw block as the caller laid it out, whatever its length: the check is
+    // for the modes whose parameter PKCS#11 defines as a bare IV, not for vendor or struct parameters.
+    [Theory]
+    [InlineData(CKM.CKM_AES_KEY_WRAP, 8)]
+    [InlineData(CKM.CKM_AES_CTR, 3)]
+    [InlineData(CkmIbmEthDerive, 5)]
+    public void Ctor_OtherMechanism_KeepsABlockOfAnyLength(CKM type, int length)
+    {
+        var mech = new Mechanism(type, new byte[length]);
+        using var scope = new MechanismParameterScope();
+
+        Assert.Equal((ulong)length, (ulong)mech.Marshal(scope, out _).ParameterLen);
     }
 
     // An empty span is an absent parameter, not a pointer to nothing.
