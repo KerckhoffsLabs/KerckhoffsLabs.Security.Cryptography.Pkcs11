@@ -37,6 +37,15 @@ public sealed class RSAPkcs11Tests_Managed
         body(session, rsa);
     }
 
+    private static void WithRsaUnder(ICryptoPolicy policy, Action<RSAPkcs11> body)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, policy);
+        using var key = session.GenerateRsaSigningKeyPair(modulusBits: 2048);
+        using var rsa = new RSAPkcs11(key);
+        body(rsa);
+    }
+
     private static void WithTransportRsa(Action<Pkcs11Session, RSAPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
@@ -123,10 +132,14 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, padding));
     });
 
-    [Fact]
-    public void SignData_BadRange_Throws() => WithRsa((_, rsa) =>
+    // A negative offset, a negative count, or a range that runs past the end, as the BCL refuses them.
+    [Theory]
+    [InlineData(4, 8)]
+    [InlineData(-1, 4)]
+    [InlineData(0, -1)]
+    public void SignData_BadRange_Throws(int offset, int count) => WithRsa((_, rsa) =>
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            rsa.SignData(new byte[8], 4, 8, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)));
+            rsa.SignData(new byte[8], offset, count, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)));
 
     [Fact]
     public void SignData_NullArguments_Throw() => WithRsa((_, rsa) =>
@@ -148,10 +161,13 @@ public sealed class RSAPkcs11Tests_Managed
             rsa.VerifyData(new byte[4], 0, 4, new byte[1], HashAlgorithmName.SHA256, null!));
     });
 
-    [Fact]
-    public void VerifyData_BadRange_Throws() => WithRsa((_, rsa) =>
+    [Theory]
+    [InlineData(4, 8)]
+    [InlineData(-1, 4)]
+    [InlineData(0, -1)]
+    public void VerifyData_BadRange_Throws(int offset, int count) => WithRsa((_, rsa) =>
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            rsa.VerifyData(new byte[8], 4, 8, new byte[1], HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)));
+            rsa.VerifyData(new byte[8], offset, count, new byte[1], HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)));
 
     // === Sign/verify — span overloads (the adapter's combined on-token hash+sign path) =====
 
@@ -302,6 +318,38 @@ public sealed class RSAPkcs11Tests_Managed
 
         Assert.Throws<CryptographicException>(() => rsa.SignHash(new byte[31], HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
         Assert.False(rsa.VerifyHash(new byte[31], sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+    });
+
+    // The digest length SignHash and VerifyHash hold a hash to, for every hash RSA signs with. One byte
+    // short is refused before the token sees it, naming the expected length; it does not verify. Under
+    // AllowInsecure, so SHA-1 reaches the length check rather than the policy.
+    [Theory]
+    [InlineData("SHA1", 20)]
+    [InlineData("SHA224", 28)]
+    [InlineData("SHA256", 32)]
+    [InlineData("SHA384", 48)]
+    [InlineData("SHA512", 64)]
+    [InlineData("SHA3-256", 32)]
+    [InlineData("SHA3-384", 48)]
+    [InlineData("SHA3-512", 64)]
+    public void SignHash_VerifyHash_HoldTheDigestToItsLength(string hashName, int digestLength) => WithRsaUnder(CryptoPolicy.AllowInsecure, rsa =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        byte[] shortDigest = new byte[digestLength - 1];
+
+        var ex = Assert.Throws<CryptographicException>(() => rsa.SignHash(shortDigest, hash, RSASignaturePadding.Pss));
+        Assert.Contains($"a {hashName} digest is {digestLength}", ex.Message, StringComparison.Ordinal);
+        Assert.False(rsa.VerifyHash(shortDigest, new byte[256], hash, RSASignaturePadding.Pss));
+    });
+
+    // A hash RSA has no digest length for is not supported, whatever the policy allows.
+    [Fact]
+    public void SignHash_VerifyHash_UnknownHash_IsNotSupported() => WithRsaUnder(CryptoPolicy.AllowInsecure, rsa =>
+    {
+        var hash = new HashAlgorithmName("BLAKE2B-512");
+
+        Assert.Throws<NotSupportedException>(() => rsa.SignHash(new byte[64], hash, RSASignaturePadding.Pss));
+        Assert.Throws<NotSupportedException>(() => rsa.VerifyHash(new byte[64], new byte[256], hash, RSASignaturePadding.Pss));
     });
 
     // The BCL's argument checks, in its order: the hash, the hash name, then the padding.

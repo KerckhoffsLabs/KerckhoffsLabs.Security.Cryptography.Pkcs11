@@ -138,6 +138,24 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
         Assert.Equal(first, second);
     }
 
+    // Setting IterationCount mid-stream restarts the stream too, at the new count: the same count gives the
+    // first bytes again, another gives the BCL's bytes for that count.
+    internal static void Assert_GetBytes_AfterSettingIterationCount_RestartsStream(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var kdf = NewKdf(session, HashAlgorithmName.SHA256);
+
+        byte[] first = kdf.GetBytes(16);
+        kdf.IterationCount = Iterations;
+        Assert.Equal(first, kdf.GetBytes(16));
+
+        kdf.IterationCount = Iterations + 1;
+        Assert.Equal(Iterations + 1, kdf.IterationCount);
+        Assert.Equal(Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations + 1, HashAlgorithmName.SHA256, 16), kdf.GetBytes(16));
+    }
+
     // Reset() must restart the stream from the beginning, matching the BCL.
     internal static void Assert_Reset_RestartsStream(IPkcs11Backend backend)
     {
