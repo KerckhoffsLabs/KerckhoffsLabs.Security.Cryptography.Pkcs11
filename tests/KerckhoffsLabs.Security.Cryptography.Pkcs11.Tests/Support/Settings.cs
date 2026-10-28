@@ -133,6 +133,50 @@ public static class Settings
         Environment.GetEnvironmentVariable("PKCS11_TEST_SWTPM");
 
     /// <summary>
+    /// Path to wolfTPM's firmware TPM server (fwtpm_server), the second software TPM the tpm2-pkcs11
+    /// fixture can run tpm2-pkcs11 over, set by the same image. Used when <see cref="Tpm2SoftwareTpm"/> is
+    /// <c>fwtpm</c>.
+    /// </summary>
+    public static string? FwtpmPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_FWTPM");
+
+    /// <summary>
+    /// Path to the TCG's TPM 2.0 reference implementation, built as a simulator (tpm2-simulator), the third
+    /// software TPM the tpm2-pkcs11 fixture can run tpm2-pkcs11 over, set by the same image. Used when
+    /// <see cref="Tpm2SoftwareTpm"/> is <c>tcgtpm</c>.
+    /// </summary>
+    public static string? TcgTpmPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_TCGTPM");
+
+    /// <summary>
+    /// Path to IBM's TPM 2.0 simulator (ibmswtpm2's tpm_server), the fourth software TPM the tpm2-pkcs11
+    /// fixture can run tpm2-pkcs11 over, set by the same image. Used when <see cref="Tpm2SoftwareTpm"/> is
+    /// <c>ibmtpm</c>.
+    /// </summary>
+    public static string? IbmTpmPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_IBMTPM");
+
+    /// <summary>
+    /// Which tpm2-pkcs11 store backend the tpm2-pkcs11 fixture uses: <c>esysdb</c> (its SQLite store, the
+    /// default) or <c>fapi</c> (tpm2-tss's FAPI keystore, provisioned by the fixture on its TPM).
+    /// </summary>
+    public static string Tpm2Pkcs11Backend =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_TPM2_BACKEND") is { Length: > 0 } backend ? backend : "esysdb";
+
+    /// <summary>The FAPI profile directory for the <c>fapi</c> backend, set by the tpm2-pkcs11 image.</summary>
+    public static string? FapiProfileDirectory =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_FAPI_PROFILES");
+
+    /// <summary>
+    /// Which software TPM the tpm2-pkcs11 fixture runs: <c>swtpm</c> (libtpms, the default), <c>swtpm-fips</c>
+    /// (swtpm restricted as on a FIPS host), <c>swtpm-min</c> (swtpm with the fewest algorithms), <c>fwtpm</c>
+    /// (wolfTPM's firmware TPM), <c>tcgtpm</c> (the TCG reference implementation) or <c>ibmtpm</c> (IBM's
+    /// simulator). CI runs the suite over each.
+    /// </summary>
+    public static string Tpm2SoftwareTpm =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_TPM") is { Length: > 0 } tpm ? tpm : "swtpm";
+
+    /// <summary>
     /// Path to tpm2-abrmd, the TPM resource manager the tpm2-pkcs11 fixture puts in front of swtpm, set by
     /// the same image. Unset elsewhere, and the tpm2-pkcs11 tests skip.
     /// </summary>

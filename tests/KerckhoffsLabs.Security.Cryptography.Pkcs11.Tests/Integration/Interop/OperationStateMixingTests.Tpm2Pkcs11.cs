@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
@@ -18,8 +19,16 @@ public sealed class OperationStateMixingTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixtur
     public void Sign_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Sign_SinglePartAfterUpdate_Throws(_backend);
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 cannot use a secret key from C_CreateObject (no CKA_ALLOWED_MECHANISMS)")]
-    public void Encrypt_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Encrypt_SinglePartAfterUpdate_Throws(_backend);
+    public void Encrypt_SinglePartAfterUpdate_Throws()
+    {
+        Assert.SkipUnless(_backend.Supports(CKM.CKM_AES_CBC_PAD), "Backend does not advertise CKM_AES_CBC_PAD (wolfTPM's fwTPM has no TPM2_ALG_CBC).");
+        OperationStateMixingTestCases.Assert_Encrypt_SinglePartAfterUpdate_Throws(_backend);
+    }
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.ImportedSecretKeysAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 cannot use a secret key from C_CreateObject (no CKA_ALLOWED_MECHANISMS)")]
-    public void Decrypt_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Decrypt_SinglePartAfterUpdate_Throws(_backend);
+    public void Decrypt_SinglePartAfterUpdate_Throws()
+    {
+        Assert.SkipUnless(_backend.Supports(CKM.CKM_AES_CBC_PAD), "Backend does not advertise CKM_AES_CBC_PAD (wolfTPM's fwTPM has no TPM2_ALG_CBC).");
+        OperationStateMixingTestCases.Assert_Decrypt_SinglePartAfterUpdate_Throws(_backend);
+    }
 }

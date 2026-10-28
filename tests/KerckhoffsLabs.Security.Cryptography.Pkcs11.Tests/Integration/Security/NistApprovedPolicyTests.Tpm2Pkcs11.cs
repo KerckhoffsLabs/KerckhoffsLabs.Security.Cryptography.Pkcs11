@@ -12,7 +12,7 @@ public sealed class NistApprovedPolicyTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture 
     public void AesGcm_RoundTrips() =>
         NistApprovedPolicyTestCases.Assert_AesGcm_RoundTrips(_backend);
 
-    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
+    [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SessionKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#921: key pairs can only be token objects")]
     public void RsaPss_Signs() =>
         NistApprovedPolicyTestCases.Assert_RsaPss_Signs(_backend);
 
