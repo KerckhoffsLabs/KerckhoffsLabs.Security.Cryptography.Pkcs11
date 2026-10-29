@@ -109,4 +109,13 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
             Assert.Skip("Kryoptic refuses an sLen of 2^32 + 32 with CKR_GENERAL_ERROR");
         AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
     }
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault == "a DER length that lies" && !KryopticBackendFixture.KryopticRefusesAMalformedEcdhPeerAsInvalid)
+            Assert.Skip("Kryoptic refuses a DER peer value whose length lies with CKR_DEVICE_ERROR");
+        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
 }

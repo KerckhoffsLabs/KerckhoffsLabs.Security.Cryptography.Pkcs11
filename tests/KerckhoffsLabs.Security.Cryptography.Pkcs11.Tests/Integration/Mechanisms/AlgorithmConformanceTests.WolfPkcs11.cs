@@ -107,4 +107,13 @@ public sealed class AlgorithmConformanceTests_WolfPkcs11(WolfPkcs11BackendFixtur
     [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault) => AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
+
+    [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault == "a DER length that lies" && !WolfPkcs11BackendFixture.WolfPkcs11RefusesAMalformedEcdhPeerAsInvalid)
+            Assert.Skip("wolfPKCS11 refuses a DER peer value whose length lies with CKR_FUNCTION_FAILED");
+        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
 }

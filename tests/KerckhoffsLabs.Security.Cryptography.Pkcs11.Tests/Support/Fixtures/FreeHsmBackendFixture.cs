@@ -196,6 +196,20 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmRefusesAMismatchedPssHash = false;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 takes, with <c>CKR_OK</c>, <c>CKD_NULL</c> with shared
+    /// data (it ignores it and derives Z: <c>src/fhsm_pkcs11.c</c> marks the field unused) and <c>CKA_VALUE_LEN</c> 33
+    /// (it makes a 32-byte key, <c>CKA_VALUE_LEN</c> 32), and refuses a peer value that is no point (1 KiB, or a DER
+    /// length that lies) with <c>CKR_ATTRIBUTE_VALUE_INVALID</c>. Confirmed by a probe reading the derived keys back.
+    /// PKCS#11 v3.2 §6.3.16 (with <c>CKD_NULL</c>, "pSharedData must be NULL and ulSharedDataLen must be zero"),
+    /// §6.3.17, §4.1 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> for the parameters, and
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c> for the length.
+    /// </summary>
+    public const bool FreeHsmChecksTheEcdhParameters = false;
+
+    /// <summary>Gate for the out-of-range ECDH parameter case: see <see cref="FreeHsmChecksTheEcdhParameters"/>.</summary>
+    public static bool EcdhParameterRefusalAvailable => FreeHsmAvailable && FreeHsmChecksTheEcdhParameters;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

@@ -119,4 +119,15 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.PssParameterRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 refuses an out-of-range PSS parameter with CKR_ARGUMENTS_BAD or CKR_MECHANISM_INVALID")]
     [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault) => AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault is "a 1 KiB peer value" or "a DER length that lies" && !SoftHsmBackendFixture.SoftHsmRefusesAMalformedEcdhPeerAsInvalid)
+            Assert.Skip("SoftHSM2 refuses an ECDH peer value that is no point with CKR_GENERAL_ERROR");
+        if (fault == "CKA_VALUE_LEN 33" && !SoftHsmBackendFixture.SoftHsmRefusesAnEcdhValueLenAboveTheSecret)
+            Assert.Skip("SoftHSM2 refuses a CKA_VALUE_LEN above the ECDH secret with CKR_FUNCTION_FAILED");
+        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
 }

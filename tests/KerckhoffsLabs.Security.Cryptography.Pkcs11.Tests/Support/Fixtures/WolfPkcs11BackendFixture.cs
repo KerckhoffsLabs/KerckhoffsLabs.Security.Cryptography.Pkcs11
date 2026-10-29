@@ -200,6 +200,15 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the over-long raw RSA verify case: see <see cref="WolfPkcs11RefusesOverlongRawRsaDataByItsLength"/>.</summary>
     public static bool OverlongRawRsaVerifyAvailable => WolfPkcs11Available && WolfPkcs11RefusesOverlongRawRsaDataByItsLength;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is a DER OCTET STRING whose length byte
+    /// promises 65 bytes and has 40 answers <c>CKR_FUNCTION_FAILED</c> (<c>src/crypto.c</c> hands the bytes to wolfCrypt,
+    /// whose import failure it maps so); a 1 KiB peer value is refused as it should be. PKCS#11 v3.2 §6.3.16 and
+    /// §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// WolfPkcs11QuirkTests.MalformedEcdhPeer_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAMalformedEcdhPeerAsInvalid = false;
+
     public WolfPkcs11BackendFixture()
     {
         string? libPath = Settings.WolfPkcs11LibraryPath ?? BuiltLibraryPath();

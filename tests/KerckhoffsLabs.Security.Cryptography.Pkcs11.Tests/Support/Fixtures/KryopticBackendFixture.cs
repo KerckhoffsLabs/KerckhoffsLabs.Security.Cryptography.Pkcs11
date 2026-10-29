@@ -279,6 +279,13 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the NULL OAEP label case: see <see cref="KryopticRefusesANullOaepLabel"/>.</summary>
     public static bool NullOaepLabelRefusalAvailable => KryopticAvailable && KryopticRefusesANullOaepLabel;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is a DER OCTET STRING whose length byte
+    /// promises 65 bytes and has 40 answers <c>CKR_DEVICE_ERROR</c>; a 1 KiB peer value is refused as it should be.
+    /// PKCS#11 v3.2 §6.3.16 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool KryopticRefusesAMalformedEcdhPeerAsInvalid = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

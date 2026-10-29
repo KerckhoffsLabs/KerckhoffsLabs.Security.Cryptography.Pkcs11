@@ -108,4 +108,8 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
             Assert.Skip("FreeHSM signs CKM_SHA256_RSA_PKCS_PSS with SHA-256 whatever hashAlg says");
         AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
     }
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.EcdhParameterRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM takes CKD_NULL shared data and a CKA_VALUE_LEN above the secret, and refuses a malformed peer as an attribute")]
+    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault) => AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
 }

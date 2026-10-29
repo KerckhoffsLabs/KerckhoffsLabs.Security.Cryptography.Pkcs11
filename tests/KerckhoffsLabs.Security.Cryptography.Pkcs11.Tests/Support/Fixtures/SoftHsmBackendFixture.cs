@@ -183,6 +183,22 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the out-of-range PSS parameter case: see <see cref="SoftHsmRefusesAnOutOfRangePssParameterAsInvalid"/>.</summary>
     public static bool PssParameterRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesAnOutOfRangePssParameterAsInvalid;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is no point on the curve (1 KiB, or a DER
+    /// OCTET STRING whose length byte promises more bytes than follow) answers <c>CKR_GENERAL_ERROR</c>
+    /// (<c>deriveECDH</c> in <c>src/lib/SoftHSM.cpp</c> passes the bytes to the crypto layer unchecked). PKCS#11 v3.2
+    /// §6.3.16 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAMalformedEcdhPeerAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 for a generic secret with <c>CKA_VALUE_LEN</c> 33, one
+    /// byte more than the secret, answers <c>CKR_FUNCTION_FAILED</c>. PKCS#11 v3.2 §6.3.17 (the mechanism only
+    /// truncates), §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnEcdhValueLenAboveTheSecret = false;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

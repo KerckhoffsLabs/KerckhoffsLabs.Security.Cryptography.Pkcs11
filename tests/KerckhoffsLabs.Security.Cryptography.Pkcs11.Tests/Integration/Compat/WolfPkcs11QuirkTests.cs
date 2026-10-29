@@ -422,4 +422,14 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"C_Verify(CKM_RSA_X_509) of 257 bytes under a 2048-bit key no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11RefusesOverlongRawRsaDataByItsLength to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void MalformedEcdhPeer_QuirkStillPresent()
+    {
+        var (rv, _) = Mechanisms.AlgorithmConformanceTestCases.DeriveEcdhWithFault(_backend, "a DER length that lies");
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_DeriveKey(CKM_ECDH1_DERIVE) with a DER peer value whose length lies no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAMalformedEcdhPeerAsInvalid to true and delete this test.");
+    }
 }

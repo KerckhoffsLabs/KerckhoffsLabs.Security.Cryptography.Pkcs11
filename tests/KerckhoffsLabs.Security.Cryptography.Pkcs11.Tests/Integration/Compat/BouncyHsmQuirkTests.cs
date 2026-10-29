@@ -691,4 +691,24 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_EncryptInit(CKM_RSA_PKCS_OAEP) with a NULL pSourceData and ulSourceDataLen 8 no longer encrypts with the empty label (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesANullOaepLabel to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void EcdhSharedDataWithCkdNull_QuirkStillPresent()
+    {
+        var (rv, value) = Mechanisms.AlgorithmConformanceTestCases.DeriveEcdhWithFault(_backend, "CKD_NULL with shared data");
+
+        Assert.True(rv == CKR.CKR_OK && value is not null && value.AsSpan().SequenceEqual(Mechanisms.AlgorithmConformanceTestCases.EcdhSecret),
+            $"C_DeriveKey(CKM_ECDH1_DERIVE) with CKD_NULL and shared data no longer derives Z (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesSharedDataWithCkdNull to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void EcdhValueLenAboveTheSecret_QuirkStillPresent()
+    {
+        var (rv, value) = Mechanisms.AlgorithmConformanceTestCases.DeriveEcdhWithFault(_backend, "CKA_VALUE_LEN 33");
+
+        Assert.True(rv == CKR.CKR_OK && value is not null && value.AsSpan().SequenceEqual((byte[])[0x00, .. Mechanisms.AlgorithmConformanceTestCases.EcdhSecret.ToArray()]),
+            $"C_DeriveKey(CKM_ECDH1_DERIVE) on P-256 with CKA_VALUE_LEN 33 no longer makes 00 || Z (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAnEcdhValueLenAboveTheSecret to true and delete this test.");
+    }
 }

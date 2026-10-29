@@ -108,4 +108,15 @@ public sealed class AlgorithmConformanceTests_BouncyHsm(BouncyHsmBackendFixture 
             Assert.Skip("BouncyHsm cuts sLen to 32 bits and signs with a 32-byte salt");
         AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
     }
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault == "CKD_NULL with shared data" && !BouncyHsmBackendFixture.BouncyHsmRefusesSharedDataWithCkdNull)
+            Assert.Skip("BouncyHsm ignores shared data with CKD_NULL");
+        if (fault == "CKA_VALUE_LEN 33" && !BouncyHsmBackendFixture.BouncyHsmRefusesAnEcdhValueLenAboveTheSecret)
+            Assert.Skip("BouncyHsm left-pads the ECDH secret to a CKA_VALUE_LEN above it");
+        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
 }

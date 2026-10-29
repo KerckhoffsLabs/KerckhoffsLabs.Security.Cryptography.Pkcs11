@@ -330,6 +330,22 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the NULL OAEP label case: see <see cref="BouncyHsmRefusesANullOaepLabel"/>.</summary>
     public static bool NullOaepLabelRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesANullOaepLabel;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with <c>CKD_NULL</c> and shared data answers <c>CKR_OK</c> and
+    /// derives Z, ignoring the shared data. PKCS#11 v3.2 §6.3.16: with <c>CKD_NULL</c>, "pSharedData must be NULL and
+    /// ulSharedDataLen must be zero"; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// BouncyHsmQuirkTests.EcdhSharedDataWithCkdNull_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesSharedDataWithCkdNull = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 for a generic secret with <c>CKA_VALUE_LEN</c> 33
+    /// answers <c>CKR_OK</c> and makes 00 || Z. PKCS#11 v3.2 §6.3.17: the mechanism only truncates the secret; §4.1
+    /// and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// BouncyHsmQuirkTests.EcdhValueLenAboveTheSecret_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAnEcdhValueLenAboveTheSecret = false;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

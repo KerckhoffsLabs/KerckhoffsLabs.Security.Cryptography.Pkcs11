@@ -23,11 +23,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// <summary>
 /// What the algorithms compute, checked on every real backend against a reference the test holds: the RSA-PSS
 /// salt and mask the token was asked for, read back out of its signatures, and the PSS parameters it refuses;
-/// RSA-OAEP's randomisation, key transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA verification; the RFC 8032 EdDSA
-/// variants other than pure Ed25519; ECDSA on the curves the rest of the suite does not reach; the 224-bit
-/// digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on X448; HKDF with SHA-512 and
-/// with a salt key; SHA-256 key derivation; AES key wrap's IV and integrity check; ML-KEM and HashML-DSA under
-/// the wrong key or hash; and a saved digest state, with the refusals of saving and restoring one.
+/// RSA-OAEP's randomisation, key transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA
+/// verification; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the curves the rest of the suite
+/// does not reach; the 224-bit digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on
+/// X448, and the ECDH parameters it refuses; HKDF with SHA-512 and with a salt key; SHA-256 key derivation; AES
+/// key wrap's IV and integrity check; ML-KEM and HashML-DSA under the wrong key or hash; and a saved digest
+/// state, with the refusals of saving and restoring one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -803,6 +804,136 @@ internal static class AlgorithmConformanceTestCases
             }
             finally { session.DestroyObject(priv); }
         });
+    }
+
+    public static TheoryData<string> EcdhParameterFaults =>
+        ["CKD_NULL with shared data", "a 1 KiB peer value", "a DER length that lies", "CKA_VALUE_LEN 33"];
+
+    // CK_ECDH1_DERIVE_PARAMS for CKM_ECDH1_DERIVE on P-256 (PKCS#11 v3.2 §6.3.16): with CKD_NULL, "pSharedData must
+    // be NULL and ulSharedDataLen must be zero"; pPublicData is the peer's point, raw or DER-encoded, so 1 KiB (a raw
+    // point padded with zeros) is none, and neither is a DER OCTET STRING whose length byte promises 65 bytes and
+    // has 40 (04 41 and 40 bytes). C_DeriveKey refuses each with CKR_MECHANISM_PARAM_INVALID (§5.1.6). A raw secret
+    // is 32 bytes on P-256 and the mechanism can only truncate it (§6.3.17), so CKA_VALUE_LEN 33 for a generic
+    // secret is an attribute it cannot meet: CKR_ATTRIBUTE_VALUE_INVALID or CKR_TEMPLATE_INCONSISTENT (§4.1,
+    // §5.1.6), or CKR_KEY_SIZE_RANGE, which C_DeriveKey lists (§5.18.5). None makes a key, and the same session then
+    // derives Z from the SP 800-56A vector (checked through an HMAC under it where the module has HMAC-SHA256).
+    // Through the raw dispatch, as the library's parameter type refuses the first three.
+    internal static void Assert_Ecdh_ParameterOutOfRange_IsRefused(IPkcs11Backend backend, string fault)
+    {
+        backend.RequireMechanisms(CKM.CKM_ECDH1_DERIVE);
+        WithSession(backend, session =>
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+            try
+            {
+                using var buffers = new NativeBuffers();
+                string label = $"kl-ecdh-param-{Guid.NewGuid():N}";
+                CKR rv = RawDerive(lowLevel, session, EcdhWithFault(buffers, fault, out ulong valueLen), priv, valueLen, label, out _);
+                CKR[] allowed = fault == "CKA_VALUE_LEN 33"
+                    ? [CKR.CKR_ATTRIBUTE_VALUE_INVALID, CKR.CKR_TEMPLATE_INCONSISTENT, CKR.CKR_KEY_SIZE_RANGE]
+                    : [CKR.CKR_MECHANISM_PARAM_INVALID];
+                Assert.True(allowed.Contains(rv), $"C_DeriveKey(CKM_ECDH1_DERIVE) with {fault} returned {rv}.");
+                using (var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label))
+                    Assert.Empty(session.FindAllObjects([labelAttribute]));
+
+                AssertDerivedOk(RawDerive(lowLevel, session, RawEcdh(buffers, EcdhPeer, []), priv, 32, label, out ObjectHandle derived));
+                try
+                {
+                    if (backend.Supports(CKM.CKM_SHA256_HMAC))
+                        Assert.Equal(HMACSHA256.HashData(EcdhZ, Message), session.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), derived, Message));
+                }
+                finally { session.DestroyObject(derived); }
+            }
+            finally { session.DestroyObject(priv); }
+        });
+
+        static void AssertDerivedOk(CKR rv) =>
+            Assert.True(rv == CKR.CKR_OK, $"C_DeriveKey(CKM_ECDH1_DERIVE) with good parameters after the refusal returned {rv}.");
+    }
+
+    // The CKD_NULL derivation from the SP 800-56A vector with the fault in its parameters, and the CKA_VALUE_LEN
+    // to ask for.
+    private static Mechanism EcdhWithFault(NativeBuffers buffers, string fault, out ulong valueLen)
+    {
+        byte[] peer = fault switch
+        {
+            "a 1 KiB peer value" => [.. EcdhPeer[2..], .. new byte[1024 - 65]],
+            "a DER length that lies" => [.. EcdhPeer[..2], .. EcdhPeer[2..42]],
+            _ => EcdhPeer,
+        };
+        byte[] shared = fault == "CKD_NULL with shared data" ? "kl-ecdh-shared-info"u8.ToArray() : [];
+        valueLen = fault == "CKA_VALUE_LEN 33" ? 33UL : 32UL;
+        return RawEcdh(buffers, peer, shared);
+    }
+
+    // For the tripwires: the derivation of Assert_Ecdh_ParameterOutOfRange_IsRefused with one fault, into an
+    // extractable, non-sensitive generic secret whose value is read back when the module makes one. Z is the secret
+    // a module that ignores the fault derives.
+    internal static (CKR Rv, byte[]? Value) DeriveEcdhWithFault(IPkcs11Backend backend, string fault)
+    {
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+        try
+        {
+            using var buffers = new NativeBuffers();
+            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var sensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+            using var extractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = EcdhWithFault(buffers, fault, out ulong valueLen).Marshal(scope, out _);
+            using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, valueLen);
+            CK_ATTRIBUTE[] template = [.. new[] { keyClass, keyType, token, length, sensitive, extractable }.Select(a => a.CkAttribute)];
+            CKR rv = lowLevel.C_DeriveKey((NativeCULong)session.SessionId, in mech, (NativeCULong)priv.ObjectId, template, out NativeCULong handle);
+            if (rv != CKR.CKR_OK)
+                return (rv, null);
+            var derived = new ObjectHandle((ulong)handle);
+            try { return (rv, ReadAttribute(session, derived, CKA.CKA_VALUE)); }
+            finally { session.DestroyObject(derived); }
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    /// <summary>The SP 800-56A vector's Z, which <see cref="DeriveEcdhWithFault"/> gives a module that ignores the fault.</summary>
+    internal static ReadOnlySpan<byte> EcdhSecret => EcdhZ;
+
+    private static Mechanism RawEcdh(NativeBuffers buffers, byte[] peer, byte[] shared)
+    {
+        var parameter = new CK_ECDH1_DERIVE_PARAMS
+        {
+            Kdf = (NativeCULong)(ulong)CKD.CKD_NULL,
+            SharedDataLen = (NativeCULong)(ulong)shared.Length,
+            SharedData = shared.Length == 0 ? IntPtr.Zero : buffers.Of(shared),
+            PublicDataLen = (NativeCULong)(ulong)peer.Length,
+            PublicData = buffers.Of(peer),
+        };
+        return RawParameter.From(CKM.CKM_ECDH1_DERIVE, in parameter);
+    }
+
+    // C_DeriveKey of a session generic secret of valueLen bytes, with the label and CKA_SIGN, through the raw
+    // dispatch.
+    private static CKR RawDerive(LowLevelPkcs11Library lowLevel, Pkcs11SessionCore session, Mechanism mechanism, ObjectHandle baseKey,
+        ulong valueLen, string label, out ObjectHandle derived)
+    {
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, valueLen);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        CK_ATTRIBUTE[] template = [.. new[] { keyClass, keyType, token, length, sign, labelAttribute }.Select(a => a.CkAttribute)];
+        CKR rv = lowLevel.C_DeriveKey((NativeCULong)session.SessionId, in mech, (NativeCULong)baseKey.ObjectId, template, out NativeCULong handle);
+        derived = new ObjectHandle((ulong)handle);
+        return rv;
     }
 
     // On a curve whose cofactor is 1, cofactor ECDH (CKM_ECDH1_COFACTOR_DERIVE) agrees the same Z as plain ECDH.
