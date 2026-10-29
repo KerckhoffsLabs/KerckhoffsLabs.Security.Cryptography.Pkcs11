@@ -11,8 +11,4 @@ public sealed class EncryptRsaTests_WolfPkcs11(WolfPkcs11BackendFixture f)
     [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     public void RsaPkcs1V15_ThrowsCryptoPolicyViolationException_ByDefault()
         => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
-
-    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
-    public void RsaPkcs1V15_ThrowsCryptoPolicyViolationException_ByDefault_SoftHsm()
-        => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

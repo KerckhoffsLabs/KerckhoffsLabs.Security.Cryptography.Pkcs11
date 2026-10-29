@@ -23,20 +23,4 @@ public sealed class EncryptAesTests_WolfPkcs11(WolfPkcs11BackendFixture f)
     [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     public void AesEcb_AllowedWhenAllowInsecureTrue()
         => EncryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
-
-    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
-    public void AesCbcPad_ProducesCiphertext_SoftHsm()
-        => EncryptAesTestCases.Assert_AesCbcPad_ProducesCiphertext(_backend);
-
-    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
-    public void AesCbcPad_RoundTrips_SoftHsm()
-        => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
-
-    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
-    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault_SoftHsm()
-        => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
-
-    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
-    public void AesEcb_AllowedWhenAllowInsecureTrue_SoftHsm()
-        => EncryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }
