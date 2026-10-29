@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -149,6 +151,90 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             "C_UnwrapKey of an EC private key no longer gives CKR_KEY_NOT_WRAPPABLE " +
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11UnwrapsEcPrivateKeys to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void SessionObjectVisibility_QuirkStillPresent()
+    {
+        using var other = TestKeys.OpenLoggedInSession(_backend);
+        using var creator = _backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)_backend.SlotId).OpenSessionCore();
+        string label = $"kl-visibility-{Guid.NewGuid():N}";
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        creator.CreateObject([attrClass, attrToken, attrLabel]);
+
+        int seen = other.FindAllObjects([attrClass, attrLabel]).Count;
+        TestKeys.LogoutIfRequired(_backend, other);
+
+        Assert.True(seen == 0,
+            "Another session of the application now sees a session object: set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11SharesSessionObjectsAcrossSessions to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void MultipartSignAndEcb_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+        ObjectHandle aes = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+        var failures = new List<string>();
+        try
+        {
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM ecdsa = new Mechanism(CKM.CKM_ECDSA_SHA256).Marshal(scope, out _);
+            CKR init = lowLevel.C_SignInit(sid, in ecdsa, (NativeCULong)priv.ObjectId);
+            failures.Add($"ECDSA-SHA256 C_SignUpdate: {(init == CKR.CKR_OK ? lowLevel.C_SignUpdate(sid, new byte[32]) : init)}");
+            if (init == CKR.CKR_OK) lowLevel.C_Sign(sid, new byte[32], new byte[132], lengthOnly: false, out _);
+#pragma warning disable KLPKCS11009 // ECB is the mechanism whose multi-part support is checked; raw low-level calls, no policy.
+            CK_MECHANISM ecb = new Mechanism(CKM.CKM_AES_ECB).Marshal(scope, out _);
+#pragma warning restore KLPKCS11009
+            init = lowLevel.C_EncryptInit(sid, in ecb, (NativeCULong)aes.ObjectId);
+            failures.Add($"AES-ECB C_EncryptUpdate: {(init == CKR.CKR_OK ? lowLevel.C_EncryptUpdate(sid, new byte[16], new byte[16], lengthOnly: false, out _) : init)}");
+        }
+        finally
+        {
+            session.DestroyObject(aes);
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(failures.TrueForAll(f => f.EndsWith(": CKR_MECHANISM_INVALID", StringComparison.Ordinal)),
+            $"A multi-part hash-and-sign or AES-ECB operation no longer gives CKR_MECHANISM_INVALID ({string.Join("; ", failures)}): " +
+            "set WolfPkcs11BackendFixture.WolfPkcs11DoesMultipartSignAndEcb to true and delete this test, or split the flag " +
+            "if only some are fixed.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void ShortBufferLength_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"kl-short-buffer-{Guid.NewGuid():N}");
+        ObjectHandle data = session.CreateObject([attrClass, attrToken, attrLabel]);
+        IntPtr buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(64);
+        CKR rv;
+        ulong length;
+        try
+        {
+            CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_LABEL, value = buffer, valueLen = (NativeCULong)1UL }];
+            rv = _backend.Library.LowLevelLibrary!.C_GetAttributeValue((NativeCULong)session.SessionId, (NativeCULong)data.ObjectId, template);
+            length = (ulong)template[0].valueLen;
+        }
+        finally
+        {
+            System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
+            session.DestroyObject(data);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL && length == 1,
+            $"C_GetAttributeValue into a 1-byte buffer now gives {rv} with ulValueLen {length}: set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11MarksAShortBufferUnavailable to true and delete this test.");
     }
 
     private static string Code(Func<bool> verify, string what)

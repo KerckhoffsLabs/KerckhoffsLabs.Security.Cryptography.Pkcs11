@@ -104,6 +104,31 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11UnwrapsEcPrivateKeys = false;
 
+    /// <summary>
+    /// False while a session object is visible only to the session that made it: wolfPKCS11 keeps session
+    /// objects per session, so another session of the application finds nothing and its handle is invalid
+    /// there. PKCS#11 v3.2 §4.4.1 makes a session object the application's, seen by all its sessions until
+    /// the session that made it closes.
+    /// </summary>
+    public const bool WolfPkcs11SharesSessionObjectsAcrossSessions = false;
+
+    /// <summary>
+    /// False while the hash-and-sign mechanisms (every <c>CKM_SHA*_RSA_PKCS</c>, <c>CKM_SHA*_RSA_PKCS_PSS</c>
+    /// and <c>CKM_ECDSA_SHA*</c>) and AES-ECB encryption work single-part only: <c>C_SignUpdate</c>,
+    /// <c>C_VerifyUpdate</c> and <c>C_EncryptUpdate</c> return <c>CKR_MECHANISM_INVALID</c>, though PKCS#11 v3.2
+    /// defines them multi-part and the token advertises them for <c>CKF_SIGN</c>, <c>CKF_VERIFY</c> and
+    /// <c>CKF_ENCRYPT</c>. AES-CBC, AES-GCM, AES-CTS, CMAC and the HMACs work multi-part.
+    /// </summary>
+    public const bool WolfPkcs11DoesMultipartSignAndEcb = false;
+
+    /// <summary>
+    /// False while <c>C_GetAttributeValue</c> with a buffer too small for the value returns
+    /// <c>CKR_BUFFER_TOO_SMALL</c> but leaves the attribute's <c>ulValueLen</c> as the caller gave it, where
+    /// PKCS#11 v3.2 §5.7.5 sets it to <c>CK_UNAVAILABLE_INFORMATION</c>: a caller cannot tell which attribute
+    /// was short.
+    /// </summary>
+    public const bool WolfPkcs11MarksAShortBufferUnavailable = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 
@@ -115,6 +140,12 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for cases that unwrap an EC private key: see <see cref="WolfPkcs11UnwrapsEcPrivateKeys"/>.</summary>
     public static bool EcPrivateKeyUnwrapAvailable => WolfPkcs11Available && WolfPkcs11UnwrapsEcPrivateKeys;
+
+    /// <summary>Gate for cases that use a session object from another session: see <see cref="WolfPkcs11SharesSessionObjectsAcrossSessions"/>.</summary>
+    public static bool SharedSessionObjectsAvailable => WolfPkcs11Available && WolfPkcs11SharesSessionObjectsAcrossSessions;
+
+    /// <summary>Gate for the short-buffer attribute case: see <see cref="WolfPkcs11MarksAShortBufferUnavailable"/>.</summary>
+    public static bool ShortBufferMarkingAvailable => WolfPkcs11Available && WolfPkcs11MarksAShortBufferUnavailable;
 
     /// <summary>Gate for cases that verify an RSA signature of the wrong length: see <see cref="WolfPkcs11RejectsWrongLengthRsaSignatures"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsWrongLengthRsaSignatures;
