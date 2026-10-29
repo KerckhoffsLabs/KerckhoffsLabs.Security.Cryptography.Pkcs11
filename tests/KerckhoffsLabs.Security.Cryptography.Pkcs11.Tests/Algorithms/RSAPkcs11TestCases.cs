@@ -142,7 +142,8 @@ internal static class RSAPkcs11TestCases
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
         using var session = OpenSession(backend);
         using IDisposable? insecure = modulusBits < 2048 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
-        using var key = GenerateRsaKey(session, modulusBits);
+        using var key = backend.SkipIfRefusedOutsideKeySize(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, modulusBits,
+            () => GenerateRsaKey(session, modulusBits));
         try
         {
             using var rsa = new RSAPkcs11(key);
