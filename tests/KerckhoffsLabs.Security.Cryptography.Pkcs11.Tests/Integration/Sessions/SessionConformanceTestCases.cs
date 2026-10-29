@@ -3,6 +3,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -254,6 +255,166 @@ internal static class SessionConformanceTestCases
             foreach (ObjectHandle handle in session.FindAllObjects([attrClass, attrLabel]))
                 session.DestroyObject(handle);
             TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    // The AES key wraps, in order of preference; a 32-byte key needs no padding, so any of them does.
+    private static readonly CKM[] AesKeyWraps = [CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_KWP, CKM.CKM_AES_KEY_WRAP_PAD];
+
+    public static TheoryData<string> PrivateObjectCreations =>
+        ["CreateObject", "CopyObject", "GenerateKey", "GenerateKeyPair", "DeriveKey", "UnwrapKey", "EncapsulateKey", "DecapsulateKey"];
+
+    // With nobody logged in, a call that would make a CKA_PRIVATE = TRUE object answers CKR_USER_NOT_LOGGED_IN
+    // and makes nothing: "a private object cannot be created on a token unless the session attempting to create
+    // it is logged in as the normal user" (§5.1.6, CKR_USER_NOT_LOGGED_IN; §4.4, CKA_PRIVATE). Every input the
+    // call takes (a key to copy, a base key, an unwrapping key, a ciphertext) is a public session object made
+    // while logged in, which the C_Logout leaves in place (§5.6.10 destroys only the private ones), so the
+    // refusal can only be about the new object. CKA_PRIVATE is always given explicitly: its default is
+    // token-specific (§4.4). Nothing carries the case's label after a new login.
+    internal static void Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(IPkcs11Backend backend, string call)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        switch (call)
+        {
+            case "GenerateKey": backend.RequireMechanism(CKM.CKM_AES_KEY_GEN); break;
+            case "GenerateKeyPair": backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN); break;
+            case "DeriveKey": backend.RequireMechanism(CKM.CKM_HKDF_DERIVE); break;
+            case "UnwrapKey":
+                backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+                if (!AesKeyWraps.Any(backend.Supports))
+                    Assert.Skip($"Backend advertises none of {string.Join(", ", AesKeyWraps)}.");
+                break;
+            case "EncapsulateKey" or "DecapsulateKey":
+                backend.RequireMechanisms(CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM);
+                backend.RequireMlKemParameterSet(1184); // ML-KEM-768
+                break;
+        }
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        string label = $"kl-private-{Guid.NewGuid():N}";
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrInput = new ObjectAttribute(CKA.CKA_LABEL, label + "-input");
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPublic = new ObjectAttribute(CKA.CKA_PRIVATE, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrLen32 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrValue8 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(8));
+        using var attrValue32 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+        using var attrMlKem768 = new ObjectAttribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768);
+        using var attrEncapsulate = new ObjectAttribute(CKA.CKA_ENCAPSULATE, true);
+        using var attrDecapsulate = new ObjectAttribute(CKA.CKA_DECAPSULATE, true);
+
+        using var session = Slot(backend).OpenSessionCore();
+        using var pin = new SecurePin(backend.UserPin.Span);
+        session.Login(CKU.CKU_USER, pin);
+        bool loggedIn = true;
+        try
+        {
+            // The inputs first, made while logged in; then the call, to run once nobody is.
+            Action refused;
+            switch (call)
+            {
+                case "CreateObject":
+                    refused = () => session.CreateObject([attrData, attrSession, attrPrivate, attrLabel, attrValue8]);
+                    break;
+                case "CopyObject":
+                    {
+                        ObjectHandle source = session.CreateObject([attrData, attrSession, attrPublic, attrInput, attrValue8]);
+                        refused = () => session.CopyObject(source, [attrPrivate, attrLabel]);
+                        break;
+                    }
+                case "GenerateKey":
+                    refused = () => session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
+                        [attrSecret, attrAes, attrLen32, attrSession, attrPrivate, attrLabel, attrEncrypt]);
+                    break;
+                case "GenerateKeyPair":
+                    // Only the private half asks to be private, so it is the only reason to refuse.
+                    refused = () => session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN),
+                        [attrSession, attrPublic, attrEcParams, attrVerify, attrLabel],
+                        [attrSession, attrPrivate, attrSign, attrLabel], out _, out _);
+                    break;
+                case "DeriveKey":
+                    {
+                        ObjectHandle baseKey = session.CreateObject([attrSecret, attrGeneric, attrSession, attrPublic, attrDerive, attrInput, attrValue32]);
+                        var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
+                            CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
+                        refused = () => session.DeriveKey(mechanism, baseKey,
+                            [attrSecret, attrGeneric, attrLen32, attrSession, attrPrivate, attrLabel, attrSign]);
+                        break;
+                    }
+                case "UnwrapKey":
+                    {
+                        ObjectHandle kek = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
+                            [attrSecret, attrAes, attrLen32, attrSession, attrPublic, attrWrap, attrUnwrap, attrInput]);
+                        ObjectHandle target = session.CreateObject([attrSecret, attrAes, attrSession, attrPublic, attrExtractable, attrEncrypt, attrInput, attrValue32]);
+                        var wrap = new Mechanism(AesKeyWraps.First(backend.Supports));
+                        byte[] wrapped = session.WrapKey(wrap, kek, target);
+                        refused = () => session.UnwrapKey(wrap, kek, wrapped,
+                            [attrSecret, attrAes, attrSession, attrPrivate, attrLabel, attrEncrypt]);
+                        break;
+                    }
+                default: // EncapsulateKey, DecapsulateKey
+                    {
+                        session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN),
+                            [attrSession, attrPublic, attrMlKem768, attrEncapsulate, attrInput],
+                            [attrSession, attrPublic, attrDecapsulate, attrInput], out ObjectHandle publicKey, out ObjectHandle privateKey);
+                        List<ObjectAttribute> template = [attrSecret, attrGeneric, attrSession, attrPrivate, attrLabel];
+                        if (call == "EncapsulateKey")
+                        {
+                            refused = () => session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey, template, expectedCiphertextLen: 1088);
+                            break;
+                        }
+                        using (var read = session.GetAttributeValue(privateKey, [CKA.CKA_PRIVATE]))
+                        {
+                            if (read[0].GetValueAsBool())
+                                Assert.Skip("The token made the ML-KEM private key private though the template asked for a public one.");
+                        }
+                        (byte[] ciphertext, _) = session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey,
+                            [attrSecret, attrGeneric, attrSession, attrPublic, attrInput], expectedCiphertextLen: 1088);
+                        refused = () => session.DecapsulateKey(new Mechanism(CKM.CKM_ML_KEM), privateKey, ciphertext, template);
+                        break;
+                    }
+            }
+
+            session.Logout();
+            loggedIn = false;
+            Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, (NativeCULong)session.SessionId).State);
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(refused);
+            if (call == "CopyObject")
+            {
+                // §4.1.3: a token "might not actually support modification of" CKA_PRIVATE during a copy, and then
+                // refuses the template instead, which creates nothing either.
+                Assert.True(ex.ReturnValue is CKR.CKR_USER_NOT_LOGGED_IN or CKR.CKR_ATTRIBUTE_READ_ONLY or CKR.CKR_TEMPLATE_INCONSISTENT,
+                    $"C_CopyObject to a private copy with nobody logged in returned {ex.ReturnValue}.");
+            }
+            else
+            {
+                Assert.True(ex.ReturnValue == CKR.CKR_USER_NOT_LOGGED_IN, $"{call} of a private object with nobody logged in returned {ex.ReturnValue}.");
+            }
+
+            session.Login(CKU.CKU_USER, pin);
+            loggedIn = true;
+            Assert.Empty(session.FindAllObjects([attrLabel]));
+        }
+        finally
+        {
+            if (loggedIn)
+                session.Logout();
         }
     }
 

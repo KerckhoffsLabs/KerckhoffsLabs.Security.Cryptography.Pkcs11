@@ -74,6 +74,20 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the <c>CKA_LOCAL</c> cases.</summary>
     public static bool LocalAttributeAvailable => CratonHsmAvailable && SupportsLocalAttribute;
 
+    /// <summary>
+    /// False while Craton HSM refuses an object without a login only by its class: <c>C_CreateObject</c> checks
+    /// for <c>CKO_PRIVATE_KEY</c> or <c>CKO_SECRET_KEY</c> (<c>src/pkcs11_abi/functions.rs</c>) and nothing looks
+    /// at <c>CKA_PRIVATE</c>, so with nobody logged in <c>C_CreateObject</c> of a data object, <c>C_CopyObject</c>,
+    /// <c>C_GenerateKey</c>, <c>C_GenerateKeyPair</c> and <c>C_UnwrapKey</c> make a <c>CKA_PRIVATE = TRUE</c>
+    /// session object. PKCS#11 v3.2 §5.1.6 (<c>CKR_USER_NOT_LOGGED_IN</c>): a private object cannot be created
+    /// unless the session is logged in as the normal user.
+    /// CratonHsmQuirkTests.PrivateObjectWithoutALogin_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmRefusesPrivateObjectsWithoutALogin = false;
+
+    /// <summary>Gate for the private-object-without-a-login case: see <see cref="CratonHsmRefusesPrivateObjectsWithoutALogin"/>.</summary>
+    public static bool PrivateObjectLoginCheckAvailable => CratonHsmAvailable && CratonHsmRefusesPrivateObjectsWithoutALogin;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

@@ -37,4 +37,8 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void SecondLibraryInstance_LeavesTheFirstWorking() => SessionConformanceTestCases.Assert_SecondLibraryInstance_LeavesTheFirstWorking(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic makes a private session object with nobody logged in")]
+    [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCreations), MemberType = typeof(SessionConformanceTestCases))]
+    public void PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(string call) => SessionConformanceTestCases.Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(_backend, call);
 }

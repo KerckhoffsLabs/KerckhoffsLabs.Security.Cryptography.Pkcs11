@@ -43,4 +43,8 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void SecondLibraryInstance_LeavesTheFirstWorking() => SessionConformanceTestCases.Assert_SecondLibraryInstance_LeavesTheFirstWorking(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM makes a private object with nobody logged in")]
+    [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCreations), MemberType = typeof(SessionConformanceTestCases))]
+    public void PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(string call) => SessionConformanceTestCases.Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(_backend, call);
 }

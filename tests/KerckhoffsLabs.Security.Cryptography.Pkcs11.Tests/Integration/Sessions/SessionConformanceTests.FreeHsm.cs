@@ -37,4 +37,8 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
     {
         Assert.Skip("FreeHSM refuses a second C_Initialize in one process with CKR_FUNCTION_FAILED, not CKR_CRYPTOKI_ALREADY_INITIALIZED.");
     }
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCreations), MemberType = typeof(SessionConformanceTestCases))]
+    public void PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(string call) => SessionConformanceTestCases.Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(_backend, call);
 }

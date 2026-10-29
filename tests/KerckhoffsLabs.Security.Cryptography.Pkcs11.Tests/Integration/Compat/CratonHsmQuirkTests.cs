@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -35,5 +36,25 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
         {
             try { key.Destroy(); } catch (Pkcs11Exception) { /* best-effort cleanup */ }
         }
+    }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void PrivateObjectWithoutALogin_QuirkStillPresent()
+    {
+        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
+        using var session = slot.OpenSessionCore();
+        CKR logout = _backend.Library.LowLevelLibrary!.C_Logout((NativeCULong)session.SessionId);
+        Assert.True(logout is CKR.CKR_OK or CKR.CKR_USER_NOT_LOGGED_IN, $"C_Logout returned {logout}.");
+
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-private-{Guid.NewGuid():N}");
+        Exception? ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrToken, attrPrivate, attrLabel])));
+
+        Assert.True(ex is null,
+            "Craton HSM now refuses a private object with nobody logged in " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "CratonHsmBackendFixture.CratonHsmRefusesPrivateObjectsWithoutALogin to true and delete this test.");
     }
 }
