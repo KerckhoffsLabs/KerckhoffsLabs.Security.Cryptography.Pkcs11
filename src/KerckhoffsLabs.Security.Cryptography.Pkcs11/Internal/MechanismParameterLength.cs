@@ -256,11 +256,12 @@ internal static class MechanismParameterLength
         // within a group is the same mechanism; one already in an earlier group is a mistake in the table.
         public void Add(Rule rule, params CKM[] types)
         {
-            foreach (CKM type in types.Distinct())
-            {
-                if (!_rules.TryAdd(type, rule))
-                    throw new InvalidOperationException($"{type} has more than one parameter rule.");
-            }
+            CKM[] distinct = [.. types.Distinct()];
+            CKM[] taken = [.. distinct.Where(_rules.ContainsKey)];
+            if (taken.Length > 0)
+                throw new InvalidOperationException($"{string.Join(", ", taken)} already have a parameter rule.");
+            foreach (CKM type in distinct)
+                _rules.Add(type, rule);
         }
 
         public IEnumerator<KeyValuePair<CKM, Rule>> GetEnumerator() => _rules.GetEnumerator();
