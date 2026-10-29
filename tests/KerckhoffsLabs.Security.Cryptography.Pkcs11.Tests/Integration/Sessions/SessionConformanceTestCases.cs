@@ -455,6 +455,97 @@ internal static class SessionConformanceTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
+    // === Logout ================================================================
+
+    // C_Logout invalidates the application's handles to private objects and destroys its private session objects
+    // (§5.6.10). With nobody logged in, the handle of a private token key is CKR_OBJECT_HANDLE_INVALID to
+    // C_GetAttributeValue, and C_EncryptInit refuses it; a private session object is found by no search and its
+    // handle stays CKR_OBJECT_HANDLE_INVALID after a new login. A public session object keeps its handle
+    // throughout. The token key's old handle is not checked after the new login: a module may give the key the
+    // same number again, and a search then finds it under that number.
+    // C_EncryptInit may answer CKR_KEY_HANDLE_INVALID or CKR_USER_NOT_LOGGED_IN, the two §5.8.1 lists for it, or
+    // CKR_OBJECT_HANDLE_INVALID: the handle is an object handle §5.6.10 made invalid, and the spec says no more
+    // about which of the two handle codes a key handle gets then.
+    // tokenKeyEncryptInit records a backend's own answer to C_EncryptInit (null: the ones above).
+    internal static void Assert_Logout_InvalidatesPrivateHandles(IPkcs11Backend backend, CKR? tokenKeyEncryptInit = null)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        string label = $"kl-logout-{Guid.NewGuid():N}";
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrOnToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrPublic = new ObjectAttribute(CKA.CKA_PRIVATE, false);
+        using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+
+        using var session = Slot(backend).OpenSessionCore();
+        var sid = (NativeCULong)session.SessionId;
+        using var pin = new SecurePin(backend.UserPin.Span);
+        session.Login(CKU.CKU_USER, pin);
+        bool loggedIn = true;
+        try
+        {
+            ObjectHandle? tokenKey = backend.SupportsTokenObjects
+                ? session.CreateObject([attrSecret, attrAes, attrOnToken, attrPrivate, attrEncrypt, attrLabel, attrValue])
+                : null;
+            ObjectHandle privateSessionObject = session.CreateObject([attrData, attrSession, attrPrivate, attrLabel]);
+            ObjectHandle publicSessionObject = session.CreateObject([attrData, attrSession, attrPublic, attrLabel]);
+
+            session.Logout();
+            loggedIn = false;
+
+            if (tokenKey is { } key)
+            {
+                AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, key), "C_GetAttributeValue on a private token key after C_Logout");
+                if (backend.Supports(CKM.CKM_AES_ECB))
+                {
+                    // ECB only because it takes no parameter; an operation it starts is ended at once.
+                    var ecb = new CK_MECHANISM { Mechanism = (NativeCULong)(ulong)CKM.CKM_AES_ECB };
+                    CKR rv = lowLevel.C_EncryptInit(sid, in ecb, (NativeCULong)key.ObjectId);
+                    if (rv == CKR.CKR_OK)
+                        lowLevel.C_EncryptFinal(sid, [], lengthOnly: false, out _);
+                    if (tokenKeyEncryptInit is { } expected)
+                        AssertRv(expected, rv, "C_EncryptInit with a private token key after C_Logout");
+                    else
+                        Assert.True(rv is CKR.CKR_KEY_HANDLE_INVALID or CKR.CKR_USER_NOT_LOGGED_IN or CKR.CKR_OBJECT_HANDLE_INVALID,
+                            $"C_EncryptInit with a private token key after C_Logout returned {rv}.");
+                }
+            }
+            AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, privateSessionObject), "C_GetAttributeValue on a private session object after C_Logout");
+            AssertRv(CKR.CKR_OK, ClassOf(lowLevel, sid, publicSessionObject), "C_GetAttributeValue on a public session object after C_Logout");
+            Assert.Equal([publicSessionObject.ObjectId], session.FindAllObjects([attrLabel]).Select(h => h.ObjectId));
+
+            session.Login(CKU.CKU_USER, pin);
+            loggedIn = true;
+            AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, privateSessionObject), "C_GetAttributeValue on a destroyed private session object after a new login");
+            Assert.DoesNotContain(session.FindAllObjects([attrData, attrLabel]), h => h.ObjectId != publicSessionObject.ObjectId);
+        }
+        finally
+        {
+            if (!loggedIn)
+                session.Login(CKU.CKU_USER, pin);
+            // Found again by label: the token key's handle may have changed with the new login.
+            foreach (ObjectHandle handle in session.FindAllObjects([attrLabel]))
+                session.DestroyObject(handle);
+            session.Logout();
+        }
+    }
+
+    // C_GetAttributeValue of CKA_CLASS, its length only, for the module's own answer about the handle.
+    private static CKR ClassOf(LowLevelPkcs11Library lowLevel, NativeCULong session, ObjectHandle handle)
+    {
+        CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_CLASS }];
+        return lowLevel.C_GetAttributeValue(session, (NativeCULong)handle.ObjectId, template);
+    }
+
     // === Handles ===============================================================
 
     // A closed session's handle is CKR_SESSION_HANDLE_INVALID, as is one no module handed out, and a slot id

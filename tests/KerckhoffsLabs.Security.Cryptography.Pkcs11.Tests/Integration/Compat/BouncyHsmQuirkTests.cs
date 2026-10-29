@@ -1,6 +1,8 @@
 using System.Text;
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
@@ -62,5 +64,29 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         Assert.False(actual.AsSpan().SequenceEqual(Sp800108ChainedKdfTestCases.ReferenceDoublePipeline()),
             "CKM_SP800_108_DOUBLE_PIPELINE_KDF now matches SP 800-108 §5.3: set " +
             "BouncyHsmBackendFixture.BouncyHsmDoublePipelineMatchesSp800108 to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void PrivateSessionObjectAfterLogout_QuirkStillPresent()
+    {
+        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
+        using var session = slot.OpenSessionCore();
+        using var pin = new SecurePin(_backend.UserPin.Span);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-logout-{Guid.NewGuid():N}");
+        session.Login(CKU.CKU_USER, pin);
+        ObjectHandle handle = session.CreateObject([attrClass, attrToken, attrPrivate, attrLabel]);
+        session.Logout();
+        session.Login(CKU.CKU_USER, pin);
+        Exception? ex;
+        try { ex = Record.Exception(() => { using var read = session.GetAttributeValue(handle, [CKA.CKA_CLASS]); }); }
+        finally { session.Logout(); }
+
+        Assert.True(ex is null,
+            "A private session object no longer outlives C_Logout " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmDestroysPrivateSessionObjectsOnLogout to true and delete this test.");
     }
 }

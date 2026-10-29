@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sessions;
@@ -41,4 +42,12 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
     [Theory(SkipUnless = nameof(KryopticBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic makes a private session object with nobody logged in")]
     [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCreations), MemberType = typeof(SessionConformanceTestCases))]
     public void PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(string call) => SessionConformanceTestCases.Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(_backend, call);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void Logout_InvalidatesPrivateHandles()
+    {
+        // Kryoptic answers C_EncryptInit with a private token key after C_Logout with CKR_GENERAL_ERROR.
+        SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend,
+            tokenKeyEncryptInit: KryopticBackendFixture.KryopticRefusesAPrivateKeyAfterLogout ? null : CKR.CKR_GENERAL_ERROR);
+    }
 }

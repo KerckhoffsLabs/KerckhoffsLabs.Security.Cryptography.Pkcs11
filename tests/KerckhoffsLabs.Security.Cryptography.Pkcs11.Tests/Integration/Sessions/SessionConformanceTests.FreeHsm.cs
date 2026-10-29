@@ -41,4 +41,7 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCreations), MemberType = typeof(SessionConformanceTestCases))]
     public void PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(string call) => SessionConformanceTestCases.Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(_backend, call);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.LogoutInvalidationAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM keeps private session objects, and their handles, after C_Logout")]
+    public void Logout_InvalidatesPrivateHandles() => SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend);
 }

@@ -53,6 +53,18 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
         (Settings.FreeHsmLibraryPath is { } p && File.Exists(p)) ||
         BuiltLibraryPath() is not null;
 
+    /// <summary>
+    /// False while <c>C_Logout</c> leaves the application's private session objects in place and readable: with
+    /// nobody logged in, <c>C_GetAttributeValue</c> on one answers <c>CKR_OK</c>, and so does <c>C_EncryptInit</c>
+    /// with the handle of a private token key, though <c>C_GetAttributeValue</c> on that handle answers
+    /// <c>CKR_OBJECT_HANDLE_INVALID</c>. PKCS#11 v3.2 §5.6.10 destroys private session objects on <c>C_Logout</c>
+    /// and makes every handle to a private object invalid.
+    /// </summary>
+    public const bool FreeHsmDestroysPrivateSessionObjectsOnLogout = false;
+
+    /// <summary>Gate for the C_Logout handle case: see <see cref="FreeHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
+    public static bool LogoutInvalidationAvailable => FreeHsmAvailable && FreeHsmDestroysPrivateSessionObjectsOnLogout;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

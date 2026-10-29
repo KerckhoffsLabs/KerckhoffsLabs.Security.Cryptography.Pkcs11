@@ -82,6 +82,14 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the private-object-without-a-login case: see <see cref="KryopticRefusesPrivateObjectsWithoutALogin"/>.</summary>
     public static bool PrivateObjectLoginCheckAvailable => KryopticAvailable && KryopticRefusesPrivateObjectsWithoutALogin;
 
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> with the handle of a private token key after <c>C_Logout</c> answers
+    /// <c>CKR_GENERAL_ERROR</c>, a code that says the token failed rather than that the key may not be used.
+    /// PKCS#11 v3.2 §5.6.10 makes every handle to a private object invalid on <c>C_Logout</c>; §5.8.1 refuses it
+    /// with <c>CKR_KEY_HANDLE_INVALID</c> or <c>CKR_USER_NOT_LOGGED_IN</c>.
+    /// </summary>
+    public const bool KryopticRefusesAPrivateKeyAfterLogout = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();
