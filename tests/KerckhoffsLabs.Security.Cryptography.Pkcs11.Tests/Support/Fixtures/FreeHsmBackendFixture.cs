@@ -170,6 +170,13 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmReportsAShortBufferForKeyAttributes = false;
 
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with <c>ulTagBits</c> above 128 answers
+    /// <c>CKR_ARGUMENTS_BAD</c> (<c>src/fhsm_pkcs11.c</c>, with an IV or AAD over its buffer). PKCS#11 v3.2 §6.13.7: a
+    /// tag of 0 to 128 bits; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>, which it gives for a NULL pointer.
+    /// </summary>
+    public const bool FreeHsmRefusesAnOutOfRangeGcmTagAsInvalid = false;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

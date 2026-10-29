@@ -5,8 +5,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
@@ -526,5 +528,83 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_GENERAL_ERROR },
             $"C_UnwrapKey(CKM_RSA_PKCS_OAEP) of a 255-byte blob under a 2048-bit key no longer answers CKR_GENERAL_ERROR (got {ex?.Message ?? "no error"}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesAnOaepBlobByItsLength to true and delete this test.");
+    }
+
+    // A raw CK_GCM_PARAMS with a 12-byte IV, so that the module sees the fields as given.
+    private static Mechanism RawGcm(NativeBuffers buffers, byte[] iv, IntPtr aad, ulong aadLen, ulong tagBits)
+    {
+        var parameter = new CK_GCM_PARAMS
+        {
+            Iv = buffers.Of(iv),
+            IvLen = (NativeCULong)12UL,
+            IvBits = (NativeCULong)96UL,
+            AAD = aad,
+            AADLen = (NativeCULong)aadLen,
+            TagBits = (NativeCULong)tagBits,
+        };
+        return RawParameter.From(CKM.CKM_AES_GCM, in parameter);
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void OutOfRangeAeadParameter_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        ObjectHandle key = TestKeys.CreateAes256Key(session, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        CKR rv;
+        try
+        {
+            using var buffers = new NativeBuffers();
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = RawGcm(buffers, new byte[12], buffers.Of([1, 2, 3]), 3, 136).Marshal(scope, out _);
+            rv = lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)key.ObjectId);
+            if (rv == CKR.CKR_OK)
+                lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_ENCRYPT);
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_GENERAL_ERROR,
+            $"C_EncryptInit(CKM_AES_GCM) with ulTagBits 136 no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAnOutOfRangeAeadParameterAsInvalid to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void NullAadPointer_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        byte[] rawKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        byte[] iv = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12);
+        byte[] plaintext = new byte[20];
+        ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+        CKR rv;
+        byte[] output = new byte[36];
+        try
+        {
+            using var buffers = new NativeBuffers();
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = RawGcm(buffers, iv, IntPtr.Zero, 9, 128).Marshal(scope, out _);
+            rv = lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)key.ObjectId);
+            if (rv == CKR.CKR_OK)
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Encrypt(sid, plaintext, output, lengthOnly: false, out _));
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        byte[] expected = new byte[36];
+        using (var bcl = new System.Security.Cryptography.AesGcm(rawKey, 16))
+            bcl.Encrypt(iv, plaintext, expected.AsSpan(0, 20), expected.AsSpan(20), []);
+        Assert.True(rv == CKR.CKR_OK && output.AsSpan().SequenceEqual(expected),
+            $"C_EncryptInit(CKM_AES_GCM) with a NULL pAAD and ulAADLen 9 no longer runs with no AAD (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesANullAadPointer to true and delete this test.");
     }
 }

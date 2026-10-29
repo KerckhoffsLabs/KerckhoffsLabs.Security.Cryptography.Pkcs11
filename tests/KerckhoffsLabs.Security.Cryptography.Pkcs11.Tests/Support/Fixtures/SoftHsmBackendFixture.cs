@@ -155,6 +155,23 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the private-key <c>C_DigestKey</c> case: see <see cref="SoftHsmRefusesToDigestAPrivateKey"/>.</summary>
     public static bool PrivateKeyDigestRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesToDigestAPrivateKey;
 
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
+    /// non-zero <c>ulIvLen</c>, or a NULL <c>pAAD</c> behind a non-zero <c>ulAADLen</c>, ends the test process:
+    /// <c>SymEncryptInit</c> and <c>SymDecryptInit</c> in <c>src/lib/SoftHSM.cpp</c> <c>memcpy</c> from the pointer
+    /// without checking it. PKCS#11 v3.2 §6.13.2 lets <c>pAAD</c> be NULL only when <c>ulAADLen</c> is 0, and
+    /// §5.1.6 has invalid parameters refused (<c>CKR_MECHANISM_PARAM_INVALID</c>, or <c>CKR_ARGUMENTS_BAD</c>).
+    /// Confirmed by running each row alone. Not yet reported upstream.
+    /// </summary>
+    public const bool SoftHsmSurvivesANullGcmPointer = false;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> takes <c>ulIvLen</c> 0 (<c>CKR_OK</c>)
+    /// and refuses <c>ulTagBits</c> 136 with <c>CKR_ARGUMENTS_BAD</c> (the same functions). PKCS#11 v3.2 §6.13.7: an
+    /// IV of 1 to 2^32 - 1 bytes, a tag of 0 to 128 bits; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnOutOfRangeGcmParameterAsInvalid = false;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

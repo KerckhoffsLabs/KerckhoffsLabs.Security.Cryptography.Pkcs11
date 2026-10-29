@@ -289,6 +289,25 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="BouncyHsmRefusesAnOaepBlobByItsLength"/>.</summary>
     public static bool OaepBlobLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnOaepBlobByItsLength;
 
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit</c> with a <c>CK_GCM_PARAMS</c> or <c>CK_CCM_PARAMS</c>
+    /// out of its range (a NULL <c>pIv</c> or <c>pNonce</c>, <c>ulIvLen</c> 0, <c>ulTagBits</c> 136, a nonce of 6 or 14
+    /// bytes, <c>ulMACLen</c> 2, 5 or 18) answers <c>CKR_GENERAL_ERROR</c>: <c>BufferedCipherWrapperFactory</c> checks
+    /// none of the fields, and BouncyCastle's own refusal is reported as a general error. PKCS#11 v3.2 §6.13.7 and
+    /// §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// BouncyHsmQuirkTests.OutOfRangeAeadParameter_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAnOutOfRangeAeadParameterAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit</c> with <c>CKM_AES_GCM</c> or <c>CKM_AES_CCM</c> and a NULL
+    /// <c>pAAD</c> behind a non-zero <c>ulAADLen</c> answers <c>CKR_OK</c> and runs with no AAD (the ciphertext and tag
+    /// are the BCL's with empty AAD). PKCS#11 v3.2 §6.13.2, §6.13.4: <c>pAAD</c> may be NULL only when
+    /// <c>ulAADLen</c> is 0; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>).
+    /// BouncyHsmQuirkTests.NullAadPointer_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesANullAadPointer = false;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

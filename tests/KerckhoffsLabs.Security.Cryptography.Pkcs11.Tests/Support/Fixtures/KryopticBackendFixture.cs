@@ -233,6 +233,22 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the private-key <c>C_DigestKey</c> case: see <see cref="KryopticReportsAPrivateKeyAsIndigestible"/>.</summary>
     public static bool PrivateKeyDigestRefusalAvailable => KryopticAvailable && KryopticReportsAPrivateKeyAsIndigestible;
 
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit</c> with <c>CKM_AES_GCM</c> or <c>CKM_AES_CCM</c> and a NULL
+    /// <c>pAAD</c> behind a non-zero <c>ulAADLen</c> answers <c>CKR_OK</c> and runs with no AAD: <c>bytes_to_vec</c>
+    /// (<c>src/pkcs11/mod.rs</c>) makes an empty vector of a NULL pointer, in <c>src/ossl/aes.rs</c>. Confirmed by a
+    /// probe whose ciphertext and tag were the BCL's with empty AAD. PKCS#11 v3.2 §6.13.2, §6.13.4: <c>pAAD</c> may be
+    /// NULL only when <c>ulAADLen</c> is 0; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>).
+    /// </summary>
+    public const bool KryopticRefusesANullAadPointer = false;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_CCM)</c> with a NULL <c>pNonce</c> behind
+    /// <c>ulNonceLen</c> 12 answers <c>CKR_DEVICE_ERROR</c>: the NULL pointer becomes an empty nonce, which OpenSSL
+    /// refuses. PKCS#11 v3.2 §6.13.7 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>).
+    /// </summary>
+    public const bool KryopticRefusesANullCcmNonceAsInvalid = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();
