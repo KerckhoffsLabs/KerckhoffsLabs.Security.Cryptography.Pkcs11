@@ -87,13 +87,22 @@ if ! is_built_from "${BUILD_STAMP_FILE}" "${STAMP}" "${BUILD_LIB}"; then
   # PKCS#11 v3.2 and every mechanism family it has except the ones the spec leaves out: no
   # NSS-compatibility mode (it relaxes spec checks), no wolfTPM store, no LMS/XMSS (this library has
   # no API for them). Multi-threaded, for the suite's thread-safety cases.
+  #
+  # Two capacity settings for a test suite, neither of which changes what any function returns
+  # short of the limit:
+  # - 1024 objects per session and per token instead of 8 and 64 (WP11_SESSION_OBJECT_CNT_MAX,
+  #   WP11_TOKEN_OBJECT_CNT_MAX): the shared cases routinely hold more than 8 session objects.
+  # - 1000 PBKDF2 iterations to hash a PIN instead of 600000, the count upstream's own CI uses:
+  #   every test logs in, and the default takes about 1.6 s per C_Login.
   (
     cd "${BUILD_DIR}"
     ./autogen.sh
     ./configure --enable-pkcs11v32 --enable-mldsa --enable-mlkem --enable-aesccm --enable-aesecb \
       --enable-aescts --enable-aescmac --enable-hkdf --enable-pbkdf2 --enable-sha3 \
+      --with-pbkdf2-iterations=1000 \
       --with-static-wolfssl="${WOLFSSL_PREFIX}/lib/libwolfssl.a" \
-      CPPFLAGS="-I${WOLFSSL_PREFIX}/include" CFLAGS="${SAN}" LDFLAGS="${SAN}"
+      CPPFLAGS="-I${WOLFSSL_PREFIX}/include -DWP11_SESSION_OBJECT_CNT_MAX=1024 -DWP11_TOKEN_OBJECT_CNT_MAX=1024" \
+      CFLAGS="${SAN}" LDFLAGS="${SAN}"
     make -j"$(nproc)"
   ) 2>&1
 
