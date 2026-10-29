@@ -119,6 +119,26 @@ internal static class SessionConformanceTestCases
         Assert.Equal(CKR.CKR_MECHANISM_INVALID, ex.ReturnValue);
     }
 
+    // C_GetMechanismList into a list one entry short answers CKR_BUFFER_TOO_SMALL and sets *pulCount to the
+    // number of mechanisms (§5.5.5: "In either case, the value *pulCount is set to hold the number of
+    // mechanisms"), and the retry at that count returns the whole list.
+    internal static void Assert_MechanismList_OneShort_IsBufferTooSmall(IPkcs11Backend backend)
+    {
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        AssertRv(CKR.CKR_OK, lowLevel.C_GetMechanismList(backend.SlotId, [], out NativeCULong count), "C_GetMechanismList (count)");
+        if ((ulong)count < 2)
+            Assert.Skip($"The token lists {count} mechanisms; a list one short of that would be empty, which asks for the count.");
+
+        var shortList = new CKM[(int)(ulong)count - 1];
+        AssertRv(CKR.CKR_BUFFER_TOO_SMALL, lowLevel.C_GetMechanismList(backend.SlotId, shortList, out NativeCULong reported), "C_GetMechanismList into a list one short");
+        Assert.Equal((ulong)count, (ulong)reported);
+
+        var list = new CKM[(int)(ulong)reported];
+        AssertRv(CKR.CKR_OK, lowLevel.C_GetMechanismList(backend.SlotId, list, out NativeCULong returned), "C_GetMechanismList at the reported count");
+        Assert.Equal((ulong)count, (ulong)returned);
+        Assert.Equal(backend.SupportedMechanisms.Order(), list.Order());
+    }
+
     // === Session information and states ========================================
 
     // A session's state follows the token's login (§5.6): read/write or read-only, public or user. A login is

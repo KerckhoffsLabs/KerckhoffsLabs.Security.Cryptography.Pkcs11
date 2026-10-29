@@ -60,4 +60,7 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.PinLengthRangeAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm reports its maximum PIN length as its minimum")]
     public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.ShortMechanismListAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm leaves *pulCount as given on CKR_BUFFER_TOO_SMALL")]
+    public void MechanismList_OneShort_IsBufferTooSmall() => SessionConformanceTestCases.Assert_MechanismList_OneShort_IsBufferTooSmall(_backend);
 }

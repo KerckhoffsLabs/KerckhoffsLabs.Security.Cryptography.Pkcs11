@@ -60,4 +60,7 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.RefusedPinRecoveryAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM refuses the right PIN for a while after a refused one")]
     public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void MechanismList_OneShort_IsBufferTooSmall() => SessionConformanceTestCases.Assert_MechanismList_OneShort_IsBufferTooSmall(_backend);
 }

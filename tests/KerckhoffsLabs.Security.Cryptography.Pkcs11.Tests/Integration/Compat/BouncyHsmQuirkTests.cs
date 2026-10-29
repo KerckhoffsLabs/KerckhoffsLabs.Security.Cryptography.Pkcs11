@@ -143,4 +143,17 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_GetTokenInfo no longer reports ulMinPinLen as ulMaxPinLen (got [{token.MinPinLen}, {token.MaxPinLen}]): set " +
             "BouncyHsmBackendFixture.BouncyHsmReportsItsMinimumPinLength to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void ShortMechanismList_QuirkStillPresent()
+    {
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_GetMechanismList(_backend.SlotId, [], out NativeCULong count));
+        var shortList = new CKM[(int)(ulong)count - 1];
+        CKR rv = lowLevel.C_GetMechanismList(_backend.SlotId, shortList, out NativeCULong reported);
+
+        Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL && (ulong)reported == (ulong)shortList.Length,
+            $"C_GetMechanismList into a list one short no longer leaves *pulCount as given (got {rv}, {reported} of {count}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmReportsTheMechanismCountOnAShortList to true and delete this test.");
+    }
 }

@@ -68,4 +68,7 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.PinLengthRangeAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic sets a PIN shorter than its own minimum")]
     public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void MechanismList_OneShort_IsBufferTooSmall() => SessionConformanceTestCases.Assert_MechanismList_OneShort_IsBufferTooSmall(_backend);
 }

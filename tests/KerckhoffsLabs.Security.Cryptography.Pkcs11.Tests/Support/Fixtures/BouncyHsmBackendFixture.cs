@@ -98,6 +98,18 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmReportsItsMinimumPinLength = false;
 
+    /// <summary>
+    /// False while <c>C_GetMechanismList</c> into a list too short answers <c>CKR_BUFFER_TOO_SMALL</c> but leaves
+    /// <c>*pulCount</c> as the caller gave it: <c>GetMechanismListHandler</c> sends no data with the error, so the
+    /// native client has no count to write. PKCS#11 v3.2 §5.5.5: "In either case, the value *pulCount is set to
+    /// hold the number of mechanisms". Not yet reported upstream.
+    /// BouncyHsmQuirkTests.ShortMechanismList_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmReportsTheMechanismCountOnAShortList = false;
+
+    /// <summary>Gate for the short mechanism list case: see <see cref="BouncyHsmReportsTheMechanismCountOnAShortList"/>.</summary>
+    public static bool ShortMechanismListAvailable => BouncyHsmAvailable && BouncyHsmReportsTheMechanismCountOnAShortList;
+
     /// <summary>Gate for the PIN length case: see <see cref="BouncyHsmReportsItsMinimumPinLength"/>.</summary>
     public static bool PinLengthRangeAvailable => BouncyHsmAvailable && BouncyHsmReportsItsMinimumPinLength;
 
