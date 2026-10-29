@@ -203,6 +203,27 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the key material case: see <see cref="BouncyHsmFixesKeyMaterial"/>.</summary>
     public static bool KeyMaterialFixedAvailable => BouncyHsmAvailable && BouncyHsmFixesKeyMaterial;
 
+    /// <summary>
+    /// False while <c>C_CreateObject</c> with <c>CKA_TOKEN</c> given as <c>{NULL, 1}</c> (a NULL <c>pValue</c> with a
+    /// length) crashes the process (SIGSEGV): the native client reads the CK_BBOOL without checking the pointer.
+    /// PKCS#11 v3.2 §4.1.1 point 2 (<c>CKR_ATTRIBUTE_VALUE_INVALID</c>), or <c>CKR_ARGUMENTS_BAD</c>. Not yet
+    /// reported upstream. No tripwire: reproducing the crash would take the test host down.
+    /// </summary>
+    public const bool BouncyHsmSurvivesANullAttributeValue = false;
+
+    /// <summary>
+    /// False while a malformed attribute value is refused with <c>CKR_GENERAL_ERROR</c> or
+    /// <c>CKR_DEVICE_ERROR</c>: <c>C_CreateObject</c> and <c>C_FindObjectsInit</c> with a 4-byte <c>CKA_TOKEN</c>
+    /// answer <c>CKR_GENERAL_ERROR</c>, and with a <c>{NULL, n}</c> <c>CKA_VALUE</c> or <c>CKA_LABEL</c>
+    /// <c>CKR_DEVICE_ERROR</c>. PKCS#11 v3.2 §4.1.1 point 2: <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (or
+    /// <c>CKR_ARGUMENTS_BAD</c> for the NULL ones). Not yet reported upstream.
+    /// BouncyHsmQuirkTests.MalformedAttributeValue_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesMalformedAttributeValues = false;
+
+    /// <summary>Gate for the malformed attribute case: see <see cref="BouncyHsmRefusesMalformedAttributeValues"/>.</summary>
+    public static bool MalformedAttributeRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesMalformedAttributeValues;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

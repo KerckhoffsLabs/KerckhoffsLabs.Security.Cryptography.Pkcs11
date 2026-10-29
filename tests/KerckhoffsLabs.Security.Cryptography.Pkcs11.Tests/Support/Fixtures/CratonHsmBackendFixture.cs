@@ -160,6 +160,18 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the provenance-in-a-template case: see <see cref="CratonHsmRefusesProvenanceAttributesInATemplate"/>.</summary>
     public static bool ProvenanceTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesProvenanceAttributesInATemplate;
 
+    /// <summary>
+    /// False while malformed attribute values are taken: <c>C_CreateObject</c> of a data object with a 4-byte
+    /// <c>CKA_TOKEN</c>, a <c>{NULL, 1}</c> <c>CKA_TOKEN</c> or a <c>{NULL, 16}</c> <c>CKA_VALUE</c> answers
+    /// <c>CKR_OK</c>, and a search with a 4-byte <c>CKA_TOKEN</c> of zeros finds a session object. PKCS#11 v3.2
+    /// §4.1.1 point 2: <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>); §5.7.7: a search matches
+    /// only objects whose attributes match the template.
+    /// </summary>
+    public const bool CratonHsmRefusesMalformedAttributeValues = false;
+
+    /// <summary>Gate for the malformed attribute case: see <see cref="CratonHsmRefusesMalformedAttributeValues"/>.</summary>
+    public static bool MalformedAttributeRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesMalformedAttributeValues;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

@@ -96,4 +96,8 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in a template")]
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.MalformedAttributeRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM takes malformed attribute values")]
+    [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed) => ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
 }

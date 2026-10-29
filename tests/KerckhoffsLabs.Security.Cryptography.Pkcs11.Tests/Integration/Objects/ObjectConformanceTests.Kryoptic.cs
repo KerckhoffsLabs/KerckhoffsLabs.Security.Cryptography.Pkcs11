@@ -87,4 +87,14 @@ public sealed class ObjectConformanceTests_Kryoptic(KryopticBackendFixture backe
     [Theory(SkipUnless = nameof(KryopticBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in C_GenerateKey")]
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
+    {
+        if (malformed is "C_CreateObject with CKA_TOKEN NULL and ulValueLen 1" or "C_CreateObject with CKA_VALUE NULL and ulValueLen 16"
+            && !KryopticBackendFixture.KryopticRefusesANullAttributeValue)
+            Assert.Skip("Kryoptic crashes on a NULL CKA_TOKEN with a length, and takes a NULL CKA_VALUE with one");
+        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
+    }
 }

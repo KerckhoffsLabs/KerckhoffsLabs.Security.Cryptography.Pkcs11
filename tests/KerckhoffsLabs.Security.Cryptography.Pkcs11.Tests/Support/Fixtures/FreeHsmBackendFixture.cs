@@ -134,6 +134,13 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the provenance-in-a-template case: see <see cref="FreeHsmRefusesProvenanceAttributesInATemplate"/>.</summary>
     public static bool ProvenanceTemplateRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesProvenanceAttributesInATemplate;
 
+    /// <summary>
+    /// False while <c>C_FindObjectsInit</c> with a 4-byte <c>CKA_TOKEN</c> of zeros starts a search that finds a
+    /// session object, whose <c>CKA_TOKEN</c> is a 1-byte CK_BBOOL. PKCS#11 v3.2 §5.7.7: a search matches only
+    /// objects whose attributes match every attribute of the template. <c>C_CreateObject</c> refuses it.
+    /// </summary>
+    public const bool FreeHsmMatchesAWrongLengthBoolean = false;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

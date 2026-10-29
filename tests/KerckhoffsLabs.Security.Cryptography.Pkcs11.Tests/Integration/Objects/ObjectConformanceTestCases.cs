@@ -926,4 +926,104 @@ internal static class ObjectConformanceTestCases
         using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
         return session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrExtractable, attrEncrypt, attrValue, .. extra]);
     }
+
+    // === Malformed attribute values ============================================
+
+    public static TheoryData<string> MalformedAttributes =>
+    [
+        "C_CreateObject with a 4-byte CKA_TOKEN", "C_CreateObject with CKA_TOKEN NULL and ulValueLen 1",
+        "C_CreateObject with CKA_VALUE NULL and ulValueLen 16", "C_FindObjectsInit with CKA_LABEL NULL and ulValueLen 4",
+        "C_FindObjectsInit with a 4-byte CKA_TOKEN",
+    ];
+
+    // An attribute whose value does not fit its type, or that names a length but no value, is refused without
+    // harm to the module. Through the raw call, since the library never builds such a template. C_CreateObject
+    // of a data object with a CK_BBOOL of 4 bytes answers CKR_ATTRIBUTE_VALUE_INVALID (§4.1.1 point 2), and
+    // with a NULL pValue and a non-zero ulValueLen CKR_ATTRIBUTE_VALUE_INVALID or CKR_ARGUMENTS_BAD; nothing is
+    // created. C_FindObjectsInit with either refuses it with one of those codes, or starts a search that
+    // matches nothing: no object has such a value (§5.7.7). The session works afterwards. A module that crashes
+    // here takes the test host with it, so its wrapper skips the row.
+    // leavesAnObjectBehind records a backend that refuses the template but keeps the object it started.
+    internal static void Assert_MalformedAttribute_IsRefusedHarmlessly(IPkcs11Backend backend, string malformed, bool leavesAnObjectBehind = false)
+    {
+        WithSession(backend, session =>
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            var sid = (NativeCULong)session.SessionId;
+            string label = $"kl-malformed-attribute-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            // A search for the case's label finds what a refused C_CreateObject left, so the label goes in too.
+            ObjectHandle data = CreateDataObject(session, label + "-existing", [0x01]);
+            var allocations = new List<IntPtr>();
+            try
+            {
+                CK_ATTRIBUTE Value(CKA type, byte[] value)
+                {
+                    IntPtr p = Marshal.AllocHGlobal(Math.Max(value.Length, 1));
+                    allocations.Add(p);
+                    Marshal.Copy(value, 0, p, value.Length);
+                    return new CK_ATTRIBUTE { type = (NativeCULong)(ulong)type, value = p, valueLen = (NativeCULong)(ulong)value.Length };
+                }
+                CK_ATTRIBUTE Null(CKA type, ulong length) => new() { type = (NativeCULong)(ulong)type, value = IntPtr.Zero, valueLen = (NativeCULong)length };
+                byte[] classBytes = new byte[Unsafe.SizeOf<NativeCULong>()];
+                MemoryMarshal.Write(classBytes, (NativeCULong)(ulong)CKO.CKO_DATA);
+
+                CK_ATTRIBUTE[] dataObject = [Value(CKA.CKA_CLASS, classBytes), Value(CKA.CKA_LABEL, System.Text.Encoding.UTF8.GetBytes(label))];
+                CK_ATTRIBUTE[] template = malformed switch
+                {
+                    "C_CreateObject with a 4-byte CKA_TOKEN" => [.. dataObject, Value(CKA.CKA_TOKEN, [0x00, 0x00, 0x00, 0x00])],
+                    "C_CreateObject with CKA_TOKEN NULL and ulValueLen 1" => [.. dataObject, Null(CKA.CKA_TOKEN, 1)],
+                    "C_CreateObject with CKA_VALUE NULL and ulValueLen 16" => [.. dataObject, Value(CKA.CKA_TOKEN, [0x00]), Null(CKA.CKA_VALUE, 16)],
+                    "C_FindObjectsInit with CKA_LABEL NULL and ulValueLen 4" => [Value(CKA.CKA_CLASS, classBytes), Null(CKA.CKA_LABEL, 4)],
+                    _ => [Value(CKA.CKA_CLASS, classBytes), Value(CKA.CKA_TOKEN, [0x00, 0x00, 0x00, 0x00])],
+                };
+
+                if (malformed.StartsWith("C_CreateObject", StringComparison.Ordinal))
+                {
+                    CKR rv = lowLevel.C_CreateObject(sid, template, out NativeCULong created);
+                    if (rv == CKR.CKR_OK)
+                        lowLevel.C_DestroyObject(sid, created);
+                    CKR[] accepted = malformed.Contains("NULL", StringComparison.Ordinal)
+                        ? [CKR.CKR_ATTRIBUTE_VALUE_INVALID, CKR.CKR_ARGUMENTS_BAD]
+                        : [CKR.CKR_ATTRIBUTE_VALUE_INVALID];
+                    Assert.True(accepted.Contains(rv), $"{malformed}: returned {rv}, expected {string.Join(" or ", accepted)}.");
+                    List<ObjectHandle> left = session.FindAllObjects([attrLabel]);
+                    foreach (ObjectHandle handle in left)
+                        session.DestroyObject(handle);
+                    if (leavesAnObjectBehind)
+                        Assert.NotEmpty(left);
+                    else
+                        Assert.Empty(left);
+                }
+                else
+                {
+                    CKR rv = lowLevel.C_FindObjectsInit(sid, template);
+                    if (rv == CKR.CKR_OK)
+                    {
+                        var found = new NativeCULong[16];
+                        CKR findRv = lowLevel.C_FindObjects(sid, found, out NativeCULong count);
+                        CKR finalRv = lowLevel.C_FindObjectsFinal(sid);
+                        Assert.Equal(CKR.CKR_OK, findRv);
+                        Assert.Equal(CKR.CKR_OK, finalRv);
+                        Assert.True((ulong)count == 0, $"{malformed}: the search matched {(ulong)count} object(s).");
+                    }
+                    else
+                    {
+                        Assert.True(rv is CKR.CKR_ATTRIBUTE_VALUE_INVALID or CKR.CKR_ARGUMENTS_BAD, $"{malformed}: returned {rv}.");
+                    }
+                }
+
+                // The module still answers, and the session still searches.
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_GetSessionInfo(sid, out _));
+                using var attrExisting = new ObjectAttribute(CKA.CKA_LABEL, label + "-existing");
+                Assert.Equal([data.ObjectId], session.FindAllObjects([attrExisting]).Select(h => h.ObjectId));
+            }
+            finally
+            {
+                foreach (IntPtr p in allocations)
+                    Marshal.FreeHGlobal(p);
+                session.DestroyObject(data);
+            }
+        });
+    }
 }

@@ -119,4 +119,13 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.MalformedAttributeRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm refuses malformed attribute values with CKR_GENERAL_ERROR or CKR_DEVICE_ERROR")]
+    [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
+    {
+        if (malformed == "C_CreateObject with CKA_TOKEN NULL and ulValueLen 1" && !BouncyHsmBackendFixture.BouncyHsmSurvivesANullAttributeValue)
+            Assert.Skip("BouncyHsm's native client crashes on a NULL CKA_TOKEN with a length");
+        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
+    }
 }

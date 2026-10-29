@@ -106,4 +106,13 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
         // SoftHSM2 refuses the template with CKR_ATTRIBUTE_READ_ONLY but leaves the object behind.
         ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row, leavesAnObjectBehind: true);
     }
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
+    {
+        // SoftHSM2 refuses each malformed C_CreateObject template with the right code but leaves the object behind.
+        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed,
+            leavesAnObjectBehind: malformed.StartsWith("C_CreateObject", StringComparison.Ordinal));
+    }
 }

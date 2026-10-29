@@ -101,4 +101,13 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in a template")]
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
+    {
+        if (malformed == "C_FindObjectsInit with a 4-byte CKA_TOKEN" && !FreeHsmBackendFixture.FreeHsmMatchesAWrongLengthBoolean)
+            Assert.Skip("FreeHSM's search with a 4-byte CKA_TOKEN finds a session object");
+        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
+    }
 }

@@ -325,4 +325,35 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "flag unchanged"}): set " +
             "BouncyHsmBackendFixture.BouncyHsmFixesThePrivateAndModifiableFlags to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void MalformedAttributeValue_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        IntPtr buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(16);
+        CKR rv;
+        try
+        {
+            System.Runtime.InteropServices.Marshal.Copy(new byte[16], 0, buffer, 16);
+            // A CK_OBJECT_CLASS of zero (CKO_DATA) in the first half, a 4-byte CKA_TOKEN of zeros in the second.
+            CK_ATTRIBUTE[] template =
+            [
+                new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_CLASS, value = buffer, valueLen = (NativeCULong)(ulong)System.Runtime.CompilerServices.Unsafe.SizeOf<NativeCULong>() },
+                new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_TOKEN, value = buffer + 8, valueLen = (NativeCULong)4UL },
+            ];
+            rv = lowLevel.C_CreateObject((NativeCULong)session.SessionId, template, out NativeCULong created);
+            if (rv == CKR.CKR_OK)
+                lowLevel.C_DestroyObject((NativeCULong)session.SessionId, created);
+        }
+        finally
+        {
+            System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
+            session.Logout();
+        }
+
+        Assert.True(rv == CKR.CKR_GENERAL_ERROR,
+            $"C_CreateObject with a 4-byte CKA_TOKEN no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesMalformedAttributeValues to true and delete this test.");
+    }
 }

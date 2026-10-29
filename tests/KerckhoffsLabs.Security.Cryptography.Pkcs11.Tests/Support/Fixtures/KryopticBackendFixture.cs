@@ -140,6 +140,15 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the provenance-in-a-template case: see <see cref="KryopticRefusesProvenanceAttributesInATemplate"/>.</summary>
     public static bool ProvenanceTemplateRefusalAvailable => KryopticAvailable && KryopticRefusesProvenanceAttributesInATemplate;
 
+    /// <summary>
+    /// False while an attribute with a NULL <c>pValue</c> and a non-zero <c>ulValueLen</c> is not refused:
+    /// <c>C_CreateObject</c> with <c>CKA_TOKEN</c> given as <c>{NULL, 1}</c> crashes the process (SIGSEGV), and
+    /// with <c>CKA_VALUE</c> given as <c>{NULL, 16}</c> makes a data object with an empty value and answers
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §4.1.1 point 2 (<c>CKR_ATTRIBUTE_VALUE_INVALID</c>), or
+    /// <c>CKR_ARGUMENTS_BAD</c>. No tripwire: reproducing the crash would take the test host down.
+    /// </summary>
+    public const bool KryopticRefusesANullAttributeValue = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();
