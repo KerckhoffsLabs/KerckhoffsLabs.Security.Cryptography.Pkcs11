@@ -16,6 +16,10 @@ public sealed class OperationContractTests_Nss(NssBackendFixture backend)
     [MemberData(nameof(OperationContractTestCases.BufferTooSmallOperations), MemberType = typeof(OperationContractTestCases))]
     public void SingleCall_BufferTooSmall_ReportsAUsableLength(string operation)
     {
+        if (operation == "Ed25519")
+            Assert.Skip("NSS softoken refuses an Ed25519 C_Sign into any buffer but 64 bytes with CKR_ARGUMENTS_BAD (https://bugzilla.mozilla.org/show_bug.cgi?id=2075850).");
+        if (operation == "Ed448")
+            Assert.Skip("NSS softoken has no Ed448.");
         if (operation == "RSA-OAEP-SHA256")
             _backend.RequireSoftoken(3, 52, "NSS 3.51 answers an RSA-OAEP C_Decrypt into a 1-byte buffer with CKR_DEVICE_ERROR, not CKR_BUFFER_TOO_SMALL");
         OperationContractTestCases.Assert_SingleCall_BufferTooSmall_ReportsAUsableLength(_backend, operation);

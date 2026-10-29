@@ -344,6 +344,33 @@ internal static class TestKeys
         return (pub, priv);
     }
 
+    /// <summary>
+    /// Generates an ML-DSA key pair of the given parameter set as session objects.
+    /// Returns (publicHandle, privateHandle).
+    /// </summary>
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateMlDsaKeyPair(Pkcs11SessionCore session, CkpMlDsa parameterSet)
+    {
+        var mechanism = new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN);
+
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_ML_DSA);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubParameterSet = new ObjectAttribute(CKA.CKA_PARAMETER_SET, (ulong)parameterSet);
+
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_ML_DSA);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+
+        var pubTemplate = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParameterSet };
+        var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privSign };
+
+        session.GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
+        return (pub, priv);
+    }
+
     // === Fixed-key imports for known-answer tests =========================================
 
     /// <summary>Imports an RSA public key from its big-endian modulus and exponent (verify/encrypt).</summary>

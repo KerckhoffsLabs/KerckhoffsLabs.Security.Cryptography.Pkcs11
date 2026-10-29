@@ -115,7 +115,7 @@ internal static class OperationContractTestCases
 
     // === CKR_BUFFER_TOO_SMALL ================================================
 
-    public static TheoryData<string> BufferTooSmallOperations => ["ECDSA-P256", "RSA-PSS-SHA256", "RSA-OAEP-SHA256"];
+    public static TheoryData<string> BufferTooSmallOperations => ["ECDSA-P256", "RSA-PSS-SHA256", "RSA-OAEP-SHA256", "Ed25519", "Ed448", "ML-DSA-44"];
 
     // A single-part call with a 1-byte buffer must answer CKR_BUFFER_TOO_SMALL (§5.2), report a length the
     // caller can act on, and keep the operation for the retry. Two recorded deviations are tolerated, as the
@@ -128,6 +128,8 @@ internal static class OperationContractTestCases
         {
             "ECDSA-P256" => [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA],
             "RSA-PSS-SHA256" => [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS],
+            "Ed25519" or "Ed448" => [CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKM.CKM_EDDSA],
+            "ML-DSA-44" => [CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_ML_DSA],
             _ => [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP],
         };
         backend.RequireMechanisms(needed);
@@ -145,6 +147,32 @@ internal static class OperationContractTestCases
                             var mechanism = new Mechanism(CKM.CKM_ECDSA);
                             byte[] signature = SignWithAShortBufferFirst(lowLevel, sid, mechanism, priv, digest, 64);
                             Assert.True(session.Verify(mechanism, pub, digest, signature));
+                        }
+                        finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                        break;
+                    }
+                case "Ed25519":
+                case "Ed448":
+                    {
+                        var (pub, priv) = operation == "Ed25519" ? TestKeys.GenerateEd25519KeyPair(session) : TestKeys.GenerateEd448KeyPair(session);
+                        try
+                        {
+                            // A bare CKM_EDDSA is not taken for Ed448 everywhere; the pure-EdDSA parameters are.
+                            var mechanism = operation == "Ed25519" ? new Mechanism(CKM.CKM_EDDSA) : new Mechanism(CKM.CKM_EDDSA, new CkmEddsaParams(phFlag: false));
+                            byte[] signature = SignWithAShortBufferFirst(lowLevel, sid, mechanism, priv, Message, operation == "Ed25519" ? 64 : 114);
+                            Assert.True(session.Verify(mechanism, pub, Message, signature));
+                        }
+                        finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                        break;
+                    }
+                case "ML-DSA-44":
+                    {
+                        var (pub, priv) = TestKeys.GenerateMlDsaKeyPair(session, CkpMlDsa.CKP_ML_DSA_44);
+                        try
+                        {
+                            var mechanism = new Mechanism(CKM.CKM_ML_DSA);
+                            byte[] signature = SignWithAShortBufferFirst(lowLevel, sid, mechanism, priv, Message, 2420);
+                            Assert.True(session.Verify(mechanism, pub, Message, signature));
                         }
                         finally { session.DestroyObject(priv); session.DestroyObject(pub); }
                         break;
