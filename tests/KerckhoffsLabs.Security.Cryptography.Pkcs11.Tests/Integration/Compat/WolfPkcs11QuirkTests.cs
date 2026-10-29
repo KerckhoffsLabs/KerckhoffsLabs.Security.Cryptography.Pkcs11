@@ -432,4 +432,14 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"C_DeriveKey(CKM_ECDH1_DERIVE) with a DER peer value whose length lies no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11RefusesAMalformedEcdhPeerAsInvalid to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void HkdfOutputAboveTheRfcLimit_QuirkStillPresent()
+    {
+        var (rv, _) = Derive.HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 255 x 32 + 1");
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_DeriveKey(CKM_HKDF_DERIVE) past RFC 5869's limit no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAnHkdfOutputAboveTheRfcLimit to true and delete this test.");
+    }
 }

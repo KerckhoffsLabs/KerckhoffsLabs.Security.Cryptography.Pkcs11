@@ -346,6 +346,31 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmRefusesAnEcdhValueLenAboveTheSecret = false;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with SHA-256 and <c>CKA_VALUE_LEN</c> 8161 (255 x 32 + 1, past
+    /// RFC 5869's limit) answers <c>CKR_GENERAL_ERROR</c>, and with <c>CKA_VALUE_LEN</c> 2^32 + 1 answers <c>CKR_OK</c>
+    /// and makes a 1-byte key (the length cut to its low 32 bits). PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// BouncyHsmQuirkTests.HkdfOutputAboveTheRfcLimit_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with <c>CKF_HKDF_SALT_KEY</c> and an EC public key as
+    /// <c>hSaltKey</c> answers <c>CKR_OBJECT_HANDLE_INVALID</c>; the handle is a valid key's. PKCS#11 v3.2 §6.62.2
+    /// names no code: <c>CKR_MECHANISM_PARAM_INVALID</c>, <c>CKR_KEY_HANDLE_INVALID</c> or
+    /// <c>CKR_KEY_TYPE_INCONSISTENT</c> (§5.1.6).
+    /// BouncyHsmQuirkTests.HkdfSaltKeyOfTheWrongType_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent = false;
+
+    /// <summary>
+    /// Gate for the out-of-range HKDF parameter case: see <see cref="BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit"/> and
+    /// <see cref="BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent"/>.
+    /// </summary>
+    public static bool HkdfParameterRefusalAvailable =>
+        BouncyHsmAvailable && BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit && BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

@@ -286,6 +286,14 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticRefusesAMalformedEcdhPeerAsInvalid = false;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with SHA-256 and <c>CKA_VALUE_LEN</c> 8161 (255 x 32 + 1, past
+    /// RFC 5869's limit) answers <c>CKR_DEVICE_ERROR</c>; 2^32 + 1 and a salt key that is no secret key are refused as
+    /// they should be. PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// </summary>
+    public const bool KryopticRefusesAnHkdfOutputAboveTheRfcLimit = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

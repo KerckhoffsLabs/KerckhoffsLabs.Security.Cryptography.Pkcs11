@@ -28,4 +28,13 @@ public sealed class HkdfTests_Kryoptic(KryopticBackendFixture backend)
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ExtractOnly_MatchesBclViaSignProbe() => HkdfTestCases.Assert_ExtractOnly_MatchesBclViaSignProbe(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(HkdfTestCases.HkdfParameterFaults), MemberType = typeof(HkdfTestCases))]
+    public void Hkdf_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault == "CKA_VALUE_LEN 255 x 32 + 1" && !KryopticBackendFixture.KryopticRefusesAnHkdfOutputAboveTheRfcLimit)
+            Assert.Skip("Kryoptic refuses an HKDF output past RFC 5869's limit with CKR_DEVICE_ERROR");
+        HkdfTestCases.Assert_Hkdf_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
 }

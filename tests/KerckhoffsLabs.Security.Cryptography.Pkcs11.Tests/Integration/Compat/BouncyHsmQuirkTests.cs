@@ -711,4 +711,26 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_DeriveKey(CKM_ECDH1_DERIVE) on P-256 with CKA_VALUE_LEN 33 no longer makes 00 || Z (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesAnEcdhValueLenAboveTheSecret to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void HkdfOutputAboveTheRfcLimit_QuirkStillPresent()
+    {
+        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        var (rv, _) = HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 255 x 32 + 1");
+        var (narrowed, length) = HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 2^32 + 1");
+
+        Assert.True(rv == CKR.CKR_GENERAL_ERROR && narrowed == CKR.CKR_OK && length == 1,
+            $"C_DeriveKey(CKM_HKDF_DERIVE) past RFC 5869's limit no longer answers CKR_GENERAL_ERROR, or 2^32 + 1 a 1-byte key (got {rv}; {narrowed}, {length}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void HkdfSaltKeyOfTheWrongType_QuirkStillPresent()
+    {
+        var (rv, _) = HkdfTestCases.DeriveHkdfWithFault(_backend, "a salt key that is an EC public key");
+
+        Assert.True(rv == CKR.CKR_OBJECT_HANDLE_INVALID,
+            $"C_DeriveKey(CKM_HKDF_DERIVE) with an EC public key as the salt key no longer answers CKR_OBJECT_HANDLE_INVALID (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent to true and delete this test.");
+    }
 }
