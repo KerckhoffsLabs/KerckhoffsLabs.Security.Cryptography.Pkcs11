@@ -87,4 +87,10 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers an RSA-OAEP blob of the wrong length with CKR_DEVICE_ERROR")]
     public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void RsaX509_Verify_RequiresTheLeadingBytes() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_RequiresTheLeadingBytes(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
 }

@@ -132,6 +132,17 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="SoftHsmRefusesAnOaepBlobByItsLength"/>.</summary>
     public static bool OaepBlobLengthRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesAnOaepBlobByItsLength;
 
+    /// <summary>
+    /// False while <c>C_Verify(CKM_RSA_X_509)</c> with more data than the modulus has bytes ends the test process:
+    /// <c>AsymVerify</c> in <c>src/lib/SoftHSM.cpp</c> zero-pads the data to the modulus's length with
+    /// <c>data.wipe(size - ulDataLen)</c>, which wraps around for <c>ulDataLen &gt; size</c>. PKCS#11 v3.2 §6.1.12
+    /// (Table 45: at most k bytes) and §5.1.6: <c>CKR_DATA_LEN_RANGE</c>. Not yet reported upstream.
+    /// </summary>
+    public const bool SoftHsmSurvivesAnOverlongRawRsaVerify = false;
+
+    /// <summary>Gate for the over-long raw RSA verify case: see <see cref="SoftHsmSurvivesAnOverlongRawRsaVerify"/>.</summary>
+    public static bool OverlongRawRsaVerifyAvailable => SoftHsmAvailable && SoftHsmSurvivesAnOverlongRawRsaVerify;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

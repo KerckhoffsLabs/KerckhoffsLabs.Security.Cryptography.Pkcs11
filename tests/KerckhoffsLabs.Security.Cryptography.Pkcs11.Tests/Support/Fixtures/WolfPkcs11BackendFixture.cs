@@ -168,6 +168,14 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11RefusesAKeyWrapBlobByItsLength = false;
 
+    /// <summary>
+    /// False while <c>C_Verify(CKM_RSA_X_509)</c> with more data than the modulus has bytes answers
+    /// <c>CKR_FUNCTION_FAILED</c> (wolfPKCS11's own test expects it). PKCS#11 v3.2 §6.1.12 (Table 45: at most k
+    /// bytes) and §5.1.6: <c>CKR_DATA_LEN_RANGE</c>. The token key verifies the right data afterwards.
+    /// WolfPkcs11QuirkTests.OverlongRawRsaVerify_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesOverlongRawRsaDataByItsLength = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 
@@ -188,6 +196,9 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for cases that verify an RSA signature of the wrong length: see <see cref="WolfPkcs11RejectsWrongLengthRsaSignatures"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsWrongLengthRsaSignatures;
+
+    /// <summary>Gate for the over-long raw RSA verify case: see <see cref="WolfPkcs11RefusesOverlongRawRsaDataByItsLength"/>.</summary>
+    public static bool OverlongRawRsaVerifyAvailable => WolfPkcs11Available && WolfPkcs11RefusesOverlongRawRsaDataByItsLength;
 
     public WolfPkcs11BackendFixture()
     {

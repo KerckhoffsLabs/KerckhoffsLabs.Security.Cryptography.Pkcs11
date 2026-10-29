@@ -376,4 +376,50 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"C_UnwrapKey(CKM_AES_KEY_WRAP) of a 20-byte blob no longer answers CKR_WRAPPED_KEY_INVALID (got {ex?.Message ?? "no error"}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11RefusesAKeyWrapBlobByItsLength to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void OverlongRawRsaVerify_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var onToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+        using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var bits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, 2048UL);
+        using var exponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
+        session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), [pubClass, keyType, onToken, verify, bits, exponent],
+            [privClass, keyType, onToken, sign], out ObjectHandle pub, out ObjectHandle priv);
+        CKR rv, again;
+        try
+        {
+            byte[] m = RandomNumberGenerator.GetBytes(256);
+            m[0] = 0x01;
+            byte[] signature = new byte[256];
+            using var scope = new MechanismParameterScope();
+#pragma warning disable KLPKCS11008, KLPKCS11009 // CKM_RSA_X_509 through the raw dispatch.
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_RSA_X_509).Marshal(scope, out _);
+#pragma warning restore KLPKCS11008, KLPKCS11009
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_SignInit(sid, in mech, (NativeCULong)priv.ObjectId));
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_Sign(sid, m, signature, lengthOnly: false, out _));
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_VerifyInit(sid, in mech, (NativeCULong)pub.ObjectId));
+            rv = lowLevel.C_Verify(sid, [.. m, 0x00], signature);
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_VerifyInit(sid, in mech, (NativeCULong)pub.ObjectId));
+            again = lowLevel.C_Verify(sid, m, signature);
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.Equal(CKR.CKR_OK, again);
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_Verify(CKM_RSA_X_509) of 257 bytes under a 2048-bit key no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesOverlongRawRsaDataByItsLength to true and delete this test.");
+    }
 }

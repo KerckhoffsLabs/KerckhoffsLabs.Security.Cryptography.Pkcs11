@@ -86,4 +86,10 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void RsaX509_Verify_RequiresTheLeadingBytes() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_RequiresTheLeadingBytes(_backend);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
 }

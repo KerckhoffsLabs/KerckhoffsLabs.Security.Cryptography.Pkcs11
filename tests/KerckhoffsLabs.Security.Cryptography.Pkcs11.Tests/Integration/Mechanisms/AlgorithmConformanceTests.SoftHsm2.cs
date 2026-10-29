@@ -102,4 +102,10 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 answers an RSA-OAEP blob of the wrong length with CKR_GENERAL_ERROR")]
     public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void RsaX509_Verify_RequiresTheLeadingBytes() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_RequiresTheLeadingBytes(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.OverlongRawRsaVerifyAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 ends the process on an over-long raw RSA C_Verify")]
+    public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
 }

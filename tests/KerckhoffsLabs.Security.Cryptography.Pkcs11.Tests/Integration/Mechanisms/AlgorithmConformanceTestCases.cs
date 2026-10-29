@@ -21,10 +21,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// <summary>
 /// What the algorithms compute, checked on every real backend against a reference the test holds: the RSA-PSS
 /// salt and mask the token was asked for, read back out of its signatures; RSA-OAEP's randomisation, key
-/// transport and wrapped-key length; the PKCS#1 v1.5 length bound; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the
-/// curves the rest of the suite does not reach; the 224-bit digests; <c>C_DigestKey</c>; key agreement with a
-/// KDF, with the cofactor and on X448; HKDF with SHA-512 and with a salt key; SHA-256 key derivation; AES key
-/// wrap's IV and integrity check; ML-KEM and HashML-DSA under the wrong key or hash; and a saved digest state.
+/// transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA verification; the RFC 8032 EdDSA
+/// variants other than pure Ed25519; ECDSA on the curves the rest of the suite does not reach; the 224-bit
+/// digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on X448; HKDF with SHA-512 and
+/// with a salt key; SHA-256 key derivation; AES key wrap's IV and integrity check; ML-KEM and HashML-DSA under
+/// the wrong key or hash; and a saved digest state.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -346,6 +347,99 @@ internal static class AlgorithmConformanceTestCases
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         });
     }
+
+    // === Raw RSA ================================================================
+
+    // A 2048-bit signing key pair for CKM_RSA_X_509, on the token when asked: the lock a module takes on a token
+    // key is the one an early return can leave held.
+    private static (ObjectHandle Pub, ObjectHandle Priv) GenerateRawRsaPair(Pkcs11SessionCore session, bool onToken)
+    {
+        using var template = new Template(
+        [
+            new(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_RSA), new(CKA.CKA_TOKEN, onToken),
+            new(CKA.CKA_VERIFY, true), new(CKA.CKA_MODULUS_BITS, 2048UL), new(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]),
+        ]);
+        using var privTemplate = new Template(
+        [
+            new(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_RSA), new(CKA.CKA_TOKEN, onToken),
+            new(CKA.CKA_SENSITIVE, true), new(CKA.CKA_SIGN, true),
+        ]);
+        session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), template.Attributes, privTemplate.Attributes, out var pub, out var priv);
+        return (pub, priv);
+    }
+
+    // A full 256-byte block whose top byte is not zero and below every 2048-bit modulus's (0x80 and up).
+    private static byte[] RawRsaBlock()
+    {
+        byte[] m = RandomNumberGenerator.GetBytes(256);
+        m[0] = 0x01;
+        return m;
+    }
+
+    private static CKR RawRsa(Func<NativeCULong, CK_MECHANISM, CKR> call, NativeCULong key)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = new Mechanism(CKM.CKM_RSA_X_509).Marshal(scope, out _);
+        return call(key, mech);
+    }
+
+    private static byte[] RawRsaSign(LowLevelPkcs11Library lowLevel, NativeCULong sid, ObjectHandle priv, byte[] m)
+    {
+        Assert.Equal(CKR.CKR_OK, RawRsa((k, mech) => lowLevel.C_SignInit(sid, in mech, k), (NativeCULong)priv.ObjectId));
+        byte[] signature = new byte[256];
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_Sign(sid, m, signature, lengthOnly: false, out NativeCULong length));
+        Assert.Equal(256UL, (ulong)length);
+        return signature;
+    }
+
+    private static CKR RawRsaVerify(LowLevelPkcs11Library lowLevel, NativeCULong sid, ObjectHandle pub, ReadOnlySpan<byte> data, byte[] signature)
+    {
+        Assert.Equal(CKR.CKR_OK, RawRsa((k, mech) => lowLevel.C_VerifyInit(sid, in mech, k), (NativeCULong)pub.ObjectId));
+        return lowLevel.C_Verify(sid, data, signature);
+    }
+
+    private static void WithRawRsa(IPkcs11Backend backend, bool onToken, Action<LowLevelPkcs11Library, NativeCULong, ObjectHandle, ObjectHandle> body)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_X_509);
+        backend.RequireMechanismFlags(CKM.CKM_RSA_X_509, f => f.Sign && f.Verify, "CKF_SIGN and CKF_VERIFY");
+        WithSession(backend, session =>
+        {
+            var (pub, priv) = GenerateRawRsaPair(session, onToken);
+            try { body(backend.Library.LowLevelLibrary!, (NativeCULong)session.SessionId, pub, priv); }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
+    // Raw RSA compares the zero-padded data with the whole k-byte block the signature recovers (§6.1.12: the
+    // input is converted to an integer, so its leading zero bytes are the only ones it may leave out). A
+    // signature over a block m whose top byte is not zero therefore verifies m, and does not verify m[1..]: a
+    // module that compares only the trailing bytes accepts it for data it does not sign (CKR_SIGNATURE_INVALID,
+    // §5.15.2). Through the raw dispatch: raw RSA is outside the library's policy.
+    internal static void Assert_RsaX509_Verify_RequiresTheLeadingBytes(IPkcs11Backend backend) =>
+        WithRawRsa(backend, onToken: false, (lowLevel, sid, pub, priv) =>
+        {
+            byte[] m = RawRsaBlock();
+            byte[] signature = RawRsaSign(lowLevel, sid, priv, m);
+            Assert.Equal(CKR.CKR_OK, RawRsaVerify(lowLevel, sid, pub, m, signature));
+            CKR rv = RawRsaVerify(lowLevel, sid, pub, m.AsSpan(1), signature);
+            Assert.True(rv == CKR.CKR_SIGNATURE_INVALID, $"C_Verify(CKM_RSA_X_509) of m[1..] under a signature over m returned {rv}.");
+        });
+
+    // C_Verify with CKM_RSA_X_509 takes at most k bytes of data (§6.1.12, Table 45): 257 bytes under a 2048-bit
+    // token key are refused, with CKR_DATA_LEN_RANGE, or CKR_SIGNATURE_INVALID from a module that checks the
+    // signature against the data as given, and the refusal ends the operation (§5.15.2). The token key then
+    // verifies the right data at once: a module that kept the key locked on the error would hang or refuse it.
+    internal static void Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(IPkcs11Backend backend) =>
+        WithRawRsa(backend, onToken: true, (lowLevel, sid, pub, priv) =>
+        {
+            byte[] m = RawRsaBlock();
+            byte[] signature = RawRsaSign(lowLevel, sid, priv, m);
+            CKR rv = RawRsaVerify(lowLevel, sid, pub, [.. m, 0x00], signature);
+            Assert.True(rv is CKR.CKR_DATA_LEN_RANGE or CKR.CKR_SIGNATURE_INVALID,
+                $"C_Verify(CKM_RSA_X_509) of 257 bytes under a 2048-bit key returned {rv}.");
+            Assert.Equal(CKR.CKR_OK, RawRsaVerify(lowLevel, sid, pub, m, signature));
+            Assert.Equal(signature, RawRsaSign(lowLevel, sid, priv, m));
+        });
 
     // === EdDSA ==================================================================
 
