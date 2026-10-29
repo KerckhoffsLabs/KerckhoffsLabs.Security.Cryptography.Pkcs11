@@ -109,4 +109,13 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void StorageControls_DefaultToTrue() => ObjectConformanceTestCases.Assert_StorageControls_DefaultToTrue(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.RefusedKeyPairs), MemberType = typeof(ObjectConformanceTestCases))]
+    public void RefusedKeyPairGeneration_LeavesNothing(string refused)
+    {
+        if (refused == "CKA_UNIQUE_ID in the private key template" && !CratonHsmBackendFixture.CratonHsmRefusesAUniqueIdInATemplate)
+            Assert.Skip("Craton HSM generates a key pair with a CKA_UNIQUE_ID in the private key's template");
+        ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
+    }
 }

@@ -122,4 +122,13 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void StorageControls_DefaultToTrue() => ObjectConformanceTestCases.Assert_StorageControls_DefaultToTrue(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.RefusedKeyPairs), MemberType = typeof(ObjectConformanceTestCases))]
+    public void RefusedKeyPairGeneration_LeavesNothing(string refused)
+    {
+        if (refused == "CKA_UNIQUE_ID in the private key template" && !FreeHsmBackendFixture.FreeHsmRefusesAUniqueIdInATemplate)
+            Assert.Skip("FreeHSM generates a key pair with a CKA_UNIQUE_ID in the private key's template");
+        ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
+    }
 }

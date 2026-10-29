@@ -109,4 +109,13 @@ public sealed class ObjectConformanceTests_Kryoptic(KryopticBackendFixture backe
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void StorageControls_DefaultToTrue() => ObjectConformanceTestCases.Assert_StorageControls_DefaultToTrue(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.RefusedKeyPairs), MemberType = typeof(ObjectConformanceTestCases))]
+    public void RefusedKeyPairGeneration_LeavesNothing(string refused)
+    {
+        if (refused == "CKA_UNIQUE_ID in the private key template" && !KryopticBackendFixture.KryopticRefusesAUniqueIdWithReadOnly)
+            Assert.Skip("Kryoptic generates a key pair with a CKA_UNIQUE_ID in the private key's template");
+        ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
+    }
 }

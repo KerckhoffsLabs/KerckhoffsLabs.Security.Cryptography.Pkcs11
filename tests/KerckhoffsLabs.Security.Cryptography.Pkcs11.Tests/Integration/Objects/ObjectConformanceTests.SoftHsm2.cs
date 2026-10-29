@@ -127,4 +127,14 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void StorageControls_DefaultToTrue() => ObjectConformanceTestCases.Assert_StorageControls_DefaultToTrue(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.RefusedKeyPairs), MemberType = typeof(ObjectConformanceTestCases))]
+    public void RefusedKeyPairGeneration_LeavesNothing(string refused)
+    {
+        // SoftHSM2 refuses a CKA_UNIQUE_ID in the private key's template with CKR_ATTRIBUTE_TYPE_INVALID (it has no
+        // such attribute) after it has made the public key, and leaves that key behind.
+        ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused,
+            leavesAnObjectBehind: refused == "CKA_UNIQUE_ID in the private key template");
+    }
 }

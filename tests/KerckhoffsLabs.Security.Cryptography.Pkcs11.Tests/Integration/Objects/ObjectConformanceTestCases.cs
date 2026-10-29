@@ -1163,4 +1163,64 @@ internal static class ObjectConformanceTestCases
             }
         });
     }
+
+    // === A refused key pair generation ==========================================
+
+    public static TheoryData<string> RefusedKeyPairs =>
+        ["RSA modulus below the minimum", "EC curve the token does not know", "CKA_UNIQUE_ID in the private key template"];
+
+    // "If a call to C_GenerateKeyPair cannot support the precise templates supplied to it, it will fail and return
+    // without creating any key objects" (§5.18.2). Each row asks for a pair the token must refuse: a 256-bit RSA
+    // modulus, below every advertised minimum (CKR_KEY_SIZE_RANGE); an EC curve by an OID no curve has
+    // (1.2.3.4, CKR_CURVE_NOT_SUPPORTED or CKR_ATTRIBUTE_VALUE_INVALID); and a CKA_UNIQUE_ID in the private key's
+    // template only, so that a token that makes the public key first has to undo it (§4.4.1). Whatever the code,
+    // no object carries the label both templates give. Through the raw call: the library would refuse the curve
+    // itself, and retries a generation that fails with CKR_FUNCTION_FAILED. leavesAnObjectBehind records a backend
+    // that refuses the pair but keeps the key it made first.
+    internal static void Assert_RefusedKeyPairGeneration_LeavesNothing(IPkcs11Backend backend, string refused, bool leavesAnObjectBehind = false)
+    {
+        CKM mechanism = refused.StartsWith("RSA", StringComparison.Ordinal) ? CKM.CKM_RSA_PKCS_KEY_PAIR_GEN : CKM.CKM_EC_KEY_PAIR_GEN;
+        backend.RequireMechanism(mechanism);
+        if (mechanism == CKM.CKM_RSA_PKCS_KEY_PAIR_GEN)
+        {
+            MechanismInfo info = backend.Library.GetSlotList().First(sl => sl.SlotId.Value == (ulong)backend.SlotId).GetMechanismInfo(mechanism);
+            if (info.MinKeySize is > 0 and <= 256)
+                Assert.Skip($"The token advertises RSA key pairs from {info.MinKeySize} bits.");
+        }
+        WithSession(backend, session =>
+        {
+            string label = $"kl-refused-pair-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+            using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+            using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+            using var attrModulusBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, 256UL);
+            using var attrPublicExponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
+            using var attrUnknownCurve = new ObjectAttribute(CKA.CKA_EC_PARAMS, (byte[])[0x06, 0x03, 0x2A, 0x03, 0x04]);
+            using var attrP256 = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+            using var attrUniqueId = new ObjectAttribute(CKA.CKA_UNIQUE_ID, "kl-chosen-id");
+            (ObjectAttribute[] publicTemplate, ObjectAttribute[] privateTemplate) = refused switch
+            {
+                "RSA modulus below the minimum" => ([attrToken, attrLabel, attrVerify, attrModulusBits, attrPublicExponent], [attrToken, attrLabel, attrSign, attrSensitive]),
+                "EC curve the token does not know" => ([attrToken, attrLabel, attrVerify, attrUnknownCurve], [attrToken, attrLabel, attrSign, attrSensitive]),
+                _ => ((ObjectAttribute[])[attrToken, attrLabel, attrVerify, attrP256], (ObjectAttribute[])[attrToken, attrLabel, attrSign, attrSensitive, attrUniqueId]),
+            };
+            CK_ATTRIBUTE[] publicRaw = [.. publicTemplate.Select(a => a.CkAttribute)];
+            CK_ATTRIBUTE[] privateRaw = [.. privateTemplate.Select(a => a.CkAttribute)];
+            var ckMechanism = new CK_MECHANISM { Mechanism = (NativeCULong)(ulong)mechanism };
+            CKR rv = backend.Library.LowLevelLibrary!.C_GenerateKeyPair((NativeCULong)session.SessionId, in ckMechanism, publicRaw, privateRaw, out _, out _);
+            GC.KeepAlive(publicTemplate);
+            GC.KeepAlive(privateTemplate);
+
+            List<ObjectHandle> left = session.FindAllObjects([attrLabel]);
+            foreach (ObjectHandle handle in left)
+                session.DestroyObject(handle);
+            Assert.True(rv != CKR.CKR_OK, $"{refused}: C_GenerateKeyPair made the key pair.");
+            if (leavesAnObjectBehind)
+                Assert.NotEmpty(left);
+            else
+                Assert.True(left.Count == 0, $"{refused}: C_GenerateKeyPair returned {rv} and left {left.Count} object(s) behind.");
+        });
+    }
 }

@@ -152,6 +152,15 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the data object copy case: see <see cref="FreeHsmKeepsCkaObjectId"/>.</summary>
     public static bool DataObjectIdAvailable => FreeHsmAvailable && FreeHsmKeepsCkaObjectId;
 
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair</c> with a <c>CKA_UNIQUE_ID</c> in the private key's template makes the key
+    /// pair, though the token does not report <c>CKA_UNIQUE_ID</c> at all. PKCS#11 v3.2 §4.4.1: a
+    /// <c>CKA_UNIQUE_ID</c> in the template of an operation that creates objects "MUST fail"
+    /// (<c>CKR_ATTRIBUTE_READ_ONLY</c>; a token without the attribute answers <c>CKR_ATTRIBUTE_TYPE_INVALID</c>,
+    /// §4.1.1 point 1), and §5.18.2 makes nothing then.
+    /// </summary>
+    public const bool FreeHsmRefusesAUniqueIdInATemplate = false;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

@@ -112,9 +112,9 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>
     /// False while a <c>CKA_UNIQUE_ID</c> from the caller is refused with other codes than
     /// <c>CKR_ATTRIBUTE_READ_ONLY</c>: <c>C_CreateObject</c> with one answers <c>CKR_ATTRIBUTE_TYPE_INVALID</c> and
-    /// <c>C_SetAttributeValue</c> of one <c>CKR_ACTION_PROHIBITED</c>; <c>C_CopyObject</c> answers
-    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>. PKCS#11 v3.2 §4.4.1: such operations "MUST fail" with
-    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>.
+    /// <c>C_SetAttributeValue</c> of one <c>CKR_ACTION_PROHIBITED</c>, and <c>C_GenerateKeyPair</c> with one in the
+    /// private key's template makes the key pair; <c>C_CopyObject</c> answers <c>CKR_ATTRIBUTE_READ_ONLY</c>.
+    /// PKCS#11 v3.2 §4.4.1: such operations "MUST fail" with <c>CKR_ATTRIBUTE_READ_ONLY</c>.
     /// </summary>
     public const bool KryopticRefusesAUniqueIdWithReadOnly = false;
 
