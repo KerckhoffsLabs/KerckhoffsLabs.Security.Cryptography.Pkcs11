@@ -167,7 +167,7 @@ internal static class BufferConventionTestCases
                             byte[] expected = encrypt ? [.. ciphertext, .. tag] : Message;
 
                             var mechanism = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(nonce, [], 128));
-                            var updates = new MemoryStream();
+                            using var updates = new MemoryStream();
                             void Start()
                             {
                                 updates.SetLength(0);
