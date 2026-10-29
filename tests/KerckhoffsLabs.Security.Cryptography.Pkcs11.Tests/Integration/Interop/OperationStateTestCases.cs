@@ -95,7 +95,7 @@ internal static class OperationStateTestCases
         "C_Sign", "C_SignUpdate", "C_SignFinal",
         "C_Verify", "C_VerifyUpdate", "C_VerifyFinal",
         "C_FindObjects", "C_FindObjectsFinal",
-        "C_SignRecover", "C_VerifyRecover", "C_VerifyRecover with a sign active",
+        "C_SignRecover", "C_VerifyRecover", "C_VerifyRecover with a sign active", "C_DigestKey",
     ];
 
     // A call that continues or ends an operation the session never started answers
@@ -103,7 +103,8 @@ internal static class OperationStateTestCases
     // operation on an error, as the signal to start it again. The recover rows run where CKM_RSA_PKCS has
     // CKF_SIGN_RECOVER or CKF_VERIFY_RECOVER, the only sign of a module that implements the function. An active
     // signature is no verification with recovery (§5.15.6): C_VerifyRecover with a C_SignInit active has
-    // nothing to continue either, and the signature is still there to finish.
+    // nothing to continue either, and the signature is still there to finish. C_DigestKey continues a digest
+    // (§5.12.4) like C_DigestUpdate, here with a secret key it could digest.
     internal static void Assert_CallWithoutInit_IsOperationNotInitialized(IPkcs11Backend backend, string call, CKR expected = CKR.CKR_OPERATION_NOT_INITIALIZED)
     {
         backend.RequireMechanism(CKM.CKM_SHA256);
@@ -131,6 +132,14 @@ internal static class OperationStateTestCases
                     Assert.True(session.Verify(ecdsa, pub, digest, signature));
                 }
                 finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                AssertDigestStillRuns(lowLevel, sid);
+                return;
+            }
+            if (call == "C_DigestKey")
+            {
+                ObjectHandle key = TestKeys.CreateGenericSecretKey(session, RandomNumberGenerator.GetBytes(32));
+                try { AssertRv(expected, lowLevel.C_DigestKey(sid, (NativeCULong)key.ObjectId), call + " without an Init"); }
+                finally { session.DestroyObject(key); }
                 AssertDigestStillRuns(lowLevel, sid);
                 return;
             }

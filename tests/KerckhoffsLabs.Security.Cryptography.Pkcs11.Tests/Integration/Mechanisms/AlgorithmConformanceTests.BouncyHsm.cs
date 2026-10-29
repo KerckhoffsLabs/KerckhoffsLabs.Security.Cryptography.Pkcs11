@@ -92,4 +92,7 @@ public sealed class AlgorithmConformanceTests_BouncyHsm(BouncyHsmBackendFixture 
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
 }

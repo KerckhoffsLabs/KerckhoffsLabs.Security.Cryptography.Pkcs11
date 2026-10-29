@@ -102,4 +102,7 @@ public sealed class AlgorithmConformanceTests_CratonHsm(CratonHsmBackendFixture 
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
 }

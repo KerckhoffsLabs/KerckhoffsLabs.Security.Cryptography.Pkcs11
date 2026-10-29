@@ -223,6 +223,16 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="KryopticRefusesAnOaepBlobByItsLength"/>.</summary>
     public static bool OaepBlobLengthRefusalAvailable => KryopticAvailable && KryopticRefusesAnOaepBlobByItsLength;
 
+    /// <summary>
+    /// False while <c>C_DigestKey</c> of a key that is not a secret key (an EC private key) answers
+    /// <c>CKR_KEY_HANDLE_INVALID</c>: <c>digest_key</c> in <c>src/fns/digest.rs</c>. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_KEY_INDIGESTIBLE</c> ("perhaps the key isn't a secret key"); the handle is a valid key's.
+    /// </summary>
+    public const bool KryopticReportsAPrivateKeyAsIndigestible = false;
+
+    /// <summary>Gate for the private-key <c>C_DigestKey</c> case: see <see cref="KryopticReportsAPrivateKeyAsIndigestible"/>.</summary>
+    public static bool PrivateKeyDigestRefusalAvailable => KryopticAvailable && KryopticReportsAPrivateKeyAsIndigestible;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

@@ -645,6 +645,45 @@ internal static class AlgorithmConformanceTestCases
         });
     }
 
+    // C_DigestKey digests a secret key's value only: an EC private key "cannot be digested" (CKR_KEY_INDIGESTIBLE,
+    // PKCS#11 v3.2 §5.1.6: "perhaps the key isn't a secret key"; §5.12.4). After that refusal the digest either
+    // goes on, so that C_DigestFinal gives the digest of the data fed before it, or was ended, so that
+    // C_DigestFinal answers CKR_OPERATION_NOT_INITIALIZED; either way the next C_DigestInit succeeds.
+    internal static void Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_SHA256, CKM.CKM_EC_KEY_PAIR_GEN);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        WithSession(backend, session =>
+        {
+            var sid = (NativeCULong)session.SessionId;
+            var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+            try
+            {
+                CKR DigestInit()
+                {
+                    using var scope = new MechanismParameterScope();
+                    CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256).Marshal(scope, out _);
+                    return lowLevel.C_DigestInit(sid, in mech);
+                }
+                Assert.Equal(CKR.CKR_OK, DigestInit());
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestUpdate(sid, Message));
+                CKR rv = lowLevel.C_DigestKey(sid, (NativeCULong)priv.ObjectId);
+                Assert.True(rv == CKR.CKR_KEY_INDIGESTIBLE, $"C_DigestKey of an EC private key returned {rv}.");
+
+                byte[] digest = new byte[32];
+                CKR final = lowLevel.C_DigestFinal(sid, digest, lengthOnly: false, out _);
+                Assert.True(final is CKR.CKR_OK or CKR.CKR_OPERATION_NOT_INITIALIZED,
+                    $"C_DigestFinal after the refused C_DigestKey returned {final}.");
+                if (final == CKR.CKR_OK)
+                    Assert.Equal(SHA256.HashData(Message), digest);
+                Assert.Equal(CKR.CKR_OK, DigestInit());
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Digest(sid, Message, digest, lengthOnly: false, out _));
+                Assert.Equal(SHA256.HashData(Message), digest);
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
     // === Key agreement ==========================================================
 
     // SP 800-56A ECC CDH for P-256 (the suite's ECDH known answer): our private scalar, the peer's point, and Z.

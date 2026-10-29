@@ -143,6 +143,18 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the over-long raw RSA verify case: see <see cref="SoftHsmSurvivesAnOverlongRawRsaVerify"/>.</summary>
     public static bool OverlongRawRsaVerifyAvailable => SoftHsmAvailable && SoftHsmSurvivesAnOverlongRawRsaVerify;
 
+    /// <summary>
+    /// False while <c>C_DigestKey</c> digests the <c>CKA_VALUE</c> of any object that has one, a sensitive EC private
+    /// key's scalar included: <c>C_DigestKey</c> in <c>src/lib/SoftHSM.cpp</c> checks neither the class nor, for
+    /// SHA-1 and SHA-2, <c>CKA_SENSITIVE</c> or <c>CKA_EXTRACTABLE</c>. Confirmed with an imported P-256 key: the
+    /// digest is SHA-256 of its private scalar. PKCS#11 v3.2 §5.12.4 digests "the value of a secret key", and
+    /// §5.1.6 has a key that is not one answer <c>CKR_KEY_INDIGESTIBLE</c>. Not yet reported upstream.
+    /// </summary>
+    public const bool SoftHsmRefusesToDigestAPrivateKey = false;
+
+    /// <summary>Gate for the private-key <c>C_DigestKey</c> case: see <see cref="SoftHsmRefusesToDigestAPrivateKey"/>.</summary>
+    public static bool PrivateKeyDigestRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesToDigestAPrivateKey;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

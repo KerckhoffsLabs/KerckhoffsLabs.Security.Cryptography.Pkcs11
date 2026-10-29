@@ -108,4 +108,7 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.OverlongRawRsaVerifyAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 ends the process on an over-long raw RSA C_Verify")]
     public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.PrivateKeyDigestRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 digests an EC private key's scalar")]
+    public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
 }

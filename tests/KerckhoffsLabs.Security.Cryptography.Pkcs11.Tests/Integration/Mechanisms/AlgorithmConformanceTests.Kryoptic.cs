@@ -93,4 +93,7 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.PrivateKeyDigestRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers C_DigestKey of a private key with CKR_KEY_HANDLE_INVALID")]
+    public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
 }
