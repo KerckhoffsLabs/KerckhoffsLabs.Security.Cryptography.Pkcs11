@@ -139,6 +139,135 @@ internal static class SessionConformanceTestCases
         Assert.Equal(backend.SupportedMechanisms.Order(), list.Order());
     }
 
+    // === What the token advertises holds ======================================
+
+    // Every RSA mechanism of §6.1 the token lists gives its key size range in modulus bits (§6.1.4-§6.1.10: "the
+    // supported range of RSA modulus sizes, in bits"), so a token that makes a 2048-bit key reports a range
+    // containing 2048 for each, where it reports one at all (a [0, 0] range reports nothing).
+    internal static void Assert_RsaMechanisms_AdvertiseThe2048BitKeysTheyTake(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        using (var session = TestKeys.OpenLoggedInSession(backend))
+        {
+            try
+            {
+                var (pub, priv) = TestKeys.GenerateRsa2048SigningKeyPair(session);
+                session.DestroyObject(priv);
+                session.DestroyObject(pub);
+            }
+            finally { TestKeys.LogoutIfRequired(backend, session); }
+        }
+
+        Pkcs11Slot slot = Slot(backend);
+        var outside = new List<string>();
+        foreach (CKM mechanism in backend.SupportedMechanisms.Where(IsRsaModulusMechanism).Order())
+        {
+            MechanismInfo info = slot.GetMechanismInfo(mechanism);
+            if (info.MaxKeySize != 0 && (info.MinKeySize > 2048 || info.MaxKeySize < 2048))
+                outside.Add($"{mechanism} [{info.MinKeySize}, {info.MaxKeySize}]");
+        }
+        Assert.True(outside.Count == 0, $"The token makes a 2048-bit RSA key but advertises ranges without 2048 for: {string.Join(", ", outside)}.");
+    }
+
+    // The §6.1 mechanisms whose CK_MECHANISM_INFO sizes are RSA modulus bits.
+    private static bool IsRsaModulusMechanism(CKM mechanism)
+    {
+        string name = mechanism.ToString();
+        return name is "CKM_RSA_PKCS_KEY_PAIR_GEN" or "CKM_RSA_X9_31_KEY_PAIR_GEN" or "CKM_RSA_PKCS" or "CKM_RSA_X_509"
+                or "CKM_RSA_9796" or "CKM_RSA_PKCS_OAEP" or "CKM_RSA_PKCS_PSS" or "CKM_RSA_X9_31"
+            || (name.StartsWith("CKM_SHA", StringComparison.Ordinal)
+                && (name.EndsWith("_RSA_PKCS", StringComparison.Ordinal) || name.EndsWith("_RSA_PKCS_PSS", StringComparison.Ordinal)));
+    }
+
+    public static TheoryData<CKM> AdvertisedKeyWraps =>
+        [CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_PAD, CKM.CKM_AES_KEY_WRAP_KWP, CKM.CKM_AES_KEY_WRAP_PKCS7, CKM.CKM_RSA_PKCS_OAEP];
+
+    // A mechanism the token lists with CKF_WRAP wraps an extractable AES-256 key, and one it lists with CKF_UNWRAP
+    // as well unwraps the result to a key that decrypts what the original encrypts (§5.5.6: the flags say what the mechanism
+    // can be used for). The AES key wraps and RSA-OAEP (SHA-256, MGF1-SHA-256) only: the modes that wrap by
+    // encrypting (AES-ECB, AES-CBC-PAD, AES-GCM), RSA PKCS#1 v1.5 and raw RSA, and the other key types, are
+    // WrapUnwrapKeyTestCases' and the mechanism cases' to cover. The comparison runs one block through AES-ECB,
+    // or AES-CBC under one random IV, whichever the token has; the policy is relaxed for it and for the wraps,
+    // which is the token's behaviour under test, not the library's.
+    internal static void Assert_AdvertisedWrapMechanism_WrapsAnAesKey(IPkcs11Backend backend, CKM mechanism)
+    {
+        backend.RequireMechanismFlags(mechanism, f => f.Wrap, "CKF_WRAP");
+        if (mechanism == CKM.CKM_RSA_PKCS_OAEP)
+            backend.RequireMechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        else
+            backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+        bool unwraps = Slot(backend).GetMechanismInfo(mechanism).MechanismFlags.Unwrap;
+
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var created = new List<ObjectHandle>();
+        try
+        {
+            ObjectHandle wrapping, unwrapping;
+            Mechanism wrap;
+            if (mechanism == CKM.CKM_RSA_PKCS_OAEP)
+            {
+                (wrapping, unwrapping) = TestKeys.GenerateRsa2048KeyPair(session);
+                created.AddRange([wrapping, unwrapping]);
+                wrap = new Mechanism(mechanism, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
+            }
+            else
+            {
+                wrapping = unwrapping = TestKeys.GenerateAes256WrappingKey(session);
+                created.Add(wrapping);
+                wrap = new Mechanism(mechanism);
+            }
+            ObjectHandle target = TestKeys.ImportExtractableAesKey(session, RandomNumberGenerator.GetBytes(32));
+            created.Add(target);
+
+            byte[] wrapped = session.WrapKey(wrap, wrapping, target);
+            Assert.NotEmpty(wrapped);
+            if (!unwraps)
+                return;
+
+            using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+            ObjectHandle unwrapped = session.UnwrapKey(wrap, unwrapping, wrapped, [attrClass, attrKeyType, attrToken, attrDecrypt]);
+            created.Add(unwrapped);
+
+#pragma warning disable KLPKCS11009 // one block, only to tell the two keys apart, under the relaxed policy
+            Mechanism? block = backend.Supports(CKM.CKM_AES_ECB) ? new Mechanism(CKM.CKM_AES_ECB)
+                : backend.Supports(CKM.CKM_AES_CBC) ? new Mechanism(CKM.CKM_AES_CBC, RandomNumberGenerator.GetBytes(16))
+                : null;
+#pragma warning restore KLPKCS11009
+            if (block is not null)
+            {
+                byte[] data = RandomNumberGenerator.GetBytes(16);
+                Assert.Equal(data, session.Decrypt(block, unwrapped, session.Encrypt(block, target, data)));
+            }
+        }
+        finally
+        {
+            foreach (ObjectHandle handle in created)
+                session.DestroyObject(handle);
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    // A token with a clock (CKF_CLOCK_ON_TOKEN) reports the time in utcTime as YYYYMMDDhhmmss followed by two
+    // reserved '0' characters (§3.2, CK_TOKEN_INFO), a valid date and time.
+    internal static void Assert_ClockOnToken_ReportsAWellFormedUtcTime(IPkcs11Backend backend)
+    {
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        AssertRv(CKR.CKR_OK, lowLevel.C_GetTokenInfo(backend.SlotId, out CK_TOKEN_INFO info), "C_GetTokenInfo");
+        if (((ulong)info.Flags & CKF.CKF_CLOCK_ON_TOKEN) == 0)
+            Assert.Skip("The token has no clock (CKF_CLOCK_ON_TOKEN clear).");
+
+        string utcTime = System.Text.Encoding.ASCII.GetString(info.UtcTime);
+        Assert.True(utcTime.Length == 16 && utcTime.All(char.IsAsciiDigit) && utcTime.EndsWith("00", StringComparison.Ordinal),
+            $"utcTime \"{utcTime.Replace("\0", "\\0", StringComparison.Ordinal)}\" is not YYYYMMDDhhmmss00.");
+        Assert.True(DateTime.TryParseExact(utcTime[..14], "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out _),
+            $"utcTime \"{utcTime}\" is no valid date and time.");
+    }
+
     // === Session information and states ========================================
 
     // A session's state follows the token's login (§5.6): read/write or read-only, public or user. A login is

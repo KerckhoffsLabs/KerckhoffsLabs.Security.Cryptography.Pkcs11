@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sessions;
@@ -63,4 +64,14 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.ShortMechanismListAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm leaves *pulCount as given on CKR_BUFFER_TOO_SMALL")]
     public void MechanismList_OneShort_IsBufferTooSmall() => SessionConformanceTestCases.Assert_MechanismList_OneShort_IsBufferTooSmall(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void RsaMechanisms_AdvertiseThe2048BitKeysTheyTake() => SessionConformanceTestCases.Assert_RsaMechanisms_AdvertiseThe2048BitKeysTheyTake(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void ClockOnToken_ReportsAWellFormedUtcTime() => SessionConformanceTestCases.Assert_ClockOnToken_ReportsAWellFormedUtcTime(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.AdvertisedKeyWraps), MemberType = typeof(SessionConformanceTestCases))]
+    public void AdvertisedWrapMechanism_WrapsAnAesKey(CKM mechanism) => SessionConformanceTestCases.Assert_AdvertisedWrapMechanism_WrapsAnAesKey(_backend, mechanism);
 }
