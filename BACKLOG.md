@@ -852,9 +852,9 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S
-- **Location:** `.gitmodules`; untagged pins `vendor/softhsmv2` = `884cb38f` (28 commits past `2.7.0`), `vendor/opencryptoki` = `1cf36153` (390 past `v3.27.0`), `vendor/craton-hsm-core` = `ab729b47` (no upstream tags); `.github/dependabot.yml` (no `gitsubmodule` ecosystem)
+- **Location:** `.gitmodules`; untagged pins `vendor/softhsmv2` = `884cb38f` (28 commits past `2.7.0`), `vendor/opencryptoki` = `1cf36153` (390 past `v3.27.0`), `vendor/craton-hsm-core` = `89c6daf8` (v0.10.6 by its version bump; no upstream tags); `.github/dependabot.yml` (no `gitsubmodule` ecosystem)
 - **Problem:** Two of the four backends are pinned to mid-development upstream commits rather than releases, so the "three independent real backends" evidence rests partly on unreleased upstream code — and the `ci.yml` comment misstates the opencryptoki pin as the v3.27.0 release. Submodule SHAs also feed the native-artifact cache key (`ci.yml:170`), so a bump silently changes what the whole matrix tests. There is no `CODEOWNERS` and no `gitsubmodule` entry for dependency automation, so a submodule bump arrives as an opaque one-line SHA diff.
-- **Remaining scope:** SoftHSMv2 (`884cb38f`, 28 commits past 2.7.0), opencryptoki (`1cf36153`, 390 past v3.27.0) and craton-hsm-core (`ab729b47`, no upstream tags) are still untagged pins, with no in-tree record of why. `dependabot.yml` covers `nuget`, `pip` and `github-actions` but not `gitsubmodule`.
+- **Remaining scope:** SoftHSMv2 (`884cb38f`, 28 commits past 2.7.0), opencryptoki (`1cf36153`, 390 past v3.27.0) and craton-hsm-core (`89c6daf8`, the v0.10.6 version bump; no upstream tags) are still untagged pins, with no in-tree record of why. `dependabot.yml` covers `nuget`, `pip` and `github-actions` but not `gitsubmodule`.
 - **Proposed action:** Move each submodule to a tagged release where possible, or add a short `vendor/README.md` recording why each non-tag pin was chosen and what it fixes; correct the `ci.yml:225` comment; and add `.github/CODEOWNERS` covering `vendor/`, `.github/workflows/`, `build/` and `Directory.Build.props` so infrastructure and pin changes always require an owner's review.
 - **Breaks public API?** No
 - **Raised by:** QA C

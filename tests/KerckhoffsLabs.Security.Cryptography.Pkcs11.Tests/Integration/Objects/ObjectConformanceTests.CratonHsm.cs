@@ -70,4 +70,7 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
         // Craton HSM creates an object of an undefined class, and an AES key with no value or of 13 bytes.
         ObjectConformanceTestCases.Assert_MalformedTemplate_CreatesNothing(_backend, malformed, acceptedByTheBackend: malformed != "no CKA_CLASS");
     }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void MixedRead_FillsTheReadableAttributes() => ObjectConformanceTestCases.Assert_MixedRead_FillsTheReadableAttributes(_backend);
 }
