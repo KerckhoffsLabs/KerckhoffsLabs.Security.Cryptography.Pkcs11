@@ -178,4 +178,39 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"A sensitive ML-DSA private key no longer reveals the length of its CKA_VALUE (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmHidesSensitivePqcPrivateKeys to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void MissingKeyAttribute_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrExponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
+        Exception? ex;
+        try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrKeyType, attrToken, attrExponent]))); }
+        finally { session.Logout(); }
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_ATTRIBUTE_VALUE_INVALID },
+            "C_CreateObject of an RSA public key without CKA_MODULUS no longer answers CKR_ATTRIBUTE_VALUE_INVALID " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "success"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmReportsAMissingKeyAttributeAsIncomplete to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SecretKeyWithoutAKeyType_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, new byte[32]);
+        Exception? ex;
+        try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrToken, attrValue]))); }
+        finally { session.Logout(); }
+
+        Assert.True(ex is null,
+            "C_CreateObject of a secret key without CKA_KEY_TYPE no longer makes a key " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesASecretKeyWithoutAKeyType to true and delete this test.");
+    }
 }

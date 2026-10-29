@@ -581,4 +581,71 @@ internal static class ObjectConformanceTestCases
         });
     }
 
+    public static TheoryData<string> IncompleteTemplates =>
+    [
+        "RSA key pair without CKA_MODULUS_BITS", "EC key pair without CKA_EC_PARAMS", "RSA public key without CKA_MODULUS",
+        "RSA private key without CKA_MODULUS", "EC public key without CKA_EC_PARAMS", "EC private key without CKA_EC_PARAMS",
+        "secret key without CKA_KEY_TYPE",
+    ];
+
+    // A template that leaves out an attribute the object needs is refused with CKR_TEMPLATE_INCOMPLETE and
+    // creates nothing (§4.1.1, point 4). Each left-out attribute is one its table says MUST be specified:
+    // CKA_MODULUS_BITS and the public key's CKA_EC_PARAMS when a key pair is generated (footnote 3, §6.1.2,
+    // §6.3.3), CKA_MODULUS, CKA_EC_PARAMS and CKA_KEY_TYPE when a key is created (footnote 1, §6.1.2, §6.1.3,
+    // §6.3.3, §6.3.4, §4.8). Every other value in the template is valid. Nothing carries the case's label after.
+    // leavesAnObjectBehind records a backend that refuses the template but keeps the object it started.
+    internal static void Assert_IncompleteTemplate_IsTemplateIncomplete(IPkcs11Backend backend, string incomplete, bool leavesAnObjectBehind = false)
+    {
+        if (incomplete.StartsWith("RSA key pair", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        else if (incomplete.StartsWith("EC key pair", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        WithSession(backend, session =>
+        {
+            string label = $"kl-incomplete-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+            using var attrPrivate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+            using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrRsa = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+            using var attrEc = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+            using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+            using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+            using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            using var attrModulusBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, 2048UL);
+            using var attrPublicExponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
+            using var attrPrivateExponent = new ObjectAttribute(CKA.CKA_PRIVATE_EXPONENT, RandomNumberGenerator.GetBytes(256));
+            using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+            using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            ECParameters ec = ecdsa.ExportParameters(includePrivateParameters: true);
+            using var attrEcPoint = new ObjectAttribute(CKA.CKA_EC_POINT, TestKeys.DerEcPoint(ec.Q.X!, ec.Q.Y!));
+            using var attrEcValue = new ObjectAttribute(CKA.CKA_VALUE, ec.D!);
+            using var attrValue32 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+
+            Action refused = incomplete switch
+            {
+                "RSA key pair without CKA_MODULUS_BITS" => () => session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
+                    [attrToken, attrLabel, attrVerify, attrPublicExponent], [attrToken, attrLabel, attrSign, attrSensitive], out _, out _),
+                "EC key pair without CKA_EC_PARAMS" => () => session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN),
+                    [attrToken, attrLabel, attrVerify], [attrToken, attrLabel, attrSign, attrSensitive], out _, out _),
+                "RSA public key without CKA_MODULUS" => () => session.CreateObject([attrPublic, attrRsa, attrToken, attrLabel, attrVerify, attrPublicExponent]),
+                "RSA private key without CKA_MODULUS" => () => session.CreateObject([attrPrivate, attrRsa, attrToken, attrLabel, attrSign, attrSensitive, attrPublicExponent, attrPrivateExponent]),
+                "EC public key without CKA_EC_PARAMS" => () => session.CreateObject([attrPublic, attrEc, attrToken, attrLabel, attrVerify, attrEcPoint]),
+                "EC private key without CKA_EC_PARAMS" => () => session.CreateObject([attrPrivate, attrEc, attrToken, attrLabel, attrSign, attrSensitive, attrEcValue]),
+                _ => () => session.CreateObject([attrSecret, attrToken, attrLabel, attrEncrypt, attrSensitive, attrValue32]),
+            };
+            Exception? ex = Record.Exception(refused);
+            List<ObjectHandle> left = session.FindAllObjects([attrLabel]);
+            foreach (ObjectHandle handle in left)
+                session.DestroyObject(handle);
+            Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_TEMPLATE_INCOMPLETE },
+                $"{incomplete}: expected CKR_TEMPLATE_INCOMPLETE, got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "success"}.");
+            if (leavesAnObjectBehind)
+                Assert.NotEmpty(left);
+            else
+                Assert.True(left.Count == 0, $"{incomplete}: the refused call left {left.Count} object(s) behind.");
+        });
+    }
 }

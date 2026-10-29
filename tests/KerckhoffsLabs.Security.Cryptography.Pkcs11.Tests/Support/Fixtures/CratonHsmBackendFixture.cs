@@ -124,6 +124,19 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the C_Logout handle case: see <see cref="CratonHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => CratonHsmAvailable && CratonHsmDestroysPrivateSessionObjectsOnLogout;
 
+    /// <summary>
+    /// False while a template without an attribute PKCS#11 v3.2 says must be given still makes an object:
+    /// <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> without <c>CKA_MODULUS_BITS</c> (§6.1.2, footnote 3),
+    /// and <c>C_CreateObject</c> of an RSA public key without <c>CKA_MODULUS</c>, an EC public or private key
+    /// without <c>CKA_EC_PARAMS</c> (§6.1.2, §6.3.3, §6.3.4, footnote 1) and a secret key without
+    /// <c>CKA_KEY_TYPE</c> (§4.8, footnote 1) answer <c>CKR_OK</c>; an RSA private key without <c>CKA_MODULUS</c>
+    /// is refused with <c>CKR_TEMPLATE_INCONSISTENT</c>. §4.1.1 point 4: <c>CKR_TEMPLATE_INCOMPLETE</c>.
+    /// </summary>
+    public const bool CratonHsmRequiresTheKeyAttributes = false;
+
+    /// <summary>Gate for the incomplete-template case: see <see cref="CratonHsmRequiresTheKeyAttributes"/>.</summary>
+    public static bool IncompleteTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRequiresTheKeyAttributes;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

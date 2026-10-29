@@ -77,4 +77,8 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
     public void SensitivePrivateKey_HidesItsSecretParts(string keyType) => ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.IncompleteTemplateRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM makes keys from templates without the attributes they need")]
+    [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
+    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete) => ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
 }

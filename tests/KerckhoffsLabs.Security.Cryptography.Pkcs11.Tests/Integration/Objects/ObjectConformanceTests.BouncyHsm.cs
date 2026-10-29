@@ -84,4 +84,17 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
             Assert.Skip("BouncyHsm reveals the CKA_VALUE of a sensitive ML-DSA or ML-KEM private key");
         ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
     }
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
+    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete)
+    {
+        if (incomplete is "RSA public key without CKA_MODULUS" or "RSA private key without CKA_MODULUS"
+            or "EC public key without CKA_EC_PARAMS" or "EC private key without CKA_EC_PARAMS"
+            && !BouncyHsmBackendFixture.BouncyHsmReportsAMissingKeyAttributeAsIncomplete)
+            Assert.Skip("BouncyHsm answers a key without CKA_MODULUS or CKA_EC_PARAMS with CKR_ATTRIBUTE_VALUE_INVALID");
+        if (incomplete == "secret key without CKA_KEY_TYPE" && !BouncyHsmBackendFixture.BouncyHsmRefusesASecretKeyWithoutAKeyType)
+            Assert.Skip("BouncyHsm makes a secret key without CKA_KEY_TYPE");
+        ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
+    }
 }

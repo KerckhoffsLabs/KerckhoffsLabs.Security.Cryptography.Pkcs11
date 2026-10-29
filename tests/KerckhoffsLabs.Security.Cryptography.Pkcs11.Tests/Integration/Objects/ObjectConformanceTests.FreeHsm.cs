@@ -71,4 +71,14 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
             Assert.Skip("FreeHSM answers a sensitive RSA key's private exponent with CKR_ATTRIBUTE_TYPE_INVALID");
         ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
     }
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
+    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete)
+    {
+        if (incomplete is "RSA key pair without CKA_MODULUS_BITS" or "EC key pair without CKA_EC_PARAMS" or "EC private key without CKA_EC_PARAMS"
+            && !FreeHsmBackendFixture.FreeHsmRequiresTheKeyAttributes)
+            Assert.Skip("FreeHSM generates a key pair without CKA_MODULUS_BITS or CKA_EC_PARAMS");
+        ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
+    }
 }

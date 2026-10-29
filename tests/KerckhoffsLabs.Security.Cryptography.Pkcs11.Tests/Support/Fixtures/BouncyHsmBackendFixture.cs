@@ -143,6 +143,24 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for SP 800-108 double-pipeline cases: see <see cref="BouncyHsmDoublePipelineMatchesSp800108"/>.</summary>
     public static bool Sp800108DoublePipelineAvailable => BouncyHsmAvailable && BouncyHsmDoublePipelineMatchesSp800108;
 
+    /// <summary>
+    /// False while a key template without its <c>CKA_MODULUS</c> or <c>CKA_EC_PARAMS</c> is refused with
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>: <c>C_CreateObject</c> of an RSA public or private key without
+    /// <c>CKA_MODULUS</c>, or an EC public or private key without <c>CKA_EC_PARAMS</c>. PKCS#11 v3.2 §4.1.1
+    /// point 4 has <c>CKR_TEMPLATE_INCOMPLETE</c> for a template missing an attribute the object needs (footnote 1,
+    /// §6.1.2, §6.1.3, §6.3.3, §6.3.4). Not yet reported upstream.
+    /// BouncyHsmQuirkTests.MissingKeyAttribute_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmReportsAMissingKeyAttributeAsIncomplete = false;
+
+    /// <summary>
+    /// False while <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> without <c>CKA_KEY_TYPE</c> makes a key, where
+    /// PKCS#11 v3.2 §4.8 (footnote 1) says <c>CKA_KEY_TYPE</c> must be given (§4.1.1 point 4:
+    /// <c>CKR_TEMPLATE_INCOMPLETE</c>). Not yet reported upstream.
+    /// BouncyHsmQuirkTests.SecretKeyWithoutAKeyType_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesASecretKeyWithoutAKeyType = false;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

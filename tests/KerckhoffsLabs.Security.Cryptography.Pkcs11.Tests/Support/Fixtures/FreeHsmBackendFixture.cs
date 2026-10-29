@@ -92,6 +92,15 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the C_Logout handle case: see <see cref="FreeHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => FreeHsmAvailable && FreeHsmDestroysPrivateSessionObjectsOnLogout;
 
+    /// <summary>
+    /// False while a key pair can be generated without the attribute that sizes it: <c>C_GenerateKeyPair</c> with
+    /// <c>CKM_RSA_PKCS_KEY_PAIR_GEN</c> and no <c>CKA_MODULUS_BITS</c>, or <c>CKM_EC_KEY_PAIR_GEN</c> and no
+    /// <c>CKA_EC_PARAMS</c>, answers <c>CKR_OK</c>, where PKCS#11 v3.2 §6.1.2 and §6.3.3 (footnote 3) say they
+    /// must be given (§4.1.1 point 4: <c>CKR_TEMPLATE_INCOMPLETE</c>); and <c>C_CreateObject</c> of an EC private
+    /// key without <c>CKA_EC_PARAMS</c> answers <c>CKR_TEMPLATE_INCONSISTENT</c>.
+    /// </summary>
+    public const bool FreeHsmRequiresTheKeyAttributes = false;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

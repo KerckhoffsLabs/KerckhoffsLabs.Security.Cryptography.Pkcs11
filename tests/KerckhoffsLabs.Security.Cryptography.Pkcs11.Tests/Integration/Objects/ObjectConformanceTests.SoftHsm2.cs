@@ -70,4 +70,15 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
     public void SensitivePrivateKey_HidesItsSecretParts(string keyType) => ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
+    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete)
+    {
+        // SoftHSM2 refuses a public or private key template without CKA_MODULUS or CKA_EC_PARAMS but leaves the
+        // object behind, as it does for an AES key with no value.
+        ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete,
+            leavesAnObjectBehind: incomplete is "RSA public key without CKA_MODULUS" or "RSA private key without CKA_MODULUS"
+                or "EC public key without CKA_EC_PARAMS" or "EC private key without CKA_EC_PARAMS");
+    }
 }
