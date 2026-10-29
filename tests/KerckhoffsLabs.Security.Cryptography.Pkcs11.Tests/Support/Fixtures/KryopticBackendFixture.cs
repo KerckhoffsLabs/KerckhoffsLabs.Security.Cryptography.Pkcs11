@@ -99,6 +99,16 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticRefusesTokenObjectWritesInReadOnlySessions = false;
 
+    /// <summary>
+    /// False while <c>C_SetPIN</c> takes a PIN shorter than the token's own <c>ulMinPinLen</c>: <c>C_GetTokenInfo</c>
+    /// reports 8 (<c>src/token.rs</c>), but only the NSS database storage checks a PIN's length, so a 7-byte PIN is
+    /// set. PKCS#11 v3.2 §5.5.9 and §5.1.6: a PIN of a length outside the range is <c>CKR_PIN_LEN_RANGE</c>.
+    /// </summary>
+    public const bool KryopticEnforcesItsMinimumPinLength = false;
+
+    /// <summary>Gate for the PIN length case: see <see cref="KryopticEnforcesItsMinimumPinLength"/>.</summary>
+    public static bool PinLengthRangeAvailable => KryopticAvailable && KryopticEnforcesItsMinimumPinLength;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

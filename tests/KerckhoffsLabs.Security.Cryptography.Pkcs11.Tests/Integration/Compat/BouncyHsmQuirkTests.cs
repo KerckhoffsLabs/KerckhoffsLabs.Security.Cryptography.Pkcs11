@@ -133,4 +133,14 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesPrivateObjectsToTheSo to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void MinimumPinLength_QuirkStillPresent()
+    {
+        TokenInfo token = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId).GetTokenInfo();
+
+        Assert.True(token.MinPinLen == token.MaxPinLen && token.MinPinLen > (ulong)_backend.UserPin.Length,
+            $"C_GetTokenInfo no longer reports ulMinPinLen as ulMaxPinLen (got [{token.MinPinLen}, {token.MaxPinLen}]): set " +
+            "BouncyHsmBackendFixture.BouncyHsmReportsItsMinimumPinLength to true and delete this test.");
+    }
 }

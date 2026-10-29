@@ -59,4 +59,7 @@ public sealed class SessionConformanceTests_SoftHsm(SoftHsmBackendFixture backen
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
 }

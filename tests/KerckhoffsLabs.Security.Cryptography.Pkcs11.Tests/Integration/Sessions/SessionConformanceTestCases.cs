@@ -17,8 +17,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sessions
 /// </summary>
 /// <remarks>
 /// Nothing here changes the fixture's token beyond its own objects: a wrong PIN is tried once and followed by
-/// the right one at once, so no token counts towards a lockout; no PIN is changed; the SO logs in with the
-/// right PIN only, and is logged out again whatever fails.
+/// the right one at once, so no token counts towards a lockout; no PIN is changed (a C_SetPIN to a PIN of a
+/// length the token refuses is undone if the token takes it); the SO logs in with the right PIN only, and is
+/// logged out again whatever fails.
 /// </remarks>
 internal static class SessionConformanceTestCases
 {
@@ -287,6 +288,62 @@ internal static class SessionConformanceTestCases
         using (var pin = new SecurePin(backend.UserPin.Span))
         using (var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin))
             Assert.Equal(16, opened.GenerateRandom(16).Length);
+    }
+
+    // A PIN shorter than ulMinPinLen or longer than ulMaxPinLen (§3.2, CK_TOKEN_INFO) logs nobody in, and C_SetPIN
+    // will not set one: CKR_PIN_LEN_RANGE, "The specified PIN is too long or too short" (§5.1.6, §5.5.9), after
+    // which the old PIN still logs in. C_Login may answer CKR_PIN_LEN_RANGE or CKR_PIN_INCORRECT: §5.1.6 says the
+    // first "only applies to functions which attempt to set a PIN", yet C_Login of a PIN no token could hold is
+    // refused for its length all the same, and §5.6.8 lists neither as wrong. No wrong PIN of a valid length is
+    // ever presented, and every refusal is followed at once by a login with the right PIN, so no token is left a
+    // try short; a token that counts the refusal and then refuses the right PIN fails here, and the rest of its
+    // collection with it. A length of 0 is never tried (a NULL PIN means the protected authentication path,
+    // §5.6.8), nor one above 1024 bytes. A C_SetPIN that does take the PIN is undone.
+    internal static void Assert_PinOutsideTheLengthRange_IsRefused(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        TokenInfo token = Slot(backend).GetTokenInfo();
+        bool hasMin = token.MinPinLen != CK.CK_UNAVAILABLE_INFORMATION;
+        bool hasMax = token.MaxPinLen != 0 && token.MaxPinLen != CK.CK_UNAVAILABLE_INFORMATION; // 0: CK_EFFECTIVELY_INFINITE
+        ulong own = (ulong)backend.UserPin.Length;
+        Assert.True((!hasMin || own >= token.MinPinLen) && (!hasMax || own <= token.MaxPinLen),
+            $"The token's PIN length range [{token.MinPinLen}, {token.MaxPinLen}] leaves out the {own}-byte user PIN it was given.");
+        var outside = new List<byte[]>();
+        if (hasMin && token.MinPinLen >= 2)
+            outside.Add([.. Enumerable.Repeat((byte)'7', (int)token.MinPinLen - 1)]);
+        if (hasMax && token.MaxPinLen < 1024)
+            outside.Add([.. Enumerable.Repeat((byte)'7', (int)token.MaxPinLen + 1)]);
+        if (outside.Count == 0)
+            Assert.Skip($"The token's PIN length range [{token.MinPinLen}, {token.MaxPinLen}] leaves no length to try.");
+
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+        NativeCULong session = OpenRawSession(lowLevel, backend.SlotId);
+        try
+        {
+            foreach (byte[] pin in outside)
+            {
+                string what = $"a {pin.Length}-byte PIN (range [{token.MinPinLen}, {token.MaxPinLen}])";
+                CKR rv = lowLevel.C_Login(session, CKU.CKU_USER, pin);
+                Assert.True(rv is CKR.CKR_PIN_LEN_RANGE or CKR.CKR_PIN_INCORRECT, $"C_Login with {what} returned {rv}.");
+                Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, session).State);
+                AssertRv(CKR.CKR_OK, lowLevel.C_Login(session, CKU.CKU_USER, backend.UserPin.Span), $"C_Login with the right PIN after {what}");
+
+                rv = lowLevel.C_SetPIN(session, backend.UserPin.Span, pin);
+                if (rv == CKR.CKR_OK)
+                    AssertRv(CKR.CKR_OK, lowLevel.C_SetPIN(session, pin, backend.UserPin.Span), "C_SetPIN back to the right PIN");
+                AssertRv(CKR.CKR_PIN_LEN_RANGE, rv, $"C_SetPIN to {what}");
+                AssertRv(CKR.CKR_OK, lowLevel.C_Logout(session), "C_Logout");
+                AssertRv(CKR.CKR_OK, lowLevel.C_Login(session, CKU.CKU_USER, backend.UserPin.Span), $"C_Login with the old PIN after C_SetPIN to {what}");
+                AssertRv(CKR.CKR_OK, lowLevel.C_Logout(session), "C_Logout");
+            }
+        }
+        finally
+        {
+            lowLevel.C_Logout(session);
+            lowLevel.C_CloseSession(session);
+        }
     }
 
     // === Access without a login ================================================

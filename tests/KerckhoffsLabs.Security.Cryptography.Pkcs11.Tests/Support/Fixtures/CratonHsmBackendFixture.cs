@@ -108,6 +108,19 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the read-only session cases: see <see cref="CratonHsmMakesSessionObjectsInReadOnlySessions"/>.</summary>
     public static bool ReadOnlySessionObjectsAvailable => CratonHsmAvailable && CratonHsmMakesSessionObjectsInReadOnlySessions;
 
+    /// <summary>
+    /// False while any refused <c>C_Login</c> locks the right PIN out for a while: <c>C_Login</c> does not check a
+    /// PIN's length, so one shorter than <c>ulMinPinLen</c> counts as a failed login, which opens a backoff window
+    /// (<c>check_rate_limit</c> in <c>src/token/token.rs</c>) during which the right PIN is refused with
+    /// <c>CKR_PIN_LOCKED</c>, though the PIN is not locked. Every case that logs in after a refused PIN fails, and
+    /// so does the rest of the collection, so the cases that present one do not run here, and there is no
+    /// tripwire: reproducing it would lock the collection out.
+    /// </summary>
+    public const bool CratonHsmTakesTheRightPinRightAfterARefusedOne = false;
+
+    /// <summary>Gate for the cases that present a refused PIN: see <see cref="CratonHsmTakesTheRightPinRightAfterARefusedOne"/>.</summary>
+    public static bool RefusedPinRecoveryAvailable => CratonHsmAvailable && CratonHsmTakesTheRightPinRightAfterARefusedOne;
+
     /// <summary>Gate for the C_Logout handle case: see <see cref="CratonHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => CratonHsmAvailable && CratonHsmDestroysPrivateSessionObjectsOnLogout;
 

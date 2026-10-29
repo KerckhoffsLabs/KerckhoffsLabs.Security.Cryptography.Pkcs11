@@ -59,4 +59,7 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
             Assert.Skip("FreeHSM copies a token object in a read-only session");
         SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
     }
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
 }

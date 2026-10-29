@@ -57,4 +57,7 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.PinLengthRangeAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm reports its maximum PIN length as its minimum")]
+    public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
 }

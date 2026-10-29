@@ -65,4 +65,7 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
             Assert.Skip("Kryoptic copies a token object in a read-only session, and refuses its destruction with CKR_ACTION_PROHIBITED");
         SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
     }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.PinLengthRangeAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic sets a PIN shorter than its own minimum")]
+    public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
 }

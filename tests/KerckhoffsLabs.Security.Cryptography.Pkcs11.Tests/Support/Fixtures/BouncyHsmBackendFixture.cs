@@ -89,6 +89,18 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmRefusesPrivateObjectsToTheSo = false;
 
+    /// <summary>
+    /// False while <c>C_GetTokenInfo</c> reports <c>ulMinPinLen</c> as the maximum: the native client copies
+    /// <c>MaxPinLen</c> into both fields (<c>bouncy-pkcs11.c</c>, <c>C_GetTokenInfo</c>), so the token reports a
+    /// range of [512, 512] that leaves out the PIN it logs in with, where the server's own minimum is 4
+    /// (<c>P11Constants.MinPinLength</c>). PKCS#11 v3.2 §3.2 (<c>CK_TOKEN_INFO</c>). Not yet reported upstream.
+    /// BouncyHsmQuirkTests.MinimumPinLength_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmReportsItsMinimumPinLength = false;
+
+    /// <summary>Gate for the PIN length case: see <see cref="BouncyHsmReportsItsMinimumPinLength"/>.</summary>
+    public static bool PinLengthRangeAvailable => BouncyHsmAvailable && BouncyHsmReportsItsMinimumPinLength;
+
     /// <summary>Gate for the SO-and-user login case: see <see cref="BouncyHsmKeepsTheSoAndTheUserApart"/>.</summary>
     public static bool SoUserExclusionAvailable => BouncyHsmAvailable && BouncyHsmKeepsTheSoAndTheUserApart;
 
