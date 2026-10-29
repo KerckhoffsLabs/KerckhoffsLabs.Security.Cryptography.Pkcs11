@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// <summary>Cross-backend port of the SoftHSM2 key wrap/unwrap integration tests, run against wolfPKCS11.
 /// Each case runs across every <see cref="CKM"/> AES key-wrap variant and skips the ones wolfPKCS11
 /// doesn't advertise: wolfPKCS11 implements <see cref="CKM.CKM_AES_KEY_WRAP"/> and
-/// <see cref="CKM.CKM_AES_KEY_WRAP_KWP"/> (NIST SP800-38F).</summary>
+/// <see cref="CKM.CKM_AES_KEY_WRAP_PAD"/>, not <see cref="CKM.CKM_AES_KEY_WRAP_KWP"/>.</summary>
 [Collection("WolfPkcs11")]
 public sealed class WrapUnwrapKeyTests_WolfPkcs11(WolfPkcs11BackendFixture backend)
 {
