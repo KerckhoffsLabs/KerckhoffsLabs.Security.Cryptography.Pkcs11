@@ -99,4 +99,13 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.OperationStateMisuses), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void OperationState_Misuse_IsRefused(string misuse) => AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault)
+    {
+        if (fault == "hashAlg SHA-384" && !FreeHsmBackendFixture.FreeHsmRefusesAMismatchedPssHash)
+            Assert.Skip("FreeHSM signs CKM_SHA256_RSA_PKCS_PSS with SHA-256 whatever hashAlg says");
+        AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
+    }
 }

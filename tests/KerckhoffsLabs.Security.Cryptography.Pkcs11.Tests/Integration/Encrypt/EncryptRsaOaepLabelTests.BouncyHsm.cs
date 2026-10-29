@@ -15,4 +15,8 @@ public sealed class EncryptRsaOaepLabelTests_BouncyHsm(BouncyHsmBackendFixture b
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void OaepWithWrongLabel_FailsToDecrypt() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepWithWrongLabel_FailsToDecrypt(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.NullOaepLabelRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm takes a NULL OAEP label behind a length as the empty label")]
+    public void OaepNullLabelWithLength_IsRefused() =>
+        EncryptRsaOaepLabelTestCases.Assert_OaepNullLabelWithLength_IsRefused(_backend);
 }

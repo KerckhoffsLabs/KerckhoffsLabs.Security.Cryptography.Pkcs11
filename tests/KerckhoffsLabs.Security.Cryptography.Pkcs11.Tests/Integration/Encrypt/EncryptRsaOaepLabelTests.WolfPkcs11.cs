@@ -15,4 +15,8 @@ public sealed class EncryptRsaOaepLabelTests_WolfPkcs11(WolfPkcs11BackendFixture
     [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     public void OaepWithWrongLabel_FailsToDecrypt() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepWithWrongLabel_FailsToDecrypt(_backend);
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void OaepNullLabelWithLength_IsRefused() =>
+        EncryptRsaOaepLabelTestCases.Assert_OaepNullLabelWithLength_IsRefused(_backend);
 }

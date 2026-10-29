@@ -7,8 +7,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // The OAEP key-transport case compares two AES keys by what CKM_AES_CBC makes of one block under each, and the
@@ -20,8 +22,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 
 /// <summary>
 /// What the algorithms compute, checked on every real backend against a reference the test holds: the RSA-PSS
-/// salt and mask the token was asked for, read back out of its signatures; RSA-OAEP's randomisation, key
-/// transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA verification; the RFC 8032 EdDSA
+/// salt and mask the token was asked for, read back out of its signatures, and the PSS parameters it refuses;
+/// RSA-OAEP's randomisation, key transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA verification; the RFC 8032 EdDSA
 /// variants other than pure Ed25519; ECDSA on the curves the rest of the suite does not reach; the 224-bit
 /// digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on X448; HKDF with SHA-512 and
 /// with a salt key; SHA-256 key derivation; AES key wrap's IV and integrity check; ML-KEM and HashML-DSA under
@@ -191,6 +193,89 @@ internal static class AlgorithmConformanceTestCases
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         });
+    }
+
+    public static TheoryData<string> PssParameterFaults => ["hashAlg SHA-384", "sLen 2^32 + 32"];
+
+    // CK_RSA_PKCS_PSS_PARAMS for CKM_SHA256_RSA_PKCS_PSS (PKCS#11 v3.2 §6.1.9): hashAlg "must match the hash
+    // algorithm indicated by the signature mechanism", and sLen must be at most k* - 2 - hLen (§6.1.15), 222
+    // bytes for a 2048-bit key. CKM_SHA384 in hashAlg, or an sLen of 2^32 + 32 where CK_ULONG is 64 bits (a
+    // module that narrows it to 32 bits signs with a 32-byte salt), is an invalid parameter. C_SignInit and
+    // C_VerifyInit refuse it with CKR_MECHANISM_PARAM_INVALID (§5.1.6), or a module that checks the parameters
+    // against the key only when it signs takes the Init and then refuses C_Sign (§5.13.2 names no code for it, so
+    // any error is taken) and does not verify a signature under them; nothing is ever signed. Through the raw
+    // dispatch, as the library's parameter type takes neither. After each refusal the same session signs, and
+    // verifies, with SHA-256 and a 32-byte salt. ignoresPssParameters records a module that ignores hashAlg, sLen
+    // and mgf: it takes both Inits and signs and verifies as with SHA-256 and a 32-byte salt.
+    internal static void Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(IPkcs11Backend backend, string fault, bool ignoresPssParameters = false)
+    {
+        if (fault.Contains("2^32", StringComparison.Ordinal))
+            Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        WithSession(backend, session =>
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            var sid = (NativeCULong)session.SessionId;
+            var (pub, priv) = TestKeys.GenerateRsa2048SigningKeyPair(session);
+            try
+            {
+                Mechanism bad = RawPss(fault == "hashAlg SHA-384" ? CKM.CKM_SHA384 : CKM.CKM_SHA256,
+                    fault == "hashAlg SHA-384" ? 32UL : (1UL << 32) + 32);
+                Mechanism good = RawPss(CKM.CKM_SHA256, 32);
+                byte[] signature = new byte[256];
+                CKR rv = RawInit((mech, k) => lowLevel.C_SignInit(sid, in mech, k), bad, priv);
+                if (rv == CKR.CKR_OK)
+                {
+                    rv = lowLevel.C_Sign(sid, Message, signature, lengthOnly: false, out _);
+                    if (ignoresPssParameters)
+                    {
+                        Assert.Equal(CKR.CKR_OK, rv);
+                        Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), good, pub));
+                        Assert.Equal(CKR.CKR_OK, lowLevel.C_Verify(sid, Message, signature));
+                        Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), bad, pub));
+                        Assert.Equal(CKR.CKR_OK, lowLevel.C_Verify(sid, Message, signature));
+                        return;
+                    }
+                    Assert.True(rv is not (CKR.CKR_OK or CKR.CKR_BUFFER_TOO_SMALL),
+                        $"C_Sign(CKM_SHA256_RSA_PKCS_PSS) with {fault} signed (C_SignInit took it).");
+                }
+                else
+                    Assert.True(rv == CKR.CKR_MECHANISM_PARAM_INVALID, $"C_SignInit(CKM_SHA256_RSA_PKCS_PSS) with {fault} returned {rv}.");
+                Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_SignInit(sid, in mech, k), good, priv));
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Sign(sid, Message, signature, lengthOnly: false, out NativeCULong length));
+                Assert.Equal(256UL, (ulong)length);
+
+                rv = RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), bad, pub);
+                if (rv == CKR.CKR_OK)
+                {
+                    rv = lowLevel.C_Verify(sid, Message, signature);
+                    Assert.True(rv != CKR.CKR_OK, $"C_Verify(CKM_SHA256_RSA_PKCS_PSS) with {fault} verified a signature under SHA-256 and a 32-byte salt.");
+                }
+                else
+                    Assert.True(rv == CKR.CKR_MECHANISM_PARAM_INVALID, $"C_VerifyInit(CKM_SHA256_RSA_PKCS_PSS) with {fault} returned {rv}.");
+                Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), good, pub));
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Verify(sid, Message, signature));
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
+    private static Mechanism RawPss(CKM hashAlg, ulong saltLength)
+    {
+        var parameter = new CK_RSA_PKCS_PSS_PARAMS
+        {
+            HashAlg = (NativeCULong)(ulong)hashAlg,
+            Mgf = (NativeCULong)(ulong)CKG.CKG_MGF1_SHA256,
+            Len = (NativeCULong)saltLength,
+        };
+        return RawParameter.From(CKM.CKM_SHA256_RSA_PKCS_PSS, in parameter);
+    }
+
+    private static CKR RawInit(Func<CK_MECHANISM, NativeCULong, CKR> init, Mechanism mechanism, ObjectHandle key)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        return init(mech, (NativeCULong)key.ObjectId);
     }
 
     private static Mechanism Pss(int salt, CKG mgf) =>

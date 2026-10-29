@@ -308,6 +308,28 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmRefusesANullAadPointer = false;
 
+    /// <summary>
+    /// False while a <c>CK_ULONG</c> length in a mechanism parameter is cut to its low 32 bits on a 64-bit platform:
+    /// <c>C_SignInit</c> with <c>CKM_SHA256_HMAC_GENERAL</c> and a MAC length of 2^32 + 16 is taken and signs 16
+    /// bytes, <c>CKM_AES_CMAC_GENERAL</c> with 2^32 + 8 is taken too, and <c>CKM_SHA256_RSA_PKCS_PSS</c> with an
+    /// <c>sLen</c> of 2^32 + 32 signs with a 32-byte salt (a probe's signature verified under a 32-byte salt). PKCS#11 v3.2
+    /// §6.22.3, §6.14.3, §6.1.15 and §5.1.6: an out-of-range length is <c>CKR_MECHANISM_PARAM_INVALID</c>; the
+    /// in-range rows pass.
+    /// BouncyHsmQuirkTests.ParameterLengthAbove32Bits_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAParameterLengthAbove32Bits = false;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit(CKM_RSA_PKCS_OAEP)</c> with a NULL <c>pSourceData</c> behind <c>ulSourceDataLen</c>
+    /// 8 answers <c>CKR_OK</c> and encrypts with the empty label. PKCS#11 v3.2 §6.1.7: the length "must be 0" when
+    /// <c>pSourceData</c> is NULL; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>).
+    /// BouncyHsmQuirkTests.NullOaepLabel_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesANullOaepLabel = false;
+
+    /// <summary>Gate for the NULL OAEP label case: see <see cref="BouncyHsmRefusesANullOaepLabel"/>.</summary>
+    public static bool NullOaepLabelRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesANullOaepLabel;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

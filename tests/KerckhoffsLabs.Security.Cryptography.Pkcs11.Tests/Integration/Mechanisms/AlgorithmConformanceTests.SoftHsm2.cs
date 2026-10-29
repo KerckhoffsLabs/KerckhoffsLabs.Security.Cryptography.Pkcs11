@@ -115,4 +115,8 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.OperationStateMisuses), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void OperationState_Misuse_IsRefused(string misuse) => AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.PssParameterRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 refuses an out-of-range PSS parameter with CKR_ARGUMENTS_BAD or CKR_MECHANISM_INVALID")]
+    [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault) => AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
 }

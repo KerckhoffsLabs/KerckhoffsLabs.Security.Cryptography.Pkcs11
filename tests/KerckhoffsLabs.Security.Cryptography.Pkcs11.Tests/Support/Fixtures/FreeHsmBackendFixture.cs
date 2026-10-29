@@ -188,6 +188,14 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the AES-CTR counter overflow case: see <see cref="FreeHsmRefusesAnAesCtrCounterOverflow"/>.</summary>
     public static bool AesCtrCounterOverflowAvailable => FreeHsmAvailable && FreeHsmRefusesAnAesCtrCounterOverflow;
 
+    /// <summary>
+    /// False while <c>C_SignInit(CKM_SHA256_RSA_PKCS_PSS)</c> with <c>hashAlg</c> <c>CKM_SHA384</c> answers <c>CKR_OK</c>
+    /// and <c>C_Sign</c> signs as with SHA-256 (a probe's signature verified under SHA-256 and a 32-byte salt):
+    /// <c>hashAlg</c> is not checked against the mechanism. PKCS#11 v3.2 §6.1.9: it "must match the hash algorithm
+    /// indicated by the signature mechanism"; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>. The <c>sLen</c> row passes.
+    /// </summary>
+    public const bool FreeHsmRefusesAMismatchedPssHash = false;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

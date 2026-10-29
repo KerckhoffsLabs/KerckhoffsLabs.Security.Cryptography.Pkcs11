@@ -18,4 +18,8 @@ public sealed class MechanismParameterTests_CratonHsm(CratonHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.AesCtrParamsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM takes a bare counter block, not CK_AES_CTR_PARAMS")]
     public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
+    public void MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(string row) => MechanismParameterTestCases.Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(_backend, row);
 }

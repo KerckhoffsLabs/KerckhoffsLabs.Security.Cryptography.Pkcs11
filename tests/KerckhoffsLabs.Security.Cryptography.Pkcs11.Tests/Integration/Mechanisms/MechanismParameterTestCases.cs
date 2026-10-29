@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -13,7 +14,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// <summary>
 /// A mechanism parameter outside what PKCS#11 v3.2 allows is refused at the <c>C_*Init</c> that receives it,
 /// checked on every real backend: the AES-GCM and AES-CCM parameter blocks with a NULL pointer behind a length
-/// or a length out of its range, and AES-CTR's counter width and the overflow of its counter.
+/// or a length out of its range, AES-CTR's counter width and the overflow of its counter, and the output length of
+/// the general-length MACs.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -263,5 +265,80 @@ internal static class MechanismParameterTestCases
             }
             finally { session.DestroyObject(key); }
         });
+    }
+
+    // === General-length MACs ================================================
+
+    // RFC 4493 §4's AES-128 key and 64-byte message, whose CMAC is 51f0bebf7e3b9d92fc49741779363cfe.
+    private static readonly byte[] CmacKey = Convert.FromHexString("2b7e151628aed2a6abf7158809cf4f3c");
+    private static readonly byte[] CmacMessage = Convert.FromHexString(
+        "6bc1bee22e409f96e93d7e117393172a" + "ae2d8a571e03ac9c9eb76fac45af8e51" +
+        "30c81c46a35ce411e5fbc1191a0a52ef" + "f69f2445df4f9b17ad2b417be66c3710");
+    private static readonly byte[] CmacOfTheMessage = Convert.FromHexString("51f0bebf7e3b9d92fc49741779363cfe");
+
+    public static TheoryData<string> MacGeneralLengthsOutOfRange =>
+        ["HMAC-SHA256 33", "HMAC-SHA256 2^32 + 16", "CMAC 17", "CMAC 2^32 + 8"];
+
+    // A CK_MAC_GENERAL_PARAMS: the MAC length, a CK_ULONG.
+    private static Mechanism MacGeneral(CKM type, ulong length)
+    {
+        byte[] parameter = new byte[UnmanagedMemory.NativeULongSize];
+        if (parameter.Length == 8)
+            BinaryPrimitives.WriteUInt64LittleEndian(parameter, length);
+        else
+            BinaryPrimitives.WriteUInt32LittleEndian(parameter, checked((uint)length));
+        return new Mechanism(type, parameter);
+    }
+
+    // The general-length MACs take a CK_MAC_GENERAL_PARAMS holding the output length: 1 to 32 bytes for
+    // CKM_SHA256_HMAC_GENERAL (PKCS#11 v3.2 §6.22.3) and 1 to the block size for CKM_AES_CMAC_GENERAL (§6.14.3,
+    // Table 121). A length outside that is an invalid parameter, and C_SignInit refuses it with
+    // CKR_MECHANISM_PARAM_INVALID (§5.1.6). The rows above 2^32, where CK_ULONG is 64 bits, catch a module that
+    // narrows the length to 32 bits and signs 16 (8) bytes. After the refusal the same session signs with a length
+    // in range, and the MAC is the start of the full one (the BCL's HMAC-SHA256; RFC 4493's CMAC).
+    internal static void Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(IPkcs11Backend backend, string row)
+    {
+        bool hmac = row.StartsWith("HMAC", StringComparison.Ordinal);
+        if (row.Contains("2^32", StringComparison.Ordinal))
+            Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        CKM type = hmac ? CKM.CKM_SHA256_HMAC_GENERAL : CKM.CKM_AES_CMAC_GENERAL;
+        backend.RequireMechanismFlags(type, f => f.Sign, "CKF_SIGN");
+        ulong length = row switch
+        {
+            "HMAC-SHA256 33" => 33,
+            "HMAC-SHA256 2^32 + 16" => (1UL << 32) + 16,
+            "CMAC 17" => 17,
+            _ => (1UL << 32) + 8,
+        };
+        int inRange = hmac ? 16 : 8;
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = hmac ? RandomNumberGenerator.GetBytes(32) : CmacKey;
+            byte[] message = hmac ? Message : CmacMessage;
+            ObjectHandle key = CreateSigningKey(session, hmac ? CKK.CKK_GENERIC_SECRET : CKK.CKK_AES, rawKey);
+            try
+            {
+                CKR rv = Init(lowLevel.C_SignInit, sid, MacGeneral(type, length), key);
+                Assert.True(rv == CKR.CKR_MECHANISM_PARAM_INVALID, $"C_SignInit({type}) with a MAC length of {length} returned {rv}.");
+
+                AssertOk(Init(lowLevel.C_SignInit, sid, MacGeneral(type, (ulong)inRange), key), $"C_SignInit({type}) with a MAC length of {inRange} after the refusal");
+                byte[] mac = new byte[64];
+                AssertOk(lowLevel.C_Sign(sid, message, mac, lengthOnly: false, out NativeCULong written), "C_Sign");
+                byte[] full = hmac ? HMACSHA256.HashData(rawKey, message) : CmacOfTheMessage;
+                Assert.Equal(full[..inRange], mac.AsSpan(0, (int)(ulong)written).ToArray());
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    private static ObjectHandle CreateSigningKey(Pkcs11SessionCore session, CKK keyType, byte[] value)
+    {
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, keyType);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
+        return session.CreateObject([keyClass, type, token, sign, verify, attrValue]);
     }
 }

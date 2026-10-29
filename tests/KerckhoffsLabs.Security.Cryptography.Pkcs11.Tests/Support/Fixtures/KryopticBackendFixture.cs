@@ -261,6 +261,24 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the AES-CTR counter overflow case: see <see cref="KryopticEncryptsTheLastCounterValue"/>.</summary>
     public static bool AesCtrCounterOverflowAvailable => KryopticAvailable && KryopticEncryptsTheLastCounterValue;
 
+    /// <summary>
+    /// False while <c>C_SignInit(CKM_SHA256_RSA_PKCS_PSS)</c> with an <c>sLen</c> of 2^32 + 32 answers
+    /// <c>CKR_GENERAL_ERROR</c>; a <c>hashAlg</c> other than the mechanism's is refused as it should be. PKCS#11 v3.2
+    /// §6.1.15 (sLen at most k* - 2 - hLen) and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool KryopticRefusesAnOverlongPssSaltAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit(CKM_RSA_PKCS_OAEP)</c> with a NULL <c>pSourceData</c> behind <c>ulSourceDataLen</c>
+    /// 8 answers <c>CKR_OK</c> and encrypts with the empty label (a probe's ciphertext decrypted under the default
+    /// label): the NULL pointer becomes an empty vector. PKCS#11 v3.2 §6.1.7: the length "must be 0" when
+    /// <c>pSourceData</c> is NULL; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>).
+    /// </summary>
+    public const bool KryopticRefusesANullOaepLabel = false;
+
+    /// <summary>Gate for the NULL OAEP label case: see <see cref="KryopticRefusesANullOaepLabel"/>.</summary>
+    public static bool NullOaepLabelRefusalAvailable => KryopticAvailable && KryopticRefusesANullOaepLabel;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

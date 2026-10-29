@@ -28,4 +28,13 @@ public sealed class MechanismParameterTests_BouncyHsm(BouncyHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.AesCtrParamsAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm takes a bare counter block, not CK_AES_CTR_PARAMS")]
     public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
+    public void MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(string row)
+    {
+        if (row.Contains("2^32", StringComparison.Ordinal) && !BouncyHsmBackendFixture.BouncyHsmRefusesAParameterLengthAbove32Bits)
+            Assert.Skip("BouncyHsm cuts the MAC length to 32 bits");
+        MechanismParameterTestCases.Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(_backend, row);
+    }
 }

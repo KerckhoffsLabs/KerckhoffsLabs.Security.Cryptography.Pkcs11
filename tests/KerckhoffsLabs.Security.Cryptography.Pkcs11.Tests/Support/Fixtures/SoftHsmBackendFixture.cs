@@ -172,6 +172,17 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool SoftHsmRefusesAnOutOfRangeGcmParameterAsInvalid = false;
 
+    /// <summary>
+    /// False while <c>C_SignInit</c> and <c>C_VerifyInit(CKM_SHA256_RSA_PKCS_PSS)</c> refuse a <c>hashAlg</c> other than
+    /// <c>CKM_SHA256</c> with <c>CKR_ARGUMENTS_BAD</c> (the parameter check in <c>src/lib/SoftHSM.cpp</c>) and an
+    /// <c>sLen</c> too long for the key with <c>CKR_MECHANISM_INVALID</c> (the crypto layer's <c>signInit</c> refuses it,
+    /// <c>src/lib/crypto/OSSLRSA.cpp</c>). PKCS#11 v3.2 §6.1.9, §6.1.15 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnOutOfRangePssParameterAsInvalid = false;
+
+    /// <summary>Gate for the out-of-range PSS parameter case: see <see cref="SoftHsmRefusesAnOutOfRangePssParameterAsInvalid"/>.</summary>
+    public static bool PssParameterRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesAnOutOfRangePssParameterAsInvalid;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

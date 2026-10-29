@@ -23,4 +23,8 @@ public sealed class MechanismParameterTests_FreeHsm(FreeHsmBackendFixture backen
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.AesCtrCounterOverflowAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM runs AES-CTR past ulCounterBits, carrying into the nonce")]
     public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
+    public void MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(string row) => MechanismParameterTestCases.Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(_backend, row);
 }

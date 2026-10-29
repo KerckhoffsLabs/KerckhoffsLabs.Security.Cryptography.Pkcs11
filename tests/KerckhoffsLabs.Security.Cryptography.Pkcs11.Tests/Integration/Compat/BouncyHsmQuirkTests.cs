@@ -607,4 +607,88 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_EncryptInit(CKM_AES_GCM) with a NULL pAAD and ulAADLen 9 no longer runs with no AAD (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesANullAadPointer to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void ParameterLengthAbove32Bits_QuirkStillPresent()
+    {
+        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        byte[] rawKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        byte[] data = "the quick brown fox"u8.ToArray();
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var value = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
+        ObjectHandle key = session.CreateObject([keyClass, keyType, token, sign, value]);
+        CKR rv;
+        byte[] mac = new byte[64];
+        NativeCULong length = default;
+        try
+        {
+            byte[] parameter = new byte[8];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(parameter, (1UL << 32) + 16);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256_HMAC_GENERAL, parameter).Marshal(scope, out _);
+            rv = lowLevel.C_SignInit(sid, in mech, (NativeCULong)key.ObjectId);
+            if (rv == CKR.CKR_OK)
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Sign(sid, data, mac, lengthOnly: false, out length));
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        byte[] truncated = System.Security.Cryptography.HMACSHA256.HashData(rawKey, data)[..16];
+        Assert.True(rv == CKR.CKR_OK && mac.AsSpan(0, (int)(ulong)length).SequenceEqual(truncated),
+            $"C_SignInit(CKM_SHA256_HMAC_GENERAL) with a MAC length of 2^32 + 16 no longer gives a 16-byte MAC (got {rv}, {length} bytes): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAParameterLengthAbove32Bits to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void NullOaepLabel_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
+        byte[] plaintext = "the quick brown fox"u8.ToArray();
+        CKR rv;
+        byte[] ciphertext = new byte[256];
+        byte[]? decrypted = null;
+        try
+        {
+            var parameter = new CK_RSA_PKCS_OAEP_PARAMS
+            {
+                HashAlg = (NativeCULong)(ulong)CKM.CKM_SHA256,
+                Mgf = (NativeCULong)(ulong)CKG.CKG_MGF1_SHA256,
+                Source = (NativeCULong)CKZ.CKZ_DATA_SPECIFIED,
+                SourceData = IntPtr.Zero,
+                SourceDataLen = (NativeCULong)8UL,
+            };
+            using (var scope = new MechanismParameterScope())
+            {
+                CK_MECHANISM mech = RawParameter.From(CKM.CKM_RSA_PKCS_OAEP, in parameter).Marshal(scope, out _);
+                rv = lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)pub.ObjectId);
+            }
+            if (rv == CKR.CKR_OK)
+            {
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Encrypt(sid, plaintext, ciphertext, lengthOnly: false, out _));
+                decrypted = session.Decrypt(new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)), priv, ciphertext);
+            }
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_OK && decrypted is not null && decrypted.AsSpan().SequenceEqual(plaintext),
+            $"C_EncryptInit(CKM_RSA_PKCS_OAEP) with a NULL pSourceData and ulSourceDataLen 8 no longer encrypts with the empty label (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesANullOaepLabel to true and delete this test.");
+    }
 }

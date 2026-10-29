@@ -25,4 +25,8 @@ public sealed class MechanismParameterTests_Kryoptic(KryopticBackendFixture back
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.AesCtrCounterOverflowAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic refuses the message that uses the last AES-CTR counter value")]
     public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
+    public void MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(string row) => MechanismParameterTestCases.Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(_backend, row);
 }

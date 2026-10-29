@@ -9,8 +9,8 @@ public sealed class AlgorithmConformanceTests_CratonHsm(CratonHsmBackendFixture 
 {
     private readonly CratonHsmBackendFixture _backend = backend;
 
-    // Craton HSM ignores CK_RSA_PKCS_PSS_PARAMS' salt length and MGF: it signs with a 32-byte salt and MGF1-SHA256,
-    // and verifies under any.
+    // Craton HSM ignores CK_RSA_PKCS_PSS_PARAMS' hash, salt length and MGF: it signs with SHA-256, a 32-byte salt and
+    // MGF1-SHA256, and verifies under any.
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void RsaPss_SignatureCarriesTheSaltAndMaskAsked() => AlgorithmConformanceTestCases.Assert_RsaPss_SignatureCarriesTheSaltAndMaskAsked(_backend, ignoresPssParameters: true);
 
@@ -114,4 +114,8 @@ public sealed class AlgorithmConformanceTests_CratonHsm(CratonHsmBackendFixture 
             Assert.Skip("Craton HSM restores a digest state given a key it does not need");
         AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
     }
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault) => AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault, ignoresPssParameters: true);
 }
