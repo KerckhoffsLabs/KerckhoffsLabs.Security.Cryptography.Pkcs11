@@ -44,6 +44,51 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
         (Settings.WolfPkcs11LibraryPath is { } p && File.Exists(p)) ||
         BuiltLibraryPath() is not null;
 
+    // What wolfPKCS11 at the vendored commit (v2.2.0) does differently from PKCS#11 v3.2 that the shared
+    // cases run into. Each flag is false while it stands, a gate or a wrapper check skips the cases it
+    // breaks, and the matching WolfPkcs11QuirkTests tripwire fails once it is fixed: set the flag to true
+    // then and delete the tripwire.
+
+    /// <summary>
+    /// False while <c>C_DeriveKey</c> overrides the template's <c>CKA_SENSITIVE</c> and <c>CKA_EXTRACTABLE</c>
+    /// from the base key: a sensitive base gives a sensitive key and a non-extractable base a non-extractable
+    /// one, whatever the template asks, so the value of an ECDH secret or an HKDF output cannot be read back.
+    /// For <c>CKM_ECDH1_DERIVE</c> (§6.3.17) and <c>CKM_HKDF_DERIVE</c> (§6.62.3) the template may set either
+    /// value; the base key decides only <c>CKA_ALWAYS_SENSITIVE</c> and <c>CKA_NEVER_EXTRACTABLE</c>.
+    /// </summary>
+    public const bool WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity = false;
+
+    /// <summary>
+    /// False while RSA-OAEP refuses an empty message: <c>C_Encrypt</c> of zero bytes gives
+    /// <c>CKR_FUNCTION_FAILED</c> and <c>C_Decrypt</c> of another implementation's ciphertext of it
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c>, though RFC 8017 §7.1 allows any length up to k - 2hLen - 2.
+    /// </summary>
+    public const bool WolfPkcs11AcceptsEmptyOaepMessage = false;
+
+    /// <summary>
+    /// False while <c>C_Verify</c> answers a malformed or out-of-range signature with <c>CKR_FUNCTION_FAILED</c>
+    /// instead of <c>CKR_SIGNATURE_INVALID</c>, so the caller cannot tell a bad signature from a failing token:
+    /// every altered PKCS#1 v1.5 RSA signature, an RSA-PSS one at or above the modulus, an ECDSA P-521 one
+    /// whose r or s has a bit above the 521st set, and an ML-DSA one whose hint encoding is malformed (FIPS 204
+    /// §7.3 rejects it like any other invalid signature). Correctly encoded wrong signatures get
+    /// <c>CKR_SIGNATURE_INVALID</c>. Which one a one-bit flip gives depends on the bit and the signature, so
+    /// the cases that alter a signature would fail at random.
+    /// </summary>
+    public const bool WolfPkcs11RejectsMalformedSignatures = false;
+
+    /// <summary>
+    /// False while <c>CKM_RSA_PKCS_KEY_PAIR_GEN</c> advertises 1024 bits as its minimum (a constant in
+    /// <c>src/slot.c</c>) but fails to make a 1024-bit key with <c>CKR_FUNCTION_FAILED</c>: wolfSSL's default
+    /// <c>RSA_MIN_SIZE</c> is 2048.
+    /// </summary>
+    public const bool WolfPkcs11GeneratesItsMinimumRsaKeySize = false;
+
+    /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
+    public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
+
+    /// <summary>Gate for cases that verify an altered signature: see <see cref="WolfPkcs11RejectsMalformedSignatures"/>.</summary>
+    public static bool MalformedSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsMalformedSignatures;
+
     public WolfPkcs11BackendFixture()
     {
         string? libPath = Settings.WolfPkcs11LibraryPath ?? BuiltLibraryPath();
