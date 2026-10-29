@@ -5,6 +5,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -646,6 +647,110 @@ internal static class ObjectConformanceTestCases
                 Assert.NotEmpty(left);
             else
                 Assert.True(left.Count == 0, $"{incomplete}: the refused call left {left.Count} object(s) behind.");
+        });
+    }
+
+    public static TheoryData<string> InconsistentTemplates =>
+    [
+        "AES key generated as CKK_GENERIC_SECRET", "AES key generated as CKO_DATA", "EC key pair with an RSA private key",
+        "EC key pair with a private-key class for the public key", "secret key of type CKK_EC", "private key of type CKK_AES",
+        "data object from an HKDF derive",
+    ];
+
+    // A template whose class or key type contradicts the mechanism, or the object's other attributes, is
+    // refused with CKR_TEMPLATE_INCONSISTENT and creates nothing. C_GenerateKey and C_GenerateKeyPair say so for
+    // a key type or class the mechanism does not make (§5.18.1, §5.18.2); C_CreateObject of a secret key of an
+    // asymmetric key type, or a private key of a symmetric one, is the set of valid values that cannot be
+    // satisfied together of §4.1.1 point 5; and CKM_HKDF_DERIVE contributes CKA_CLASS itself (§6.62.3: a secret
+    // key; CKM_HKDF_DATA is the one that makes a data object, §6.62.4), so a template asking for CKO_DATA
+    // contradicts it. C_CreateObject and C_DeriveKey may also answer CKR_ATTRIBUTE_VALUE_INVALID: neither says
+    // which code a class or key type that does not fit the object takes, and §4.1.1 point 2 (a value that is not
+    // valid for the attribute) can be read to cover it. Nothing carries the case's label after.
+    internal static void Assert_InconsistentTemplate_IsTemplateInconsistent(IPkcs11Backend backend, string inconsistent)
+    {
+        if (inconsistent.StartsWith("AES key generated", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+        else if (inconsistent.StartsWith("EC key pair", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        else if (inconsistent == "data object from an HKDF derive")
+            backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
+        WithSession(backend, session =>
+        {
+            string label = $"kl-inconsistent-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrInput = new ObjectAttribute(CKA.CKA_LABEL, label + "-input");
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+            using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrPrivate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+            using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var attrEc = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+            using var attrRsa = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+            using var attrLen32 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+            using var attrValue32 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+            using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+            using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+            using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+            using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+            using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+
+            var created = new List<ObjectHandle>();
+            try
+            {
+                Action refused;
+                switch (inconsistent)
+                {
+                    case "AES key generated as CKK_GENERIC_SECRET":
+                        refused = () => created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrGeneric, attrLen32, attrToken, attrLabel, attrEncrypt, attrSensitive]));
+                        break;
+                    case "AES key generated as CKO_DATA":
+                        refused = () => created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrData, attrLen32, attrToken, attrLabel]));
+                        break;
+                    case "EC key pair with an RSA private key":
+                        refused = () => GenerateEcKeyPair([attrToken, attrLabel, attrVerify, attrEcParams], [attrRsa, attrToken, attrLabel, attrSign, attrSensitive]);
+                        break;
+                    case "EC key pair with a private-key class for the public key":
+                        refused = () => GenerateEcKeyPair([attrPrivate, attrToken, attrLabel, attrVerify, attrEcParams], [attrToken, attrLabel, attrSign, attrSensitive]);
+                        break;
+                    case "secret key of type CKK_EC":
+                        refused = () => created.Add(session.CreateObject([attrSecret, attrEc, attrToken, attrLabel, attrEncrypt, attrSensitive, attrValue32]));
+                        break;
+                    case "private key of type CKK_AES":
+                        refused = () => created.Add(session.CreateObject([attrPrivate, attrAes, attrToken, attrLabel, attrDecrypt, attrSensitive, attrValue32]));
+                        break;
+                    default: // data object from an HKDF derive
+                        {
+                            ObjectHandle baseKey = session.CreateObject([attrSecret, attrGeneric, attrToken, attrInput, attrDerive, attrSensitive, attrValue32]);
+                            created.Add(baseKey);
+                            var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
+                            refused = () => created.Add(session.DeriveKey(mechanism, baseKey, [attrData, attrLen32, attrToken, attrLabel]));
+                            break;
+                        }
+                }
+                Exception? ex = Record.Exception(refused);
+                List<ObjectHandle> left = session.FindAllObjects([attrLabel]);
+                CKR[] accepted = inconsistent.Contains(" generated ", StringComparison.Ordinal) || inconsistent.StartsWith("EC key pair", StringComparison.Ordinal)
+                    ? [CKR.CKR_TEMPLATE_INCONSISTENT]
+                    : [CKR.CKR_TEMPLATE_INCONSISTENT, CKR.CKR_ATTRIBUTE_VALUE_INVALID];
+                Assert.True(ex is Pkcs11Exception pex && accepted.Contains(pex.ReturnValue),
+                    $"{inconsistent}: expected {string.Join(" or ", accepted)}, got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "success"}.");
+                Assert.True(left.Count == 0, $"{inconsistent}: the refused call left {left.Count} object(s) behind.");
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in created.Concat(session.FindAllObjects([attrLabel])).DistinctBy(h => h.ObjectId))
+                    session.DestroyObject(handle);
+            }
+
+            void GenerateEcKeyPair(List<ObjectAttribute> publicTemplate, List<ObjectAttribute> privateTemplate)
+            {
+                session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), publicTemplate, privateTemplate, out ObjectHandle publicKey, out ObjectHandle privateKey);
+                created.Add(publicKey);
+                created.Add(privateKey);
+            }
         });
     }
 }

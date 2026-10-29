@@ -97,4 +97,13 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
             Assert.Skip("BouncyHsm makes a secret key without CKA_KEY_TYPE");
         ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
     }
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
+    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent)
+    {
+        if (inconsistent.StartsWith("EC key pair", StringComparison.Ordinal) && !BouncyHsmBackendFixture.BouncyHsmChecksTheKeyPairTemplatesClassAndKeyType)
+            Assert.Skip("BouncyHsm generates an EC key pair whose templates give another class or key type");
+        ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    }
 }

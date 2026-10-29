@@ -129,6 +129,15 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11MarksAShortBufferUnavailable = false;
 
+    /// <summary>
+    /// False while <c>C_CreateObject</c> makes a <c>CKO_PRIVATE_KEY</c> of the secret key type <c>CKK_AES</c>: the
+    /// template is taken with <c>CKR_OK</c>, where PKCS#11 v3.2 §4.1.1 point 5 refuses a set of values that cannot
+    /// hold together (<c>CKR_TEMPLATE_INCONSISTENT</c>). A <c>CKO_SECRET_KEY</c> of type <c>CKK_EC</c> is refused.
+    /// Fixed upstream after v2.2.0 (wolfSSL/wolfPKCS11#263 checks the class against the key type).
+    /// WolfPkcs11QuirkTests.PrivateKeyOfASecretKeyType_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAPrivateKeyOfASecretKeyType = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 

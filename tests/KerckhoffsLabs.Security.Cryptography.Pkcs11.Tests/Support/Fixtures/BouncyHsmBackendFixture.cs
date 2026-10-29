@@ -161,6 +161,15 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmRefusesASecretKeyWithoutAKeyType = false;
 
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> takes templates whose class or key type the
+    /// mechanism does not make: <c>CKK_RSA</c> in the private template, or <c>CKO_PRIVATE_KEY</c> in the public
+    /// one, answers <c>CKR_OK</c>, where PKCS#11 v3.2 §5.18.2 answers <c>CKR_TEMPLATE_INCONSISTENT</c>.
+    /// <c>C_GenerateKey</c> and <c>C_CreateObject</c> check them. Not yet reported upstream.
+    /// BouncyHsmQuirkTests.KeyPairTemplateKeyType_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmChecksTheKeyPairTemplatesClassAndKeyType = false;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

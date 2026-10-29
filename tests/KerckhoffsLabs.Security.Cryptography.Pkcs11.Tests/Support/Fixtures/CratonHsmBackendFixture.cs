@@ -137,6 +137,19 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the incomplete-template case: see <see cref="CratonHsmRequiresTheKeyAttributes"/>.</summary>
     public static bool IncompleteTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRequiresTheKeyAttributes;
 
+    /// <summary>
+    /// False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against the mechanism or
+    /// each other: <c>C_GenerateKey(CKM_AES_KEY_GEN)</c> with <c>CKK_GENERIC_SECRET</c> or <c>CKO_DATA</c>,
+    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or
+    /// <c>CKO_PRIVATE_KEY</c> for the public one, and <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type
+    /// <c>CKK_EC</c> or a <c>CKO_PRIVATE_KEY</c> of type <c>CKK_AES</c> all answer <c>CKR_OK</c>. PKCS#11 v3.2
+    /// §5.18.1, §5.18.2 and §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c>.
+    /// </summary>
+    public const bool CratonHsmChecksTheTemplatesClassAndKeyType = false;
+
+    /// <summary>Gate for the inconsistent-template case: see <see cref="CratonHsmChecksTheTemplatesClassAndKeyType"/>.</summary>
+    public static bool InconsistentTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmChecksTheTemplatesClassAndKeyType;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

@@ -237,6 +237,25 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             "WolfPkcs11BackendFixture.WolfPkcs11MarksAShortBufferUnavailable to true and delete this test.");
     }
 
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void PrivateKeyOfASecretKeyType_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        Exception? ex;
+        try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrValue]))); }
+        finally { TestKeys.LogoutIfRequired(_backend, session); }
+
+        Assert.True(ex is null,
+            "C_CreateObject of a CKO_PRIVATE_KEY of type CKK_AES is now refused " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAPrivateKeyOfASecretKeyType to true and delete this test.");
+    }
+
     private static string Code(Func<bool> verify, string what)
     {
         Exception? ex = Record.Exception(() => verify());

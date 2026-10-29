@@ -106,6 +106,14 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         (Settings.SoftHsmLibraryPath is { } p && File.Exists(p)) ||
         BuiltLibraryPath() is not null;
 
+    /// <summary>
+    /// False while <c>C_GenerateKey</c> and <c>C_GenerateKeyPair</c> answer a template whose <c>CKA_CLASS</c> the
+    /// mechanism does not make (<c>CKO_DATA</c> from <c>CKM_AES_KEY_GEN</c>, <c>CKO_PRIVATE_KEY</c> in the public
+    /// template of <c>CKM_EC_KEY_PAIR_GEN</c>) with <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, where PKCS#11 v3.2 §5.18.1
+    /// and §5.18.2 answer <c>CKR_TEMPLATE_INCONSISTENT</c>. Nothing is created.
+    /// </summary>
+    public const bool SoftHsmReportsAContradictoryClassAsInconsistent = false;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

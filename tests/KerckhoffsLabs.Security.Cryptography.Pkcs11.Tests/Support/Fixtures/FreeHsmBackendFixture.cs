@@ -101,6 +101,20 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmRequiresTheKeyAttributes = false;
 
+    /// <summary>
+    /// False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against the mechanism or
+    /// each other: <c>C_GenerateKey(CKM_AES_KEY_GEN)</c> with <c>CKK_GENERIC_SECRET</c> or <c>CKO_DATA</c>,
+    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or
+    /// <c>CKO_PRIVATE_KEY</c> for the public one, <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type
+    /// <c>CKK_EC</c> or a <c>CKO_PRIVATE_KEY</c> of type <c>CKK_AES</c>, and <c>C_DeriveKey(CKM_HKDF_DERIVE)</c>
+    /// with <c>CKO_DATA</c> all answer <c>CKR_OK</c>. PKCS#11 v3.2 §5.18.1, §5.18.2, §4.1.1 point 5 and §6.62.3:
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c>.
+    /// </summary>
+    public const bool FreeHsmChecksTheTemplatesClassAndKeyType = false;
+
+    /// <summary>Gate for the inconsistent-template case: see <see cref="FreeHsmChecksTheTemplatesClassAndKeyType"/>.</summary>
+    public static bool InconsistentTemplateRefusalAvailable => FreeHsmAvailable && FreeHsmChecksTheTemplatesClassAndKeyType;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

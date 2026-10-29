@@ -213,4 +213,31 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesASecretKeyWithoutAKeyType to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void KeyPairTemplateKeyType_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+        using var attrRsa = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        Exception? ex;
+        try
+        {
+            ex = Record.Exception(() =>
+            {
+                session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), [attrToken, attrEcParams], [attrToken, attrRsa, attrSensitive],
+                    out ObjectHandle publicKey, out ObjectHandle privateKey);
+                session.DestroyObject(privateKey);
+                session.DestroyObject(publicKey);
+            });
+        }
+        finally { session.Logout(); }
+
+        Assert.True(ex is null,
+            "C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN) with CKK_RSA in the private template is now refused " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmChecksTheKeyPairTemplatesClassAndKeyType to true and delete this test.");
+    }
 }

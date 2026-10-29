@@ -81,4 +81,14 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
             leavesAnObjectBehind: incomplete is "RSA public key without CKA_MODULUS" or "RSA private key without CKA_MODULUS"
                 or "EC public key without CKA_EC_PARAMS" or "EC private key without CKA_EC_PARAMS");
     }
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
+    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent)
+    {
+        if (inconsistent is "AES key generated as CKO_DATA" or "EC key pair with a private-key class for the public key"
+            && !SoftHsmBackendFixture.SoftHsmReportsAContradictoryClassAsInconsistent)
+            Assert.Skip("SoftHSM2 answers a class the generation mechanism does not make with CKR_ATTRIBUTE_VALUE_INVALID");
+        ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    }
 }

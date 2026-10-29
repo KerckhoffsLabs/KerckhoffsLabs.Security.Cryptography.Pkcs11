@@ -81,4 +81,8 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
             Assert.Skip("FreeHSM generates a key pair without CKA_MODULUS_BITS or CKA_EC_PARAMS");
         ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
     }
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.InconsistentTemplateRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM makes objects whose class or key type contradicts the mechanism")]
+    [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
+    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent) => ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
 }
