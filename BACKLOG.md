@@ -4,8 +4,8 @@ _Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (c
 
 ## Summary
 
-- Open items: 80, 23 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (14 partly resolved) | Low: 25 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 93, 23 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (14 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **Only one session per slot is usable.** The second `OpenSession` on a slot throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either session logs the other out (BL-084).
@@ -913,6 +913,136 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Report it upstream. After a `vendor/bouncyhsm` bump with the fix, `BouncyHsmQuirkTests.Sp800108DoublePipeline_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
+
+### [BL-169] Lift the wolfPKCS11 derived-key sensitivity gate once C_DeriveKey takes the template's CKA_SENSITIVE and CKA_EXTRACTABLE
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity`, `DerivedKeyReadbackAvailable`)
+- **Problem:** wolfPKCS11 v2.2.0's `C_DeriveKey` makes a key derived from a sensitive base sensitive, and one from a non-extractable base non-extractable, whatever the template asks, so the ECDH secret and the HKDF output cannot be read back and `ECDiffieHellmanPkcs11`'s raw-secret and KDF methods and `HkdfPkcs11` fail on it. PKCS#11 v3.2 §6.3.17 and §6.62.3 let the template set either value; the base key decides only `CKA_ALWAYS_SENSITIVE` and `CKA_NEVER_EXTRACTABLE`. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.DerivedKeySensitivity_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-170] Lift the wolfPKCS11 empty-OAEP-message gate once RSA-OAEP takes an empty message
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11AcceptsEmptyOaepMessage`)
+- **Problem:** RSA-OAEP `C_Encrypt` of zero bytes gives `CKR_FUNCTION_FAILED`, and `C_Decrypt` of another implementation's ciphertext of it `CKR_ENCRYPTED_DATA_INVALID`; RFC 8017 §7.1 allows any length up to k - 2hLen - 2. The OAEP cases leave the empty message out on wolfPKCS11 (`emptyData`). Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.EmptyOaepMessage_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-171] Lift the wolfPKCS11 malformed-signature gate once C_Verify answers it with CKR_SIGNATURE_INVALID
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11RejectsMalformedSignatures`, `MalformedSignatureRejectionAvailable`)
+- **Problem:** `C_Verify` answers a malformed or out-of-range signature with `CKR_FUNCTION_FAILED` instead of `CKR_SIGNATURE_INVALID`: every altered RSA PKCS#1 v1.5 signature, RSA-PSS at or above the modulus, ECDSA P-521 with r or s above 2^521, ML-DSA with a malformed hint. The signature laws and the PSS round trips that alter a signature skip on wolfPKCS11. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.MalformedSignature_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-172] Lift the wolfPKCS11 wrong-length-RSA-signature gate once C_Verify answers it with CKR_SIGNATURE_LEN_RANGE
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11RejectsWrongLengthRsaSignatures`, `WrongLengthRsaSignatureRejectionAvailable`)
+- **Problem:** `C_Verify` of an RSA signature of the wrong length (empty, short or padded; PSS and PKCS#1 v1.5) gives `CKR_FUNCTION_FAILED` instead of `CKR_SIGNATURE_LEN_RANGE`, so `SignatureLengthTests_WolfPkcs11.Rsa_WrongLengthSignature_ReturnsFalse` skips. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.WrongLengthRsaSignature_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-173] Lift the wolfPKCS11 RSA-1024 gate once CKM_RSA_PKCS_KEY_PAIR_GEN generates the minimum it advertises
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11GeneratesItsMinimumRsaKeySize`)
+- **Problem:** `CKM_RSA_PKCS_KEY_PAIR_GEN` advertises 1024 bits as its minimum (a constant in `src/slot.c`) but fails to make a 1024-bit key with `CKR_FUNCTION_FAILED`, because wolfSSL's default `RSA_MIN_SIZE` is 2048. The 1024 row of the RSA key-size sweep skips. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.MinimumRsaKeySize_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-174] Lift the wolfPKCS11 wrap-template gate once C_GenerateKey takes CKA_WRAP_TEMPLATE and CKA_UNWRAP_TEMPLATE
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11AcceptsWrapTemplates`, `WrapTemplateAvailable`)
+- **Problem:** `CKA_WRAP_TEMPLATE` or `CKA_UNWRAP_TEMPLATE` makes `C_GenerateKey` fail with `CKR_ATTRIBUTE_VALUE_INVALID`: wolfPKCS11 lists them as byte arrays (`src/crypto.c`) rather than the attribute arrays PKCS#11 v3.2 §4.10 defines, so `Pkcs11Session.GenerateAesKeyEncryptionKey` cannot work on it and the KEK cases skip. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.WrapTemplate_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-175] Lift the wolfPKCS11 EC-unwrap gate once wolfPKCS11 unwraps EC private keys
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11UnwrapsEcPrivateKeys`, `EcPrivateKeyUnwrapAvailable`)
+- **Problem:** A capability rather than a departure: wolfPKCS11 wraps and unwraps only RSA private keys and AES, generic-secret and HKDF keys (`CHECK_WRAPPABLE` in `src/crypto.c`), so `C_UnwrapKey` of an EC private key gives `CKR_KEY_NOT_WRAPPABLE`, and no mechanism flag says so.
+- **Proposed action:** After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.EcPrivateKeyUnwrap_StillMissing` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-176] Lift the wolfPKCS11 session-object gate once session objects are visible to every session of the application
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11SharesSessionObjectsAcrossSessions`, `SharedSessionObjectsAvailable`)
+- **Problem:** wolfPKCS11 keeps session objects per session: another session of the application does not find one and cannot use its handle. PKCS#11 v3.2 §4.4.1 makes a session object the application's, seen by every session until the one that made it closes. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.SessionObjectVisibility_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-177] Lift the wolfPKCS11 multi-part gate once the hash-and-sign mechanisms and AES-ECB work multi-part
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11DoesMultipartSignAndEcb`)
+- **Problem:** `C_SignUpdate`, `C_VerifyUpdate` and `C_EncryptUpdate` return `CKR_MECHANISM_INVALID` for every `CKM_SHA*_RSA_PKCS`, `CKM_SHA*_RSA_PKCS_PSS` and `CKM_ECDSA_SHA*` and for `CKM_AES_ECB`, though PKCS#11 v3.2 defines them multi-part and the token advertises them. The multi-part rows of the buffer, operation-state and stream cases skip. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.MultipartSignAndEcb_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-178] Lift the wolfPKCS11 short-buffer gate once C_GetAttributeValue marks a short attribute CK_UNAVAILABLE_INFORMATION
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11MarksAShortBufferUnavailable`, `ShortBufferMarkingAvailable`)
+- **Problem:** `C_GetAttributeValue` into a buffer too small returns `CKR_BUFFER_TOO_SMALL` but leaves the attribute's `ulValueLen` as given, where PKCS#11 v3.2 §5.7.5 sets `CK_UNAVAILABLE_INFORMATION`. Not yet reported upstream; the draft is with the maintainer.
+- **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.ShortBufferLength_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-179] Support stateful hash-based signatures (LMS/HSS, XMSS/XMSS^MT)
+- **Area:** Feature
+- **Severity:** Low
+- **Effort:** L
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11` (`CKM.CKM_HSS`, `CKM.CKM_HSS_KEY_PAIR_GEN`, `CKM.CKM_XMSS`, `CKM.CKM_XMSSMT` are named only)
+- **Problem:** The library has no API for PKCS#11 v3.1's stateful hash-based signatures. wolfPKCS11 implements them (`--enable-lms --enable-xmss`), so it would be the backend to test them on; the wolfPKCS11 test build leaves them off.
+- **Proposed action:** Design the key-state handling (each signature consumes state), then add the API and enable LMS/XMSS in `build/build-wolfpkcs11.sh`.
+- **Breaks public API?** No (additive)
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-180] Lift the inline per-backend signing tests into shared test cases
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Sign/` (`SignEdDsaContextTests`, `SignHashMlDsaTests`, `SignMlDsaDeterministicHedgeTests`)
+- **Problem:** BouncyHsm's and opencryptoki's wrappers each carry their own copy of these test bodies, with no `*TestCases` class, so no other backend runs them (wolfPKCS11's ML-DSA hedge variant goes unchecked).
+- **Proposed action:** Move the bodies into shared `*TestCases` and wrap them on every backend.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
+
+### [BL-181] Restore the hand-trimmed RSA-size and small-curve rows in the backend wrappers
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** the `*.FreeHsm.cs`, `*.CratonHsm.cs` and other wrappers of `RSAPkcs11TestCases.Assert_SignVerifyData_AcrossKeySizes_RoundTrips` and the `ECDsaPkcs11TestCases` secp160r1/secp224k1 cases
+- **Problem:** Backends without every RSA modulus or curve left those rows out of their wrappers by hand. `Pkcs11BackendExtensions.SkipIfRefusedOutsideKeySize` now skips a size a token refuses outside its advertised range, so the rows can go back and run wherever the token does more than it claims.
+- **Proposed action:** Restore the rows on every backend; triage any refusal inside an advertised range.
+- **Breaks public API?** No
+- **Raised by:** wolfPKCS11 backend
 
 ## PKCS#11 v3.2 Coverage Matrix
 
