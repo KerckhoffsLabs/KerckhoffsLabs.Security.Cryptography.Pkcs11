@@ -61,6 +61,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// multi-part operation is active starts over, computes over its own input only, discards what the
 /// Updates fed, and ends the operation (the <c>*_SinglePartAfterUpdate_DiscardsTheUpdate</c> cases).
 /// Digest-2 is enforced.</description></item>
+/// <item><description>wolfPKCS11 (not part of the three above) mixes the two: Digest-1 starts over and
+/// discards the Updates, as FreeHSM does; Sign-2 and Encrypt-1 treat the call as a continuation, as NSS
+/// does. Digest-2 and Decrypt-1 are enforced.</description></item>
 /// <item><description>Decrypt-1: enforced on all three (naturally, via a padding/tag mismatch
 /// downstream of the malformed combined ciphertext — not because any of them checks operation state
 /// here either).</description></item>
