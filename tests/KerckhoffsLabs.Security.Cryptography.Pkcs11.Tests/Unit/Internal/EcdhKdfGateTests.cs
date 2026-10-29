@@ -8,6 +8,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -124,7 +125,7 @@ public sealed class EcdhKdfGateTests
         using var session = fake.CreateSession(sessionId: 1, policy: policy);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
-            () => Derive(session, new Mechanism(CKM.CKM_ECDH1_DERIVE, new byte[40])));
+            () => Derive(session, new Mechanism(CKM.CKM_ECDH1_DERIVE, RawParameter.Of(CKM.CKM_ECDH1_DERIVE))));
         Assert.IsType<MechanismUseRequest>(ex.Request);
         Assert.Contains("CkmEcdh1DeriveParams", ex.Reason, StringComparison.Ordinal);
         Assert.Equal(0, fake.Calls);

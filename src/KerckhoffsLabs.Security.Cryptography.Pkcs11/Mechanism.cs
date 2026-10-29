@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
@@ -71,10 +72,23 @@ public sealed class Mechanism
     /// the struct's leading field here produces a block the token rejects as malformed.
     /// </para>
     /// <para>
-    /// For the AES and DES CBC, OFB and CFB modes, whose whole parameter is an IV of the cipher's block
-    /// size, the length is checked here: 16 bytes for AES, 8 for DES and Triple DES. A token is told the
-    /// parameter's length, but one that reads a block regardless would read past a shorter IV into
-    /// whatever memory follows it.
+    /// For a standard mechanism whose parameter has a fixed layout, the length is checked here. A token is
+    /// told the parameter's length, but one that reads the whole layout regardless would read past a
+    /// shorter block into whatever memory follows it. The block must be:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>an IV of the cipher's block size for a block cipher's CBC, OFB, CFB or CTS mode (16 bytes
+    /// for AES, Camellia, ARIA, SEED and Twofish; 8 for DES, Triple DES, Blowfish, CAST, CDMF and IDEA);</item>
+    /// <item>empty or one IV for a mechanism whose IV is optional (<c>CKM_AES_KEY_WRAP</c> and
+    /// <c>CKM_AES_KEY_WRAP_KWP</c>, the GOST 28147 modes);</item>
+    /// <item>the mechanism's <c>CK_*_PARAMS</c> struct at its size on this platform, as this library
+    /// marshals it (packed on Windows, natural elsewhere), or empty where the struct is optional. A struct
+    /// with pointers in it still needs them to be valid, which a raw block leaves to the caller; prefer
+    /// the <see cref="MechanismParameters"/> descriptor where there is one.</item>
+    /// </list>
+    /// <para>
+    /// A mechanism with a variable-length parameter, a vendor mechanism, or one this library has no layout
+    /// for takes a block of any length.
     /// </para>
     /// <para>
     /// A <c>byte[]</c> converts to the span implicitly, so this one overload serves both.
@@ -86,27 +100,14 @@ public sealed class Mechanism
     /// ignored. An empty parameter marshals as a null <c>pParameter</c> with zero length.
     /// </param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c> (32 bits on Windows).</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="type"/> takes an IV of the cipher's block size and <paramref name="parameter"/> is another length.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="type"/>'s parameter has a fixed layout and <paramref name="parameter"/> is not its length.</exception>
     public Mechanism(CKM type, ReadOnlySpan<byte> parameter)
     {
         _type = type.ToCULong();
-        if (IvLength(type) is int ivLength && parameter.Length != ivLength)
-            throw new ArgumentException($"{type} takes a {ivLength}-byte IV as its parameter, not {parameter.Length} bytes.", nameof(parameter));
+        if (MechanismParameterLength.For(type) is { } rule && !rule.Lengths.Contains(parameter.Length))
+            throw new ArgumentException(MechanismParameterLength.Describe(type, rule, parameter.Length), nameof(parameter));
         _rawParameter = parameter.ToArray();
     }
-
-    /// <summary>
-    /// The IV length of a standard mechanism whose whole parameter is an IV of its cipher's block size, or
-    /// <see langword="null"/> for any other mechanism, whose raw block stays the caller's to lay out.
-    /// </summary>
-    private static int? IvLength(CKM type) => type switch
-    {
-        CKM.CKM_AES_CBC or CKM.CKM_AES_CBC_PAD or CKM.CKM_AES_OFB
-            or CKM.CKM_AES_CFB8 or CKM.CKM_AES_CFB64 or CKM.CKM_AES_CFB128 => 16,
-        CKM.CKM_DES_CBC or CKM.CKM_DES_CBC_PAD or CKM.CKM_DES3_CBC or CKM.CKM_DES3_CBC_PAD
-            or CKM.CKM_DES_OFB8 or CKM.CKM_DES_OFB64 or CKM.CKM_DES_CFB8 or CKM.CKM_DES_CFB64 => 8,
-        _ => null,
-    };
 
     /// <summary>
     /// The mechanism type. It may be vendor-defined (see <see cref="IsVendorDefined"/>) or newer than

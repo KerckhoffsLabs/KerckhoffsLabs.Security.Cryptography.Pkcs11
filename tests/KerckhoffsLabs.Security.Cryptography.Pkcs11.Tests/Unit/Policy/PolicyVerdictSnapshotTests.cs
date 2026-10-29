@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 
 #pragma warning disable KLPKCS11007, KLPKCS11009 // weak curves and mechanisms are part of the snapshot
 
@@ -141,7 +142,7 @@ public sealed class PolicyVerdictSnapshotTests
                 CKM.CKM_PKCS5_PBKD2 => CryptoOperation.GenerateKey,
                 _ => CryptoOperation.Encrypt,
             };
-            Add("raw", MechanismNames.Of(mechanism), new MechanismUseRequest(new Mechanism(mechanism, new byte[16]), operation));
+            Add("raw", MechanismNames.Of(mechanism), new MechanismUseRequest(new Mechanism(mechanism, RawParameter.Of(mechanism)), operation));
         }
 
         // KDF PRFs.

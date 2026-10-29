@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
@@ -92,8 +93,8 @@ public sealed class MechanismChecksTests
     public void AeadTagChecks_AllowNoParameters_RefuseRawBytes()
     {
         Assert.True(Run(MechanismChecks.GcmTagLength(96), new Mechanism(CKM.CKM_AES_GCM)).IsAllowed);
-        Assert.False(Run(MechanismChecks.GcmTagLength(96), new Mechanism(CKM.CKM_AES_GCM, new byte[40])).IsAllowed);
-        Assert.False(Run(MechanismChecks.CcmMacLength(64), new Mechanism(CKM.CKM_AES_CCM, new byte[40])).IsAllowed);
+        Assert.False(Run(MechanismChecks.GcmTagLength(96), new Mechanism(CKM.CKM_AES_GCM, RawParameter.Of(CKM.CKM_AES_GCM))).IsAllowed);
+        Assert.False(Run(MechanismChecks.CcmMacLength(64), new Mechanism(CKM.CKM_AES_CCM, RawParameter.Of(CKM.CKM_AES_CCM))).IsAllowed);
     }
 
     [Theory]
@@ -149,7 +150,7 @@ public sealed class MechanismChecksTests
     public void RsaPss_HashBound_RefusesRawParameterBytes()
     {
         MechanismCheck hashed = MechanismChecks.RsaPss([CKM.CKM_SHA256], parametersRequired: false);
-        Assert.False(Run(hashed, new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new byte[24]), CryptoOperation.Sign).IsAllowed);
+        Assert.False(Run(hashed, new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, RawParameter.Of(CKM.CKM_SHA256_RSA_PKCS_PSS)), CryptoOperation.Sign).IsAllowed);
         Assert.True(Run(hashed, new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS), CryptoOperation.Sign).IsAllowed);
     }
 

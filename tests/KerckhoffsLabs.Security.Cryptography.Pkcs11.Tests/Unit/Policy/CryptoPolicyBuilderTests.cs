@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 
 #pragma warning disable KLPKCS11009 // legacy mechanisms are the subject under test
 
@@ -310,7 +311,7 @@ public sealed class CryptoPolicyBuilderTests
             .AllowMechanism(ecdh, [CryptoOperation.Derive], "ECDH.", MechanismChecks.Ecdh1DeriveParams())
             .AllowKeyAgreementKdf(CKD.CKD_SHA256_KDF, "X9.63.")
             .Build();
-        Assert.False(Allowed(p, new Mechanism(ecdh, new byte[24]), CryptoOperation.Derive));
+        Assert.False(Allowed(p, new Mechanism(ecdh, RawParameter.Of(ecdh)), CryptoOperation.Derive));
     }
 
     // === Value equality, removal wording, names, hashes =========================
