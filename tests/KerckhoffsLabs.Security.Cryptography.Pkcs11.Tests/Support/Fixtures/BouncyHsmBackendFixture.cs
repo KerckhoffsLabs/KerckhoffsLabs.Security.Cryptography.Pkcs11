@@ -235,6 +235,16 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the CKA_COPYABLE one-way case: see <see cref="BouncyHsmKeepsCkaCopyableFalse"/>.</summary>
     public static bool CopyableOneWayAvailable => BouncyHsmAvailable && BouncyHsmKeepsCkaCopyableFalse;
 
+    /// <summary>
+    /// False while an RSA key of the wrong class is refused with <c>CKR_KEY_HANDLE_INVALID</c>: a public key given
+    /// to <c>C_SignRecoverInit</c> and a private key given to <c>C_VerifyRecoverInit</c> (CKM_RSA_PKCS;
+    /// <c>RsaWrapperSignWithRecover</c> in BouncyHsm.Core). The handle names a valid key; PKCS#11 v3.2 §5.1.6
+    /// keeps <c>CKR_KEY_HANDLE_INVALID</c> for a handle that is not one, and answers a key the mechanism
+    /// cannot use with <c>CKR_KEY_TYPE_INCONSISTENT</c> or <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>. Not yet
+    /// reported upstream. BouncyHsmQuirkTests.KeyOfTheWrongClass_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent = false;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

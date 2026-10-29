@@ -280,4 +280,34 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11GeneratesItsMinimumRsaKeySize to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void VerifyRecoverUnderASign_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+        CKR rv;
+        try
+        {
+            using (var scope = new MechanismParameterScope())
+            {
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_ECDSA).Marshal(scope, out _);
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_SignInit(sid, in mech, (NativeCULong)priv.ObjectId));
+            }
+            rv = lowLevel.C_VerifyRecover(sid, new byte[64], new byte[64], lengthOnly: false, out _);
+            lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_SIGN);
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_MECHANISM_INVALID,
+            $"C_VerifyRecover with an ECDSA C_SignInit active and no C_VerifyRecoverInit no longer answers CKR_MECHANISM_INVALID (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11ReportsAVerifyRecoverNeverStarted to true and delete this test.");
+    }
 }

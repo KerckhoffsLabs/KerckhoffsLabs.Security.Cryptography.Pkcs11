@@ -382,4 +382,32 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "flag unchanged"}): set " +
             "BouncyHsmBackendFixture.BouncyHsmKeepsCkaCopyableFalse to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void KeyOfTheWrongClass_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        using var rsa = System.Security.Cryptography.RSA.Create(2048);
+        var (pub, priv) = TestKeys.ImportRsaRecoveryKeyPair(session, rsa);
+        CKR rv;
+        try
+        {
+            using var scope = new MechanismParameterScope();
+#pragma warning disable KLPKCS11008 // CKM_RSA_PKCS for a signature with recovery, through the raw dispatch.
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_RSA_PKCS).Marshal(scope, out _);
+#pragma warning restore KLPKCS11008
+            rv = lowLevel.C_SignRecoverInit((NativeCULong)session.SessionId, in mech, (NativeCULong)pub.ObjectId);
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_KEY_HANDLE_INVALID,
+            $"C_SignRecoverInit with an RSA public key no longer answers CKR_KEY_HANDLE_INVALID (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent to true and delete this test.");
+    }
 }

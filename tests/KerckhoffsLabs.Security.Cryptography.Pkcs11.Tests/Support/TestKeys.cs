@@ -407,6 +407,56 @@ internal static class TestKeys
     }
 
     /// <summary>
+    /// Imports the BCL RSA key <paramref name="rsa"/> as a session key pair for signatures with message
+    /// recovery: the public key has <c>CKA_VERIFY</c> and the private key <c>CKA_SIGN</c>, and both have
+    /// <c>CKA_VERIFY_RECOVER</c> / <c>CKA_SIGN_RECOVER</c> set to <paramref name="recover"/>. An imported key, so
+    /// that a C_SignRecover result can be checked against the BCL's deterministic PKCS#1 v1.5 signature.
+    /// Returns (publicHandle, privateHandle).
+    /// </summary>
+    public static (ObjectHandle pub, ObjectHandle priv) ImportRsaRecoveryKeyPair(Pkcs11SessionCore session, System.Security.Cryptography.RSA rsa, bool recover = true)
+    {
+        System.Security.Cryptography.RSAParameters k = rsa.ExportParameters(includePrivateParameters: true);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var n = new ObjectAttribute(CKA.CKA_MODULUS, k.Modulus!);
+        using var e = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, k.Exponent!);
+
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var verifyRecover = new ObjectAttribute(CKA.CKA_VERIFY_RECOVER, recover);
+        ObjectHandle pub = session.CreateObject([pubClass, keyType, token, verify, verifyRecover, n, e]);
+
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var signRecover = new ObjectAttribute(CKA.CKA_SIGN_RECOVER, recover);
+        using var d = new ObjectAttribute(CKA.CKA_PRIVATE_EXPONENT, k.D!);
+        using var p = new ObjectAttribute(CKA.CKA_PRIME_1, k.P!);
+        using var q = new ObjectAttribute(CKA.CKA_PRIME_2, k.Q!);
+        using var dp = new ObjectAttribute(CKA.CKA_EXPONENT_1, k.DP!);
+        using var dq = new ObjectAttribute(CKA.CKA_EXPONENT_2, k.DQ!);
+        using var iq = new ObjectAttribute(CKA.CKA_COEFFICIENT, k.InverseQ!);
+        ObjectHandle priv;
+        try
+        {
+            priv = session.CreateObject([privClass, keyType, token, sign, signRecover, n, e, d, p, q, dp, dq, iq]);
+        }
+        catch
+        {
+            session.DestroyObject(pub);
+            throw;
+        }
+        return (pub, priv);
+    }
+
+    /// <summary>
+    /// The input of a CKM_RSA_PKCS signature with message recovery that equals the BCL's PKCS#1 v1.5
+    /// SHA-256 signature of <paramref name="message"/>: the DER DigestInfo of its SHA-256 hash (RFC 8017 §9.2).
+    /// </summary>
+    public static byte[] Sha256DigestInfo(ReadOnlySpan<byte> message) =>
+        [0x30, 0x31, 0x30, 0x0D, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20,
+         .. System.Security.Cryptography.SHA256.HashData(message)];
+
+    /// <summary>
     /// Encodes a NIST P-curve public point as the PKCS#11 CKA_EC_POINT / ECDH peer-point form:
     /// the uncompressed point (0x04 ‖ X ‖ Y) wrapped in a DER OCTET STRING.
     /// </summary>

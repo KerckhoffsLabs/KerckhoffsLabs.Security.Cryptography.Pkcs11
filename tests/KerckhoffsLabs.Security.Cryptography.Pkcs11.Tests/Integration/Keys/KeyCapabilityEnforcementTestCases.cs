@@ -1,13 +1,16 @@
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // CKM_AES_CBC_PAD is unauthenticated and gated by default; it is used here only as a convenient,
 // widely-supported mechanism to probe CKA_ENCRYPT/CKA_DECRYPT enforcement, not for its own security
-// properties, so the compile-time warning is suppressed for this file only.
-#pragma warning disable KLPKCS11009
+// properties, so the compile-time warning is suppressed for this file only. CKM_RSA_PKCS is used the same
+// way, through the raw dispatch, to probe CKA_SIGN_RECOVER/CKA_VERIFY_RECOVER.
+#pragma warning disable KLPKCS11008, KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
@@ -151,6 +154,45 @@ internal static class KeyCapabilityEnforcementTestCases
                     session.Decrypt(new Mechanism(CKM.CKM_AES_CBC_PAD, iv), decryptOff, validCiphertext));
             }
             finally { session.DestroyObject(decryptOff); }
+        }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+    }
+
+    // === Signatures with message recovery ======================================
+
+    private delegate CKR KeyedInit(NativeCULong session, in CK_MECHANISM mechanism, NativeCULong key);
+
+    private static CKR Init(KeyedInit init, NativeCULong sid, Mechanism mechanism, ObjectHandle key)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        return init(sid, in mech, (NativeCULong)key.ObjectId);
+    }
+
+    // A key whose CKA_SIGN_RECOVER (CKA_VERIFY_RECOVER) is FALSE, though its CKA_SIGN (CKA_VERIFY) is TRUE, is
+    // refused by C_SignRecoverInit (C_VerifyRecoverInit) with CKR_KEY_FUNCTION_NOT_PERMITTED: the attribute
+    // "MUST be CK_TRUE" (PKCS#11 v3.2 §5.13.5, §5.15.5), and the key is of the mechanism's type, so the
+    // higher-priority CKR_KEY_TYPE_INCONSISTENT does not apply (§5.1.6). The ordinary CKA_SIGN (CKA_VERIFY) is
+    // no stand-in for it. CKM_RSA_PKCS, where the token offers it with CKF_SIGN_RECOVER (CKF_VERIFY_RECOVER).
+    internal static void Assert_Recover_WithRecoverFalse_IsKeyFunctionNotPermitted(IPkcs11Backend backend, bool sign)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => sign ? f.SignRecover : f.VerifyRecover, sign ? "CKF_SIGN_RECOVER" : "CKF_VERIFY_RECOVER");
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var rsa = System.Security.Cryptography.RSA.Create(2048);
+            var (pub, priv) = TestKeys.ImportRsaRecoveryKeyPair(session, rsa, recover: false);
+            try
+            {
+                LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+                var sid = (NativeCULong)session.SessionId;
+                CKR rv = sign
+                    ? Init(lowLevel.C_SignRecoverInit, sid, new Mechanism(CKM.CKM_RSA_PKCS), priv)
+                    : Init(lowLevel.C_VerifyRecoverInit, sid, new Mechanism(CKM.CKM_RSA_PKCS), pub);
+                string call = sign ? "C_SignRecoverInit with CKA_SIGN_RECOVER = FALSE" : "C_VerifyRecoverInit with CKA_VERIFY_RECOVER = FALSE";
+                Assert.True(rv == CKR.CKR_KEY_FUNCTION_NOT_PERMITTED, $"{call} returned {rv}.");
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         }
         finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
     }

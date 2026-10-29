@@ -5,9 +5,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// The cases reach CKM_AES_CBC through the raw dispatch, past the session's policy, which the compile-time
-// policy analyzer cannot see, so its warning is suppressed for this file only.
-#pragma warning disable KLPKCS11009
+// The cases reach CKM_AES_CBC, and CKM_RSA_PKCS for signatures with message recovery, through the raw
+// dispatch, past the session's policy, which the compile-time policy analyzer cannot see, so its warnings
+// are suppressed for this file only.
+#pragma warning disable KLPKCS11008, KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 
@@ -76,6 +77,11 @@ internal static class OperationStateTestCases
         Assert.Equal(SHA256.HashData(Message), digest);
     }
 
+    // Signatures with message recovery are checked with CKM_RSA_PKCS, the one mechanism the backends offer
+    // them for (§6.1.6); its flags say whether this module does.
+    private static void RequireRecover(IPkcs11Backend backend, bool sign) =>
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => sign ? f.SignRecover : f.VerifyRecover, sign ? "CKF_SIGN_RECOVER" : "CKF_VERIFY_RECOVER");
+
     // === CKR_OPERATION_NOT_INITIALIZED ==========================================
 
     public static TheoryData<string> CallsWithoutInit =>
@@ -86,19 +92,45 @@ internal static class OperationStateTestCases
         "C_Sign", "C_SignUpdate", "C_SignFinal",
         "C_Verify", "C_VerifyUpdate", "C_VerifyFinal",
         "C_FindObjects", "C_FindObjectsFinal",
+        "C_SignRecover", "C_VerifyRecover", "C_VerifyRecover with a sign active",
     ];
 
     // A call that continues or ends an operation the session never started answers
     // CKR_OPERATION_NOT_INITIALIZED (PKCS#11 v3.1 §5.2). The library takes that code, after a module ended an
-    // operation on an error, as the signal to start it again.
+    // operation on an error, as the signal to start it again. The recover rows run where CKM_RSA_PKCS has
+    // CKF_SIGN_RECOVER or CKF_VERIFY_RECOVER, the only sign of a module that implements the function. An active
+    // signature is no verification with recovery (§5.15.6): C_VerifyRecover with a C_SignInit active has
+    // nothing to continue either, and the signature is still there to finish.
     internal static void Assert_CallWithoutInit_IsOperationNotInitialized(IPkcs11Backend backend, string call, CKR expected = CKR.CKR_OPERATION_NOT_INITIALIZED)
     {
         backend.RequireMechanism(CKM.CKM_SHA256);
+        if (call == "C_SignRecover")
+            RequireRecover(backend, sign: true);
+        else if (call.StartsWith("C_VerifyRecover", StringComparison.Ordinal))
+            RequireRecover(backend, sign: false);
+        if (call == "C_VerifyRecover with a sign active")
+            backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA]);
         WithSession(backend, (lowLevel, sid, session) =>
         {
             byte[] output = new byte[64];
             byte[] signature = new byte[64];
             NativeCULong[] handles = new NativeCULong[4];
+            if (call == "C_VerifyRecover with a sign active")
+            {
+                var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+                try
+                {
+                    var ecdsa = new Mechanism(CKM.CKM_ECDSA);
+                    byte[] digest = SHA256.HashData(Message);
+                    AssertRv(CKR.CKR_OK, Init(lowLevel.C_SignInit, sid, ecdsa, priv), "C_SignInit");
+                    AssertRv(expected, lowLevel.C_VerifyRecover(sid, signature, output, lengthOnly: false, out _), call);
+                    AssertRv(CKR.CKR_OK, lowLevel.C_Sign(sid, digest, signature, lengthOnly: false, out _), "C_Sign of the active signature");
+                    Assert.True(session.Verify(ecdsa, pub, digest, signature));
+                }
+                finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                AssertDigestStillRuns(lowLevel, sid);
+                return;
+            }
             CKR rv = call switch
             {
                 "C_Digest" => lowLevel.C_Digest(sid, Message, output, lengthOnly: false, out _),
@@ -118,6 +150,8 @@ internal static class OperationStateTestCases
                 "C_VerifyFinal" => lowLevel.C_VerifyFinal(sid, signature),
                 "C_FindObjects" => lowLevel.C_FindObjects(sid, handles, out _),
                 "C_FindObjectsFinal" => lowLevel.C_FindObjectsFinal(sid),
+                "C_SignRecover" => lowLevel.C_SignRecover(sid, Message.AsSpan(0, 32), output, lengthOnly: false, out _),
+                "C_VerifyRecover" => lowLevel.C_VerifyRecover(sid, signature, output, lengthOnly: false, out _),
                 _ => throw new ArgumentOutOfRangeException(nameof(call), call, null),
             };
             AssertRv(expected, rv, call + " without an Init");
@@ -166,7 +200,7 @@ internal static class OperationStateTestCases
 
     // === CKR_OPERATION_ACTIVE ==================================================
 
-    public static TheoryData<string> SecondInits => ["Digest", "Encrypt", "Decrypt", "Sign", "Verify", "FindObjects"];
+    public static TheoryData<string> SecondInits => ["Digest", "Encrypt", "Decrypt", "Sign", "Verify", "FindObjects", "SignRecover", "VerifyRecover"];
 
     // A second Init of the same kind while one is active answers CKR_OPERATION_ACTIVE (§5.2) and leaves the
     // first operation as it was.
@@ -180,6 +214,8 @@ internal static class OperationStateTestCases
             _ => [],
         };
         backend.RequireMechanisms(needed);
+        if (operation is "SignRecover" or "VerifyRecover")
+            RequireRecover(backend, sign: operation == "SignRecover");
 
         WithSession(backend, (lowLevel, sid, session) =>
         {
@@ -246,6 +282,31 @@ internal static class OperationStateTestCases
                             {
                                 AssertRv(CKR.CKR_OK, lowLevel.C_Verify(sid, digest, signature), "C_Verify of the first operation");
                             }
+                        }
+                        finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                        break;
+                    }
+                case "SignRecover":
+                case "VerifyRecover":
+                    {
+                        using var rsa = RSA.Create(2048);
+                        var (pub, priv) = TestKeys.ImportRsaRecoveryKeyPair(session, rsa);
+                        try
+                        {
+                            var pkcs1 = new Mechanism(CKM.CKM_RSA_PKCS);
+                            byte[] data = TestKeys.Sha256DigestInfo(Message);
+                            byte[] signature = rsa.SignData(Message, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                            KeyedInit init = operation == "SignRecover" ? lowLevel.C_SignRecoverInit : lowLevel.C_VerifyRecoverInit;
+                            ObjectHandle key = operation == "SignRecover" ? priv : pub;
+                            AssertRv(CKR.CKR_OK, Init(init, sid, pkcs1, key), $"C_{operation}Init");
+                            AssertRv(expected, Init(init, sid, pkcs1, key), $"a second C_{operation}Init");
+
+                            byte[] output = new byte[256];
+                            CKR rv = operation == "SignRecover"
+                                ? lowLevel.C_SignRecover(sid, data, output, lengthOnly: false, out NativeCULong n)
+                                : lowLevel.C_VerifyRecover(sid, signature, output, lengthOnly: false, out n);
+                            AssertRv(CKR.CKR_OK, rv, $"C_{operation} of the first operation");
+                            Assert.Equal(operation == "SignRecover" ? signature : data, output.AsSpan(0, (int)n).ToArray());
                         }
                         finally { session.DestroyObject(priv); session.DestroyObject(pub); }
                         break;
@@ -324,26 +385,49 @@ internal static class OperationStateTestCases
 
     // === A key of the wrong type ===============================================
 
-    public static TheoryData<string> KeysOfTheWrongType => ["ECDSA sign with an AES key", "ECDSA verify with an AES key", "AES-CBC encrypt with an EC public key"];
+    public static TheoryData<string> KeysOfTheWrongType =>
+    [
+        "ECDSA sign with an AES key", "ECDSA verify with an AES key", "AES-CBC encrypt with an EC public key",
+        "RSA verify-recover with an AES key", "RSA verify-recover with an RSA private key", "RSA sign-recover with an RSA public key",
+    ];
 
     // Init with a key the mechanism cannot use answers CKR_KEY_TYPE_INCONSISTENT (§5.1.6). A module may answer
     // CKR_KEY_FUNCTION_NOT_PERMITTED instead, since the key also lacks the usage the mechanism needs. The
     // library checks no mechanism against a key before the call, so the module is the only guard.
     internal static void Assert_KeyOfTheWrongType_IsRefused(IPkcs11Backend backend, string misuse, CKR[]? alsoAccepted = null)
     {
-        backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA, CKM.CKM_AES_CBC]);
+        bool recover = misuse.Contains("-recover", StringComparison.Ordinal);
+        if (recover)
+            RequireRecover(backend, sign: misuse.Contains("sign-recover", StringComparison.Ordinal));
+        else
+            backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA, CKM.CKM_AES_CBC]);
         CKR[] accepted = [CKR.CKR_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED, .. alsoAccepted ?? []];
         WithSession(backend, (lowLevel, sid, session) =>
         {
             ObjectHandle aesKey = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
-            var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+            ObjectHandle pub, priv;
+            using var rsa = RSA.Create(2048);
             try
             {
+                (pub, priv) = recover ? TestKeys.ImportRsaRecoveryKeyPair(session, rsa) : TestKeys.GenerateEcP256KeyPair(session);
+            }
+            catch
+            {
+                session.DestroyObject(aesKey);
+                throw;
+            }
+            try
+            {
+                var pkcs1 = new Mechanism(CKM.CKM_RSA_PKCS);
                 CKR rv = misuse switch
                 {
                     "ECDSA sign with an AES key" => Init(lowLevel.C_SignInit, sid, new Mechanism(CKM.CKM_ECDSA), aesKey),
                     "ECDSA verify with an AES key" => Init(lowLevel.C_VerifyInit, sid, new Mechanism(CKM.CKM_ECDSA), aesKey),
-                    _ => Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_AES_CBC, Iv), pub),
+                    "AES-CBC encrypt with an EC public key" => Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_AES_CBC, Iv), pub),
+                    "RSA verify-recover with an AES key" => Init(lowLevel.C_VerifyRecoverInit, sid, pkcs1, aesKey),
+                    "RSA verify-recover with an RSA private key" => Init(lowLevel.C_VerifyRecoverInit, sid, pkcs1, priv),
+                    "RSA sign-recover with an RSA public key" => Init(lowLevel.C_SignRecoverInit, sid, pkcs1, pub),
+                    _ => throw new ArgumentOutOfRangeException(nameof(misuse), misuse, null),
                 };
                 AssertRvIn(accepted, rv, misuse);
                 AssertDigestStillRuns(lowLevel, sid);
@@ -359,18 +443,36 @@ internal static class OperationStateTestCases
 
     // === A destroyed key =======================================================
 
-    public static TheoryData<string> UsesOfADestroyedKey => ["C_EncryptInit", "C_DecryptInit", "C_GetAttributeValue", "C_DestroyObject"];
+    public static TheoryData<string> UsesOfADestroyedKey =>
+        ["C_EncryptInit", "C_DecryptInit", "C_GetAttributeValue", "C_DestroyObject", "C_SignRecoverInit", "C_VerifyRecoverInit"];
 
     // A handle whose object is gone answers CKR_KEY_HANDLE_INVALID where it names a key for an operation, and
     // CKR_OBJECT_HANDLE_INVALID where it names an object (§5.1.6). Most modules answer an operation's Init
     // with CKR_OBJECT_HANDLE_INVALID as well, which the library maps to the same exception family. No object is created between the destroy and
     // the call, so a module that hands out handles again has nothing to give the old one to.
+    // The recover rows destroy the RSA key the Init would take, the private key for C_SignRecoverInit and the
+    // public key for C_VerifyRecoverInit.
     internal static void Assert_DestroyedKey_IsRefused(IPkcs11Backend backend, string use, CKR? expected = null)
     {
-        backend.RequireMechanism(CKM.CKM_AES_CBC);
+        bool recover = use.Contains("RecoverInit", StringComparison.Ordinal);
+        if (recover)
+            RequireRecover(backend, sign: use == "C_SignRecoverInit");
+        else
+            backend.RequireMechanism(CKM.CKM_AES_CBC);
         WithSession(backend, (lowLevel, sid, session) =>
         {
-            ObjectHandle key = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            ObjectHandle key;
+            if (recover)
+            {
+                using var rsa = RSA.Create(2048);
+                var (pub, priv) = TestKeys.ImportRsaRecoveryKeyPair(session, rsa);
+                (key, ObjectHandle kept) = use == "C_SignRecoverInit" ? (priv, pub) : (pub, priv);
+                session.DestroyObject(kept);
+            }
+            else
+            {
+                key = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            }
             AssertRv(CKR.CKR_OK, lowLevel.C_DestroyObject(sid, (NativeCULong)key.ObjectId), "C_DestroyObject");
 
             var cbc = new Mechanism(CKM.CKM_AES_CBC, Iv);
@@ -383,6 +485,12 @@ internal static class OperationStateTestCases
                 case "C_DecryptInit":
                     rv = Init(lowLevel.C_DecryptInit, sid, cbc, key);
                     break;
+                case "C_SignRecoverInit":
+                    rv = Init(lowLevel.C_SignRecoverInit, sid, new Mechanism(CKM.CKM_RSA_PKCS), key);
+                    break;
+                case "C_VerifyRecoverInit":
+                    rv = Init(lowLevel.C_VerifyRecoverInit, sid, new Mechanism(CKM.CKM_RSA_PKCS), key);
+                    break;
                 case "C_GetAttributeValue":
                     {
                         CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_KEY_TYPE }];
@@ -393,7 +501,7 @@ internal static class OperationStateTestCases
                     rv = lowLevel.C_DestroyObject(sid, (NativeCULong)key.ObjectId);
                     break;
             }
-            CKR[] spec = use is "C_EncryptInit" or "C_DecryptInit"
+            CKR[] spec = use.EndsWith("Init", StringComparison.Ordinal)
                 ? [CKR.CKR_KEY_HANDLE_INVALID, CKR.CKR_OBJECT_HANDLE_INVALID]
                 : [CKR.CKR_OBJECT_HANDLE_INVALID];
             AssertRvIn(expected is { } e ? [e] : spec, rv, use + " with a destroyed key");

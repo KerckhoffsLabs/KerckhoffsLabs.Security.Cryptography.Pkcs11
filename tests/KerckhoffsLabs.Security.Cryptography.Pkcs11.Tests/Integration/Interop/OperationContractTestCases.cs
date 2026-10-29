@@ -7,9 +7,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// The CBC cases opt in to CKM_AES_CBC and CKM_AES_CBC_PAD on the session (UsePolicy), which the
-// compile-time policy analyzer cannot see, so its warning is suppressed for this file only.
-#pragma warning disable KLPKCS11009
+// The CBC cases opt in to CKM_AES_CBC and CKM_AES_CBC_PAD on the session (UsePolicy), and the recover cases
+// reach CKM_RSA_PKCS through the raw dispatch, which the compile-time policy analyzer cannot see, so its
+// warnings are suppressed for this file only.
+#pragma warning disable KLPKCS11008, KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 
@@ -115,7 +116,8 @@ internal static class OperationContractTestCases
 
     // === CKR_BUFFER_TOO_SMALL ================================================
 
-    public static TheoryData<string> BufferTooSmallOperations => ["ECDSA-P256", "RSA-PSS-SHA256", "RSA-OAEP-SHA256", "Ed25519", "Ed448", "ML-DSA-44"];
+    public static TheoryData<string> BufferTooSmallOperations =>
+        ["ECDSA-P256", "RSA-PSS-SHA256", "RSA-OAEP-SHA256", "Ed25519", "Ed448", "ML-DSA-44", "RSA sign-recover", "RSA verify-recover"];
 
     // A single-part call with a 1-byte buffer must answer CKR_BUFFER_TOO_SMALL (§5.2), report a length the
     // caller can act on, and keep the operation for the retry. Two recorded deviations are tolerated, as the
@@ -130,9 +132,17 @@ internal static class OperationContractTestCases
             "RSA-PSS-SHA256" => [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS],
             "Ed25519" or "Ed448" => [CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKM.CKM_EDDSA],
             "ML-DSA-44" => [CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_ML_DSA],
+            "RSA sign-recover" or "RSA verify-recover" => [],
             _ => [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP],
         };
         backend.RequireMechanisms(needed);
+        // The recover rows (C_SignRecover, C_VerifyRecover: §5.13.6, §5.15.6 follow §5.2) run where CKM_RSA_PKCS
+        // has CKF_SIGN_RECOVER or CKF_VERIFY_RECOVER, with an imported key, so that the result is the BCL's.
+        if (operation is "RSA sign-recover" or "RSA verify-recover")
+        {
+            bool sign = operation == "RSA sign-recover";
+            backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => sign ? f.SignRecover : f.VerifyRecover, sign ? "CKF_SIGN_RECOVER" : "CKF_VERIFY_RECOVER");
+        }
 
         WithSession(backend, (lowLevel, sid, session) =>
         {
@@ -173,6 +183,30 @@ internal static class OperationContractTestCases
                             var mechanism = new Mechanism(CKM.CKM_ML_DSA);
                             byte[] signature = SignWithAShortBufferFirst(lowLevel, sid, mechanism, priv, Message, 2420);
                             Assert.True(session.Verify(mechanism, pub, Message, signature));
+                        }
+                        finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                        break;
+                    }
+                case "RSA sign-recover":
+                case "RSA verify-recover":
+                    {
+                        using var rsa = RSA.Create(2048);
+                        var (pub, priv) = TestKeys.ImportRsaRecoveryKeyPair(session, rsa);
+                        try
+                        {
+                            var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
+                            byte[] data = TestKeys.Sha256DigestInfo(Message);
+                            byte[] signature = rsa.SignData(Message, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                            byte[] result = operation == "RSA sign-recover"
+                                ? RunWithAShortBufferFirst(
+                                    () => Init(lowLevel.C_SignRecoverInit, sid, mechanism, priv),
+                                    (buffer, lengthOnly) => (lowLevel.C_SignRecover(sid, data, buffer, lengthOnly, out NativeCULong n), n),
+                                    signature.Length)
+                                : RunWithAShortBufferFirst(
+                                    () => Init(lowLevel.C_VerifyRecoverInit, sid, mechanism, pub),
+                                    (buffer, lengthOnly) => (lowLevel.C_VerifyRecover(sid, signature, buffer, lengthOnly, out NativeCULong n), n),
+                                    data.Length);
+                            Assert.Equal(operation == "RSA sign-recover" ? signature : data, result);
                         }
                         finally { session.DestroyObject(priv); session.DestroyObject(pub); }
                         break;

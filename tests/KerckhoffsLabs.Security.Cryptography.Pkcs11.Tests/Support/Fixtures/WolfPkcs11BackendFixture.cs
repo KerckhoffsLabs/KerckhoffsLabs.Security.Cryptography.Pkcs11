@@ -138,6 +138,16 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11RefusesAPrivateKeyOfASecretKeyType = false;
 
+    /// <summary>
+    /// False while <c>C_VerifyRecover</c>, with another operation active and no verification with recovery,
+    /// answers <c>CKR_MECHANISM_INVALID</c> where PKCS#11 v3.2 §5.15.6 and §5.2 give
+    /// <c>CKR_OPERATION_NOT_INITIALIZED</c>: it reads the session's one active mechanism (an ECDSA
+    /// <c>C_SignInit</c>'s, say) and refuses it before it asks whether a verify-recover was started
+    /// (<c>wp11_C_VerifyRecover</c> in <c>src/crypto.c</c>). With nothing active it answers correctly.
+    /// WolfPkcs11QuirkTests.VerifyRecoverUnderASign_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11ReportsAVerifyRecoverNeverStarted = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 
