@@ -64,4 +64,8 @@ public sealed class OperationStateTests_FreeHsm(FreeHsmBackendFixture backend)
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.WrongLengthSignatures), MemberType = typeof(OperationStateTestCases))]
     public void Verify_WrongLengthSignature_EndsTheOperation(string shape) => OperationStateTestCases.Assert_Verify_WrongLengthSignature_EndsTheOperation(_backend, shape);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(OperationStateTestCases.NonKeyObjectsAsKeys), MemberType = typeof(OperationStateTestCases))]
+    public void NonKeyObject_IsRefusedAsAKey(string misuse) => OperationStateTestCases.Assert_NonKeyObject_IsRefusedAsAKey(_backend, misuse);
 }

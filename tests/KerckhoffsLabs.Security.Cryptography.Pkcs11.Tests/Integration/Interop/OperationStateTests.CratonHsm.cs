@@ -29,7 +29,12 @@ public sealed class OperationStateTests_CratonHsm(CratonHsmBackendFixture backen
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.KeysOfTheWrongType), MemberType = typeof(OperationStateTestCases))]
-    public void KeyOfTheWrongType_IsRefused(string misuse) => OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
+    public void KeyOfTheWrongType_IsRefused(string misuse)
+    {
+        if (misuse == "ECDH derive from an AES key" && !CratonHsmBackendFixture.CratonHsmChecksTheDeriveBaseKeyType)
+            Assert.Skip("Craton HSM derives an ECDH key from an AES key");
+        OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
+    }
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.UsesOfADestroyedKey), MemberType = typeof(OperationStateTestCases))]
@@ -52,4 +57,8 @@ public sealed class OperationStateTests_CratonHsm(CratonHsmBackendFixture backen
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.WrongLengthSignatures), MemberType = typeof(OperationStateTestCases))]
     public void Verify_WrongLengthSignature_EndsTheOperation(string shape) => OperationStateTestCases.Assert_Verify_WrongLengthSignature_EndsTheOperation(_backend, shape);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(OperationStateTestCases.NonKeyObjectsAsKeys), MemberType = typeof(OperationStateTestCases))]
+    public void NonKeyObject_IsRefusedAsAKey(string misuse) => OperationStateTestCases.Assert_NonKeyObject_IsRefusedAsAKey(_backend, misuse);
 }

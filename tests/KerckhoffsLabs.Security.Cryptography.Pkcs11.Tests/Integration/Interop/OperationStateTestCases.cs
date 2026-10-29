@@ -2,7 +2,9 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // The cases reach CKM_AES_CBC, and CKM_RSA_PKCS for signatures with message recovery, through the raw
@@ -389,21 +391,34 @@ internal static class OperationStateTestCases
     [
         "ECDSA sign with an AES key", "ECDSA verify with an AES key", "AES-CBC encrypt with an EC public key",
         "RSA verify-recover with an AES key", "RSA verify-recover with an RSA private key", "RSA sign-recover with an RSA public key",
+        "ECDH derive from an AES key", "HKDF derive from an EC private key",
     ];
 
     // Init with a key the mechanism cannot use answers CKR_KEY_TYPE_INCONSISTENT (§5.1.6). A module may answer
     // CKR_KEY_FUNCTION_NOT_PERMITTED instead, since the key also lacks the usage the mechanism needs. The
-    // library checks no mechanism against a key before the call, so the module is the only guard.
+    // library checks no mechanism against a key before the call, so the module is the only guard. The derive
+    // rows give the base key CKA_DERIVE, so that only its type is wrong (CKM_ECDH1_DERIVE takes an EC private
+    // key, §6.3.17; CKM_HKDF_DERIVE a generic secret or HKDF key, §6.62.3), and check that C_DeriveKey made no
+    // key.
     internal static void Assert_KeyOfTheWrongType_IsRefused(IPkcs11Backend backend, string misuse, CKR[]? alsoAccepted = null)
     {
         bool recover = misuse.Contains("-recover", StringComparison.Ordinal);
         if (recover)
             RequireRecover(backend, sign: misuse.Contains("sign-recover", StringComparison.Ordinal));
+        else if (misuse.StartsWith("ECDH", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_ECDH1_DERIVE);
+        else if (misuse.StartsWith("HKDF", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
         else
             backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA, CKM.CKM_AES_CBC]);
         CKR[] accepted = [CKR.CKR_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED, .. alsoAccepted ?? []];
         WithSession(backend, (lowLevel, sid, session) =>
         {
+            if (misuse.Contains("derive", StringComparison.Ordinal))
+            {
+                AssertDeriveFromTheWrongKeyType(lowLevel, sid, session, misuse, accepted);
+                return;
+            }
             ObjectHandle aesKey = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
             ObjectHandle pub, priv;
             using var rsa = RSA.Create(2048);
@@ -437,6 +452,158 @@ internal static class OperationStateTestCases
                 session.DestroyObject(priv);
                 session.DestroyObject(pub);
                 session.DestroyObject(aesKey);
+            }
+        });
+    }
+
+    private static void AssertDeriveFromTheWrongKeyType(LowLevelPkcs11Library lowLevel, NativeCULong sid, Pkcs11SessionCore session, string misuse, CKR[] accepted)
+    {
+        string label = $"kl-wrong-base-{Guid.NewGuid():N}";
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrLen32 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+
+        ObjectHandle baseKey;
+        Mechanism mechanism;
+        if (misuse.StartsWith("ECDH", StringComparison.Ordinal))
+        {
+            using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+            baseKey = session.CreateObject([attrSecret, attrAes, attrToken, attrDerive, attrValue]);
+            using var peer = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            ECPoint q = peer.ExportParameters(includePrivateParameters: false).Q;
+            mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, TestKeys.DerEcPoint(q.X!, q.Y!)));
+        }
+        else
+        {
+            using var ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            baseKey = TestKeys.ImportEcP256PrivateKey(session, ecdh.ExportParameters(includePrivateParameters: true).D!);
+            mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
+        }
+        try
+        {
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+            CK_ATTRIBUTE[] template = [.. new[] { attrSecret, attrGeneric, attrToken, attrLen32, attrLabel }.Select(a => a.CkAttribute)];
+            CKR rv = lowLevel.C_DeriveKey(sid, in mech, (NativeCULong)baseKey.ObjectId, template, out NativeCULong derived);
+            if (rv == CKR.CKR_OK)
+                lowLevel.C_DestroyObject(sid, derived);
+            AssertRvIn(accepted, rv, misuse);
+            Assert.Empty(session.FindAllObjects([attrLabel]));
+            AssertDigestStillRuns(lowLevel, sid);
+        }
+        finally { session.DestroyObject(baseKey); }
+    }
+
+    // === An object that is not a key ===========================================
+
+    private static readonly CKM[] AesKeyWraps = [CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_PAD, CKM.CKM_AES_KEY_WRAP_KWP];
+
+    public static TheoryData<string> NonKeyObjectsAsKeys =>
+    [
+        "C_SignInit with a data object", "C_EncryptInit with a data object",
+        "C_SignInit with a certificate", "C_EncryptInit with a certificate",
+        "C_WrapKey with a data object as the wrapping key", "C_UnwrapKey with a certificate as the unwrapping key",
+    ];
+
+    // A handle to an object that is not a key, named where a key is wanted, is refused, makes nothing, and leaves
+    // the session able to digest. PKCS#11 v3.2 does not single out one code: §5.1.6 has CKR_KEY_HANDLE_INVALID
+    // cover it ("it may be the case that the specified handle is a valid handle for an object which is not a
+    // key"), but the object is no key of the mechanism's type either (CKR_KEY_TYPE_INCONSISTENT) and has none of
+    // the usage attributes the operation needs (CKR_KEY_FUNCTION_NOT_PERMITTED), so an Init may answer any of
+    // the three. As the wrapping key of C_WrapKey the codes are CKR_WRAPPING_KEY_HANDLE_INVALID or
+    // CKR_WRAPPING_KEY_TYPE_INCONSISTENT (§5.18.3), as the unwrapping key of C_UnwrapKey their UNWRAPPING
+    // counterparts (§5.18.4), or CKR_KEY_FUNCTION_NOT_PERMITTED for the missing CKA_WRAP or CKA_UNWRAP. A
+    // module that read the object as a key of some type would get past all of these. A data object and an
+    // X.509 certificate, both session objects.
+    internal static void Assert_NonKeyObject_IsRefusedAsAKey(IPkcs11Backend backend, string misuse)
+    {
+        bool wrap = misuse.StartsWith("C_WrapKey", StringComparison.Ordinal);
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        CKM keyWrap = default;
+        if (misuse.StartsWith("C_SignInit", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
+        else if (misuse.StartsWith("C_EncryptInit", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_AES_CBC);
+        else
+        {
+            Pkcs11Slot slot = backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)backend.SlotId);
+            keyWrap = AesKeyWraps.FirstOrDefault(m => backend.Supports(m) && (wrap ? slot.GetMechanismInfo(m).MechanismFlags.Wrap : slot.GetMechanismInfo(m).MechanismFlags.Unwrap));
+            if (keyWrap == default)
+                Assert.Skip($"Backend advertises none of {string.Join(", ", AesKeyWraps)} for {(wrap ? "CKF_WRAP" : "CKF_UNWRAP")}.");
+        }
+
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            string label = $"kl-not-a-key-{Guid.NewGuid():N}";
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            ObjectHandle notAKey;
+            if (misuse.Contains("data object", StringComparison.Ordinal))
+            {
+                using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+                using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+                notAKey = session.CreateObject([attrData, attrToken, attrLabel, attrValue]);
+            }
+            else
+            {
+                using var rsa = RSA.Create(2048);
+                var request = new System.Security.Cryptography.X509Certificates.CertificateRequest("CN=kl not a key", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                using var cert = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+                using var attrCertificate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_CERTIFICATE);
+                using var attrX509 = new ObjectAttribute(CKA.CKA_CERTIFICATE_TYPE, CKC.CKC_X_509);
+                using var attrSubject = new ObjectAttribute(CKA.CKA_SUBJECT, cert.SubjectName.RawData);
+                using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, cert.RawData);
+                notAKey = session.CreateObject([attrCertificate, attrX509, attrToken, attrLabel, attrSubject, attrValue]);
+            }
+            ObjectHandle aesKey = TestKeys.ImportExtractableAesKey(session, RandomNumberGenerator.GetBytes(32));
+            try
+            {
+                var handle = (NativeCULong)notAKey.ObjectId;
+                using var scope = new MechanismParameterScope();
+                CKR rv;
+                CKR[] accepted;
+                if (misuse.StartsWith("C_SignInit", StringComparison.Ordinal))
+                {
+                    CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256_HMAC).Marshal(scope, out _);
+                    rv = lowLevel.C_SignInit(sid, in mech, handle);
+                    accepted = [CKR.CKR_KEY_HANDLE_INVALID, CKR.CKR_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED];
+                }
+                else if (misuse.StartsWith("C_EncryptInit", StringComparison.Ordinal))
+                {
+                    CK_MECHANISM mech = new Mechanism(CKM.CKM_AES_CBC, Iv).Marshal(scope, out _);
+                    rv = lowLevel.C_EncryptInit(sid, in mech, handle);
+                    accepted = [CKR.CKR_KEY_HANDLE_INVALID, CKR.CKR_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED];
+                }
+                else if (wrap)
+                {
+                    CK_MECHANISM mech = new Mechanism(keyWrap).Marshal(scope, out _);
+                    rv = lowLevel.C_WrapKey(sid, in mech, handle, (NativeCULong)aesKey.ObjectId, new byte[64], lengthOnly: false, out _);
+                    accepted = [CKR.CKR_WRAPPING_KEY_HANDLE_INVALID, CKR.CKR_WRAPPING_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED];
+                }
+                else
+                {
+                    CK_MECHANISM mech = new Mechanism(keyWrap).Marshal(scope, out _);
+                    using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                    using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+                    CK_ATTRIBUTE[] template = [.. new[] { attrSecret, attrAes, attrToken, attrLabel }.Select(a => a.CkAttribute)];
+                    rv = lowLevel.C_UnwrapKey(sid, in mech, handle, RandomNumberGenerator.GetBytes(40), template, out NativeCULong unwrapped);
+                    if (rv == CKR.CKR_OK)
+                        lowLevel.C_DestroyObject(sid, unwrapped);
+                    accepted = [CKR.CKR_UNWRAPPING_KEY_HANDLE_INVALID, CKR.CKR_UNWRAPPING_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED];
+                }
+                AssertRvIn(accepted, rv, misuse);
+                using var attrSecretKey = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                Assert.Empty(session.FindAllObjects([attrSecretKey, attrLabel]));
+                AssertDigestStillRuns(lowLevel, sid);
+            }
+            finally
+            {
+                session.DestroyObject(aesKey);
+                session.DestroyObject(notAKey);
             }
         });
     }

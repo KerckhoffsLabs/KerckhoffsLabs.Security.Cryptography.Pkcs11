@@ -245,6 +245,20 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent = false;
 
+    /// <summary>
+    /// False while an object that is not a key, named as one, is refused with <c>CKR_OBJECT_HANDLE_INVALID</c>: a
+    /// data object or an X.509 certificate given to <c>C_SignInit</c> or <c>C_EncryptInit</c>, as the wrapping key
+    /// of <c>C_WrapKey</c> or the unwrapping key of <c>C_UnwrapKey</c>. The handle is valid; PKCS#11 v3.2 §5.1.6
+    /// keeps <c>CKR_OBJECT_HANDLE_INVALID</c> for a handle that is not, lists it for none of these functions, and
+    /// answers a non-key with <c>CKR_KEY_HANDLE_INVALID</c> (<c>CKR_WRAPPING_KEY_HANDLE_INVALID</c>,
+    /// <c>CKR_UNWRAPPING_KEY_HANDLE_INVALID</c>) or a key-type or key-function code. Not yet reported upstream.
+    /// BouncyHsmQuirkTests.NonKeyObjectAsAKey_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesANonKeyObjectAsAKey = false;
+
+    /// <summary>Gate for the non-key object case: see <see cref="BouncyHsmRefusesANonKeyObjectAsAKey"/>.</summary>
+    public static bool NonKeyObjectRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesANonKeyObjectAsAKey;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

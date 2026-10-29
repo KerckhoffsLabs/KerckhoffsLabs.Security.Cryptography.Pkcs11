@@ -410,4 +410,30 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_SignRecoverInit with an RSA public key no longer answers CKR_KEY_HANDLE_INVALID (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void NonKeyObjectAsAKey_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, new byte[32]);
+        ObjectHandle data = session.CreateObject([attrClass, attrToken, attrValue]);
+        CKR rv;
+        try
+        {
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256_HMAC).Marshal(scope, out _);
+            rv = _backend.Library.LowLevelLibrary!.C_SignInit((NativeCULong)session.SessionId, in mech, (NativeCULong)data.ObjectId);
+        }
+        finally
+        {
+            session.DestroyObject(data);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_OBJECT_HANDLE_INVALID,
+            $"C_SignInit(CKM_SHA256_HMAC) with a data object no longer answers CKR_OBJECT_HANDLE_INVALID (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesANonKeyObjectAsAKey to true and delete this test.");
+    }
 }

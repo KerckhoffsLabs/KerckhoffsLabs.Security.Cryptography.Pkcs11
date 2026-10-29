@@ -161,6 +161,14 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool ProvenanceTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesProvenanceAttributesInATemplate;
 
     /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> takes a base key of any type: from an AES key it answers
+    /// <c>CKR_OK</c> and makes a key, using the AES key's value as the P-256 private scalar (<c>C_DeriveKey</c> in
+    /// <c>src/pkcs11_abi/functions.rs</c> checks <c>CKA_DERIVE</c> but not the key type). PKCS#11 v3.2 §6.3.17 takes
+    /// an EC private key; §5.1.6: <c>CKR_KEY_TYPE_INCONSISTENT</c>.
+    /// </summary>
+    public const bool CratonHsmChecksTheDeriveBaseKeyType = false;
+
+    /// <summary>
     /// False while malformed attribute values are taken: <c>C_CreateObject</c> of a data object with a 4-byte
     /// <c>CKA_TOKEN</c>, a <c>{NULL, 1}</c> <c>CKA_TOKEN</c> or a <c>{NULL, 16}</c> <c>CKA_VALUE</c> answers
     /// <c>CKR_OK</c>, and a search with a 4-byte <c>CKA_TOKEN</c> of zeros finds a session object. PKCS#11 v3.2

@@ -170,6 +170,23 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the HMAC key-usage cases: see <see cref="KryopticRefusesAnUnpermittedMacKeyAsNotPermitted"/>.</summary>
     public static bool MacKeyUsageRefusalAvailable => KryopticAvailable && KryopticRefusesAnUnpermittedMacKeyAsNotPermitted;
 
+    /// <summary>
+    /// False while a data object or certificate given as the wrapping key of <c>C_WrapKey</c> or the unwrapping
+    /// key of <c>C_UnwrapKey</c> is refused with <c>CKR_GENERAL_ERROR</c>: <c>wrap_key</c> and <c>unwrap_key</c> in
+    /// <c>src/fns/keymgmt.rs</c> read its <c>CKA_WRAP</c> (<c>CKA_UNWRAP</c>), which the object does not have, and
+    /// pass the lookup's error on. PKCS#11 v3.2 §5.18.3 and §5.18.4: <c>CKR_WRAPPING_KEY_HANDLE_INVALID</c>
+    /// (<c>CKR_UNWRAPPING_KEY_HANDLE_INVALID</c>) or a key-type or key-function code.
+    /// </summary>
+    public const bool KryopticRefusesANonKeyObjectAsAWrappingKey = false;
+
+    /// <summary>
+    /// False while <c>CKM_HKDF_DERIVE</c> from an EC private key answers <c>CKR_KEY_HANDLE_INVALID</c>
+    /// (<c>src/ossl/hkdf.rs</c> refuses every class but a secret key or a data object that way). The handle names
+    /// a valid key of the wrong type: PKCS#11 v3.2 §5.1.6 <c>CKR_KEY_TYPE_INCONSISTENT</c> (§6.62.3 takes a generic
+    /// secret or HKDF key).
+    /// </summary>
+    public const bool KryopticReportsAnHkdfBaseKeyOfTheWrongTypeAsInconsistent = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();
