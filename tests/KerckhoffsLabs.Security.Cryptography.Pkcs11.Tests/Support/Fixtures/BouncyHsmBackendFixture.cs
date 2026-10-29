@@ -55,22 +55,11 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmAcceptsEmptySignature = false;
 
-    /// <summary>
-    /// False while <c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c> runs the A chain one PRF ahead: <c>Sp800_108DoublePipelineKdf</c>
-    /// computes A(1) = PRF(fixed input) as SP 800-108 §5.3 does, then applies the PRF again before the first block, so
-    /// block i is keyed on A(i+1). Feedback mode is not affected. Not yet reported upstream.
-    /// BouncyHsmQuirkTests.Sp800108DoublePipeline_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmDoublePipelineMatchesSp800108 = false;
-
     /// <summary>Gate for empty-input digest cases: see <see cref="BouncyHsmAcceptsEmptyDigest"/>.</summary>
     public static bool EmptyDigestAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyDigest;
 
     /// <summary>Gate for cases that verify an empty RSA signature: see <see cref="BouncyHsmAcceptsEmptySignature"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptySignature;
-
-    /// <summary>Gate for SP 800-108 double-pipeline cases: see <see cref="BouncyHsmDoublePipelineMatchesSp800108"/>.</summary>
-    public static bool Sp800108DoublePipelineAvailable => BouncyHsmAvailable && BouncyHsmDoublePipelineMatchesSp800108;
 
     public BouncyHsmBackendFixture()
     {

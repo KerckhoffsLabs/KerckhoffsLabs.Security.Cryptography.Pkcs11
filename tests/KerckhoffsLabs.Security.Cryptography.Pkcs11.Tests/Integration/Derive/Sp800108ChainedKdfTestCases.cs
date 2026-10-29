@@ -48,7 +48,7 @@ internal static class Sp800108ChainedKdfTestCases
         Assert.Equal(Convert.ToHexString(ReferenceDoublePipeline()), Convert.ToHexString(actual));
     }
 
-    internal static byte[] DeriveDoublePipeline(IPkcs11Backend backend) =>
+    private static byte[] DeriveDoublePipeline(IPkcs11Backend backend) =>
         Derive(backend, CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF, Segments(CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC)).Build());
 
     // Iteration variable, then [i]_32, Label || 0x00 || Context, [L]_32 with L the derived length in bits.
@@ -105,7 +105,7 @@ internal static class Sp800108ChainedKdfTestCases
         return output.Take(OutputLength).ToArray();
     }
 
-    internal static byte[] ReferenceDoublePipeline()
+    private static byte[] ReferenceDoublePipeline()
     {
         var output = new List<byte>();
         byte[] a = HMACSHA256.HashData(BaseKey, PrfInput([], null));

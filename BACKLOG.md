@@ -903,7 +903,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-168] Lift the BouncyHsm SP 800-108 double-pipeline gate once its A chain matches SP 800-108
+### [BL-168] ✅ RESOLVED — Lift the BouncyHsm SP 800-108 double-pipeline gate once its A chain matches SP 800-108
+- **Status:** Resolved 2026-10-29 by the `vendor/bouncyhsm` bump to 3e257941, the fix for harrison314/BouncyHsm#130 (reported from this entry). Block i is now keyed on A(i), so the output matches SP 800-108; `BouncyHsmDoublePipelineMatchesSp800108`, its gate and its quirk test are gone and `DoublePipeline_HmacSha256_MatchesReference` runs on BouncyHsm.
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
