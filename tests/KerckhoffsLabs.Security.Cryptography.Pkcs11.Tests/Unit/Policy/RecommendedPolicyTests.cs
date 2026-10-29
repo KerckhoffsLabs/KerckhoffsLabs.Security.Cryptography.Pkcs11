@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 
 #pragma warning disable KLPKCS11007, KLPKCS11008, KLPKCS11009, KLPKCS11010 // weak inputs are the subject under test
 
@@ -328,7 +329,7 @@ public sealed class RecommendedPolicyTests
     [Fact]
     public void HashBoundPss_WithRawParameterBytes_IsDenied() =>
         Assert.Equal("RSA-PSS parameters must be CkmRsaPkcsPssParams.",
-            Reason(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new byte[24]), CryptoOperation.Sign));
+            Reason(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, RawParameter.Of(CKM.CKM_SHA256_RSA_PKCS_PSS)), CryptoOperation.Sign));
 
     // A short AEAD tag raises the odds that one forged message verifies. Both the single-part and
     // the message-based parameter types carry it, so the floor must hold for each.
@@ -375,8 +376,8 @@ public sealed class RecommendedPolicyTests
     {
         Assert.True(Allowed(new Mechanism(CKM.CKM_AES_GCM), CryptoOperation.Encrypt));
         Assert.True(Allowed(new Mechanism(CKM.CKM_AES_CCM), CryptoOperation.Decrypt));
-        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_GCM, new byte[40]), CryptoOperation.Encrypt));
-        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_CCM, new byte[40]), CryptoOperation.Encrypt));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_GCM, RawParameter.Of(CKM.CKM_AES_GCM)), CryptoOperation.Encrypt));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_CCM, RawParameter.Of(CKM.CKM_AES_CCM)), CryptoOperation.Encrypt));
         Assert.False(Allowed(
             new Mechanism(CKM.CKM_AES_CCM, CkmGcmMessageParams.ForEncrypt(new byte[12], 16)), CryptoOperation.Encrypt));
         Assert.False(Allowed(

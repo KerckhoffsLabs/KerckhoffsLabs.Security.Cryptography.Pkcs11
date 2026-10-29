@@ -218,11 +218,12 @@ public sealed class MechanismTests
         Assert.Equal(iv, UnmanagedMemory.Read(marshalled.Parameter, ivLength));
     }
 
-    // Any other mechanism keeps its raw block as the caller laid it out, whatever its length: the check is
-    // for the modes whose parameter PKCS#11 defines as a bare IV, not for vendor or struct parameters.
+    // A mechanism with no fixed-layout parameter keeps its raw block as the caller laid it out, whatever its
+    // length: a DH peer value, a parameter the mechanism does not take, a vendor mechanism's block.
     [Theory]
-    [InlineData(CKM.CKM_AES_KEY_WRAP, 8)]
-    [InlineData(CKM.CKM_AES_CTR, 3)]
+    [InlineData(CKM.CKM_DH_PKCS_DERIVE, 3)]
+    [InlineData(CKM.CKM_DH_PKCS_DERIVE, 256)]
+    [InlineData(CKM.CKM_SHA256, 5)]
     [InlineData(CkmIbmEthDerive, 5)]
     public void Ctor_OtherMechanism_KeepsABlockOfAnyLength(CKM type, int length)
     {

@@ -3,6 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 
 #pragma warning disable KLPKCS11007, KLPKCS11008, KLPKCS11009 // weak inputs are the subject under test
 
@@ -449,8 +450,8 @@ public sealed class NistApprovedPolicyTests
     public void HashedPss_WithRawParameterBytes_IsRefused()
     {
         Assert.Equal("FIPS 186-5 §5.4: RSA-PSS parameters must be CkmRsaPkcsPssParams.",
-            Reason(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new byte[24]), CryptoOperation.Sign));
-        Assert.False(Allowed(new Mechanism(CKM.CKM_SHA1_RSA_PKCS_PSS, new byte[24]), CryptoOperation.Verify));
+            Reason(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, RawParameter.Of(CKM.CKM_SHA256_RSA_PKCS_PSS)), CryptoOperation.Sign));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_SHA1_RSA_PKCS_PSS, RawParameter.Of(CKM.CKM_SHA1_RSA_PKCS_PSS)), CryptoOperation.Verify));
     }
 
     // A short AEAD tag raises the odds that one forged message verifies. Both the single-part and
@@ -501,8 +502,8 @@ public sealed class NistApprovedPolicyTests
     {
         Assert.True(Allowed(new Mechanism(CKM.CKM_AES_GCM), CryptoOperation.Encrypt));
         Assert.True(Allowed(new Mechanism(CKM.CKM_AES_CCM), CryptoOperation.Decrypt));
-        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_GCM, new byte[40]), CryptoOperation.Encrypt));
-        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_CCM, new byte[40]), CryptoOperation.Encrypt));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_GCM, RawParameter.Of(CKM.CKM_AES_GCM)), CryptoOperation.Encrypt));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_CCM, RawParameter.Of(CKM.CKM_AES_CCM)), CryptoOperation.Encrypt));
         Assert.False(Allowed(
             new Mechanism(CKM.CKM_AES_CCM, CkmGcmMessageParams.ForEncrypt(new byte[12], 16)), CryptoOperation.Encrypt));
         Assert.False(Allowed(
