@@ -46,4 +46,8 @@ public sealed class OperationContractTests_CratonHsm(CratonHsmBackendFixture bac
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.AesCtrParamsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM takes a bare counter block, not CK_AES_CTR_PARAMS")]
     public void AesCtr_LengthQuery_ReportsTheInputLength() => OperationContractTestCases.Assert_AesCtr_LengthQuery_ReportsTheInputLength(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(OperationContractTestCases.GcmPieceLengths), MemberType = typeof(OperationContractTestCases))]
+    public void AesGcm_MultipartInOddPieces_MatchesBcl(int piece) => OperationContractTestCases.Assert_AesGcm_MultipartInOddPieces_MatchesBcl(_backend, piece);
 }

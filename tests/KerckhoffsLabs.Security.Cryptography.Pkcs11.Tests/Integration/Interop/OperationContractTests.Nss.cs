@@ -56,4 +56,8 @@ public sealed class OperationContractTests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void AesCtr_LengthQuery_ReportsTheInputLength() => OperationContractTestCases.Assert_AesCtr_LengthQuery_ReportsTheInputLength(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.MultipartClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.MultipartClassicAesGcmAvailable))]
+    [MemberData(nameof(OperationContractTestCases.GcmPieceLengths), MemberType = typeof(OperationContractTestCases))]
+    public void AesGcm_MultipartInOddPieces_MatchesBcl(int piece) => OperationContractTestCases.Assert_AesGcm_MultipartInOddPieces_MatchesBcl(_backend, piece);
 }

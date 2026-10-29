@@ -22,4 +22,7 @@ public sealed class OperationStateMixingTests_BouncyHsm(BouncyHsmBackendFixture 
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Decrypt_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Decrypt_SinglePartAfterUpdate_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void Verify_SinglePartAfterUpdate_TreatsAsContinuation() => OperationStateMixingTestCases.Assert_Verify_SinglePartAfterUpdate_TreatsAsContinuation(_backend);
 }

@@ -42,4 +42,8 @@ public sealed class OperationContractTests_BouncyHsm(BouncyHsmBackendFixture bac
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.AesCtrParamsAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm takes a bare counter block, not CK_AES_CTR_PARAMS")]
     public void AesCtr_LengthQuery_ReportsTheInputLength() => OperationContractTestCases.Assert_AesCtr_LengthQuery_ReportsTheInputLength(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(OperationContractTestCases.GcmPieceLengths), MemberType = typeof(OperationContractTestCases))]
+    public void AesGcm_MultipartInOddPieces_MatchesBcl(int piece) => OperationContractTestCases.Assert_AesGcm_MultipartInOddPieces_MatchesBcl(_backend, piece);
 }

@@ -22,4 +22,7 @@ public sealed class OperationStateMixingTests_Kryoptic(KryopticBackendFixture ba
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Decrypt_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Decrypt_SinglePartAfterUpdate_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void Verify_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Verify_SinglePartAfterUpdate_Throws(_backend);
 }

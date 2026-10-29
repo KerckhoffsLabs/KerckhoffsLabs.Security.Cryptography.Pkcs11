@@ -157,6 +157,72 @@ internal static class OperationContractTestCases
         });
     }
 
+    // === Multi-part AES-GCM ===================================================
+
+    public static TheoryData<int> GcmPieceLengths => [1, 15, 17, 4097];
+
+    // AES-GCM fed through several C_EncryptUpdate (C_DecryptUpdate) calls of the same odd length, none of them a
+    // whole number of blocks, and a shorter last one, then C_EncryptFinal (C_DecryptFinal), gives the BCL's
+    // ciphertext and tag (plaintext) whatever the module releases at each update (§6.13.2). A module that loses
+    // or repeats the partial block it carries from one update to the next gives another result.
+    internal static void Assert_AesGcm_MultipartInOddPieces_MatchesBcl(IPkcs11Backend backend, int piece)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_AES_GCM, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT and CKF_DECRYPT");
+        if (!backend.SupportsMultipartAesGcm)
+            Assert.Skip("Backend runs CKM_AES_GCM single-part only.");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                byte[] plaintext = RandomNumberGenerator.GetBytes(3 * piece + 2);
+                byte[] nonce = RandomNumberGenerator.GetBytes(12);
+                byte[] aad = "multi-part header"u8.ToArray();
+                using var aes = new AesGcm(rawKey, 16);
+                byte[] ciphertext = new byte[plaintext.Length];
+                byte[] tag = new byte[16];
+                aes.Encrypt(nonce, plaintext, ciphertext, tag, aad);
+                var mechanism = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(nonce, aad, 128));
+
+                AssertOk(Init(lowLevel.C_EncryptInit, sid, mechanism, key), "EncryptInit");
+                byte[] encrypted = InPieces(plaintext, piece,
+                    (part, output) => (lowLevel.C_EncryptUpdate(sid, part, output, lengthOnly: false, out NativeCULong n), n),
+                    output => (lowLevel.C_EncryptFinal(sid, output, lengthOnly: false, out NativeCULong n), n), "Encrypt");
+                Assert.Equal([.. ciphertext, .. tag], encrypted);
+
+                AssertOk(Init(lowLevel.C_DecryptInit, sid, mechanism, key), "DecryptInit");
+                byte[] decrypted = InPieces([.. ciphertext, .. tag], piece,
+                    (part, output) => (lowLevel.C_DecryptUpdate(sid, part, output, lengthOnly: false, out NativeCULong n), n),
+                    output => (lowLevel.C_DecryptFinal(sid, output, lengthOnly: false, out NativeCULong n), n), "Decrypt");
+                Assert.Equal(plaintext, decrypted);
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    private delegate (CKR rv, NativeCULong length) UpdateCall(ReadOnlySpan<byte> part, Span<byte> output);
+
+    private delegate (CKR rv, NativeCULong length) FinalOnlyCall(Span<byte> output);
+
+    // Feeds input to update in pieces of the length given, then calls final, each into a buffer that holds the
+    // whole input and a tag, and returns what they wrote.
+    private static byte[] InPieces(byte[] input, int piece, UpdateCall update, FinalOnlyCall final, string what)
+    {
+        using var output = new MemoryStream();
+        byte[] buffer = new byte[input.Length + 32];
+        for (int offset = 0; offset < input.Length; offset += piece)
+        {
+            var (rv, n) = update(input.AsSpan(offset, Math.Min(piece, input.Length - offset)), buffer);
+            AssertOk(rv, $"{what}Update of bytes {offset}.. in pieces of {piece}");
+            output.Write(buffer, 0, (int)n);
+        }
+        var (finalRv, last) = final(buffer);
+        AssertOk(finalRv, $"{what}Final after pieces of {piece}");
+        output.Write(buffer, 0, (int)last);
+        return output.ToArray();
+    }
+
     // === AES-CTR length queries ================================================
 
     // AES-CTR is a stream cipher: the length queries (pOutput NULL) of a single-part C_Encrypt and C_Decrypt

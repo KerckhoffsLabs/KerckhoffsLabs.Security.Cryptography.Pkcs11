@@ -22,4 +22,8 @@ public sealed class OperationStateMixingTests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Decrypt_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Decrypt_SinglePartAfterUpdate_Throws(_backend);
+
+    // Wired as a continuation, as NSS's Sign-2 is; not yet confirmed (NSS runs in CI only).
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void Verify_SinglePartAfterUpdate_TreatsAsContinuation() => OperationStateMixingTestCases.Assert_Verify_SinglePartAfterUpdate_TreatsAsContinuation(_backend);
 }

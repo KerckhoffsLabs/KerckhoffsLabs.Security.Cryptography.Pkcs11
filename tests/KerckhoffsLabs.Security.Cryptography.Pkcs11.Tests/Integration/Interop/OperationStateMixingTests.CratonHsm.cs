@@ -22,4 +22,7 @@ public sealed class OperationStateMixingTests_CratonHsm(CratonHsmBackendFixture 
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void Decrypt_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Decrypt_SinglePartAfterUpdate_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void Verify_SinglePartAfterUpdate_Throws() => OperationStateMixingTestCases.Assert_Verify_SinglePartAfterUpdate_Throws(_backend);
 }

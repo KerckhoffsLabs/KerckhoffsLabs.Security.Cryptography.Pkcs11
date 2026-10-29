@@ -26,4 +26,7 @@ public sealed class OperationStateMixingTests_FreeHsm(FreeHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void Encrypt_SinglePartAfterUpdate_DiscardsTheUpdate() => OperationStateMixingTestCases.Assert_Encrypt_SinglePartAfterUpdate_DiscardsTheUpdate(_backend);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void Verify_SinglePartAfterUpdate_DiscardsTheUpdate() => OperationStateMixingTestCases.Assert_Verify_SinglePartAfterUpdate_DiscardsTheUpdate(_backend);
 }
