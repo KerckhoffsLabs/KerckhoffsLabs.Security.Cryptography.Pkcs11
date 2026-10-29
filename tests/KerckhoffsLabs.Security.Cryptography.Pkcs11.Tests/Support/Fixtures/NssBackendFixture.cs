@@ -191,6 +191,21 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the HMAC key-usage cases.</summary>
     public static bool MacKeyUsageRefusalAvailable => NssAvailable && SupportsFunctionNotPermittedForMacKeys;
 
+    // === Departures the wolfPKCS11-history cases found ======================
+    // Each was confirmed by running the case on a softoken built from vendor/nss at the pinned 34716626, and none is
+    // yet reported upstream. NSS needs no tripwire (see NssQuirkTests for the reported ones).
+
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
+    /// non-zero <c>ulIvLen</c>, or a NULL <c>pAAD</c> behind a non-zero <c>ulAADLen</c>, ends the test process with
+    /// SIGSEGV: <c>sftk_CryptInit</c> in <c>lib/softoken/pkcs11c.c</c> hands both pointers on unchecked, and
+    /// freebl's <c>gcm_InitCounter</c> (<c>lib/freebl/gcm.c</c>) copies the IV and hashes the AAD from them.
+    /// PKCS#11 v3.2 §6.13.2 lets <c>pAAD</c> be NULL only when <c>ulAADLen</c> is 0, and §5.1.6 has invalid
+    /// parameters refused (<c>CKR_MECHANISM_PARAM_INVALID</c>, or <c>CKR_ARGUMENTS_BAD</c>). Confirmed by running
+    /// each row alone at the pinned 34716626 (exit code 139). Not yet reported upstream.
+    /// </summary>
+    public const bool NssSurvivesANullGcmPointer = false;
+
     public NssBackendFixture()
     {
         string? libPath = Settings.NssLibraryPath ?? BuiltLibraryPath();

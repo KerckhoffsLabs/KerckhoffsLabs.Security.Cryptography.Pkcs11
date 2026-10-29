@@ -12,6 +12,8 @@ public sealed class MechanismParameterTests_Nss(NssBackendFixture backend)
     [MemberData(nameof(MechanismParameterTestCases.AeadParameterFaults), MemberType = typeof(MechanismParameterTestCases))]
     public void AeadParameter_OutOfRange_IsMechanismParamInvalid(string fault)
     {
+        if (fault is "GCM pIv NULL" or "GCM pAAD NULL" && !NssBackendFixture.NssSurvivesANullGcmPointer)
+            Assert.Skip("NSS copies from a NULL pIv or pAAD and ends the test process");
         if (fault.StartsWith("GCM", StringComparison.Ordinal))
             _backend.RequireClassicAesGcm();
         MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
