@@ -72,4 +72,8 @@ public sealed class OperationStateTests_FreeHsm(FreeHsmBackendFixture backend)
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.OperationsWhoseKeyIsDestroyed), MemberType = typeof(OperationStateTestCases))]
     public void KeyDestroyedMidOperation_SessionStaysUsable(string operation) => OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext) => OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
 }

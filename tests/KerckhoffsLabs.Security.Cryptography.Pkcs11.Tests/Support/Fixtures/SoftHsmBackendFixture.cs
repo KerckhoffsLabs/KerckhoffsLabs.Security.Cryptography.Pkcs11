@@ -114,6 +114,24 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool SoftHsmReportsAContradictoryClassAsInconsistent = false;
 
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> of a blob that fails RFC 3394's integrity check answers
+    /// <c>CKR_GENERAL_ERROR</c>: <c>UnwrapKeySym</c> in <c>src/lib/SoftHSM.cpp</c> reports any failed decryption so.
+    /// PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_INVALID</c>. A blob of the wrong length is refused with
+    /// <c>CKR_WRAPPED_KEY_LEN_RANGE</c>, as it should be.
+    /// </summary>
+    public const bool SoftHsmReportsATamperedKeyWrapBlobAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_RSA_PKCS_OAEP)</c> of a blob that is not the modulus's length answers
+    /// <c>CKR_GENERAL_ERROR</c>: <c>UnwrapKeyAsym</c> in <c>src/lib/SoftHSM.cpp</c> does not check the length and
+    /// reports the failed decryption so. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnOaepBlobByItsLength = false;
+
+    /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="SoftHsmRefusesAnOaepBlobByItsLength"/>.</summary>
+    public static bool OaepBlobLengthRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesAnOaepBlobByItsLength;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

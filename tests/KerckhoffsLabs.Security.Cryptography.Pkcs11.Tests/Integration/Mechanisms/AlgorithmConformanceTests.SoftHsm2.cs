@@ -81,7 +81,12 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
 
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.AesKeyWrapTampering), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void AesKeyWrap_TamperedBlob_IsRefused(string tampering) => AlgorithmConformanceTestCases.Assert_AesKeyWrap_TamperedBlob_IsRefused(_backend, tampering);
+    public void AesKeyWrap_TamperedBlob_IsRefused(string tampering)
+    {
+        if (!tampering.EndsWith(" bytes", StringComparison.Ordinal) && !SoftHsmBackendFixture.SoftHsmReportsATamperedKeyWrapBlobAsInvalid)
+            Assert.Skip("SoftHSM2 answers an AES key wrap blob that fails the integrity check with CKR_GENERAL_ERROR");
+        AlgorithmConformanceTestCases.Assert_AesKeyWrap_TamperedBlob_IsRefused(_backend, tampering);
+    }
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void AesKeyWrap_UnwrapWithAGenericSecret_IsRefused() => AlgorithmConformanceTestCases.Assert_AesKeyWrap_UnwrapWithAGenericSecret_IsRefused(_backend);
@@ -94,4 +99,7 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void DigestState_SavedAndRestored_FinishesTheDigest() => AlgorithmConformanceTestCases.Assert_DigestState_SavedAndRestored_FinishesTheDigest(_backend, unsaveable: CKR.CKR_FUNCTION_NOT_SUPPORTED);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 answers an RSA-OAEP blob of the wrong length with CKR_GENERAL_ERROR")]
+    public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
 }

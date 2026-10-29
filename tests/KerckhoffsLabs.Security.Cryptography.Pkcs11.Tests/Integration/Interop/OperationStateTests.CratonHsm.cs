@@ -70,4 +70,8 @@ public sealed class OperationStateTests_CratonHsm(CratonHsmBackendFixture backen
             Assert.Skip("Craton HSM runs AES-GCM single-part only, so it has no multi-part encryption.");
         OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation);
     }
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext) => OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
 }

@@ -210,6 +210,17 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool CratonHsmRefusesAUniqueIdInATemplate = false;
 
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> refuses a blob that fails RFC 3394's integrity check with
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c>, and one of 8 or 20 bytes with <c>CKR_DATA_LEN_RANGE</c>: the codes of
+    /// <c>C_Decrypt</c> and <c>C_Encrypt</c>, which §5.18.4 does not list. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_WRAPPED_KEY_INVALID</c>, and <c>CKR_WRAPPED_KEY_LEN_RANGE</c> for a blob invalid by its length alone.
+    /// </summary>
+    public const bool CratonHsmReportsATamperedKeyWrapBlobAsInvalid = false;
+
+    /// <summary>Gate for the tampered AES key wrap case: see <see cref="CratonHsmReportsATamperedKeyWrapBlobAsInvalid"/>.</summary>
+    public static bool TamperedKeyWrapRefusalAvailable => CratonHsmAvailable && CratonHsmReportsATamperedKeyWrapBlobAsInvalid;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

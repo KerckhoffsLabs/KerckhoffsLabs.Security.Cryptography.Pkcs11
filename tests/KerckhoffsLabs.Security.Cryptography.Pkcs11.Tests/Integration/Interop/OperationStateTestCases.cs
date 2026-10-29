@@ -19,7 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// a key or a handle, checked on every real backend through the raw dispatch: an operation that was never
 /// started (<c>CKR_OPERATION_NOT_INITIALIZED</c>), one started twice (<c>CKR_OPERATION_ACTIVE</c>), a
 /// mechanism of the wrong kind (<c>CKR_MECHANISM_INVALID</c>), a key of the wrong type, a destroyed key,
-/// input that is not a whole number of blocks, and the session's cancel functions.
+/// input that is not a whole number of blocks, a ciphertext too short to decrypt, and the session's cancel
+/// functions.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -839,6 +840,65 @@ internal static class OperationStateTestCases
                 byte[] output = new byte[64];
                 AssertRv(expected, lowLevel.C_Decrypt(sid, new byte[length], output, lengthOnly: false, out _),
                     $"C_Decrypt of {length} bytes with {mechanism}");
+                AssertRv(keepsTheOperation ? CKR.CKR_OPERATION_ACTIVE : CKR.CKR_OK, Init(lowLevel.C_DecryptInit, sid, m, key),
+                    "C_DecryptInit after the refused C_Decrypt");
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    public static TheoryData<string> ShortCiphertexts =>
+    [
+        "AES-GCM, 0 bytes", "AES-GCM, 15 bytes", "AES-CBC-PAD, 0 bytes", "AES-CBC-PAD, 15 bytes",
+        "AES-KW, 8 bytes", "AES-KW, 20 bytes", "AES-KWP, 8 bytes", "AES-KWP, 20 bytes",
+    ];
+
+    // A ciphertext no plaintext encrypts to, by its length alone, is refused by C_Decrypt with
+    // CKR_ENCRYPTED_DATA_LEN_RANGE or CKR_ENCRYPTED_DATA_INVALID, which §5.10.2 leaves to the module ("either
+    // ... may be returned"): AES-GCM shorter than the 16-byte tag its ciphertext ends with (§6.13.2), AES-CBC-PAD
+    // shorter than a block, and AES key wrap (RFC 3394) or key wrap with padding (RFC 5649, §6.16.3) under two
+    // semiblocks or not a whole number of them. The length query (a NULL buffer) is asked first, and may answer
+    // CKR_OK with a length; the call that follows into a buffer must refuse. The refusal ends the operation
+    // (§5.2), so the next C_DecryptInit succeeds; keepsTheOperation records a backend that keeps it active,
+    // which the library ends with C_SessionCancel.
+    internal static void Assert_ShortCiphertext_Decrypt_IsRefused(IPkcs11Backend backend, string ciphertext, bool keepsTheOperation = false)
+    {
+        string[] words = ciphertext.Split([", ", " "], StringSplitOptions.None);
+        int length = int.Parse(words[1], System.Globalization.CultureInfo.InvariantCulture);
+        CKM mechanism = words[0] switch
+        {
+            "AES-GCM" => CKM.CKM_AES_GCM,
+            "AES-CBC-PAD" => CKM.CKM_AES_CBC_PAD,
+            "AES-KW" => CKM.CKM_AES_KEY_WRAP,
+            "AES-KWP" => CKM.CKM_AES_KEY_WRAP_KWP,
+            _ => throw new ArgumentOutOfRangeException(nameof(ciphertext), ciphertext, null),
+        };
+        backend.RequireMechanismFlags(mechanism, f => f.Decrypt, "CKF_DECRYPT");
+        CKR[] accepted = [CKR.CKR_ENCRYPTED_DATA_LEN_RANGE, CKR.CKR_ENCRYPTED_DATA_INVALID];
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            ObjectHandle key = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            try
+            {
+                Mechanism m = mechanism switch
+                {
+                    CKM.CKM_AES_GCM => new Mechanism(mechanism, new CkmAesGcmParams(Iv[..12], [], 128)),
+                    CKM.CKM_AES_CBC_PAD => new Mechanism(mechanism, Iv),
+                    _ => new Mechanism(mechanism),
+                };
+                byte[] input = RandomNumberGenerator.GetBytes(length);
+                AssertRv(CKR.CKR_OK, Init(lowLevel.C_DecryptInit, sid, m, key), "C_DecryptInit");
+                CKR rv = lowLevel.C_Decrypt(sid, input, [], lengthOnly: true, out _);
+                if (rv == CKR.CKR_OK)
+                {
+                    byte[] output = new byte[64];
+                    rv = lowLevel.C_Decrypt(sid, input, output, lengthOnly: false, out _);
+                    AssertRvIn(accepted, rv, $"C_Decrypt of {length} bytes with {mechanism} (the length query returned CKR_OK)");
+                }
+                else
+                {
+                    AssertRvIn(accepted, rv, $"C_Decrypt length query of {length} bytes with {mechanism}");
+                }
                 AssertRv(keepsTheOperation ? CKR.CKR_OPERATION_ACTIVE : CKR.CKR_OK, Init(lowLevel.C_DecryptInit, sid, m, key),
                     "C_DecryptInit after the refused C_Decrypt");
             }

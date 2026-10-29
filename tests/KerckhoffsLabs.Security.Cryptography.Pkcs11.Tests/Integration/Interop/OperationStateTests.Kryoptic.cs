@@ -79,4 +79,13 @@ public sealed class OperationStateTests_Kryoptic(KryopticBackendFixture backend)
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationStateTestCases.OperationsWhoseKeyIsDestroyed), MemberType = typeof(OperationStateTestCases))]
     public void KeyDestroyedMidOperation_SessionStaysUsable(string operation) => OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext)
+    {
+        if (ciphertext.EndsWith(", 8 bytes", StringComparison.Ordinal) && !KryopticBackendFixture.KryopticRefusesAOneSemiblockKeyWrapCiphertext)
+            Assert.Skip("Kryoptic answers a one-semiblock key wrap ciphertext with CKR_DEVICE_ERROR");
+        OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
+    }
 }

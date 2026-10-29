@@ -158,6 +158,16 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11ReportsTheWholeCbcPadPlaintextLength = false;
 
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> of a blob that is not a whole number of semiblocks (20 bytes)
+    /// answers <c>CKR_WRAPPED_KEY_INVALID</c>: <c>C_UnwrapKey</c> in <c>src/crypto.c</c> maps the
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c> its <c>C_Decrypt</c> gives (a code §5.10.2 allows there) to it. PKCS#11 v3.2
+    /// §5.1.6: a wrapped key invalid by its length alone is <c>CKR_WRAPPED_KEY_LEN_RANGE</c>, which outranks
+    /// <c>CKR_WRAPPED_KEY_INVALID</c>. An 8-byte blob is refused as it should be.
+    /// WolfPkcs11QuirkTests.KeyWrapBlobOfAPartialSemiblock_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAKeyWrapBlobByItsLength = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 

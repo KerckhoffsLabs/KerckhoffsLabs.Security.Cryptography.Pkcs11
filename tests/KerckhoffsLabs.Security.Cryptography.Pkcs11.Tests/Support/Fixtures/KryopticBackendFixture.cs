@@ -195,6 +195,34 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticKeepsACbcPadDecryptFinalOnAShortBuffer = false;
 
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> refuses a blob that fails RFC 3394's integrity check, or one
+    /// of 8 bytes, with <c>CKR_DEVICE_ERROR</c>, and one of 20 bytes (not a whole number of semiblocks) with
+    /// <c>CKR_DATA_LEN_RANGE</c>. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_INVALID</c> for the first,
+    /// <c>CKR_WRAPPED_KEY_LEN_RANGE</c> for a blob invalid by its length alone.
+    /// </summary>
+    public const bool KryopticReportsATamperedKeyWrapBlobAsInvalid = false;
+
+    /// <summary>Gate for the tampered AES key wrap case: see <see cref="KryopticReportsATamperedKeyWrapBlobAsInvalid"/>.</summary>
+    public static bool TamperedKeyWrapRefusalAvailable => KryopticAvailable && KryopticReportsATamperedKeyWrapBlobAsInvalid;
+
+    /// <summary>
+    /// False while a <c>C_Decrypt</c> with <c>CKM_AES_KEY_WRAP</c> or <c>CKM_AES_KEY_WRAP_KWP</c> of 8 bytes (one
+    /// semiblock) answers its length query with <c>CKR_OK</c> and then the call with <c>CKR_DEVICE_ERROR</c>. PKCS#11
+    /// v3.2 §5.10.2: a ciphertext of an inappropriate length is <c>CKR_ENCRYPTED_DATA_LEN_RANGE</c> or
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c>. 20 bytes is refused as it should be.
+    /// </summary>
+    public const bool KryopticRefusesAOneSemiblockKeyWrapCiphertext = false;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_RSA_PKCS_OAEP)</c> of a blob one byte short of the modulus answers
+    /// <c>CKR_DEVICE_ERROR</c>. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
+    /// </summary>
+    public const bool KryopticRefusesAnOaepBlobByItsLength = false;
+
+    /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="KryopticRefusesAnOaepBlobByItsLength"/>.</summary>
+    public static bool OaepBlobLengthRefusalAvailable => KryopticAvailable && KryopticRefusesAnOaepBlobByItsLength;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

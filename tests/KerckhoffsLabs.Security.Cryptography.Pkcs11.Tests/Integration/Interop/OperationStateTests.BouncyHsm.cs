@@ -84,4 +84,14 @@ public sealed class OperationStateTests_BouncyHsm(BouncyHsmBackendFixture backen
         // BouncyHsm answers C_Sign with CKR_GENERAL_ERROR once its key is destroyed, and keeps the signature active.
         OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation, keepsTheOperation: operation == "ECDSA sign");
     }
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext)
+    {
+        if (ciphertext == "AES-CBC-PAD, 0 bytes" && !BouncyHsmBackendFixture.BouncyHsmRefusesAnEmptyCbcPadCiphertext)
+            Assert.Skip("BouncyHsm decrypts an empty CBC-PAD ciphertext to nothing");
+        // BouncyHsm keeps the decryption active after refusing a ciphertext.
+        OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext, keepsTheOperation: true);
+    }
 }

@@ -67,4 +67,8 @@ public sealed class OperationStateTests_SoftHsm(SoftHsmBackendFixture backend)
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.OperationsWhoseKeyIsDestroyed), MemberType = typeof(OperationStateTestCases))]
     public void KeyDestroyedMidOperation_SessionStaysUsable(string operation) => OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext) => OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
 }

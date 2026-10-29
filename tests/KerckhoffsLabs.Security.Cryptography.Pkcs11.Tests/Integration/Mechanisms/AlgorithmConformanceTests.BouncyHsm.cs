@@ -83,4 +83,7 @@ public sealed class AlgorithmConformanceTests_BouncyHsm(BouncyHsmBackendFixture 
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void DigestState_SavedAndRestored_FinishesTheDigest() => AlgorithmConformanceTestCases.Assert_DigestState_SavedAndRestored_FinishesTheDigest(_backend, unsaveable: CKR.CKR_FUNCTION_NOT_SUPPORTED);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm answers an RSA-OAEP blob of the wrong length with CKR_GENERAL_ERROR")]
+    public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
 }

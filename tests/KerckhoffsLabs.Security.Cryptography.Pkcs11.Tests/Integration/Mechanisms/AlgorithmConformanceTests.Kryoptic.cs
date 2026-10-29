@@ -68,7 +68,7 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesKeyWrap_ExplicitDefaultIv_GivesTheSameBlob() => AlgorithmConformanceTestCases.Assert_AesKeyWrap_ExplicitDefaultIv_GivesTheSameBlob(_backend);
 
-    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.TamperedKeyWrapRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers a tampered AES key wrap blob with CKR_DEVICE_ERROR or CKR_DATA_LEN_RANGE")]
     [MemberData(nameof(AlgorithmConformanceTestCases.AesKeyWrapTampering), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void AesKeyWrap_TamperedBlob_IsRefused(string tampering) => AlgorithmConformanceTestCases.Assert_AesKeyWrap_TamperedBlob_IsRefused(_backend, tampering);
 
@@ -84,4 +84,7 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void DigestState_SavedAndRestored_FinishesTheDigest() => AlgorithmConformanceTestCases.Assert_DigestState_SavedAndRestored_FinishesTheDigest(_backend, unsaveable: CKR.CKR_STATE_UNSAVEABLE);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers an RSA-OAEP blob of the wrong length with CKR_DEVICE_ERROR")]
+    public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
 }

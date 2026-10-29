@@ -20,8 +20,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 
 /// <summary>
 /// What the algorithms compute, checked on every real backend against a reference the test holds: the RSA-PSS
-/// salt and mask the token was asked for, read back out of its signatures; RSA-OAEP's randomisation and key
-/// transport; the PKCS#1 v1.5 length bound; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the
+/// salt and mask the token was asked for, read back out of its signatures; RSA-OAEP's randomisation, key
+/// transport and wrapped-key length; the PKCS#1 v1.5 length bound; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the
 /// curves the rest of the suite does not reach; the 224-bit digests; <c>C_DigestKey</c>; key agreement with a
 /// KDF, with the cofactor and on X448; HKDF with SHA-512 and with a salt key; SHA-256 key derivation; AES key
 /// wrap's IV and integrity check; ML-KEM and HashML-DSA under the wrong key or hash; and a saved digest state.
@@ -296,6 +296,33 @@ internal static class AlgorithmConformanceTestCases
                 finally { session.DestroyObject(copy); }
             }
             finally { session.DestroyObject(original); session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
+    // An RSA-OAEP ciphertext is exactly k bytes (RFC 8017 §7.1.2 step 1b): a blob one byte short of a 2048-bit
+    // modulus, or one byte over, is invalid by its length alone, and C_UnwrapKey refuses it with
+    // CKR_WRAPPED_KEY_LEN_RANGE (PKCS#11 v3.2 §5.1.6, §5.18.4) and creates no key. The k-byte blob then unwraps.
+    internal static void Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP);
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS_OAEP, f => f.Unwrap, "CKF_UNWRAP");
+        WithSession(backend, session =>
+        {
+            var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
+            try
+            {
+                byte[] wrapped = OrSkip(() => session.Encrypt(OaepSha256, pub, Target), "OAEP with SHA-256");
+                Assert.Equal(256, wrapped.Length);
+                using Template template = UnwrappedAesTemplate();
+                foreach (byte[] bad in (byte[][])[wrapped[..^1], [.. wrapped, 0x00]])
+                {
+                    var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(OaepSha256, priv, bad, template.Attributes));
+                    Assert.True(ex.ReturnValue == CKR.CKR_WRAPPED_KEY_LEN_RANGE,
+                        $"C_UnwrapKey of a {bad.Length}-byte RSA-OAEP blob under a 2048-bit key returned {ex.ReturnValue}.");
+                }
+                session.DestroyObject(session.UnwrapKey(OaepSha256, priv, wrapped, template.Attributes));
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         });
     }
 
@@ -740,10 +767,14 @@ internal static class AlgorithmConformanceTestCases
         });
     }
 
-    public static TheoryData<string> AesKeyWrapTampering => ["first byte", "byte 8", "last byte", "truncated", "all 0xFF"];
+    public static TheoryData<string> AesKeyWrapTampering => ["first byte", "byte 8", "last byte", "truncated", "all 0xFF", "8 bytes", "20 bytes"];
 
     // RFC 3394's integrity check catches any change to the 40-byte blob of a wrapped 256-bit key: unwrap refuses it
-    // and creates no key, and the session unwraps the untouched blob afterwards.
+    // with CKR_WRAPPED_KEY_INVALID (PKCS#11 v3.2 §5.1.6: "the provided wrapped key is not valid"), creates no key,
+    // and the session unwraps the untouched blob afterwards. Cut by a semiblock it is still a well-formed blob of a
+    // 192-bit key that fails the check, so CKR_WRAPPED_KEY_INVALID too. A blob under two semiblocks (8 bytes), or
+    // not a whole number of them (20 bytes), is invalid by its length alone: CKR_WRAPPED_KEY_LEN_RANGE, which
+    // outranks CKR_WRAPPED_KEY_INVALID (§5.1.6). Both are in C_UnwrapKey's return values (§5.18.4).
     internal static void Assert_AesKeyWrap_TamperedBlob_IsRefused(IPkcs11Backend backend, string tampering)
     {
         WithKekAndTarget(backend, (session, kek, target) =>
@@ -758,11 +789,15 @@ internal static class AlgorithmConformanceTestCases
                 "last byte" => Flip(blob, blob.Length - 1),
                 "truncated" => blob[..^8],
                 "all 0xFF" => [.. Enumerable.Repeat((byte)0xFF, blob.Length)],
+                "8 bytes" => blob[..8],
+                "20 bytes" => blob[..20],
                 _ => throw new ArgumentOutOfRangeException(nameof(tampering), tampering, null),
             };
+            CKR expected = bad.Length < 16 || bad.Length % 8 != 0 ? CKR.CKR_WRAPPED_KEY_LEN_RANGE : CKR.CKR_WRAPPED_KEY_INVALID;
 
             using Template template = UnwrappedAesTemplate();
-            Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(kw, kek, bad, template.Attributes));
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(kw, kek, bad, template.Attributes));
+            Assert.Equal(expected, ex.ReturnValue);
             session.DestroyObject(session.UnwrapKey(kw, kek, blob, template.Attributes));
         });
     }

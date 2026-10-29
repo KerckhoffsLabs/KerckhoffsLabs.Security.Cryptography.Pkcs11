@@ -347,4 +347,33 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"C_Decrypt(CKM_AES_CBC_PAD) of 48 bytes into a 1-byte buffer now gives {rv} with {reported} bytes: set " +
             "WolfPkcs11BackendFixture.WolfPkcs11ReportsTheWholeCbcPadPlaintextLength to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void KeyWrapBlobOfAPartialSemiblock_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        ObjectHandle kek = TestKeys.ImportAesWrappingKey(session, RandomNumberGenerator.GetBytes(32));
+        ObjectHandle target = TestKeys.ImportExtractableAesKey(session, RandomNumberGenerator.GetBytes(32));
+        Exception? ex;
+        try
+        {
+            var kw = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+            byte[] blob = session.WrapKey(kw, kek, target);
+            using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var enc = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            ex = Record.Exception(() => session.DestroyObject(session.UnwrapKey(kw, kek, blob[..20], [c, t, tok, enc])));
+        }
+        finally
+        {
+            session.DestroyObject(target);
+            session.DestroyObject(kek);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_WRAPPED_KEY_INVALID },
+            $"C_UnwrapKey(CKM_AES_KEY_WRAP) of a 20-byte blob no longer answers CKR_WRAPPED_KEY_INVALID (got {ex?.Message ?? "no error"}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAKeyWrapBlobByItsLength to true and delete this test.");
+    }
 }

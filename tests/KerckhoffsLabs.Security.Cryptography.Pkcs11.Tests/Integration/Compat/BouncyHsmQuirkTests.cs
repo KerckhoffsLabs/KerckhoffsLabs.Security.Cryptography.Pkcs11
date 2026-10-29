@@ -467,4 +467,64 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_EncryptInit(CKM_AES_CTR) with a CK_AES_CTR_PARAMS no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmTakesAesCtrParams to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void EmptyCbcPadCiphertext_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        ObjectHandle key = TestKeys.CreateAes256Key(session, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        CKR rv;
+        NativeCULong length;
+        try
+        {
+            using (var scope = new MechanismParameterScope())
+            {
+#pragma warning disable KLPKCS11009 // CKM_AES_CBC_PAD through the raw dispatch.
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_AES_CBC_PAD, new byte[16]).Marshal(scope, out _);
+#pragma warning restore KLPKCS11009
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_DecryptInit(sid, in mech, (NativeCULong)key.ObjectId));
+            }
+            rv = lowLevel.C_Decrypt(sid, [], new byte[32], lengthOnly: false, out length);
+            lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_DECRYPT);
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_OK && (ulong)length == 0,
+            $"C_Decrypt(CKM_AES_CBC_PAD) of an empty ciphertext now gives {rv} with {length} bytes: set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAnEmptyCbcPadCiphertext to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void OaepBlobOfTheWrongLength_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
+        Exception? ex;
+        try
+        {
+            var oaep = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
+            byte[] wrapped = session.Encrypt(oaep, pub, new byte[32]);
+            using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var enc = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            ex = Record.Exception(() => session.DestroyObject(session.UnwrapKey(oaep, priv, wrapped[..^1], [c, t, tok, enc])));
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_GENERAL_ERROR },
+            $"C_UnwrapKey(CKM_RSA_PKCS_OAEP) of a 255-byte blob under a 2048-bit key no longer answers CKR_GENERAL_ERROR (got {ex?.Message ?? "no error"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAnOaepBlobByItsLength to true and delete this test.");
+    }
 }

@@ -271,6 +271,24 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the AES-CTR cases: see <see cref="BouncyHsmTakesAesCtrParams"/>.</summary>
     public static bool AesCtrParamsAvailable => BouncyHsmAvailable && BouncyHsmTakesAesCtrParams;
 
+    /// <summary>
+    /// False while a <c>CKM_AES_CBC_PAD</c> <c>C_Decrypt</c> of an empty ciphertext answers <c>CKR_OK</c> with no
+    /// plaintext. PKCS#11 v3.2 §5.10.2: a ciphertext of an inappropriate length (CBC-PAD always gives at least one
+    /// block) is <c>CKR_ENCRYPTED_DATA_LEN_RANGE</c> or <c>CKR_ENCRYPTED_DATA_INVALID</c>. 15 bytes is refused.
+    /// BouncyHsmQuirkTests.EmptyCbcPadCiphertext_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAnEmptyCbcPadCiphertext = false;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_RSA_PKCS_OAEP)</c> of a blob one byte short of the modulus answers
+    /// <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
+    /// BouncyHsmQuirkTests.OaepBlobOfTheWrongLength_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAnOaepBlobByItsLength = false;
+
+    /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="BouncyHsmRefusesAnOaepBlobByItsLength"/>.</summary>
+    public static bool OaepBlobLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnOaepBlobByItsLength;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;
