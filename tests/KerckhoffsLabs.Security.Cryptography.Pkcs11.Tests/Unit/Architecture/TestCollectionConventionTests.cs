@@ -34,6 +34,7 @@ public sealed class TestCollectionConventionTests
         ("_BouncyHsm", "BouncyHsm"),
         ("_CratonHsm", "CratonHsm"),
         ("_FreeHsm", "FreeHsm"),
+        ("_WolfPkcs11", "WolfPkcs11"),
     ];
 
     // -----------------------------------------------------------------------------------------
