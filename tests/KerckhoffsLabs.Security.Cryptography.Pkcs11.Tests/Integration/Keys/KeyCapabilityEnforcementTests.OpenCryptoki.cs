@@ -25,4 +25,14 @@ public sealed class KeyCapabilityEnforcementTests_OpenCryptoki(OpenCryptokiBacke
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void VerifyRecover_WithVerifyRecoverFalse_IsKeyFunctionNotPermitted() => KeyCapabilityEnforcementTestCases.Assert_Recover_WithRecoverFalse_IsKeyFunctionNotPermitted(_backend, sign: false);
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [MemberData(nameof(KeyCapabilityEnforcementTestCases.DeriveMechanisms), MemberType = typeof(KeyCapabilityEnforcementTestCases))]
+    public void Derive_WithDeriveFalse_IsKeyFunctionNotPermitted(string derivation) => KeyCapabilityEnforcementTestCases.Assert_Derive_WithDeriveFalse_IsKeyFunctionNotPermitted(_backend, derivation);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void Encapsulate_WithEncapsulateFalse_IsKeyFunctionNotPermitted() => KeyCapabilityEnforcementTestCases.Assert_Kem_WithCapabilityFalse_IsKeyFunctionNotPermitted(_backend, encapsulate: true);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void Decapsulate_WithDecapsulateFalse_IsKeyFunctionNotPermitted() => KeyCapabilityEnforcementTestCases.Assert_Kem_WithCapabilityFalse_IsKeyFunctionNotPermitted(_backend, encapsulate: false);
 }

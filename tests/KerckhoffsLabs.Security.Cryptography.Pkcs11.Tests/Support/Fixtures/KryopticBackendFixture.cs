@@ -157,6 +157,19 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticDerivesAnEcdhKeysHistoryFromTheBase = false;
 
+    /// <summary>
+    /// False while an HMAC key whose <c>CKA_SIGN</c> (<c>CKA_VERIFY</c>) is FALSE is refused by
+    /// <c>C_SignInit</c> (<c>C_VerifyInit</c>) with <c>CKR_KEY_TYPE_INCONSISTENT</c>
+    /// (<c>check_and_fetch_key</c> in <c>src/hmac.rs</c>), where PKCS#11 v3.2 §5.1.6 has
+    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c> for a key of the right type whose attributes do not allow the use.
+    /// AES keys with <c>CKA_ENCRYPT</c> or <c>CKA_DECRYPT</c> FALSE, and derivation and ML-KEM keys, get
+    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.
+    /// </summary>
+    public const bool KryopticRefusesAnUnpermittedMacKeyAsNotPermitted = false;
+
+    /// <summary>Gate for the HMAC key-usage cases: see <see cref="KryopticRefusesAnUnpermittedMacKeyAsNotPermitted"/>.</summary>
+    public static bool MacKeyUsageRefusalAvailable => KryopticAvailable && KryopticRefusesAnUnpermittedMacKeyAsNotPermitted;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

@@ -181,6 +181,16 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the cases that check <c>CKA_LOCAL</c> on a generated key.</summary>
     public static bool LocalOnGeneratedKeysAvailable => NssAvailable && SupportsLocalOnGeneratedKeys;
 
+    /// <summary>False while softoken refuses an HMAC key whose <c>CKA_SIGN</c> (<c>CKA_VERIFY</c>) is FALSE with
+    /// <c>CKR_KEY_TYPE_INCONSISTENT</c>, where PKCS#11 v3.2 §5.1.6 has <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c> for a
+    /// key of the right type whose attributes do not allow the use; AES keys get
+    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>. Recorded when KeyCapabilityEnforcementTestCases was first run on
+    /// NSS, which accepted any refusal then.</summary>
+    public static bool SupportsFunctionNotPermittedForMacKeys => false;
+
+    /// <summary>Gate for the HMAC key-usage cases.</summary>
+    public static bool MacKeyUsageRefusalAvailable => NssAvailable && SupportsFunctionNotPermittedForMacKeys;
+
     public NssBackendFixture()
     {
         string? libPath = Settings.NssLibraryPath ?? BuiltLibraryPath();
