@@ -92,6 +92,23 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             "flag if only some are fixed.");
     }
 
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void WrongLengthRsaSignature_QuirkStillPresent()
+    {
+        Exception? ex = null;
+        PropertyTestSupport.WithRsa(_backend, rsa =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes("wrong length");
+            byte[] signature = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+            ex = Record.Exception(() => rsa.VerifyData(data, signature[..^1], HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        });
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_FUNCTION_FAILED },
+            "C_Verify of an RSA signature one byte short no longer gives CKR_FUNCTION_FAILED " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RejectsWrongLengthRsaSignatures to true and delete this test.");
+    }
+
     private static string Code(Func<bool> verify, string what)
     {
         Exception? ex = Record.Exception(() => verify());

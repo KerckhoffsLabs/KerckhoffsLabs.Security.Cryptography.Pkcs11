@@ -77,6 +77,12 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     public const bool WolfPkcs11RejectsMalformedSignatures = false;
 
     /// <summary>
+    /// False while <c>C_Verify</c> answers an RSA signature of the wrong length (empty, cut short or padded,
+    /// PSS and PKCS#1 v1.5 alike) with <c>CKR_FUNCTION_FAILED</c> instead of <c>CKR_SIGNATURE_LEN_RANGE</c>.
+    /// </summary>
+    public const bool WolfPkcs11RejectsWrongLengthRsaSignatures = false;
+
+    /// <summary>
     /// False while <c>CKM_RSA_PKCS_KEY_PAIR_GEN</c> advertises 1024 bits as its minimum (a constant in
     /// <c>src/slot.c</c>) but fails to make a 1024-bit key with <c>CKR_FUNCTION_FAILED</c>: wolfSSL's default
     /// <c>RSA_MIN_SIZE</c> is 2048.
@@ -88,6 +94,9 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for cases that verify an altered signature: see <see cref="WolfPkcs11RejectsMalformedSignatures"/>.</summary>
     public static bool MalformedSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsMalformedSignatures;
+
+    /// <summary>Gate for cases that verify an RSA signature of the wrong length: see <see cref="WolfPkcs11RejectsWrongLengthRsaSignatures"/>.</summary>
+    public static bool WrongLengthRsaSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsWrongLengthRsaSignatures;
 
     public WolfPkcs11BackendFixture()
     {
