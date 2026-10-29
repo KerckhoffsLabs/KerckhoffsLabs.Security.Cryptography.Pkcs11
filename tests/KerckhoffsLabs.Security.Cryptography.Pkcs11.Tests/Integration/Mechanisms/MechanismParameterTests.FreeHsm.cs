@@ -16,4 +16,11 @@ public sealed class MechanismParameterTests_FreeHsm(FreeHsmBackendFixture backen
             Assert.Skip("FreeHSM refuses ulTagBits 136 with CKR_ARGUMENTS_BAD");
         MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
     }
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.AesCtrCounterBitsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
+    public void AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(ulong counterBits) => MechanismParameterTestCases.Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(_backend, counterBits);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.AesCtrCounterOverflowAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM runs AES-CTR past ulCounterBits, carrying into the nonce")]
+    public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
 }

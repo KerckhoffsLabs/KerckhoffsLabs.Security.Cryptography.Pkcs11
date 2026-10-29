@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -12,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// <summary>
 /// A mechanism parameter outside what PKCS#11 v3.2 allows is refused at the <c>C_*Init</c> that receives it,
 /// checked on every real backend: the AES-GCM and AES-CCM parameter blocks with a NULL pointer behind a length
-/// or a length out of its range.
+/// or a length out of its range, and AES-CTR's counter width and the overflow of its counter.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -152,5 +153,115 @@ internal static class MechanismParameterTestCases
             MACLen = (NativeCULong)(fault switch { "CCM ulMACLen 2" => 2UL, "CCM ulMACLen 5" => 5UL, "CCM ulMACLen 18" => 18UL, _ => 16UL }),
         };
         return RawParameter.From(CKM.CKM_AES_CCM, in parameter);
+    }
+
+    // === AES-CTR ============================================================
+
+    // A CK_AES_CTR_PARAMS: ulCounterBits, then the 16-byte counter block.
+    private static Mechanism Ctr(ulong counterBits, byte[] counterBlock)
+    {
+        byte[] parameter = new byte[UnmanagedMemory.NativeULongSize + 16];
+        if (UnmanagedMemory.NativeULongSize == 8)
+            BinaryPrimitives.WriteUInt64LittleEndian(parameter, counterBits);
+        else
+            BinaryPrimitives.WriteUInt32LittleEndian(parameter, checked((uint)counterBits));
+        counterBlock.CopyTo(parameter, parameter.Length - 16);
+#pragma warning disable KLPKCS11009 // CKM_AES_CTR through the raw dispatch, which the policy does not see.
+        return new Mechanism(CKM.CKM_AES_CTR, parameter);
+#pragma warning restore KLPKCS11009
+    }
+
+    // AES-CTR over the whole counter block as a 128-bit big-endian counter, from the BCL's AES-ECB.
+    private static byte[] AesCtr(byte[] key, byte[] initialCounter, byte[] data)
+    {
+        using var aes = Aes.Create();
+        aes.Key = key;
+        byte[] counter = (byte[])initialCounter.Clone();
+        byte[] output = new byte[data.Length];
+        for (int offset = 0; offset < data.Length; offset += 16)
+        {
+            byte[] keystream = aes.EncryptEcb(counter, PaddingMode.None);
+            for (int i = 0; i < 16 && offset + i < data.Length; i++)
+                output[offset + i] = (byte)(data[offset + i] ^ keystream[i]);
+            int carry = 15;
+            while (carry >= 0 && unchecked(++counter[carry]) == 0)
+                carry--;
+        }
+        return output;
+    }
+
+    public static TheoryData<ulong> AesCtrCounterBitsOutOfRange => [0UL, 129UL];
+
+    // PKCS#11 v3.2 §6.11.2: ulCounterBits "shall be such that 0 < ulCounterBits ≤ 128. For any values outside
+    // this range the mechanism shall return CKR_MECHANISM_PARAM_INVALID", at C_EncryptInit and C_DecryptInit
+    // alike. After each refusal the same session runs the Init with a 128-bit counter, and its result is the
+    // BCL's.
+    internal static void Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(IPkcs11Backend backend, ulong counterBits)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_AES_CTR, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT and CKF_DECRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                byte[] counter = RandomNumberGenerator.GetBytes(16);
+                byte[] expected = AesCtr(rawKey, counter, Message);
+                foreach (bool encrypt in (bool[])[true, false])
+                {
+                    string op = encrypt ? "C_EncryptInit" : "C_DecryptInit";
+                    KeyedInit init = encrypt ? lowLevel.C_EncryptInit : lowLevel.C_DecryptInit;
+                    CKR rv = Init(init, sid, Ctr(counterBits, counter), key);
+                    Assert.True(rv == CKR.CKR_MECHANISM_PARAM_INVALID, $"{op}(CKM_AES_CTR) with ulCounterBits {counterBits} returned {rv}.");
+
+                    AssertOk(Init(init, sid, Ctr(128, counter), key), $"{op}(CKM_AES_CTR) with a 128-bit counter after the refusal");
+                    byte[] input = encrypt ? Message : expected;
+                    byte[] output = new byte[input.Length];
+                    rv = encrypt
+                        ? lowLevel.C_Encrypt(sid, input, output, lengthOnly: false, out NativeCULong written)
+                        : lowLevel.C_Decrypt(sid, input, output, lengthOnly: false, out written);
+                    AssertOk(rv, encrypt ? "C_Encrypt" : "C_Decrypt");
+                    Assert.Equal(encrypt ? expected : Message, output.AsSpan(0, (int)(ulong)written).ToArray());
+                }
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    // PKCS#11 v3.2 §6.11.3: "If an attempt to encrypt/decrypt is made which will cause an overflow of the counter
+    // block's counter bits, then the mechanism shall return CKR_DATA_LEN_RANGE", and its example is the one here:
+    // with ulCounterBits = 2 and the counter bits starting at 1, "only 3 blocks of data can be processed". Three
+    // blocks encrypt to the BCL's CTR (the counter takes 1, 2 and 3, so it never carries); a fourth is refused,
+    // rather than wrapping the counter (which reuses keystream) or carrying into the nonce, and the refusal ends
+    // the operation (§5.2), so the next C_EncryptInit succeeds.
+    internal static void Assert_AesCtr_CounterOverflow_IsDataLenRange(IPkcs11Backend backend)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_AES_CTR, f => f.Encrypt, "CKF_ENCRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                byte[] counter = RandomNumberGenerator.GetBytes(16);
+                counter[15] = (byte)((counter[15] & 0xFC) | 0x01);
+                byte[] threeBlocks = RandomNumberGenerator.GetBytes(48);
+                byte[] fourBlocks = RandomNumberGenerator.GetBytes(64);
+
+                AssertOk(Init(lowLevel.C_EncryptInit, sid, Ctr(2, counter), key), "C_EncryptInit(CKM_AES_CTR) with a 2-bit counter");
+                byte[] output = new byte[64];
+                AssertOk(lowLevel.C_Encrypt(sid, threeBlocks, output, lengthOnly: false, out NativeCULong written), "C_Encrypt of three blocks");
+                Assert.Equal(AesCtr(rawKey, counter, threeBlocks), output.AsSpan(0, (int)(ulong)written).ToArray());
+
+                AssertOk(Init(lowLevel.C_EncryptInit, sid, Ctr(2, counter), key), "C_EncryptInit(CKM_AES_CTR) with a 2-bit counter");
+                CKR rv = lowLevel.C_Encrypt(sid, fourBlocks, output, lengthOnly: false, out _);
+                Assert.True(rv == CKR.CKR_DATA_LEN_RANGE, $"C_Encrypt of four blocks under a 2-bit counter starting at 1 returned {rv}.");
+
+                AssertOk(Init(lowLevel.C_EncryptInit, sid, Ctr(128, counter), key), "C_EncryptInit(CKM_AES_CTR) after the refusal");
+                AssertOk(lowLevel.C_Encrypt(sid, fourBlocks, output, lengthOnly: false, out written), "C_Encrypt of four blocks under a 128-bit counter");
+                Assert.Equal(AesCtr(rawKey, counter, fourBlocks), output.AsSpan(0, (int)(ulong)written).ToArray());
+            }
+            finally { session.DestroyObject(key); }
+        });
     }
 }

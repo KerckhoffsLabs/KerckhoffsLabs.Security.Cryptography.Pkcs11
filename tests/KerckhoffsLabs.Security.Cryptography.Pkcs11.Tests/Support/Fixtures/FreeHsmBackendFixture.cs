@@ -177,6 +177,17 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmRefusesAnOutOfRangeGcmTagAsInvalid = false;
 
+    /// <summary>
+    /// False while <c>C_Encrypt(CKM_AES_CTR)</c> of four blocks under <c>ulCounterBits</c> 2, the counter bits starting at
+    /// 1, answers <c>CKR_OK</c>: <c>src/fhsm_pkcs11.c</c> checks <c>ulCounterBits</c> for 1..128 and then runs a
+    /// 128-bit counter, which carries into the nonce. PKCS#11 v3.2 §6.11.3: an attempt that "will cause an overflow
+    /// of the counter block's counter bits" is <c>CKR_DATA_LEN_RANGE</c>. The out-of-range <c>ulCounterBits</c> rows pass.
+    /// </summary>
+    public const bool FreeHsmRefusesAnAesCtrCounterOverflow = false;
+
+    /// <summary>Gate for the AES-CTR counter overflow case: see <see cref="FreeHsmRefusesAnAesCtrCounterOverflow"/>.</summary>
+    public static bool AesCtrCounterOverflowAvailable => FreeHsmAvailable && FreeHsmRefusesAnAesCtrCounterOverflow;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

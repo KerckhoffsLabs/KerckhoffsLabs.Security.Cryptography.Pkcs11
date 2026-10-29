@@ -18,4 +18,11 @@ public sealed class MechanismParameterTests_Kryoptic(KryopticBackendFixture back
             Assert.Skip("Kryoptic refuses a NULL CCM pNonce with CKR_DEVICE_ERROR");
         MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
     }
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.AesCtrCounterBitsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
+    public void AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(ulong counterBits) => MechanismParameterTestCases.Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(_backend, counterBits);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.AesCtrCounterOverflowAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic refuses the message that uses the last AES-CTR counter value")]
+    public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
 }

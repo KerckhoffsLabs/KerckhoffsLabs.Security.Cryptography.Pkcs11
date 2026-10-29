@@ -249,6 +249,18 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticRefusesANullCcmNonceAsInvalid = false;
 
+    /// <summary>
+    /// False while <c>C_Encrypt(CKM_AES_CTR)</c> of three blocks under <c>ulCounterBits</c> 2, the counter bits starting
+    /// at 1, answers <c>CKR_DATA_LEN_RANGE</c>: the final step in <c>src/ossl/aes.rs</c> refuses once the blocks used
+    /// reach <c>maxblocks</c> (<c>blockctr &gt;= maxblocks</c>), so the last counter value is never used. PKCS#11 v3.2
+    /// §6.11.3: with that counter "only 3 blocks of data can be processed", and the fourth is
+    /// <c>CKR_DATA_LEN_RANGE</c>. The out-of-range <c>ulCounterBits</c> rows pass.
+    /// </summary>
+    public const bool KryopticEncryptsTheLastCounterValue = false;
+
+    /// <summary>Gate for the AES-CTR counter overflow case: see <see cref="KryopticEncryptsTheLastCounterValue"/>.</summary>
+    public static bool AesCtrCounterOverflowAvailable => KryopticAvailable && KryopticEncryptsTheLastCounterValue;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();
