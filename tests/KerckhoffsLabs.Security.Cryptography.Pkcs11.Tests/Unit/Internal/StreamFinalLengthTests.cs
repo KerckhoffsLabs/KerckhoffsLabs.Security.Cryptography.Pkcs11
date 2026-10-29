@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -11,6 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// whatever length the module reports for it. PKCS#11 v3.2 §5.2 lets a length query over-report but not
 /// under-report; Kryoptic's <c>CKM_AES_CBC_PAD</c> answers 0 while its last block is still held back, and a
 /// final into an empty buffer fails and ends the operation. Driven through a fake that does the same.
+/// The fake can also end the operation on a length query that has nothing to report, as NSS softoken does.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
 public sealed class StreamFinalLengthTests
@@ -43,12 +45,48 @@ public sealed class StreamFinalLengthTests
         Assert.Equal(3, fake.FinalFills); // 16, 32, then 64 bytes
     }
 
-    private static byte[] Run(UnderReportingFinalFake fake, string transform, int bufferLength)
+    // A module whose length query ends an operation that has nothing left to write: the final's
+    // CKR_OPERATION_NOT_INITIALIZED completes the transform, with every byte already out of the updates.
+    [Theory]
+    [MemberData(nameof(Transforms))]
+    public void Final_EndedByAnEmptyLengthQuery_CompletesWhenNothingIsHeldBack(string transform)
     {
-        using var session = fake.CreateSession(SessionId);
+        using var fake = new UnderReportingFinalFake(holdBack: 0, endsOnEmptyQuery: true);
+
+        Assert.Equal(Input, Run(fake, transform, bufferLength: 4, CKM.CKM_AES_CTR));
+        Assert.Equal(0, fake.FinalFills);
+    }
+
+    // The same answer after updates that held bytes back is lost output, not a shorter one.
+    [Theory]
+    [MemberData(nameof(Transforms))]
+    public void Final_EndedByAnEmptyLengthQuery_AfterHoldingBytesBack_Throws(string transform)
+    {
+        using var fake = new UnderReportingFinalFake(holdBack: 16, endsOnEmptyQuery: true);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Run(fake, transform, bufferLength: 4, CKM.CKM_AES_CTR));
+        Assert.Equal(CKR.CKR_OPERATION_NOT_INITIALIZED, ex.ReturnValue);
+    }
+
+    // Nor does it complete an AEAD transform, whose final writes the tag even when the updates held nothing
+    // back.
+    [Theory]
+    [MemberData(nameof(Transforms))]
+    public void Final_EndedByAnEmptyLengthQuery_ForAnAead_Throws(string transform)
+    {
+        using var fake = new UnderReportingFinalFake(holdBack: 0, endsOnEmptyQuery: true);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Run(fake, transform, bufferLength: 4, CKM.CKM_AES_GCM));
+        Assert.Equal(CKR.CKR_OPERATION_NOT_INITIALIZED, ex.ReturnValue);
+    }
+
+    private static byte[] Run(UnderReportingFinalFake fake, string transform, int bufferLength, CKM cipher = CKM.CKM_AES_GCM)
+    {
+        // CKM_AES_CTR stands for any unauthenticated mode, which the default policy refuses.
+        using var session = fake.CreateSession(SessionId, policy: cipher == CKM.CKM_AES_GCM ? null : CryptoPolicy.AllowInsecure);
         using var source = new MemoryStream(Input);
         using var sink = new MemoryStream();
-        Mechanism Aes() => new(CKM.CKM_AES_GCM);
+        Mechanism Aes() => new(cipher);
         Mechanism Sha256() => new(CKM.CKM_SHA256);
 
         switch (transform)
@@ -76,11 +114,13 @@ public sealed class StreamFinalLengthTests
     /// An identity transform that holds back the last <c>holdBack</c> bytes of what it has seen until the
     /// final, as a block cipher holds back its last block. The final's length query answers 0; a final into
     /// a buffer too small for what is held back answers <c>CKR_BUFFER_TOO_SMALL</c> and leaves the length as
-    /// the caller passed it.
+    /// the caller passed it. With <c>endsOnEmptyQuery</c>, the length query ends the operation, and the final
+    /// after it answers <c>CKR_OPERATION_NOT_INITIALIZED</c>, whatever was held back.
     /// </summary>
-    private sealed class UnderReportingFinalFake(int holdBack) : SessionTestModule
+    private sealed class UnderReportingFinalFake(int holdBack, bool endsOnEmptyQuery = false) : SessionTestModule
     {
         private readonly List<byte> _held = [];
+        private bool _ended;
 
         public int FinalFills { get; private set; }
 
@@ -124,9 +164,12 @@ public sealed class StreamFinalLengthTests
 
         private CKR Final(NativeBuffer<byte> output, ref NativeCULong outputLen)
         {
+            if (_ended)
+                return CKR.CKR_OPERATION_NOT_INITIALIZED;
             if (output.IsNull)
             {
                 outputLen = (NativeCULong)0UL; // under-reports: the held-back bytes are not counted
+                _ended = endsOnEmptyQuery;
                 return CKR.CKR_OK;
             }
 

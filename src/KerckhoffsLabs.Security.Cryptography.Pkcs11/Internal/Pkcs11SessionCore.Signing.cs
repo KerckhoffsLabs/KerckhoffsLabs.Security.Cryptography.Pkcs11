@@ -403,14 +403,14 @@ internal sealed partial class Pkcs11SessionCore
         rv = _pkcs11Library.C_DecryptInit(_sessionId, in ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
-        PumpStreamThrough(inputStream, outputStream, bufferLength,
+        bool nothingHeldBack = PumpStreamThrough(inputStream, outputStream, bufferLength,
             (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                 => _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
-            OpDecryptVerifyUpdate);
+            OpDecryptVerifyUpdate) && !FinalCarriesATag(decryptionMechanism.Type);
 
         byte[] lastPart = CallFinal(
             (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, lengthOnly, out length),
-            OpDecryptFinal, bufferLength);
+            OpDecryptFinal, bufferLength, nothingHeldBack);
         try
         {
             operation.End(CKF.CKF_DECRYPT);
