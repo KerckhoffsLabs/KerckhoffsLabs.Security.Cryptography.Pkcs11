@@ -19,4 +19,12 @@ public sealed class GenerateRsaKeyPairTests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void GeneratesTransportKeyPair_EncryptDecryptOnly() => GenerateRsaKeyPairTestCases.Assert_GeneratesTransportKeyPair_EncryptDecryptOnly(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(GenerateRsaKeyPairTestCases.ModulusBitsAboveTheMaximum), MemberType = typeof(GenerateRsaKeyPairTestCases))]
+    public void RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(string row) => GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(_backend, row);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(GenerateRsaKeyPairTestCases.PublicExponents), MemberType = typeof(GenerateRsaKeyPairTestCases))]
+    public void RsaKeyGen_PublicExponent_IsTheOneAsked(string exponent) => GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_PublicExponent_IsTheOneAsked(_backend, exponent);
 }

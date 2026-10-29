@@ -294,6 +294,22 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticRefusesAnHkdfOutputAboveTheRfcLimit = false;
 
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with a <c>CKA_EC_PARAMS</c> OID that names no curve (the
+    /// P-256 OID with an arc added or its last arc dropped) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_CURVE_NOT_SUPPORTED</c> or <c>CKR_DOMAIN_PARAMS_INVALID</c> (or <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, §4.1).
+    /// </summary>
+    public const bool KryopticRefusesAnOidThatIsNoCurveAsNotSupported = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> with <c>CKA_VALUE_LEN</c> 2^32 + 16 sets out to make
+    /// the 4 GiB key: the test host grew past 4 GiB of resident memory and the kernel's OOM killer ended it (confirmed
+    /// by running the row alone and in the kernel log). It reports ulMinKeySize and ulMaxKeySize 0, so the case's
+    /// range rows skip. PKCS#11 v3.2 §6.8.3: a length past the reported range is <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>, which a module can answer before allocating.
+    /// </summary>
+    public const bool KryopticBoundsAGenericSecretLength = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

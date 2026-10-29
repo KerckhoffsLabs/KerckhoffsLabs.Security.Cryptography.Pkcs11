@@ -218,6 +218,23 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11RefusesAnHkdfOutputAboveTheRfcLimit = false;
 
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a <c>CKA_PUBLIC_EXPONENT</c> of 2^64 + 65537
+    /// answers <c>CKR_FUNCTION_FAILED</c>. PKCS#11 v3.2 §6.1.4: <c>CKR_TEMPLATE_INCONSISTENT</c> "shall be returned if
+    /// the implementation cannot use the supplied exponent value". 65539 is kept, as it should be.
+    /// WolfPkcs11QuirkTests.RsaExponentAbove64Bits_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAnRsaExponentAsInconsistent = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> with a <c>CKA_VALUE_LEN</c> past its ulMaxKeySize
+    /// (513 bytes for 4096 bits, and 2^32 + 16) answers <c>CKR_FUNCTION_FAILED</c>; it makes no key. PKCS#11 v3.2
+    /// §6.8.3, §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>. The in-range rows pass.
+    /// WolfPkcs11QuirkTests.GenericSecretPastItsMaximum_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAGenericSecretLengthAsInvalid = false;
+
     public WolfPkcs11BackendFixture()
     {
         string? libPath = Settings.WolfPkcs11LibraryPath ?? BuiltLibraryPath();

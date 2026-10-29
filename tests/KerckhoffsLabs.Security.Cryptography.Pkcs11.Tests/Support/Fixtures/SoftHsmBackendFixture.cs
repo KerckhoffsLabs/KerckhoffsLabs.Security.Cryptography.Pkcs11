@@ -199,6 +199,30 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool SoftHsmRefusesAnEcdhValueLenAboveTheSecret = false;
 
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with a <c>CKA_EC_PARAMS</c> OID that names no curve (the
+    /// P-256 OID with an arc added or its last arc dropped) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_CURVE_NOT_SUPPORTED</c> or <c>CKR_DOMAIN_PARAMS_INVALID</c> (or <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, §4.1).
+    /// </summary>
+    public const bool SoftHsmRefusesAnOidThatIsNoCurveAsNotSupported = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a key one byte longer than the
+    /// <c>ulMaxKeySize</c> it reports (0x8000000 bits, so 16 MiB + 1 bytes). PKCS#11 v3.2 §6.8.3: the range is in bits;
+    /// a length past it is <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>. 2^32 + 16 bytes is refused.
+    /// </summary>
+    public const bool SoftHsmBoundsAGenericSecretByItsMaximum = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> answers <c>CKR_GENERAL_ERROR</c> for a
+    /// <c>CKA_MODULUS_BITS</c> of 2^32 + 2048 and for a <c>CKA_PUBLIC_EXPONENT</c> of 2^64 + 65537. PKCS#11 v3.2 §6.1.4:
+    /// an exponent the implementation cannot use is <c>CKR_TEMPLATE_INCONSISTENT</c>; a size past ulMaxKeySize is
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c> (§4.1, §5.1.6).
+    /// ulMaxKeySize + 8 and the exponent 65539 pass.
+    /// </summary>
+    public const bool SoftHsmRefusesAnRsaKeyGenAttributeAsInvalid = false;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

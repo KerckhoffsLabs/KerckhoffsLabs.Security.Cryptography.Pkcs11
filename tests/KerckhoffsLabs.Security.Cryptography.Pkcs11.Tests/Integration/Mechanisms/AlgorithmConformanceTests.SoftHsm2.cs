@@ -130,4 +130,7 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
             Assert.Skip("SoftHSM2 refuses a CKA_VALUE_LEN above the ECDH secret with CKR_FUNCTION_FAILED");
         AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
     }
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

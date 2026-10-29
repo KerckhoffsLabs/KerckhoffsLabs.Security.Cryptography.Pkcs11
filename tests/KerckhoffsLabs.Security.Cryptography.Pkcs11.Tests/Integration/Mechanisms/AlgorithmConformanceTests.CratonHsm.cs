@@ -122,4 +122,7 @@ public sealed class AlgorithmConformanceTests_CratonHsm(CratonHsmBackendFixture 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void Ecdh_ParameterOutOfRange_IsRefused(string fault) => AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

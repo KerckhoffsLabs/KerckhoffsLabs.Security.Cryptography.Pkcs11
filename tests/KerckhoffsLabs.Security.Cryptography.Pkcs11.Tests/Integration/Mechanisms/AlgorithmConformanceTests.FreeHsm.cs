@@ -112,4 +112,7 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.EcdhParameterRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM takes CKD_NULL shared data and a CKA_VALUE_LEN above the secret, and refuses a malformed peer as an attribute")]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void Ecdh_ParameterOutOfRange_IsRefused(string fault) => AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.AesKeyLengthRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM derives a 13-byte AES key")]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

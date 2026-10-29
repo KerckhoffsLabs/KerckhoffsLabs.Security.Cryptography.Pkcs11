@@ -18,4 +18,22 @@ public sealed class GenerateRsaKeyPairTests_SoftHsm(SoftHsmBackendFixture f)
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void GeneratesTransportKeyPair_EncryptDecryptOnly() => GenerateRsaKeyPairTestCases.Assert_GeneratesTransportKeyPair_EncryptDecryptOnly(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(GenerateRsaKeyPairTestCases.ModulusBitsAboveTheMaximum), MemberType = typeof(GenerateRsaKeyPairTestCases))]
+    public void RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(string row)
+    {
+        if (row == "2^32 + 2048" && !SoftHsmBackendFixture.SoftHsmRefusesAnRsaKeyGenAttributeAsInvalid)
+            Assert.Skip("SoftHSM2 refuses CKA_MODULUS_BITS 2^32 + 2048 with CKR_GENERAL_ERROR");
+        GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(_backend, row);
+    }
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(GenerateRsaKeyPairTestCases.PublicExponents), MemberType = typeof(GenerateRsaKeyPairTestCases))]
+    public void RsaKeyGen_PublicExponent_IsTheOneAsked(string exponent)
+    {
+        if (exponent == "2^64 + 65537" && !SoftHsmBackendFixture.SoftHsmRefusesAnRsaKeyGenAttributeAsInvalid)
+            Assert.Skip("SoftHSM2 refuses a nine-byte public exponent with CKR_GENERAL_ERROR");
+        GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_PublicExponent_IsTheOneAsked(_backend, exponent);
+    }
 }

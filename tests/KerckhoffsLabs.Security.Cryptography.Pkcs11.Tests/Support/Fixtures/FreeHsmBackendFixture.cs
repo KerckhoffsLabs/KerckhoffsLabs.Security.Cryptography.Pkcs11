@@ -210,6 +210,34 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the out-of-range ECDH parameter case: see <see cref="FreeHsmChecksTheEcdhParameters"/>.</summary>
     public static bool EcdhParameterRefusalAvailable => FreeHsmAvailable && FreeHsmChecksTheEcdhParameters;
 
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a <c>CKA_PUBLIC_EXPONENT</c> of 65539
+    /// (01 00 03) or 2^64 + 65537 answers <c>CKR_OK</c> with a key whose exponent is 65537. PKCS#11 v3.2 §6.1.4: the
+    /// exponent "will be copied from the template if supplied", and <c>CKR_TEMPLATE_INCONSISTENT</c> "shall be
+    /// returned if the implementation cannot use the supplied exponent value".
+    /// </summary>
+    public const bool FreeHsmKeepsThePublicExponentAsked = false;
+
+    /// <summary>Gate for the RSA public exponent case: see <see cref="FreeHsmKeepsThePublicExponentAsked"/>.</summary>
+    public static bool PublicExponentAvailable => FreeHsmAvailable && FreeHsmKeepsThePublicExponentAsked;
+
+    /// <summary>
+    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a 9-byte key while reporting ulMaxKeySize 64
+    /// (bits, per PKCS#11 v3.2 §6.8.3): it reports the range in other units or does not enforce it. A length past the
+    /// range is <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// </summary>
+    public const bool FreeHsmBoundsAGenericSecretByItsMaximum = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> of a <c>CKK_AES</c> key with <c>CKA_VALUE_LEN</c> 13 answers
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §6.10.2 (16, 24 or 32 bytes), §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// </summary>
+    public const bool FreeHsmRefusesAnAesKeyOfAnInvalidLength = false;
+
+    /// <summary>Gate for the derived AES key length case: see <see cref="FreeHsmRefusesAnAesKeyOfAnInvalidLength"/>.</summary>
+    public static bool AesKeyLengthRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesAnAesKeyOfAnInvalidLength;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

@@ -26,9 +26,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// RSA-OAEP's randomisation, key transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA
 /// verification; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the curves the rest of the suite
 /// does not reach; the 224-bit digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on
-/// X448, and the ECDH parameters it refuses; HKDF with SHA-512 and with a salt key; SHA-256 key derivation; AES
-/// key wrap's IV and integrity check; ML-KEM and HashML-DSA under the wrong key or hash; and a saved digest
-/// state, with the refusals of saving and restoring one.
+/// X448, the ECDH parameters it refuses and a derived AES key of a length AES does not have; HKDF with SHA-512
+/// and with a salt key; SHA-256 key derivation; AES key wrap's IV and integrity check; ML-KEM and HashML-DSA
+/// under the wrong key or hash; and a saved digest state, with the refusals of saving and restoring one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -852,6 +852,61 @@ internal static class AlgorithmConformanceTestCases
             Assert.True(rv == CKR.CKR_OK, $"C_DeriveKey(CKM_ECDH1_DERIVE) with good parameters after the refusal returned {rv}.");
     }
 
+    // An AES key is 16, 24 or 32 bytes (PKCS#11 v3.2 §6.10.2), so C_DeriveKey asking ECDH (CKD_NULL, P-256) for a
+    // CKK_AES key with CKA_VALUE_LEN 13 is refused with CKR_ATTRIBUTE_VALUE_INVALID or CKR_TEMPLATE_INCONSISTENT
+    // (§4.1, §5.1.6) or CKR_KEY_SIZE_RANGE (§5.18.5), and makes no key; the same derivation for 16 bytes then
+    // makes a 16-byte AES key.
+    // For the tripwires: the ECDH derivation of Assert_Derive_AesKeyOfAnInvalidLength_IsRefused for a CKK_AES key of
+    // the length; a key made is destroyed.
+    internal static CKR DeriveEcdhAesKey(IPkcs11Backend backend, ulong length)
+    {
+        CKR rv = default;
+        WithSession(backend, session =>
+        {
+            ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+            try
+            {
+                using var buffers = new NativeBuffers();
+                rv = RawDerive(backend.Library.LowLevelLibrary!, session, RawEcdh(buffers, EcdhPeer, []), priv, length,
+                    $"kl-derive-aes-{Guid.NewGuid():N}", out ObjectHandle derived, CKK.CKK_AES);
+                if (rv == CKR.CKR_OK)
+                    session.DestroyObject(derived);
+            }
+            finally { session.DestroyObject(priv); }
+        });
+        return rv;
+    }
+
+    internal static void Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_ECDH1_DERIVE);
+        WithSession(backend, session =>
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+            try
+            {
+                using var buffers = new NativeBuffers();
+                string label = $"kl-derive-aes13-{Guid.NewGuid():N}";
+                CKR rv = RawDerive(lowLevel, session, RawEcdh(buffers, EcdhPeer, []), priv, 13, label, out _, CKK.CKK_AES);
+                Assert.True(rv is CKR.CKR_ATTRIBUTE_VALUE_INVALID or CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_KEY_SIZE_RANGE,
+                    $"C_DeriveKey(CKM_ECDH1_DERIVE) of a 13-byte AES key returned {rv}.");
+                using (var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label))
+                    Assert.Empty(session.FindAllObjects([labelAttribute]));
+
+                rv = RawDerive(lowLevel, session, RawEcdh(buffers, EcdhPeer, []), priv, 16, label, out ObjectHandle derived, CKK.CKK_AES);
+                Assert.True(rv == CKR.CKR_OK, $"C_DeriveKey(CKM_ECDH1_DERIVE) of a 16-byte AES key returned {rv}.");
+                try
+                {
+                    using var read = session.GetAttributeValue(derived, [CKA.CKA_VALUE_LEN]);
+                    Assert.Equal(16UL, read[0].GetValueAsUlong());
+                }
+                finally { session.DestroyObject(derived); }
+            }
+            finally { session.DestroyObject(priv); }
+        });
+    }
+
     // The CKD_NULL derivation from the SP 800-56A vector with the fault in its parameters, and the CKA_VALUE_LEN
     // to ask for.
     private static Mechanism EcdhWithFault(NativeBuffers buffers, string fault, out ulong valueLen)
@@ -917,16 +972,16 @@ internal static class AlgorithmConformanceTestCases
         return RawParameter.From(CKM.CKM_ECDH1_DERIVE, in parameter);
     }
 
-    // C_DeriveKey of a session generic secret of valueLen bytes, with the label and CKA_SIGN, through the raw
-    // dispatch.
+    // C_DeriveKey of a session generic secret of valueLen bytes, with the label and CKA_SIGN (an AES key with
+    // CKA_ENCRYPT), through the raw dispatch.
     private static CKR RawDerive(LowLevelPkcs11Library lowLevel, Pkcs11SessionCore session, Mechanism mechanism, ObjectHandle baseKey,
-        ulong valueLen, string label, out ObjectHandle derived)
+        ulong valueLen, string label, out ObjectHandle derived, CKK type = CKK.CKK_GENERIC_SECRET)
     {
         using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, type);
         using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, valueLen);
-        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var sign = new ObjectAttribute(type == CKK.CKK_AES ? CKA.CKA_ENCRYPT : CKA.CKA_SIGN, true);
         using var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label);
         using var scope = new MechanismParameterScope();
         CK_MECHANISM mech = mechanism.Marshal(scope, out _);

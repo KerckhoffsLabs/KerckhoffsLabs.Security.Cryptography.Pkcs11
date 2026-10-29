@@ -29,4 +29,13 @@ public sealed class MechanismParameterTests_Kryoptic(KryopticBackendFixture back
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
     public void MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(string row) => MechanismParameterTestCases.Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(_backend, row);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.GenericSecretLengths), MemberType = typeof(MechanismParameterTestCases))]
+    public void GenericSecretKeyGen_LengthIsBoundedInBits(string row)
+    {
+        if (row == "2^32 + 16" && !KryopticBackendFixture.KryopticBoundsAGenericSecretLength)
+            Assert.Skip("Kryoptic sets out to make a 4 GiB generic secret, and the test host is killed for its memory");
+        MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
+    }
 }

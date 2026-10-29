@@ -99,4 +99,7 @@ public sealed class AlgorithmConformanceTests_OpenCryptoki(OpenCryptokiBackendFi
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void Ecdh_ParameterOutOfRange_IsRefused(string fault) => AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

@@ -733,4 +733,40 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_DeriveKey(CKM_HKDF_DERIVE) with an EC public key as the salt key no longer answers CKR_OBJECT_HANDLE_INVALID (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void KeyLengthAttributeAbove32Bits_QuirkStillPresent()
+    {
+        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        var (secretRv, secretLength) = Mechanisms.MechanismParameterTestCases.GenerateGenericSecret(_backend, (1UL << 32) + 16);
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        CKR rv;
+        int modulusBytes = 0;
+        try
+        {
+            rv = Keys.GenerateRsaKeyPairTestCases.GenerateRawRsa(_backend, session, (1UL << 32) + 2048, [0x01, 0x00, 0x01], out ObjectHandle pub, out ObjectHandle priv);
+            if (rv == CKR.CKR_OK)
+            {
+                using (var read = session.GetAttributeValue(pub, [CKA.CKA_MODULUS]))
+                    modulusBytes = read[0].GetValueAsByteArray().Length;
+                session.DestroyObject(priv);
+                session.DestroyObject(pub);
+            }
+        }
+        finally { TestKeys.LogoutIfRequired(_backend, session); }
+
+        Assert.True(rv == CKR.CKR_OK && modulusBytes == 256 && secretRv == CKR.CKR_OK && secretLength == 16,
+            $"CKA_MODULUS_BITS 2^32 + 2048 no longer makes a 2048-bit key ({rv}, {modulusBytes} bytes), or CKA_VALUE_LEN 2^32 + 16 a 16-byte " +
+            $"generic secret ({secretRv}, {secretLength}): set BouncyHsmBackendFixture.BouncyHsmRefusesAKeyLengthAttributeAbove32Bits to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void DerivedAesKeyOfAnInvalidLength_QuirkStillPresent()
+    {
+        CKR rv = Mechanisms.AlgorithmConformanceTestCases.DeriveEcdhAesKey(_backend, 13);
+
+        Assert.True(rv == CKR.CKR_GENERAL_ERROR,
+            $"C_DeriveKey(CKM_ECDH1_DERIVE) of a 13-byte AES key no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid to true and delete this test.");
+    }
 }

@@ -27,4 +27,13 @@ public sealed class MechanismParameterTests_FreeHsm(FreeHsmBackendFixture backen
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
     public void MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(string row) => MechanismParameterTestCases.Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(_backend, row);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(MechanismParameterTestCases.GenericSecretLengths), MemberType = typeof(MechanismParameterTestCases))]
+    public void GenericSecretKeyGen_LengthIsBoundedInBits(string row)
+    {
+        if (row == "ulMaxKeySize / 8 + 1" && !FreeHsmBackendFixture.FreeHsmBoundsAGenericSecretByItsMaximum)
+            Assert.Skip("FreeHSM makes a generic secret past the ulMaxKeySize it reports");
+        MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
+    }
 }

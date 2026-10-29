@@ -22,4 +22,13 @@ public sealed class MechanismParameterTests_WolfPkcs11(WolfPkcs11BackendFixture 
     [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
     public void MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(string row) => MechanismParameterTestCases.Assert_MacGeneral_LengthOutOfRange_IsMechanismParamInvalid(_backend, row);
+
+    [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    [MemberData(nameof(MechanismParameterTestCases.GenericSecretLengths), MemberType = typeof(MechanismParameterTestCases))]
+    public void GenericSecretKeyGen_LengthIsBoundedInBits(string row)
+    {
+        if (row is "ulMaxKeySize / 8 + 1" or "2^32 + 16" && !WolfPkcs11BackendFixture.WolfPkcs11RefusesAGenericSecretLengthAsInvalid)
+            Assert.Skip("wolfPKCS11 refuses a generic secret past its maximum with CKR_FUNCTION_FAILED");
+        MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
+    }
 }

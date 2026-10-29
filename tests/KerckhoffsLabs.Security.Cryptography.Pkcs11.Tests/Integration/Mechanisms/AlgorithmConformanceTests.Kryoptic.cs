@@ -118,4 +118,7 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
             Assert.Skip("Kryoptic refuses a DER peer value whose length lies with CKR_DEVICE_ERROR");
         AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
     }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

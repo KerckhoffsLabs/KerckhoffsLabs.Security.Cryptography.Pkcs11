@@ -371,6 +371,34 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool HkdfParameterRefusalAvailable =>
         BouncyHsmAvailable && BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit && BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent;
 
+    /// <summary>
+    /// False while a <c>CK_ULONG</c> length attribute in a key template is cut to its low 32 bits on a 64-bit platform:
+    /// <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with <c>CKA_MODULUS_BITS</c> 2^32 + 2048 makes a 2048-bit key
+    /// (ulMaxKeySize 6144), and <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> with <c>CKA_VALUE_LEN</c> 2^32 + 16
+    /// answers <c>CKR_OK</c>. PKCS#11 v3.2 §6.1.4, §6.8.3, §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// BouncyHsmQuirkTests.KeyLengthAttributeAbove32Bits_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAKeyLengthAttributeAbove32Bits = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a key one byte longer than the ulMaxKeySize it
+    /// reports (10485760 bits, so 1310721 bytes). PKCS#11 v3.2 §6.8.3: the range is in bits; past it is
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// </summary>
+    public const bool BouncyHsmBoundsAGenericSecretByItsMaximum = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> of a <c>CKK_AES</c> key with <c>CKA_VALUE_LEN</c> 13 answers
+    /// <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §6.10.2 (16, 24 or 32 bytes), §4.1, §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// BouncyHsmQuirkTests.DerivedAesKeyOfAnInvalidLength_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid = false;
+
+    /// <summary>Gate for the derived AES key length case: see <see cref="BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid"/>.</summary>
+    public static bool AesKeyLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

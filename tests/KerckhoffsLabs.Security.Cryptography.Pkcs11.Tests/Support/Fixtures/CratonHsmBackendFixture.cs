@@ -229,6 +229,25 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool CratonHsmRefusesAKeyNotNeeded = false;
 
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with <c>CKA_MODULUS_BITS</c> 2^32 + 2048 makes a
+    /// 2048-bit key (ulMaxKeySize 4096): the length is cut to its low 32 bits. PKCS#11 v3.2 §6.1.4, §4.1, §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>. ulMaxKeySize + 8
+    /// is refused.
+    /// </summary>
+    public const bool CratonHsmRefusesAModulusAbove32Bits = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a <c>CKA_PUBLIC_EXPONENT</c> of 65539
+    /// (01 00 03) or 2^64 + 65537 answers <c>CKR_OK</c> with a key whose exponent is 65537. PKCS#11 v3.2 §6.1.4: the
+    /// exponent "will be copied from the template if supplied", and <c>CKR_TEMPLATE_INCONSISTENT</c> "shall be
+    /// returned if the implementation cannot use the supplied exponent value".
+    /// </summary>
+    public const bool CratonHsmKeepsThePublicExponentAsked = false;
+
+    /// <summary>Gate for the RSA public exponent case: see <see cref="CratonHsmKeepsThePublicExponentAsked"/>.</summary>
+    public static bool PublicExponentAvailable => CratonHsmAvailable && CratonHsmKeepsThePublicExponentAsked;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

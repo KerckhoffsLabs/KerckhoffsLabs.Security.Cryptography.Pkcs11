@@ -116,4 +116,7 @@ public sealed class AlgorithmConformanceTests_WolfPkcs11(WolfPkcs11BackendFixtur
             Assert.Skip("wolfPKCS11 refuses a DER peer value whose length lies with CKR_FUNCTION_FAILED");
         AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

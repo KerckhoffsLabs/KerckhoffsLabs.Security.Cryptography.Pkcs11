@@ -12,4 +12,13 @@ public sealed class GenerateEcKeyPairTests_SoftHsm(SoftHsmBackendFixture f)
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void RejectsUnspecifiedCurve() => GenerateEcKeyPairTestCases.Assert_RejectsUnspecifiedCurve(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(GenerateEcKeyPairTestCases.CurveOidsNotACurve), MemberType = typeof(GenerateEcKeyPairTestCases))]
+    public void EcKeyGen_CurveOidNotACurve_IsRefused(string oid)
+    {
+        if (!SoftHsmBackendFixture.SoftHsmRefusesAnOidThatIsNoCurveAsNotSupported)
+            Assert.Skip("SoftHSM2 refuses a CKA_EC_PARAMS OID that names no curve with CKR_GENERAL_ERROR");
+        GenerateEcKeyPairTestCases.Assert_EcKeyGen_CurveOidNotACurve_IsRefused(_backend, oid);
+    }
 }

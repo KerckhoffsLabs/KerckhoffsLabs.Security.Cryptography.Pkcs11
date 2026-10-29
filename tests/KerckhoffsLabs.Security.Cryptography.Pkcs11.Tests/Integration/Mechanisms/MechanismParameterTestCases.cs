@@ -14,8 +14,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// <summary>
 /// A mechanism parameter outside what PKCS#11 v3.2 allows is refused at the <c>C_*Init</c> that receives it,
 /// checked on every real backend: the AES-GCM and AES-CCM parameter blocks with a NULL pointer behind a length
-/// or a length out of its range, AES-CTR's counter width and the overflow of its counter, and the output length of
-/// the general-length MACs.
+/// or a length out of its range, AES-CTR's counter width and the overflow of its counter, the output length of
+/// the general-length MACs, and the generic secret key lengths <c>CKM_GENERIC_SECRET_KEY_GEN</c> gives in bits.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -340,5 +340,98 @@ internal static class MechanismParameterTestCases
         using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
         using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
         return session.CreateObject([keyClass, type, token, sign, verify, attrValue]);
+    }
+
+    // === Generic secret key generation ======================================
+
+    // For the tripwires: C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN) of a session key of the length, and the
+    // CKA_VALUE_LEN of the key made, if one is (destroyed again).
+    internal static (CKR Rv, ulong? ValueLen) GenerateGenericSecret(IPkcs11Backend backend, ulong length)
+    {
+        (CKR, ulong?) result = default;
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var valueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, length);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN).Marshal(scope, out _);
+            CK_ATTRIBUTE[] template = [.. new[] { keyClass, keyType, token, valueLen }.Select(a => a.CkAttribute)];
+            CKR rv = lowLevel.C_GenerateKey(sid, in mech, template, out NativeCULong handle);
+            if (rv != CKR.CKR_OK)
+            {
+                result = (rv, null);
+                return;
+            }
+            var key = new ObjectHandle((ulong)handle);
+            try
+            {
+                using var read = session.GetAttributeValue(key, [CKA.CKA_VALUE_LEN]);
+                result = (rv, read[0].GetValueAsUlong());
+            }
+            finally { session.DestroyObject(key); }
+        });
+        return result;
+    }
+
+    public static TheoryData<string> GenericSecretLengths => ["ceil(ulMinKeySize / 8)", "ulMaxKeySize / 8", "ulMaxKeySize / 8 + 1", "2^32 + 16"];
+
+    // For CKM_GENERIC_SECRET_KEY_GEN, ulMinKeySize and ulMaxKeySize are in bits (PKCS#11 v3.2 §6.8.3), and
+    // CKA_VALUE_LEN, in bytes, sets the key's length. C_GenerateKey therefore makes a key of ceil(min / 8) bytes and
+    // of max / 8 bytes, each reading back that CKA_VALUE_LEN, and refuses max / 8 + 1 (a module that reports bytes
+    // takes it), and 2^32 + 16 where CK_ULONG is 64 bits (a module that narrows it makes 16 bytes): with
+    // CKR_ATTRIBUTE_VALUE_INVALID or CKR_TEMPLATE_INCONSISTENT (§4.1, §5.1.6) or CKR_KEY_SIZE_RANGE (§5.1 leaves
+    // room for it), making no key (found by label). The max rows run where max / 8 is at most 16 MiB.
+    internal static void Assert_GenericSecretKeyGen_LengthIsBoundedInBits(IPkcs11Backend backend, string row)
+    {
+        if (row == "2^32 + 16")
+            Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        backend.RequireMechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN);
+        MechanismInfo info = backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)backend.SlotId)
+            .GetMechanismInfo(CKM.CKM_GENERIC_SECRET_KEY_GEN);
+        if (row.StartsWith("ulMaxKeySize", StringComparison.Ordinal))
+            Assert.SkipUnless(info.MaxKeySize is > 0 and <= 8UL * 16 * 1024 * 1024, $"CKM_GENERIC_SECRET_KEY_GEN reports ulMaxKeySize {info.MaxKeySize}.");
+        if (row.StartsWith("ceil", StringComparison.Ordinal))
+            Assert.SkipUnless(info.MinKeySize > 0, "CKM_GENERIC_SECRET_KEY_GEN reports ulMinKeySize 0.");
+        (ulong length, bool made) = row switch
+        {
+            "ceil(ulMinKeySize / 8)" => ((info.MinKeySize + 7) / 8, true),
+            "ulMaxKeySize / 8" => (info.MaxKeySize / 8, true),
+            "ulMaxKeySize / 8 + 1" => (info.MaxKeySize / 8 + 1, false),
+            _ => ((1UL << 32) + 16, false),
+        };
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            string label = $"kl-generic-len-{Guid.NewGuid():N}";
+            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var valueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, length);
+            using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+            using var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN).Marshal(scope, out _);
+            CK_ATTRIBUTE[] template = [.. new[] { keyClass, keyType, token, valueLen, sign, labelAttribute }.Select(a => a.CkAttribute)];
+            CKR rv = lowLevel.C_GenerateKey(sid, in mech, template, out NativeCULong handle);
+            var key = new ObjectHandle((ulong)handle);
+            if (made)
+            {
+                Assert.True(rv == CKR.CKR_OK,
+                    $"C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN) of {length} bytes (ulMinKeySize {info.MinKeySize}, ulMaxKeySize {info.MaxKeySize} bits) returned {rv}.");
+                try
+                {
+                    using var read = session.GetAttributeValue(key, [CKA.CKA_VALUE_LEN]);
+                    Assert.Equal(length, read[0].GetValueAsUlong());
+                }
+                finally { session.DestroyObject(key); }
+                return;
+            }
+            if (rv == CKR.CKR_OK)
+                session.DestroyObject(key);
+            Assert.True(rv is CKR.CKR_ATTRIBUTE_VALUE_INVALID or CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_KEY_SIZE_RANGE,
+                $"C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN) of {length} bytes (ulMaxKeySize {info.MaxKeySize} bits) returned {rv}.");
+            Assert.Empty(session.FindAllObjects([labelAttribute]));
+        });
     }
 }

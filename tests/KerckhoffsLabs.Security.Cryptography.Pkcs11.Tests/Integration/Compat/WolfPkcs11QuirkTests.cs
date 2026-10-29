@@ -442,4 +442,35 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"C_DeriveKey(CKM_HKDF_DERIVE) past RFC 5869's limit no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11RefusesAnHkdfOutputAboveTheRfcLimit to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void RsaExponentAbove64Bits_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        CKR rv;
+        try
+        {
+            rv = Keys.GenerateRsaKeyPairTestCases.GenerateRawRsa(_backend, session, 2048, [0x01, 0, 0, 0, 0, 0, 0x01, 0x00, 0x01], out ObjectHandle pub, out ObjectHandle priv);
+            if (rv == CKR.CKR_OK)
+            {
+                session.DestroyObject(priv);
+                session.DestroyObject(pub);
+            }
+        }
+        finally { TestKeys.LogoutIfRequired(_backend, session); }
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN) with CKA_PUBLIC_EXPONENT 2^64 + 65537 no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAnRsaExponentAsInconsistent to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void GenericSecretPastItsMaximum_QuirkStillPresent()
+    {
+        var (rv, _) = Mechanisms.MechanismParameterTestCases.GenerateGenericSecret(_backend, 513);
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN) of 513 bytes (ulMaxKeySize 4096 bits) no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAGenericSecretLengthAsInvalid to true and delete this test.");
+    }
 }

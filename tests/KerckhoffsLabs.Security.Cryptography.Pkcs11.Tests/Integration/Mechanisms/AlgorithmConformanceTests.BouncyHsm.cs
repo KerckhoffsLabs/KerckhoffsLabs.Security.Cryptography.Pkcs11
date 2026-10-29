@@ -119,4 +119,7 @@ public sealed class AlgorithmConformanceTests_BouncyHsm(BouncyHsmBackendFixture 
             Assert.Skip("BouncyHsm left-pads the ECDH secret to a CKA_VALUE_LEN above it");
         AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.AesKeyLengthRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm refuses a 13-byte derived AES key with CKR_GENERAL_ERROR")]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }
