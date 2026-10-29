@@ -98,6 +98,16 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool CratonHsmDestroysPrivateSessionObjectsOnLogout = false;
 
+    /// <summary>
+    /// False while a read-only session cannot make even a session object: <c>C_CreateObject</c> with
+    /// <c>CKA_TOKEN = FALSE</c> answers <c>CKR_SESSION_READ_ONLY</c>, where PKCS#11 v3.2 §5.7.1 refuses only token
+    /// objects there. CratonHsmQuirkTests.SessionObjectInReadOnlySession_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmMakesSessionObjectsInReadOnlySessions = false;
+
+    /// <summary>Gate for the read-only session cases: see <see cref="CratonHsmMakesSessionObjectsInReadOnlySessions"/>.</summary>
+    public static bool ReadOnlySessionObjectsAvailable => CratonHsmAvailable && CratonHsmMakesSessionObjectsInReadOnlySessions;
+
     /// <summary>Gate for the C_Logout handle case: see <see cref="CratonHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => CratonHsmAvailable && CratonHsmDestroysPrivateSessionObjectsOnLogout;
 

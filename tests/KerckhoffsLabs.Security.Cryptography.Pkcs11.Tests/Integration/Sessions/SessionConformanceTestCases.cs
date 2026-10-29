@@ -524,6 +524,161 @@ internal static class SessionConformanceTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
+    public static TheoryData<string> ReadOnlySessionWrites =>
+        ["GenerateKey", "GenerateKeyPair", "DeriveKey", "UnwrapKey", "CopyObject", "SetAttributeValue", "DestroyObject"];
+
+    // A read-only session neither makes nor changes a token object, by any call: "Only session objects can be
+    // created during a read-only session" (§5.7.1, §5.7.2 for a copy), modified (§5.7.6) or destroyed (§5.7.3),
+    // and C_GenerateKey, C_GenerateKeyPair (either half), C_DeriveKey and C_UnwrapKey answer the same
+    // CKR_SESSION_READ_ONLY (§5.1.6, §5.18). The same call on session objects succeeds. The user is logged in
+    // (from a read/write session, where the token object is made); the inputs are session objects made in the
+    // read-only session itself, so the module's session-object scope does not matter.
+    internal static void Assert_ReadOnlySession_RefusesTokenObjectWrites(IPkcs11Backend backend, string call)
+    {
+        if (!backend.SupportsTokenObjects)
+            Assert.Skip("The backend has no token objects.");
+        switch (call)
+        {
+            case "GenerateKey": backend.RequireMechanism(CKM.CKM_AES_KEY_GEN); break;
+            case "GenerateKeyPair": backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN); break;
+            case "DeriveKey":
+                if (!backend.Supports(CKM.CKM_HKDF_DERIVE))
+                    backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE);
+                break;
+            case "UnwrapKey":
+                backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+                if (!AesKeyWraps.Any(backend.Supports))
+                    Assert.Skip($"Backend advertises none of {string.Join(", ", AesKeyWraps)}.");
+                break;
+        }
+
+        string label = $"kl-rowrite-{Guid.NewGuid():N}";
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrRenamed = new ObjectAttribute(CKA.CKA_LABEL, label + "-renamed");
+        using var attrOnToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrLen32 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrValue32 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+
+        using var rw = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            ObjectHandle tokenObject = CreateTokenDataObject(rw, label, isPrivate: false);
+            using var ro = Slot(backend).OpenSessionCore(readWrite: false);
+            using var insecure = ro.UsePolicy(CryptoPolicy.AllowInsecure); // ECDH with CKD_NULL below
+            ObjectHandle sessionObject = ro.CreateObject([attrData, attrSession, attrLabel]);
+
+            // Each pair: the call on a token object, then the same call on a session object.
+            (Action Token, Action Session)[] calls;
+            switch (call)
+            {
+                case "GenerateKey":
+                    {
+                        var generate = new Mechanism(CKM.CKM_AES_KEY_GEN);
+                        calls = [(() => ro.GenerateKey(generate, [attrSecret, attrAes, attrLen32, attrOnToken, attrEncrypt, attrLabel]),
+                                  () => ro.GenerateKey(generate, [attrSecret, attrAes, attrLen32, attrSession, attrEncrypt, attrLabel]))];
+                        break;
+                    }
+                case "GenerateKeyPair":
+                    {
+                        var generate = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+                        void Pair(ObjectAttribute publicToken, ObjectAttribute privateToken) =>
+                            ro.GenerateKeyPair(generate, [publicToken, attrEcParams, attrVerify, attrLabel], [privateToken, attrSign, attrLabel], out _, out _);
+                        calls = [(() => Pair(attrOnToken, attrSession), () => Pair(attrSession, attrSession)),
+                                 (() => Pair(attrSession, attrOnToken), () => Pair(attrSession, attrSession))];
+                        break;
+                    }
+                case "DeriveKey":
+                    {
+                        Mechanism derive;
+                        ObjectHandle baseKey;
+                        if (backend.Supports(CKM.CKM_HKDF_DERIVE))
+                        {
+                            baseKey = ro.CreateObject([attrSecret, attrGeneric, attrSession, attrDerive, attrLabel, attrValue32]);
+                            derive = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
+                        }
+                        else
+                        {
+                            ro.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), [attrSession, attrEcParams, attrLabel], [attrSession, attrDerive, attrLabel], out _, out baseKey);
+                            ro.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), [attrSession, attrEcParams, attrLabel], [attrSession, attrDerive, attrLabel], out ObjectHandle peer, out _);
+                            using var point = ro.GetAttributeValue(peer, [CKA.CKA_EC_POINT]);
+                            derive = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, point[0].GetValueAsByteArray()));
+                        }
+                        calls = [(() => ro.DeriveKey(derive, baseKey, [attrSecret, attrGeneric, attrLen32, attrOnToken, attrSign, attrLabel]),
+                                  () => ro.DeriveKey(derive, baseKey, [attrSecret, attrGeneric, attrLen32, attrSession, attrSign, attrLabel]))];
+                        break;
+                    }
+                case "UnwrapKey":
+                    {
+                        ObjectHandle kek = ro.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrSecret, attrAes, attrLen32, attrSession, attrWrap, attrUnwrap, attrLabel]);
+                        ObjectHandle target = ro.CreateObject([attrSecret, attrAes, attrSession, attrExtractable, attrEncrypt, attrLabel, attrValue32]);
+                        var wrap = new Mechanism(AesKeyWraps.First(backend.Supports));
+                        byte[] wrapped = ro.WrapKey(wrap, kek, target);
+                        calls = [(() => ro.UnwrapKey(wrap, kek, wrapped, [attrSecret, attrAes, attrOnToken, attrEncrypt, attrLabel]),
+                                  () => ro.UnwrapKey(wrap, kek, wrapped, [attrSecret, attrAes, attrSession, attrEncrypt, attrLabel]))];
+                        break;
+                    }
+                case "CopyObject":
+                    calls = [(() => ro.CopyObject(tokenObject, [attrLabel]), () => ro.CopyObject(sessionObject, [attrLabel])),
+                             (() => ro.CopyObject(sessionObject, [attrOnToken, attrLabel]), () => ro.CopyObject(sessionObject, [attrLabel]))];
+                    break;
+                case "SetAttributeValue":
+                    calls = [(() => ro.SetAttributeValue(tokenObject, [attrRenamed]), () => ro.SetAttributeValue(sessionObject, [attrRenamed]))];
+                    break;
+                default: // DestroyObject
+                    calls = [(() => ro.DestroyObject(tokenObject), () => ro.DestroyObject(sessionObject))];
+                    break;
+            }
+
+            for (int i = 0; i < calls.Length; i++)
+            {
+                Exception? ex = Record.Exception(calls[i].Token);
+                Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_SESSION_READ_ONLY },
+                    $"{call} #{i + 1} of a token object in a read-only session gave {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "CKR_OK"}.");
+                calls[i].Session();
+            }
+
+            // The token object is still the only one, under its own label. Told by CKA_TOKEN rather than by the
+            // search template, and the read/write session sees no other session's session objects anyway.
+            Assert.Equal([tokenObject.ObjectId], TokenObjectsLabelled(rw, attrLabel, attrRenamed).Select(h => h.ObjectId));
+            using var read = rw.GetAttributeValue(tokenObject, [CKA.CKA_LABEL]);
+            Assert.Equal(label, read[0].GetValueAsString());
+        }
+        finally
+        {
+            foreach (ObjectHandle handle in TokenObjectsLabelled(rw, attrLabel, attrRenamed))
+                rw.DestroyObject(handle);
+            TestKeys.LogoutIfRequired(backend, rw);
+        }
+    }
+
+    private static List<ObjectHandle> TokenObjectsLabelled(Pkcs11SessionCore session, params ObjectAttribute[] labels)
+    {
+        var found = new List<ObjectHandle>();
+        foreach (ObjectAttribute label in labels)
+        {
+            foreach (ObjectHandle handle in session.FindAllObjects([label]))
+            {
+                using var read = session.GetAttributeValue(handle, [CKA.CKA_TOKEN]);
+                if (read[0].GetValueAsBool())
+                    found.Add(handle);
+            }
+        }
+        return found;
+    }
+
     // === Logout ================================================================
 
     // C_Logout invalidates the application's handles to private objects and destroys its private session objects

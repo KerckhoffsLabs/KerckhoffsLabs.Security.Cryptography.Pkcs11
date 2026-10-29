@@ -26,11 +26,8 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void PrivateObjects_AreHiddenWithoutALogin() => SessionConformanceTestCases.Assert_PrivateObjects_AreHiddenWithoutALogin(_backend);
 
-    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void ReadOnlySession_RefusesTokenObjects()
-    {
-        Assert.Skip("Craton HSM refuses a session object in a read-only session too, with CKR_SESSION_READ_ONLY.");
-    }
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.ReadOnlySessionObjectsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM refuses a session object in a read-only session")]
+    public void ReadOnlySession_RefusesTokenObjects() => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjects(_backend);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void StaleHandles_AreRefused() => SessionConformanceTestCases.Assert_StaleHandles_AreRefused(_backend);
@@ -56,4 +53,8 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM lets the SO make a private object")]
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.ReadOnlySessionObjectsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM refuses a session object in a read-only session")]
+    [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
+    public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
 }

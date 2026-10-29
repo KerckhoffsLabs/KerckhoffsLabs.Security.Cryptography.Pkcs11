@@ -50,4 +50,13 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.SoPrivateObjectRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM lets the SO make a private object")]
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
+    public void ReadOnlySession_RefusesTokenObjectWrites(string call)
+    {
+        if (call == "CopyObject" && !FreeHsmBackendFixture.FreeHsmRefusesTokenObjectCopiesInReadOnlySessions)
+            Assert.Skip("FreeHSM copies a token object in a read-only session");
+        SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
+    }
 }

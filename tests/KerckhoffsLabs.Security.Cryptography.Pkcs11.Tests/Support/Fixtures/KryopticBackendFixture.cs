@@ -90,6 +90,15 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticRefusesAPrivateKeyAfterLogout = false;
 
+    /// <summary>
+    /// False while a read-only session copies and refuses to destroy token objects off the spec: <c>C_CopyObject</c>
+    /// of a token object whose template does not name <c>CKA_TOKEN</c> makes a token object (<c>copy_object</c> in
+    /// <c>src/fns/objmgmt.rs</c> checks only the template), and <c>C_DestroyObject</c> of a token object answers
+    /// <c>CKR_ACTION_PROHIBITED</c>, which says the object is not destroyable. PKCS#11 v3.2 §5.7.2 and §5.7.3: only
+    /// session objects can be created or destroyed in a read-only session (<c>CKR_SESSION_READ_ONLY</c>).
+    /// </summary>
+    public const bool KryopticRefusesTokenObjectWritesInReadOnlySessions = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

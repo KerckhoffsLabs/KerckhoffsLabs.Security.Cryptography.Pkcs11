@@ -82,4 +82,24 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
             "CratonHsmBackendFixture.CratonHsmDestroysPrivateSessionObjectsOnLogout to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void SessionObjectInReadOnlySession_QuirkStillPresent()
+    {
+        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
+        using var session = slot.OpenSessionCore(readWrite: false);
+        using var pin = new SecurePin(_backend.UserPin.Span);
+        session.Login(CKU.CKU_USER, pin);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-ro-{Guid.NewGuid():N}");
+        Exception? ex;
+        try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrToken, attrLabel]))); }
+        finally { session.Logout(); }
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_SESSION_READ_ONLY },
+            "Craton HSM no longer refuses a session object in a read-only session with CKR_SESSION_READ_ONLY " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
+            "CratonHsmBackendFixture.CratonHsmMakesSessionObjectsInReadOnlySessions to true and delete this test.");
+    }
 }

@@ -56,4 +56,13 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic lets the SO make a private object")]
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
+    public void ReadOnlySession_RefusesTokenObjectWrites(string call)
+    {
+        if (call is "CopyObject" or "DestroyObject" && !KryopticBackendFixture.KryopticRefusesTokenObjectWritesInReadOnlySessions)
+            Assert.Skip("Kryoptic copies a token object in a read-only session, and refuses its destruction with CKR_ACTION_PROHIBITED");
+        SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
+    }
 }

@@ -69,6 +69,13 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmRefusesPrivateObjectsToTheSo = false;
 
+    /// <summary>
+    /// False while <c>C_CopyObject</c> in a read-only session copies a token object (template not naming
+    /// <c>CKA_TOKEN</c>) into a new token object and answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.7.2: only session
+    /// objects can be created in a read-only session (<c>CKR_SESSION_READ_ONLY</c>).
+    /// </summary>
+    public const bool FreeHsmRefusesTokenObjectCopiesInReadOnlySessions = false;
+
     /// <summary>Gate for the SO private-object case: see <see cref="FreeHsmRefusesPrivateObjectsToTheSo"/>.</summary>
     public static bool SoPrivateObjectRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesPrivateObjectsToTheSo;
 
