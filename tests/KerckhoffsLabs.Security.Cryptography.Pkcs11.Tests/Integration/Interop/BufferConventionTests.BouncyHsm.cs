@@ -52,4 +52,19 @@ public sealed class BufferConventionTests_BouncyHsm(BouncyHsmBackendFixture back
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(BufferConventionTestCases.BoundaryDigests), MemberType = typeof(BufferConventionTestCases))]
     public void Digest_AroundBlockBoundaries_MatchesBcl(CKM mechanism) => BufferConventionTestCases.Assert_Digest_AroundBlockBoundaries_MatchesBcl(_backend, mechanism);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(BufferConventionTestCases.CbcPadWholeBlockLengths), MemberType = typeof(BufferConventionTestCases))]
+    public void CbcPadEncrypt_LengthQuery_CoversThePaddingBlock(int length) => BufferConventionTestCases.Assert_CbcPadEncrypt_LengthQuery_CoversThePaddingBlock(_backend, length);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void Digest_LengthQuery_KeepsTheOperation() => BufferConventionTestCases.Assert_Digest_LengthQuery_KeepsTheOperation(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(BufferConventionTestCases.ShortBufferAttributes), MemberType = typeof(BufferConventionTestCases))]
+    public void GetAttributeValue_ShortBuffer_WritesNothingPastIt(string attribute) => BufferConventionTestCases.Assert_GetAttributeValue_ShortBuffer_WritesNothingPastIt(_backend, attribute);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(BufferConventionTestCases.LargeBufferAttributes), MemberType = typeof(BufferConventionTestCases))]
+    public void GetAttributeValue_LargeBuffer_SetsTheExactLength(string attribute) => BufferConventionTestCases.Assert_GetAttributeValue_LargeBuffer_SetsTheExactLength(_backend, attribute);
 }

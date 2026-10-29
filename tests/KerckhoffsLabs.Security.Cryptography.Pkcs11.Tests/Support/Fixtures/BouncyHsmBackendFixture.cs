@@ -259,6 +259,18 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the non-key object case: see <see cref="BouncyHsmRefusesANonKeyObjectAsAKey"/>.</summary>
     public static bool NonKeyObjectRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesANonKeyObjectAsAKey;
 
+    /// <summary>
+    /// False while <c>CKM_AES_CTR</c> takes its parameter as a bare 16-byte counter block rather than a
+    /// <c>CK_AES_CTR_PARAMS</c> (<c>ulCounterBits</c> and <c>cb[16]</c>, PKCS#11 v3.2 §6.11.2): the native library
+    /// passes it on as raw bytes (<c>bouncy-pkcs11-utils.c</c>), so <c>C_EncryptInit</c> with a real
+    /// <c>CK_AES_CTR_PARAMS</c> answers <c>CKR_GENERAL_ERROR</c>. Not yet reported upstream.
+    /// BouncyHsmQuirkTests.AesCtrParams_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmTakesAesCtrParams = false;
+
+    /// <summary>Gate for the AES-CTR cases: see <see cref="BouncyHsmTakesAesCtrParams"/>.</summary>
+    public static bool AesCtrParamsAvailable => BouncyHsmAvailable && BouncyHsmTakesAesCtrParams;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;

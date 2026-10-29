@@ -310,4 +310,41 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"C_VerifyRecover with an ECDSA C_SignInit active and no C_VerifyRecoverInit no longer answers CKR_MECHANISM_INVALID (got {rv}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11ReportsAVerifyRecoverNeverStarted to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void CbcPadDecryptShortBuffer_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+        byte[] iv = RandomNumberGenerator.GetBytes(16);
+        ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+        CKR rv;
+        NativeCULong reported;
+        try
+        {
+            using var aes = Aes.Create();
+            aes.Key = rawKey;
+            byte[] ciphertext = aes.EncryptCbc(new byte[43], iv, PaddingMode.PKCS7);
+            using (var scope = new MechanismParameterScope())
+            {
+#pragma warning disable KLPKCS11009 // CKM_AES_CBC_PAD through the raw dispatch.
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_AES_CBC_PAD, iv).Marshal(scope, out _);
+#pragma warning restore KLPKCS11009
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_DecryptInit(sid, in mech, (NativeCULong)key.ObjectId));
+            }
+            rv = lowLevel.C_Decrypt(sid, ciphertext, new byte[1], lengthOnly: false, out reported);
+            lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_DECRYPT);
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL && (ulong)reported == 32,
+            $"C_Decrypt(CKM_AES_CBC_PAD) of 48 bytes into a 1-byte buffer now gives {rv} with {reported} bytes: set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11ReportsTheWholeCbcPadPlaintextLength to true and delete this test.");
+    }
 }

@@ -436,4 +436,35 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_SignInit(CKM_SHA256_HMAC) with a data object no longer answers CKR_OBJECT_HANDLE_INVALID (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesANonKeyObjectAsAKey to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AesCtrParams_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        ObjectHandle key = TestKeys.CreateAes256Key(session, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        CKR rv;
+        try
+        {
+            // CK_AES_CTR_PARAMS: ulCounterBits = 128, then a 16-byte counter block.
+            byte[] parameter = new byte[System.Runtime.CompilerServices.Unsafe.SizeOf<NativeCULong>() + 16];
+            parameter[0] = 128;
+            System.Security.Cryptography.RandomNumberGenerator.Fill(parameter.AsSpan(parameter.Length - 16));
+            using var scope = new MechanismParameterScope();
+#pragma warning disable KLPKCS11009 // CKM_AES_CTR through the raw dispatch.
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_AES_CTR, parameter).Marshal(scope, out _);
+#pragma warning restore KLPKCS11009
+            rv = _backend.Library.LowLevelLibrary!.C_EncryptInit((NativeCULong)session.SessionId, in mech, (NativeCULong)key.ObjectId);
+            if (rv == CKR.CKR_OK)
+                _backend.Library.LowLevelLibrary!.C_SessionCancel((NativeCULong)session.SessionId, (NativeCULong)CKF.CKF_ENCRYPT);
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_GENERAL_ERROR,
+            $"C_EncryptInit(CKM_AES_CTR) with a CK_AES_CTR_PARAMS no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmTakesAesCtrParams to true and delete this test.");
+    }
 }

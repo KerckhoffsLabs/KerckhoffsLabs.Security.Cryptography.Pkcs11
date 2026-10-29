@@ -161,6 +161,15 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmRefusesAUniqueIdInATemplate = false;
 
+    /// <summary>
+    /// False while <c>C_GetAttributeValue</c> of a public key's <c>CKA_MODULUS</c>, <c>CKA_EC_POINT</c> or
+    /// <c>CKA_EC_PARAMS</c> into a buffer too small for it answers <c>CKR_OK</c>, with the attribute's
+    /// <c>ulValueLen</c> set to <c>CK_UNAVAILABLE_INFORMATION</c> (<c>extract_pubkey_attr</c>'s failure is not
+    /// passed on, in <c>src/fhsm_pkcs11.c</c>). PKCS#11 v3.2 §5.7.5: <c>CKR_BUFFER_TOO_SMALL</c>. It writes nothing
+    /// past the buffer, and a data object's <c>CKA_LABEL</c> is refused correctly.
+    /// </summary>
+    public const bool FreeHsmReportsAShortBufferForKeyAttributes = false;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

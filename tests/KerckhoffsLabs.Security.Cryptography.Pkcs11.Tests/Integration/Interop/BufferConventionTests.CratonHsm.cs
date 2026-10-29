@@ -59,4 +59,19 @@ public sealed class BufferConventionTests_CratonHsm(CratonHsmBackendFixture back
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(BufferConventionTestCases.BoundaryDigests), MemberType = typeof(BufferConventionTestCases))]
     public void Digest_AroundBlockBoundaries_MatchesBcl(CKM mechanism) => BufferConventionTestCases.Assert_Digest_AroundBlockBoundaries_MatchesBcl(_backend, mechanism);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(BufferConventionTestCases.CbcPadWholeBlockLengths), MemberType = typeof(BufferConventionTestCases))]
+    public void CbcPadEncrypt_LengthQuery_CoversThePaddingBlock(int length) => BufferConventionTestCases.Assert_CbcPadEncrypt_LengthQuery_CoversThePaddingBlock(_backend, length);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void Digest_LengthQuery_KeepsTheOperation() => BufferConventionTestCases.Assert_Digest_LengthQuery_KeepsTheOperation(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(BufferConventionTestCases.ShortBufferAttributes), MemberType = typeof(BufferConventionTestCases))]
+    public void GetAttributeValue_ShortBuffer_WritesNothingPastIt(string attribute) => BufferConventionTestCases.Assert_GetAttributeValue_ShortBuffer_WritesNothingPastIt(_backend, attribute);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(BufferConventionTestCases.LargeBufferAttributes), MemberType = typeof(BufferConventionTestCases))]
+    public void GetAttributeValue_LargeBuffer_SetsTheExactLength(string attribute) => BufferConventionTestCases.Assert_GetAttributeValue_LargeBuffer_SetsTheExactLength(_backend, attribute);
 }

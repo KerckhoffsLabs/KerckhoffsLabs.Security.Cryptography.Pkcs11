@@ -114,10 +114,121 @@ internal static class OperationContractTestCases
         });
     }
 
+    // Multi-part CBC-PAD encryption: C_EncryptUpdate in pieces that are not whole blocks, then C_EncryptFinal,
+    // whose length query covers the padded last block (16 bytes for a plaintext of whole blocks) and whose
+    // output completes the BCL's PKCS#7 CBC ciphertext.
+    internal static void Assert_CbcPad_MultipartEncrypt_MatchesBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_AES_CBC_PAD, f => f.Encrypt, "CKF_ENCRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                using var aes = Aes.Create();
+                aes.Key = rawKey;
+                foreach (int length in (int[])[1, 15, 16, 17, 32, 33, 48])
+                {
+                    byte[] plaintext = RandomNumberGenerator.GetBytes(length);
+                    byte[] iv = RandomNumberGenerator.GetBytes(16);
+                    byte[] expected = aes.EncryptCbc(plaintext, iv, PaddingMode.PKCS7);
+
+                    AssertOk(Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_AES_CBC_PAD, iv), key), "EncryptInit");
+                    using var output = new MemoryStream();
+                    byte[] part = new byte[64];
+                    for (int offset = 0; offset < length; offset += 7)
+                    {
+                        ReadOnlySpan<byte> piece = plaintext.AsSpan(offset, Math.Min(7, length - offset));
+                        AssertOk(lowLevel.C_EncryptUpdate(sid, piece, part, lengthOnly: false, out NativeCULong n), "EncryptUpdate");
+                        output.Write(part, 0, (int)n);
+                    }
+                    AssertOk(lowLevel.C_EncryptFinal(sid, [], lengthOnly: true, out NativeCULong reported), "EncryptFinal (length query)");
+                    int tail = expected.Length - (int)output.Length;
+                    Assert.True((int)reported >= tail, $"C_EncryptFinal reported {reported} bytes for a {tail}-byte last part of {length} bytes of plaintext.");
+                    byte[] last = new byte[(int)reported];
+                    AssertOk(lowLevel.C_EncryptFinal(sid, last, lengthOnly: false, out NativeCULong lastLen), "EncryptFinal");
+                    Assert.True((int)lastLen == tail, $"C_EncryptFinal of {length} bytes of plaintext wrote {lastLen} bytes for a {tail}-byte last part.");
+                    output.Write(last, 0, (int)lastLen);
+                    Assert.Equal(expected, output.ToArray());
+                }
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    // === AES-CTR length queries ================================================
+
+    // AES-CTR is a stream cipher: the length queries (pOutput NULL) of a single-part C_Encrypt and C_Decrypt
+    // answer CKR_OK with no less than the input's length (§5.2), and the call into a buffer of the input's
+    // length gives the keystream XOR, here checked against a counter built from the BCL's AES-ECB (a 128-bit
+    // big-endian counter, CK_AES_CTR_PARAMS.ulCounterBits = 128, §6.11).
+    internal static void Assert_AesCtr_LengthQuery_ReportsTheInputLength(IPkcs11Backend backend)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_AES_CTR, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT and CKF_DECRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                byte[] counter = RandomNumberGenerator.GetBytes(16);
+                counter[15] = 0xFE; // the counter carries into the next byte within the message
+                byte[] parameter = new byte[System.Runtime.CompilerServices.Unsafe.SizeOf<NativeCULong>() + 16];
+                if (parameter.Length == 24)
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(parameter, 128);
+                else
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(parameter, 128);
+                counter.CopyTo(parameter, parameter.Length - 16);
+                var mechanism = new Mechanism(CKM.CKM_AES_CTR, parameter);
+                byte[] expected = AesCtr(rawKey, counter, Message);
+
+                foreach (bool encrypt in (bool[])[true, false])
+                {
+                    string op = encrypt ? "C_Encrypt" : "C_Decrypt";
+                    byte[] input = encrypt ? Message : expected;
+                    byte[] result = encrypt ? expected : Message;
+                    AssertOk(Init(encrypt ? lowLevel.C_EncryptInit : lowLevel.C_DecryptInit, sid, mechanism, key), op + "Init");
+                    CKR rv = encrypt
+                        ? lowLevel.C_Encrypt(sid, input, [], lengthOnly: true, out NativeCULong reported)
+                        : lowLevel.C_Decrypt(sid, input, [], lengthOnly: true, out reported);
+                    AssertOk(rv, op + " (length query)");
+                    Assert.True((ulong)reported >= (ulong)input.Length, $"The AES-CTR {op} length query reported {reported} bytes for {input.Length} bytes.");
+                    byte[] output = new byte[input.Length];
+                    rv = encrypt
+                        ? lowLevel.C_Encrypt(sid, input, output, lengthOnly: false, out NativeCULong written)
+                        : lowLevel.C_Decrypt(sid, input, output, lengthOnly: false, out written);
+                    AssertOk(rv, $"{op} into {input.Length} bytes");
+                    Assert.Equal(result, output.AsSpan(0, (int)written).ToArray());
+                }
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    private static byte[] AesCtr(byte[] key, byte[] initialCounter, byte[] data)
+    {
+        using var aes = Aes.Create();
+        aes.Key = key;
+        byte[] counter = (byte[])initialCounter.Clone();
+        byte[] output = new byte[data.Length];
+        for (int offset = 0; offset < data.Length; offset += 16)
+        {
+            byte[] keystream = aes.EncryptEcb(counter, PaddingMode.None);
+            for (int i = 0; i < 16 && offset + i < data.Length; i++)
+                output[offset + i] = (byte)(data[offset + i] ^ keystream[i]);
+            int carry = 15;
+            while (carry >= 0 && unchecked(++counter[carry]) == 0)
+                carry--;
+        }
+        return output;
+    }
+
     // === CKR_BUFFER_TOO_SMALL ================================================
 
     public static TheoryData<string> BufferTooSmallOperations =>
-        ["ECDSA-P256", "RSA-PSS-SHA256", "RSA-OAEP-SHA256", "Ed25519", "Ed448", "ML-DSA-44", "RSA sign-recover", "RSA verify-recover"];
+        ["ECDSA-P256", "RSA-PSS-SHA256", "RSA-OAEP-SHA256", "Ed25519", "Ed448", "ML-DSA-44", "RSA sign-recover", "RSA verify-recover",
+         "SHA-256 digest", "AES-CBC-PAD decrypt", "AES-CBC-PAD decrypt update", "AES-KW decrypt", "AES-KWP decrypt"];
 
     // A single-part call with a 1-byte buffer must answer CKR_BUFFER_TOO_SMALL (§5.2), report a length the
     // caller can act on, and keep the operation for the retry. Two recorded deviations are tolerated, as the
@@ -133,9 +244,19 @@ internal static class OperationContractTestCases
             "Ed25519" or "Ed448" => [CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKM.CKM_EDDSA],
             "ML-DSA-44" => [CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_ML_DSA],
             "RSA sign-recover" or "RSA verify-recover" => [],
+            "SHA-256 digest" => [CKM.CKM_SHA256],
+            "AES-CBC-PAD decrypt" or "AES-CBC-PAD decrypt update" => [],
+            "AES-KW decrypt" or "AES-KWP decrypt" => [],
             _ => [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP],
         };
         backend.RequireMechanisms(needed);
+        // The symmetric rows decrypt through C_Decrypt (C_DecryptUpdate), so they need the mechanism for
+        // CKF_DECRYPT; the key-wrap ones also for CKF_ENCRYPT, which makes their ciphertext.
+        if (operation.StartsWith("AES-CBC-PAD", StringComparison.Ordinal))
+            backend.RequireMechanismFlags(CKM.CKM_AES_CBC_PAD, f => f.Decrypt, "CKF_DECRYPT");
+        if (operation is "AES-KW decrypt" or "AES-KWP decrypt")
+            backend.RequireMechanismFlags(operation == "AES-KW decrypt" ? CKM.CKM_AES_KEY_WRAP : CKM.CKM_AES_KEY_WRAP_KWP,
+                f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT and CKF_DECRYPT");
         // The recover rows (C_SignRecover, C_VerifyRecover: §5.13.6, §5.15.6 follow §5.2) run where CKM_RSA_PKCS
         // has CKF_SIGN_RECOVER or CKF_VERIFY_RECOVER, with an imported key, so that the result is the BCL's.
         if (operation is "RSA sign-recover" or "RSA verify-recover")
@@ -185,6 +306,62 @@ internal static class OperationContractTestCases
                             Assert.True(session.Verify(mechanism, pub, Message, signature));
                         }
                         finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                        break;
+                    }
+                case "SHA-256 digest":
+                    {
+                        byte[] digested = RunWithAShortBufferFirst(
+                            () => DigestInit(lowLevel, sid, CKM.CKM_SHA256),
+                            (buffer, lengthOnly) => (lowLevel.C_Digest(sid, Message, buffer, lengthOnly, out NativeCULong n), n),
+                            32);
+                        Assert.Equal(SHA256.HashData(Message), digested);
+                        break;
+                    }
+                case "AES-CBC-PAD decrypt":
+                case "AES-CBC-PAD decrypt update":
+                    {
+                        byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+                        ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+                        try
+                        {
+                            // 48 bytes of ciphertext, 43 of plaintext.
+                            byte[] plaintext = Message.AsSpan(0, 43).ToArray();
+                            byte[] iv = RandomNumberGenerator.GetBytes(16);
+                            using var aes = Aes.Create();
+                            aes.Key = rawKey;
+                            byte[] ciphertext = aes.EncryptCbc(plaintext, iv, PaddingMode.PKCS7);
+                            var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, iv);
+                            byte[] recovered = operation == "AES-CBC-PAD decrypt"
+                                ? RunWithAShortBufferFirst(
+                                    () => Init(lowLevel.C_DecryptInit, sid, mechanism, key),
+                                    (buffer, lengthOnly) => (lowLevel.C_Decrypt(sid, ciphertext, buffer, lengthOnly, out NativeCULong n), n),
+                                    plaintext.Length)
+                                : DecryptUpdateWithAShortBufferFirst(lowLevel, sid, () => Init(lowLevel.C_DecryptInit, sid, mechanism, key), ciphertext);
+                            Assert.Equal(plaintext, recovered);
+                        }
+                        finally { session.DestroyObject(key); }
+                        break;
+                    }
+                case "AES-KW decrypt":
+                case "AES-KWP decrypt":
+                    {
+                        ObjectHandle key = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+                        try
+                        {
+                            // A 32-byte key value, what a key-wrap decryption returns.
+                            var mechanism = new Mechanism(operation == "AES-KW decrypt" ? CKM.CKM_AES_KEY_WRAP : CKM.CKM_AES_KEY_WRAP_KWP);
+                            byte[] plaintext = RandomNumberGenerator.GetBytes(32);
+                            AssertOk(Init(lowLevel.C_EncryptInit, sid, mechanism, key), "EncryptInit");
+                            byte[] wrapped = new byte[64];
+                            AssertOk(lowLevel.C_Encrypt(sid, plaintext, wrapped, lengthOnly: false, out NativeCULong wrappedLen), "Encrypt");
+                            byte[] ciphertext = wrapped.AsSpan(0, (int)wrappedLen).ToArray();
+                            byte[] recovered = RunWithAShortBufferFirst(
+                                () => Init(lowLevel.C_DecryptInit, sid, mechanism, key),
+                                (buffer, lengthOnly) => (lowLevel.C_Decrypt(sid, ciphertext, buffer, lengthOnly, out NativeCULong n), n),
+                                plaintext.Length);
+                            Assert.Equal(plaintext, recovered);
+                        }
+                        finally { session.DestroyObject(key); }
                         break;
                     }
                 case "RSA sign-recover":
@@ -253,11 +430,51 @@ internal static class OperationContractTestCases
 
     private delegate (CKR rv, NativeCULong length) SingleCall(Span<byte> buffer, bool lengthOnly);
 
+    // C_DecryptUpdate of a whole ciphertext into a 1-byte buffer (§5.2 applies to it as to C_Decrypt): a module
+    // may hold every block back and answer CKR_OK with nothing, or answer CKR_BUFFER_TOO_SMALL with what it
+    // needs and keep the operation; either way it writes nothing past the buffer, and the update and the final
+    // then give the plaintext.
+    private static byte[] DecryptUpdateWithAShortBufferFirst(LowLevelPkcs11Library lowLevel, NativeCULong sid, Func<CKR> init, byte[] ciphertext)
+    {
+        AssertOk(init(), "DecryptInit");
+        byte[] guarded = new byte[1 + ciphertext.Length + Guard];
+        guarded.AsSpan().Fill(Canary);
+        CKR rv = lowLevel.C_DecryptUpdate(sid, ciphertext, guarded.AsSpan(0, 1), lengthOnly: false, out NativeCULong reported);
+        int past = guarded.AsSpan(1).IndexOfAnyExcept(Canary);
+        Assert.True(past < 0, $"C_DecryptUpdate of {ciphertext.Length} bytes into a 1-byte buffer (it returned {rv}) wrote past it, at byte {1 + past}.");
+        byte[] updated;
+        if (rv == CKR.CKR_OK)
+        {
+            updated = guarded.AsSpan(0, (int)reported).ToArray();
+        }
+        else
+        {
+            Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL, $"C_DecryptUpdate of {ciphertext.Length} bytes into a 1-byte buffer returned {rv}.");
+            byte[] buffer = new byte[Math.Max((int)(ulong)reported, ciphertext.Length)];
+            AssertOk(lowLevel.C_DecryptUpdate(sid, ciphertext, buffer, lengthOnly: false, out NativeCULong written),
+                $"C_DecryptUpdate into {buffer.Length} bytes (CKR_BUFFER_TOO_SMALL reported {reported})");
+            updated = buffer.AsSpan(0, (int)written).ToArray();
+        }
+        byte[] last = new byte[ciphertext.Length];
+        AssertOk(lowLevel.C_DecryptFinal(sid, last, lengthOnly: false, out NativeCULong lastLen), "DecryptFinal");
+        return [.. updated, .. last.AsSpan(0, (int)lastLen)];
+    }
+
+    private const int Guard = 64;
+    private const byte Canary = 0xA5;
+
+    // The 1-byte buffer is the start of a larger one, room for the whole result and more, whose other bytes
+    // must come back as they were: a module that ignores the declared length writes into memory this case
+    // owns rather than past an allocation.
     private static byte[] RunWithAShortBufferFirst(Func<CKR> init, SingleCall call, int length)
     {
         AssertOk(init(), "Init");
-        byte[] tiny = new byte[1];
+        byte[] guarded = new byte[1 + length + Guard];
+        guarded.AsSpan().Fill(Canary);
+        Span<byte> tiny = guarded.AsSpan(0, 1);
         var (rv, reported) = call(tiny, false);
+        int past = guarded.AsSpan(1).IndexOfAnyExcept(Canary);
+        Assert.True(past < 0, $"A call with a 1-byte buffer for a {length}-byte result (it returned {rv}) wrote past it, at byte {1 + past}.");
         Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL, $"A 1-byte buffer for a {length}-byte result returned {rv}.");
         Assert.True((ulong)reported >= (ulong)length || (ulong)reported <= (ulong)tiny.Length,
             $"CKR_BUFFER_TOO_SMALL reported {reported} bytes for a {length}-byte result.");

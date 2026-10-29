@@ -161,6 +161,17 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool ProvenanceTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesProvenanceAttributesInATemplate;
 
     /// <summary>
+    /// False while <c>CKM_AES_CTR</c> takes its parameter as a bare 16-byte counter block rather than a
+    /// <c>CK_AES_CTR_PARAMS</c> (<c>ulCounterBits</c> and <c>cb[16]</c>, PKCS#11 v3.2 §6.11.2):
+    /// <c>aes_ctr_validate</c> in <c>src/crypto/encrypt.rs</c> refuses any other length, so <c>C_Encrypt</c> with a
+    /// real <c>CK_AES_CTR_PARAMS</c> answers <c>CKR_MECHANISM_PARAM_INVALID</c> (<c>C_EncryptInit</c> takes it).
+    /// </summary>
+    public const bool CratonHsmTakesAesCtrParams = false;
+
+    /// <summary>Gate for the AES-CTR cases: see <see cref="CratonHsmTakesAesCtrParams"/>.</summary>
+    public static bool AesCtrParamsAvailable => CratonHsmAvailable && CratonHsmTakesAesCtrParams;
+
+    /// <summary>
     /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> takes a base key of any type: from an AES key it answers
     /// <c>CKR_OK</c> and makes a key, using the AES key's value as the P-256 private scalar (<c>C_DeriveKey</c> in
     /// <c>src/pkcs11_abi/functions.rs</c> checks <c>CKA_DERIVE</c> but not the key type). PKCS#11 v3.2 §6.3.17 takes

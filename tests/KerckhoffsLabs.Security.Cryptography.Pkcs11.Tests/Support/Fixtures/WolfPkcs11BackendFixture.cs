@@ -148,6 +148,16 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11ReportsAVerifyRecoverNeverStarted = false;
 
+    /// <summary>
+    /// False while a single-part <c>CKM_AES_CBC_PAD</c> <c>C_Decrypt</c> into a buffer too small for the plaintext
+    /// answers <c>CKR_BUFFER_TOO_SMALL</c> with the length of the blocks before the last one only (32 for a
+    /// 48-byte ciphertext of 43 bytes of plaintext): <c>WP11_AesCbcPad_Decrypt</c> in <c>src/internal.c</c> reports
+    /// what its update step needs, before the final block. PKCS#11 v3.2 §5.2: "at least the number of bytes
+    /// needed". It writes nothing past the buffer.
+    /// WolfPkcs11QuirkTests.CbcPadDecryptShortBuffer_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11ReportsTheWholeCbcPadPlaintextLength = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 

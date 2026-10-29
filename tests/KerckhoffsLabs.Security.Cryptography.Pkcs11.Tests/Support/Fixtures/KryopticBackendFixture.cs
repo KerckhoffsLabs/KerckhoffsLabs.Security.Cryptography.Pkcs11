@@ -187,6 +187,14 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticReportsAnHkdfBaseKeyOfTheWrongTypeAsInconsistent = false;
 
+    /// <summary>
+    /// False while a <c>CKM_AES_CBC_PAD</c> <c>C_DecryptFinal</c> into a buffer too small for the last part answers
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c> and ends the operation: <c>decrypt_final</c> in <c>src/ossl/aes.rs</c>
+    /// hands the caller's buffer to OpenSSL's final, whose failure it reports as bad data. PKCS#11 v3.2 §5.2:
+    /// <c>CKR_BUFFER_TOO_SMALL</c> with the length needed, and the operation kept for the retry.
+    /// </summary>
+    public const bool KryopticKeepsACbcPadDecryptFinalOnAShortBuffer = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();
