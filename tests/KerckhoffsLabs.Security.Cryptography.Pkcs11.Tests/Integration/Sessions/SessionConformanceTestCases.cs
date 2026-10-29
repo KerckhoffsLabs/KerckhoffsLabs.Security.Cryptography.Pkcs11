@@ -17,7 +17,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sessions
 /// </summary>
 /// <remarks>
 /// Nothing here changes the fixture's token beyond its own objects: a wrong PIN is tried once and followed by
-/// the right one at once, so no token counts towards a lockout; no PIN is changed; SO is never logged in.
+/// the right one at once, so no token counts towards a lockout; no PIN is changed; the SO logs in with the
+/// right PIN only, and is logged out again whatever fails.
 /// </remarks>
 internal static class SessionConformanceTestCases
 {
@@ -186,6 +187,74 @@ internal static class SessionConformanceTestCases
             lowLevel.C_CloseSession(second);
             lowLevel.C_CloseSession(first);
         }
+    }
+
+    // The SO and the user exclude each other: with the SO logged in, C_Login(CKU_USER) from any session answers
+    // CKR_USER_ANOTHER_ALREADY_LOGGED_IN, and with the user logged in so does C_Login(CKU_SO) (§5.1.6), and the
+    // sessions stay in the state of whoever is logged in. The SO logs in from read/write sessions only (§5.6.8:
+    // a read-only one would be CKR_SESSION_READ_ONLY_EXISTS), and nobody is logged in afterwards, whatever fails.
+    internal static void Assert_SoAndUser_ExcludeEachOther(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        NativeCULong first = OpenRawSession(lowLevel, backend.SlotId);
+        NativeCULong second = OpenRawSession(lowLevel, backend.SlotId);
+        try
+        {
+            AssertRv(CKR.CKR_OK, lowLevel.C_Login(first, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO");
+            Assert.Equal(CKS.CKS_RW_SO_FUNCTIONS, (CKS)(ulong)SessionInfo(lowLevel, second).State);
+            AssertRv(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, lowLevel.C_Login(first, CKU.CKU_USER, backend.UserPin.Span), "C_Login as the user in the SO's session");
+            AssertRv(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, lowLevel.C_Login(second, CKU.CKU_USER, backend.UserPin.Span), "C_Login as the user from another session");
+            Assert.Equal(CKS.CKS_RW_SO_FUNCTIONS, (CKS)(ulong)SessionInfo(lowLevel, first).State);
+            AssertRv(CKR.CKR_OK, lowLevel.C_Logout(second), "C_Logout of the SO");
+
+            AssertRv(CKR.CKR_OK, lowLevel.C_Login(first, CKU.CKU_USER, backend.UserPin.Span), "C_Login as the user");
+            AssertRv(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, lowLevel.C_Login(second, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO with the user logged in");
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, (CKS)(ulong)SessionInfo(lowLevel, second).State);
+        }
+        finally
+        {
+            lowLevel.C_Logout(first);
+            lowLevel.C_CloseSession(second);
+            lowLevel.C_CloseSession(first);
+        }
+    }
+
+    // The SO makes no private object: "Only public objects can be created unless the normal user is logged in"
+    // (§5.7.1), so with the SO logged in C_CreateObject with CKA_PRIVATE = TRUE answers CKR_USER_NOT_LOGGED_IN
+    // (§5.1.6) and makes nothing. Nobody is logged in afterwards, whatever fails.
+    // Whether the SO may see the user's private objects is left out: [PKCS11-UG] gives the "R/W SO Functions"
+    // state the public objects only, but the specification itself says no more than that a private object needs
+    // "the user" authenticated (§4.4), and Kryoptic, BouncyHsm, Craton HSM and FreeHSM all show the SO them.
+    internal static void Assert_So_CreatesNoPrivateObject(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        string label = $"kl-so-{Guid.NewGuid():N}";
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+
+        using var so = Slot(backend).OpenSessionCore();
+        var sid = (NativeCULong)so.SessionId;
+        AssertRv(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO");
+        try
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => so.CreateObject([attrClass, attrSession, attrPrivate, attrLabel]));
+            Assert.True(ex.ReturnValue == CKR.CKR_USER_NOT_LOGGED_IN, $"C_CreateObject of a private object as the SO returned {ex.ReturnValue}.");
+        }
+        finally { lowLevel.C_Logout(sid); }
+
+        using var user = TestKeys.OpenLoggedInSession(backend);
+        try { Assert.Empty(user.FindAllObjects([attrClass, attrLabel])); }
+        finally { user.Logout(); }
     }
 
     // A wrong PIN is CKR_PIN_INCORRECT and logs nobody in; the right PIN right after it does. Tried once, and

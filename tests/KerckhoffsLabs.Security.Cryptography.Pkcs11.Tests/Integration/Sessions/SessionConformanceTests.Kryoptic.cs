@@ -50,4 +50,10 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
         SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend,
             tokenKeyEncryptInit: KryopticBackendFixture.KryopticRefusesAPrivateKeyAfterLogout ? null : CKR.CKR_GENERAL_ERROR);
     }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void SoAndUser_ExcludeEachOther() => SessionConformanceTestCases.Assert_SoAndUser_ExcludeEachOther(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic lets the SO make a private object")]
+    public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 }

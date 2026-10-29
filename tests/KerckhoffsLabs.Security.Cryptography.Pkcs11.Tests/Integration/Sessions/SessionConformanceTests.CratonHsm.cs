@@ -50,4 +50,10 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.LogoutInvalidationAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM keeps private session objects after C_Logout")]
     public void Logout_InvalidatesPrivateHandles() => SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void SoAndUser_ExcludeEachOther() => SessionConformanceTestCases.Assert_SoAndUser_ExcludeEachOther(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM lets the SO make a private object")]
+    public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 }

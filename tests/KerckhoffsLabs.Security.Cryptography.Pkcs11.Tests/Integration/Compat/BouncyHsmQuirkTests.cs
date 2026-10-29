@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -88,5 +89,48 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             "A private session object no longer outlives C_Logout " +
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
             "BouncyHsmBackendFixture.BouncyHsmDestroysPrivateSessionObjectsOnLogout to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void UserLoginOverTheSo_QuirkStillPresent()
+    {
+        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
+        using var session = slot.OpenSessionCore();
+        var sid = (NativeCULong)session.SessionId;
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, _backend.SoPin.Span));
+        CKR rv;
+        try { rv = lowLevel.C_Login(sid, CKU.CKU_USER, _backend.UserPin.Span); }
+        finally
+        {
+            lowLevel.C_Logout(sid);
+            lowLevel.C_Logout(sid);
+        }
+
+        Assert.True(rv == CKR.CKR_OK,
+            $"C_Login as the user with the SO logged in no longer answers CKR_OK (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmKeepsTheSoAndTheUserApart to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void PrivateObjectAsTheSo_QuirkStillPresent()
+    {
+        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
+        using var session = slot.OpenSessionCore();
+        var sid = (NativeCULong)session.SessionId;
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-so-{Guid.NewGuid():N}");
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, _backend.SoPin.Span));
+        Exception? ex;
+        try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrToken, attrPrivate, attrLabel]))); }
+        finally { lowLevel.C_Logout(sid); }
+
+        Assert.True(ex is null,
+            "The SO can no longer make a private object " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesPrivateObjectsToTheSo to true and delete this test.");
     }
 }

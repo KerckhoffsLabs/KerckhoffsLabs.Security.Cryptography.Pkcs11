@@ -73,13 +73,13 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// False while Kryoptic checks the login only for token objects (<c>create_object</c> and
     /// <c>insert_object</c> in <c>src/token.rs</c>): with nobody logged in, <c>C_CreateObject</c>,
     /// <c>C_CopyObject</c>, <c>C_GenerateKey</c>, <c>C_GenerateKeyPair</c>, <c>C_DeriveKey</c>, <c>C_UnwrapKey</c>,
-    /// <c>C_EncapsulateKey</c> and <c>C_DecapsulateKey</c> all make a <c>CKA_PRIVATE = TRUE</c> session object.
-    /// PKCS#11 v3.2 §5.1.6 (<c>CKR_USER_NOT_LOGGED_IN</c>): a private object cannot be created unless the session
-    /// is logged in as the normal user.
+    /// <c>C_EncapsulateKey</c> and <c>C_DecapsulateKey</c> all make a <c>CKA_PRIVATE = TRUE</c> session object; and
+    /// any login counts, so the SO makes one too. PKCS#11 v3.2 §5.1.6 (<c>CKR_USER_NOT_LOGGED_IN</c>) and §5.7.1:
+    /// only public objects can be created unless the normal user is logged in.
     /// </summary>
     public const bool KryopticRefusesPrivateObjectsWithoutALogin = false;
 
-    /// <summary>Gate for the private-object-without-a-login case: see <see cref="KryopticRefusesPrivateObjectsWithoutALogin"/>.</summary>
+    /// <summary>Gate for the private-object cases (nobody, or the SO, logged in): see <see cref="KryopticRefusesPrivateObjectsWithoutALogin"/>.</summary>
     public static bool PrivateObjectLoginCheckAvailable => KryopticAvailable && KryopticRefusesPrivateObjectsWithoutALogin;
 
     /// <summary>

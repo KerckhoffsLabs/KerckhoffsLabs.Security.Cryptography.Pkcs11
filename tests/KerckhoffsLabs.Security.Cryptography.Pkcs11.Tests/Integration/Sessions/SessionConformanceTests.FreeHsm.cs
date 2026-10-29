@@ -44,4 +44,10 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.LogoutInvalidationAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM keeps private session objects, and their handles, after C_Logout")]
     public void Logout_InvalidatesPrivateHandles() => SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void SoAndUser_ExcludeEachOther() => SessionConformanceTestCases.Assert_SoAndUser_ExcludeEachOther(_backend);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.SoPrivateObjectRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM lets the SO make a private object")]
+    public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 }

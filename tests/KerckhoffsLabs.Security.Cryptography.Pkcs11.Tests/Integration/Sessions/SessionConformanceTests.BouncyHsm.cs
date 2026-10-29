@@ -47,4 +47,10 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.LogoutInvalidationAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm keeps private session objects after C_Logout")]
     public void Logout_InvalidatesPrivateHandles() => SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.SoUserExclusionAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm logs the user in over the SO")]
+    public void SoAndUser_ExcludeEachOther() => SessionConformanceTestCases.Assert_SoAndUser_ExcludeEachOther(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.SoPrivateObjectRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm lets the SO make a private object")]
+    public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 }

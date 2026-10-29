@@ -73,6 +73,28 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmDestroysPrivateSessionObjectsOnLogout = false;
 
+    /// <summary>
+    /// False while the SO and the user can be logged in at once: with the SO logged in, <c>C_Login(CKU_USER)</c>
+    /// answers <c>CKR_OK</c> (<c>LoginHandler</c> checks only for a login of the same type), where PKCS#11 v3.2
+    /// §5.1.6 answers <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>. Not yet reported upstream.
+    /// BouncyHsmQuirkTests.UserLoginOverTheSo_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmKeepsTheSoAndTheUserApart = false;
+
+    /// <summary>
+    /// False while the SO can make a private object: with the SO logged in, <c>C_CreateObject</c> with
+    /// <c>CKA_PRIVATE = TRUE</c> succeeds, where PKCS#11 v3.2 §5.7.1 allows only public objects unless the normal
+    /// user is logged in (<c>CKR_USER_NOT_LOGGED_IN</c>, §5.1.6). Not yet reported upstream.
+    /// BouncyHsmQuirkTests.PrivateObjectAsTheSo_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesPrivateObjectsToTheSo = false;
+
+    /// <summary>Gate for the SO-and-user login case: see <see cref="BouncyHsmKeepsTheSoAndTheUserApart"/>.</summary>
+    public static bool SoUserExclusionAvailable => BouncyHsmAvailable && BouncyHsmKeepsTheSoAndTheUserApart;
+
+    /// <summary>Gate for the SO private-object case: see <see cref="BouncyHsmRefusesPrivateObjectsToTheSo"/>.</summary>
+    public static bool SoPrivateObjectRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesPrivateObjectsToTheSo;
+
     /// <summary>Gate for the C_Logout handle case: see <see cref="BouncyHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => BouncyHsmAvailable && BouncyHsmDestroysPrivateSessionObjectsOnLogout;
 

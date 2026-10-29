@@ -62,6 +62,16 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmDestroysPrivateSessionObjectsOnLogout = false;
 
+    /// <summary>
+    /// False while the SO can make a private object: with the SO logged in, <c>C_CreateObject</c> with
+    /// <c>CKA_PRIVATE = TRUE</c> succeeds, where PKCS#11 v3.2 §5.7.1 allows only public objects unless the normal
+    /// user is logged in (<c>CKR_USER_NOT_LOGGED_IN</c>, §5.1.6).
+    /// </summary>
+    public const bool FreeHsmRefusesPrivateObjectsToTheSo = false;
+
+    /// <summary>Gate for the SO private-object case: see <see cref="FreeHsmRefusesPrivateObjectsToTheSo"/>.</summary>
+    public static bool SoPrivateObjectRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesPrivateObjectsToTheSo;
+
     /// <summary>Gate for the C_Logout handle case: see <see cref="FreeHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => FreeHsmAvailable && FreeHsmDestroysPrivateSessionObjectsOnLogout;
 
