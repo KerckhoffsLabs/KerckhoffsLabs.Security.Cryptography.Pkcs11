@@ -89,11 +89,32 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11GeneratesItsMinimumRsaKeySize = false;
 
+    /// <summary>
+    /// False while <c>CKA_WRAP_TEMPLATE</c> and <c>CKA_UNWRAP_TEMPLATE</c> make <c>C_GenerateKey</c> fail with
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>: wolfPKCS11 lists them as byte arrays (<c>src/crypto.c</c>) rather
+    /// than the attribute arrays PKCS#11 v3.2 §4.10 defines, so no key-encryption key with a template can be
+    /// made, and <see cref="Pkcs11Session.GenerateAesKeyEncryptionKey"/> fails.
+    /// </summary>
+    public const bool WolfPkcs11AcceptsWrapTemplates = false;
+
+    /// <summary>
+    /// A capability, not a departure from PKCS#11: false while wolfPKCS11 wraps and unwraps only RSA private
+    /// keys and AES, generic-secret and HKDF keys (<c>CHECK_WRAPPABLE</c> in <c>src/crypto.c</c>), so an EC
+    /// private key cannot be unwrapped (<c>CKR_KEY_NOT_WRAPPABLE</c>). No mechanism flag says so.
+    /// </summary>
+    public const bool WolfPkcs11UnwrapsEcPrivateKeys = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 
     /// <summary>Gate for cases that verify an altered signature: see <see cref="WolfPkcs11RejectsMalformedSignatures"/>.</summary>
     public static bool MalformedSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsMalformedSignatures;
+
+    /// <summary>Gate for cases that make a key with a wrap or unwrap template: see <see cref="WolfPkcs11AcceptsWrapTemplates"/>.</summary>
+    public static bool WrapTemplateAvailable => WolfPkcs11Available && WolfPkcs11AcceptsWrapTemplates;
+
+    /// <summary>Gate for cases that unwrap an EC private key: see <see cref="WolfPkcs11UnwrapsEcPrivateKeys"/>.</summary>
+    public static bool EcPrivateKeyUnwrapAvailable => WolfPkcs11Available && WolfPkcs11UnwrapsEcPrivateKeys;
 
     /// <summary>Gate for cases that verify an RSA signature of the wrong length: see <see cref="WolfPkcs11RejectsWrongLengthRsaSignatures"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsWrongLengthRsaSignatures;

@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -107,6 +108,47 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             "C_Verify of an RSA signature one byte short no longer gives CKR_FUNCTION_FAILED " +
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11RejectsWrongLengthRsaSignatures to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void WrapTemplate_QuirkStillPresent()
+    {
+        using var session = _backend.OpenSession();
+
+        var ex = Record.Exception(() => session.GenerateAesKeyEncryptionKey().Dispose());
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_ATTRIBUTE_VALUE_INVALID },
+            "C_GenerateKey with CKA_WRAP_TEMPLATE and CKA_UNWRAP_TEMPLATE no longer gives CKR_ATTRIBUTE_VALUE_INVALID " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11AcceptsWrapTemplates to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void EcPrivateKeyUnwrap_StillMissing()
+    {
+        using var session = _backend.OpenSession();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        byte[] rawKek = RandomNumberGenerator.GetBytes(32);
+        ObjectHandle kekHandle = TestKeys.ImportAesWrappingKey(session.Core, rawKek);
+        using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var aes = Aes.Create();
+        aes.Key = rawKek;
+        byte[] iv = RandomNumberGenerator.GetBytes(16);
+        byte[] wrapped = aes.EncryptCbc(ec.ExportPkcs8PrivateKey(), iv, PaddingMode.PKCS7);
+        using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+
+#pragma warning disable KLPKCS11009 // CBC-PAD is the private-key wrap every backend offers.
+        var ex = Record.Exception(() => session.Core.UnwrapKey(new Mechanism(CKM.CKM_AES_CBC_PAD, iv), kekHandle, wrapped, [cls, type, token, sign]));
+#pragma warning restore KLPKCS11009
+        session.Core.DestroyObject(kekHandle);
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_KEY_NOT_WRAPPABLE },
+            "C_UnwrapKey of an EC private key no longer gives CKR_KEY_NOT_WRAPPABLE " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11UnwrapsEcPrivateKeys to true and delete this test.");
     }
 
     private static string Code(Func<bool> verify, string what)
