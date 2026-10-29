@@ -87,10 +87,9 @@ public sealed class MechanismParameterLengthTests
     public void EveryRule_TakesItsLengths_AndRefusesALongerBlock()
     {
         int ruled = 0;
-        foreach (CKM type in Enum.GetValues<CKM>().Distinct())
+        foreach (CKM type in Enum.GetValues<CKM>().Distinct().Where(t => MechanismParameterLength.For(t) is not null))
         {
-            if (MechanismParameterLength.For(type) is not { } rule)
-                continue;
+            MechanismParameterLength.Rule rule = MechanismParameterLength.For(type)!.Value;
             ruled++;
             Assert.NotEmpty(rule.Lengths);
             foreach (int length in rule.Lengths)
