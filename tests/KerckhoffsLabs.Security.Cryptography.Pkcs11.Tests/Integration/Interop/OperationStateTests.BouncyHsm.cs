@@ -76,4 +76,12 @@ public sealed class OperationStateTests_BouncyHsm(BouncyHsmBackendFixture backen
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.NonKeyObjectRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm refuses a non-key object as a key with CKR_OBJECT_HANDLE_INVALID")]
     [MemberData(nameof(OperationStateTestCases.NonKeyObjectsAsKeys), MemberType = typeof(OperationStateTestCases))]
     public void NonKeyObject_IsRefusedAsAKey(string misuse) => OperationStateTestCases.Assert_NonKeyObject_IsRefusedAsAKey(_backend, misuse);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(OperationStateTestCases.OperationsWhoseKeyIsDestroyed), MemberType = typeof(OperationStateTestCases))]
+    public void KeyDestroyedMidOperation_SessionStaysUsable(string operation)
+    {
+        // BouncyHsm answers C_Sign with CKR_GENERAL_ERROR once its key is destroyed, and keeps the signature active.
+        OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation, keepsTheOperation: operation == "ECDSA sign");
+    }
 }

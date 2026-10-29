@@ -676,6 +676,115 @@ internal static class OperationStateTestCases
         });
     }
 
+    // === A key destroyed while its operation is active ========================
+
+    public static TheoryData<string> OperationsWhoseKeyIsDestroyed => ["ECDSA sign", "AES-GCM encrypt"];
+
+    // C_DestroyObject of the key an active operation uses, then the call that continues it. PKCS#11 v3.2 does
+    // not say what happens (§5.7.3 does not mention active operations), so a module may refuse the destroy,
+    // finish with the key it holds, or fail the operation with any error: the case asserts only that every
+    // call returns, that a result returned is the right one, and that the session stays usable. The call that
+    // continues is a final, which ends the operation whatever it returns (§5.2), so a new Init with another key
+    // succeeds and the session still digests. A module that used the freed key would crash here, or return
+    // a wrong result. keepsTheOperation records a backend that keeps the operation active after the error,
+    // which the library ends with C_SessionCancel, as the case then does.
+    internal static void Assert_KeyDestroyedMidOperation_SessionStaysUsable(IPkcs11Backend backend, string operation, bool keepsTheOperation = false)
+    {
+        bool sign = operation == "ECDSA sign";
+        if (sign)
+            backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA]);
+        else
+            backend.RequireMechanismFlags(CKM.CKM_AES_GCM, f => f.Encrypt, "CKF_ENCRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] digest = SHA256.HashData(Message);
+            if (sign)
+            {
+                var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+                var (otherPub, otherPriv) = TestKeys.GenerateEcP256KeyPair(session);
+                try
+                {
+                    var ecdsa = new Mechanism(CKM.CKM_ECDSA);
+                    AssertRv(CKR.CKR_OK, Init(lowLevel.C_SignInit, sid, ecdsa, priv), "C_SignInit");
+                    CKR destroyed = lowLevel.C_DestroyObject(sid, (NativeCULong)priv.ObjectId);
+                    byte[] signature = new byte[64];
+                    CKR rv = lowLevel.C_Sign(sid, digest, signature, lengthOnly: false, out NativeCULong n);
+                    if (rv == CKR.CKR_OK)
+                        Assert.True(session.Verify(ecdsa, pub, digest, signature.AsSpan(0, (int)n).ToArray()),
+                            $"C_Sign after C_DestroyObject of its key (which returned {destroyed}) returned a signature that does not verify.");
+
+                    if (keepsTheOperation && rv != CKR.CKR_OK)
+                    {
+                        AssertRv(CKR.CKR_OPERATION_ACTIVE, Init(lowLevel.C_SignInit, sid, ecdsa, otherPriv), $"C_SignInit with another key after C_Sign returned {rv}");
+                        AssertRv(CKR.CKR_OK, lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_SIGN), "C_SessionCancel(CKF_SIGN)");
+                    }
+                    AssertRv(CKR.CKR_OK, Init(lowLevel.C_SignInit, sid, ecdsa, otherPriv), $"C_SignInit with another key after C_Sign returned {rv}");
+                    AssertRv(CKR.CKR_OK, lowLevel.C_Sign(sid, digest, signature, lengthOnly: false, out n), "C_Sign with the other key");
+                    Assert.True(session.Verify(ecdsa, otherPub, digest, signature.AsSpan(0, (int)n).ToArray()));
+                }
+                finally
+                {
+                    lowLevel.C_DestroyObject(sid, (NativeCULong)priv.ObjectId);
+                    session.DestroyObject(pub);
+                    session.DestroyObject(otherPriv);
+                    session.DestroyObject(otherPub);
+                }
+            }
+            else
+            {
+                byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+                ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+                ObjectHandle other = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+                try
+                {
+                    byte[] nonce = RandomNumberGenerator.GetBytes(12);
+                    byte[] expected = new byte[Message.Length + 16];
+                    using (var aes = new AesGcm(rawKey, 16))
+                        aes.Encrypt(nonce, Message, expected.AsSpan(0, Message.Length), expected.AsSpan(Message.Length));
+
+                    AssertRv(CKR.CKR_OK, Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(nonce, [], 128)), key), "C_EncryptInit");
+                    byte[] output = new byte[expected.Length + 16];
+                    AssertRv(CKR.CKR_OK, lowLevel.C_EncryptUpdate(sid, Message.AsSpan(0, 20), output, lengthOnly: false, out NativeCULong first), "C_EncryptUpdate");
+                    CKR destroyed = lowLevel.C_DestroyObject(sid, (NativeCULong)key.ObjectId);
+                    int written = (int)first;
+                    CKR rv = lowLevel.C_EncryptUpdate(sid, Message.AsSpan(20), output.AsSpan(written), lengthOnly: false, out NativeCULong second);
+                    if (rv == CKR.CKR_OK)
+                    {
+                        written += (int)second;
+                        rv = lowLevel.C_EncryptFinal(sid, output.AsSpan(written), lengthOnly: false, out NativeCULong last);
+                        if (rv == CKR.CKR_OK)
+                        {
+                            written += (int)last;
+                            Assert.True(expected.AsSpan().SequenceEqual(output.AsSpan(0, written)),
+                                $"The encryption whose key was destroyed (C_DestroyObject returned {destroyed}) finished with the wrong ciphertext.");
+                        }
+                    }
+                    else
+                    {
+                        // The update failed, which ends the operation (§5.2), as a final would.
+                        CKR final = lowLevel.C_EncryptFinal(sid, output, lengthOnly: false, out _);
+                        Assert.True(final != CKR.CKR_OK, $"C_EncryptFinal after a C_EncryptUpdate that returned {rv} returned CKR_OK.");
+                    }
+
+                    var next = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(RandomNumberGenerator.GetBytes(12), [], 128));
+                    if (keepsTheOperation && rv != CKR.CKR_OK)
+                    {
+                        AssertRv(CKR.CKR_OPERATION_ACTIVE, Init(lowLevel.C_EncryptInit, sid, next, other), $"C_EncryptInit with another key after the encryption returned {rv}");
+                        AssertRv(CKR.CKR_OK, lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_ENCRYPT), "C_SessionCancel(CKF_ENCRYPT)");
+                    }
+                    AssertRv(CKR.CKR_OK, Init(lowLevel.C_EncryptInit, sid, next, other), $"C_EncryptInit with another key after the encryption returned {rv}");
+                    AssertRv(CKR.CKR_OK, lowLevel.C_Encrypt(sid, Message, output, lengthOnly: false, out _), "C_Encrypt with the other key");
+                }
+                finally
+                {
+                    lowLevel.C_DestroyObject(sid, (NativeCULong)key.ObjectId);
+                    session.DestroyObject(other);
+                }
+            }
+            AssertDigestStillRuns(lowLevel, sid);
+        });
+    }
+
     // === Input that is not a whole number of blocks ============================
 
     public static TheoryData<CKM, int> PartialBlockEncryptions => new()

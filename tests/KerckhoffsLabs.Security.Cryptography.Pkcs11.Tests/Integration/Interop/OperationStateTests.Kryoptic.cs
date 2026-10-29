@@ -75,4 +75,8 @@ public sealed class OperationStateTests_Kryoptic(KryopticBackendFixture backend)
             Assert.Skip("Kryoptic refuses a non-key wrapping key with CKR_GENERAL_ERROR");
         OperationStateTestCases.Assert_NonKeyObject_IsRefusedAsAKey(_backend, misuse);
     }
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(OperationStateTestCases.OperationsWhoseKeyIsDestroyed), MemberType = typeof(OperationStateTestCases))]
+    public void KeyDestroyedMidOperation_SessionStaysUsable(string operation) => OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation);
 }
