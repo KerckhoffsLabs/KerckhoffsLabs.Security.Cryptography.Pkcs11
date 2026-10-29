@@ -356,4 +356,30 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_CreateObject with a 4-byte CKA_TOKEN no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesMalformedAttributeValues to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void CopyableUndone_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrUncopyable = new ObjectAttribute(CKA.CKA_COPYABLE, false);
+        using var attrCopyable = new ObjectAttribute(CKA.CKA_COPYABLE, true);
+        Exception? ex;
+        bool after;
+        try
+        {
+            ObjectHandle data = session.CreateObject([attrClass, attrToken, attrUncopyable]);
+            ex = Record.Exception(() => session.SetAttributeValue(data, [attrCopyable]));
+            using (var read = session.GetAttributeValue(data, [CKA.CKA_COPYABLE]))
+                after = read[0].GetValueAsBool();
+            session.DestroyObject(data);
+        }
+        finally { session.Logout(); }
+
+        Assert.True(ex is null && after,
+            "C_SetAttributeValue no longer sets CKA_COPYABLE back to TRUE " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "flag unchanged"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmKeepsCkaCopyableFalse to true and delete this test.");
+    }
 }

@@ -141,6 +141,17 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmMatchesAWrongLengthBoolean = false;
 
+    /// <summary>
+    /// False while a data object's <c>CKA_OBJECT_ID</c> is taken by <c>C_CreateObject</c> and then not reported:
+    /// <c>C_GetAttributeValue</c> marks it unavailable on the object and on a copy. PKCS#11 v3.2 Table 20 gives
+    /// every data object a <c>CKA_OBJECT_ID</c> (default empty). <c>CKA_VALUE</c> and <c>CKA_APPLICATION</c> are
+    /// kept and copied.
+    /// </summary>
+    public const bool FreeHsmKeepsCkaObjectId = false;
+
+    /// <summary>Gate for the data object copy case: see <see cref="FreeHsmKeepsCkaObjectId"/>.</summary>
+    public static bool DataObjectIdAvailable => FreeHsmAvailable && FreeHsmKeepsCkaObjectId;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

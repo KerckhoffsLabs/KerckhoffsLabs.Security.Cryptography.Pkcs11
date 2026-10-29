@@ -1026,4 +1026,141 @@ internal static class ObjectConformanceTestCases
             }
         });
     }
+
+    // === What a copy keeps =====================================================
+
+    // A copy is the original with the template's changes (§5.7.2): with a template that names only CKA_LABEL,
+    // the copy of a token object is a token object and the copy of a session object a session object. The
+    // token objects are destroyed whatever happens.
+    internal static void Assert_CopyObject_KeepsCkaToken(IPkcs11Backend backend)
+    {
+        if (!backend.SupportsTokenObjects)
+            Assert.Skip("The backend has no token objects.");
+        WithSession(backend, session =>
+        {
+            string label = $"kl-copy-token-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrCopyLabel = new ObjectAttribute(CKA.CKA_LABEL, label + "-copy");
+            using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+            using var attrOnToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+            using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, (byte[])[0x01]);
+            var made = new List<ObjectHandle>();
+            try
+            {
+                ObjectHandle tokenObject = session.CreateObject([attrClass, attrOnToken, attrLabel, attrValue]);
+                made.Add(tokenObject);
+                ObjectHandle tokenCopy = session.CopyObject(tokenObject, [attrCopyLabel]);
+                made.Add(tokenCopy);
+                Assert.True(ReadBool(session, tokenCopy, CKA.CKA_TOKEN), "The copy of a token object is a session object.");
+
+                ObjectHandle sessionObject = CreateDataObject(session, label, [0x02]);
+                made.Add(sessionObject);
+                ObjectHandle sessionCopy = session.CopyObject(sessionObject, [attrCopyLabel]);
+                made.Add(sessionCopy);
+                Assert.False(ReadBool(session, sessionCopy, CKA.CKA_TOKEN), "The copy of a session object is a token object.");
+            }
+            finally
+            {
+                using var attrCopies = new ObjectAttribute(CKA.CKA_LABEL, label + "-copy");
+                foreach (ObjectHandle handle in made.Concat(session.FindAllObjects([attrLabel])).Concat(session.FindAllObjects([attrCopies])).DistinctBy(h => h.ObjectId))
+                    session.DestroyObject(handle);
+            }
+        });
+    }
+
+    // A copy of a data object keeps its CKA_VALUE, CKA_APPLICATION and CKA_OBJECT_ID (Table 20): the template
+    // changes only CKA_LABEL, and the original keeps its own label.
+    internal static void Assert_CopyObject_KeepsADataObjectsFields(IPkcs11Backend backend)
+    {
+        WithSession(backend, session =>
+        {
+            byte[] value = RandomNumberGenerator.GetBytes(48);
+            byte[] objectId = [0x06, 0x03, 0x2A, 0x03, 0x04]; // OID 1.2.3.4
+            using var attrApplication = new ObjectAttribute(CKA.CKA_APPLICATION, "kl-application");
+            using var attrObjectId = new ObjectAttribute(CKA.CKA_OBJECT_ID, objectId);
+            ObjectHandle original = CreateDataObject(session, "kl-copy-original", value, attrApplication, attrObjectId);
+            ObjectHandle? copy = null;
+            try
+            {
+                using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, "kl-copy-of-data");
+                copy = session.CopyObject(original, [attrLabel]);
+                foreach ((string which, ObjectHandle handle) in new[] { ("original", original), ("copy", copy.Value) })
+                {
+                    using var read = session.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_APPLICATION, CKA.CKA_OBJECT_ID]);
+                    Assert.True(read.All(a => !a.CannotBeRead), $"The {which} does not report every data object attribute it was given.");
+                    Assert.Equal(value, read[0].GetValueAsByteArray());
+                    Assert.Equal("kl-application", read[1].GetValueAsString());
+                    Assert.Equal(objectId, read[2].GetValueAsByteArray());
+                }
+                using var copyLabel = session.GetAttributeValue(copy.Value, [CKA.CKA_LABEL]);
+                Assert.Equal("kl-copy-of-data", copyLabel[0].GetValueAsString());
+                using var originalLabel = session.GetAttributeValue(original, [CKA.CKA_LABEL]);
+                Assert.Equal("kl-copy-original", originalLabel[0].GetValueAsString());
+            }
+            finally
+            {
+                if (copy is { } made)
+                    session.DestroyObject(made);
+                session.DestroyObject(original);
+            }
+        });
+    }
+
+    // CKA_COPYABLE "Can't be set to TRUE once it is set to FALSE" (Table 19): on an object created with
+    // CKA_COPYABLE = FALSE, C_SetAttributeValue(CKA_COPYABLE = TRUE) is refused with CKR_ATTRIBUTE_READ_ONLY
+    // (§4.1.1 point 3) or leaves it FALSE, and C_CopyObject is still refused with CKR_ACTION_PROHIBITED (§4.1.3).
+    // The copy's template names a label: SoftHSM2 refuses a NULL template with CKR_ARGUMENTS_BAD before it looks
+    // at CKA_COPYABLE.
+    internal static void Assert_UncopyableObject_StaysUncopyable(IPkcs11Backend backend)
+    {
+        WithSession(backend, session =>
+        {
+            using var copyable = new ObjectAttribute(CKA.CKA_COPYABLE, false);
+            ObjectHandle data = CreateDataObject(session, "kl-stays-uncopyable", [0x01], copyable);
+            try
+            {
+                Assert.False(ReadBool(session, data, CKA.CKA_COPYABLE));
+                using var undone = new ObjectAttribute(CKA.CKA_COPYABLE, true);
+                Exception? set = Record.Exception(() => Set(session, data, undone));
+                Assert.True(set is null or Pkcs11Exception { ReturnValue: CKR.CKR_ATTRIBUTE_READ_ONLY },
+                    $"C_SetAttributeValue(CKA_COPYABLE = TRUE) answered {(set as Pkcs11Exception)?.ReturnValue.ToString() ?? set?.GetType().Name}.");
+                Assert.False(ReadBool(session, data, CKA.CKA_COPYABLE), "CKA_COPYABLE went back from FALSE to TRUE.");
+                using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, "kl-stays-uncopyable-copy");
+                var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.DestroyObject(session.CopyObject(data, [attrLabel])));
+                Assert.Equal(CKR.CKR_ACTION_PROHIBITED, ex.ReturnValue);
+            }
+            finally { session.DestroyObject(data); }
+        });
+    }
+
+    // CKA_MODIFIABLE, CKA_COPYABLE and CKA_DESTROYABLE default to TRUE (Table 19): an object created without them
+    // reads all three TRUE, and can be copied, changed and destroyed.
+    internal static void Assert_StorageControls_DefaultToTrue(IPkcs11Backend backend)
+    {
+        WithSession(backend, session =>
+        {
+            ObjectHandle data = CreateDataObject(session, "kl-defaults", [0x01]);
+            bool destroyed = false;
+            try
+            {
+                using (var read = session.GetAttributeValue(data, [CKA.CKA_MODIFIABLE, CKA.CKA_COPYABLE, CKA.CKA_DESTROYABLE]))
+                {
+                    Assert.True(read[0].GetValueAsBool(), "CKA_MODIFIABLE defaulted to FALSE.");
+                    Assert.True(read[1].GetValueAsBool(), "CKA_COPYABLE defaulted to FALSE.");
+                    Assert.True(read[2].GetValueAsBool(), "CKA_DESTROYABLE defaulted to FALSE.");
+                }
+                using var copyLabel = new ObjectAttribute(CKA.CKA_LABEL, "kl-defaults-copy");
+                session.DestroyObject(session.CopyObject(data, [copyLabel]));
+                using var label = new ObjectAttribute(CKA.CKA_LABEL, "kl-defaults-changed");
+                Set(session, data, label);
+                session.DestroyObject(data);
+                destroyed = true;
+            }
+            finally
+            {
+                if (!destroyed)
+                    session.DestroyObject(data);
+            }
+        });
+    }
 }

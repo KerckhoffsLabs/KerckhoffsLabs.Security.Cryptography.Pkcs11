@@ -172,6 +172,16 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the malformed attribute case: see <see cref="CratonHsmRefusesMalformedAttributeValues"/>.</summary>
     public static bool MalformedAttributeRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesMalformedAttributeValues;
 
+    /// <summary>
+    /// False while <c>CKA_COPYABLE</c> is ignored: an object created with <c>CKA_COPYABLE = FALSE</c> reads it back
+    /// TRUE and <c>C_CopyObject</c> copies it. PKCS#11 v3.2 §4.1.3 and Table 19: <c>C_CopyObject</c> of such an
+    /// object answers <c>CKR_ACTION_PROHIBITED</c>.
+    /// </summary>
+    public const bool CratonHsmKeepsCkaCopyable = false;
+
+    /// <summary>Gate for the CKA_COPYABLE cases: see <see cref="CratonHsmKeepsCkaCopyable"/>.</summary>
+    public static bool CopyableAvailable => CratonHsmAvailable && CratonHsmKeepsCkaCopyable;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

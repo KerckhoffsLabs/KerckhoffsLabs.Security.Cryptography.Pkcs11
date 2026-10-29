@@ -224,6 +224,17 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the malformed attribute case: see <see cref="BouncyHsmRefusesMalformedAttributeValues"/>.</summary>
     public static bool MalformedAttributeRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesMalformedAttributeValues;
 
+    /// <summary>
+    /// False while <c>C_SetAttributeValue(CKA_COPYABLE = TRUE)</c> on an object created with
+    /// <c>CKA_COPYABLE = FALSE</c> answers <c>CKR_OK</c> and makes it copyable again. PKCS#11 v3.2 Table 19:
+    /// CKA_COPYABLE "Can't be set to TRUE once it is set to FALSE". Not yet reported upstream.
+    /// BouncyHsmQuirkTests.CopyableUndone_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmKeepsCkaCopyableFalse = false;
+
+    /// <summary>Gate for the CKA_COPYABLE one-way case: see <see cref="BouncyHsmKeepsCkaCopyableFalse"/>.</summary>
+    public static bool CopyableOneWayAvailable => BouncyHsmAvailable && BouncyHsmKeepsCkaCopyableFalse;
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;
