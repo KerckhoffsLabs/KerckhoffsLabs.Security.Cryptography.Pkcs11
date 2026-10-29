@@ -60,16 +60,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void Sp800108DoublePipeline_QuirkStillPresent()
-    {
-        byte[] actual = Sp800108ChainedKdfTestCases.DeriveDoublePipeline(_backend);
-
-        Assert.False(actual.AsSpan().SequenceEqual(Sp800108ChainedKdfTestCases.ReferenceDoublePipeline()),
-            "CKM_SP800_108_DOUBLE_PIPELINE_KDF now matches SP 800-108 §5.3: set " +
-            "BouncyHsmBackendFixture.BouncyHsmDoublePipelineMatchesSp800108 to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Sp800108AdditionalKey_QuirkStillPresent()
     {
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Sp800108ChainedKdfTestCases.Assert_Counter_AdditionalDerivedKey_TakesTheNextBytes(_backend));
