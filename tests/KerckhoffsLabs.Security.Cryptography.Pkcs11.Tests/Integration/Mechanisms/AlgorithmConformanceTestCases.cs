@@ -515,8 +515,9 @@ internal static class AlgorithmConformanceTestCases
     // token key are refused, with CKR_DATA_LEN_RANGE, or CKR_SIGNATURE_INVALID from a module that checks the
     // signature against the data as given, and the refusal ends the operation (§5.15.2). The token key then
     // verifies the right data at once: a module that kept the key locked on the error would hang or refuse it.
+    // A backend without token objects runs it with a session key pair.
     internal static void Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(IPkcs11Backend backend) =>
-        WithRawRsa(backend, onToken: true, (lowLevel, sid, pub, priv) =>
+        WithRawRsa(backend, onToken: backend.SupportsTokenObjects, (lowLevel, sid, pub, priv) =>
         {
             byte[] m = RawRsaBlock();
             byte[] signature = RawRsaSign(lowLevel, sid, priv, m);
