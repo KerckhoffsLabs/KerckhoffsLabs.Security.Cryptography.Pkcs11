@@ -76,6 +76,16 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool FreeHsmRefusesTokenObjectCopiesInReadOnlySessions = false;
 
+    /// <summary>
+    /// False while a sensitive RSA private key answers <c>C_GetAttributeValue</c> of <c>CKA_PRIVATE_EXPONENT</c>,
+    /// <c>CKA_PRIME_1</c>, <c>CKA_PRIME_2</c>, <c>CKA_EXPONENT_1</c>, <c>CKA_EXPONENT_2</c> and <c>CKA_COEFFICIENT</c>
+    /// with <c>CKR_ATTRIBUTE_TYPE_INVALID</c>, as if the key had no such attribute, where PKCS#11 v3.2 §5.7.5 has
+    /// <c>CKR_ATTRIBUTE_SENSITIVE</c> for a value the key holds but may not reveal (§6.1.3, footnote 7). The
+    /// value is not revealed: <c>ulValueLen</c> is <c>CK_UNAVAILABLE_INFORMATION</c>. A sensitive EC key's
+    /// <c>CKA_VALUE</c> answers <c>CKR_ATTRIBUTE_SENSITIVE</c>.
+    /// </summary>
+    public const bool FreeHsmReportsRsaPrivatePartsAsSensitive = false;
+
     /// <summary>Gate for the SO private-object case: see <see cref="FreeHsmRefusesPrivateObjectsToTheSo"/>.</summary>
     public static bool SoPrivateObjectRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesPrivateObjectsToTheSo;
 

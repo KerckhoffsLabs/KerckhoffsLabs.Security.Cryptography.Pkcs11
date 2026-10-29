@@ -107,6 +107,18 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmReportsTheMechanismCountOnAShortList = false;
 
+    /// <summary>
+    /// False while a sensitive ML-DSA or ML-KEM private key reveals its secret: with <c>CKA_SENSITIVE = TRUE</c>,
+    /// <c>C_GetAttributeValue</c> of an ML-DSA key's <c>CKA_VALUE</c> and <c>CKA_SEED</c>, and of an ML-KEM key's
+    /// <c>CKA_VALUE</c>, answers <c>CKR_OK</c> and returns the private key. <c>MlDsaPrivateKeyObject</c> and
+    /// <c>MlKemPrivateKeyObject</c> (and <c>SlhDsaPrivateKeyObject</c>) do not override
+    /// <c>IsSensitiveAttribute</c>, which the RSA, EC, EdDSA and Montgomery private keys do. PKCS#11 v3.2 §6.67.3
+    /// and §6.68.3, footnote 7: these attributes cannot be revealed while the key is sensitive (§5.7.5:
+    /// <c>CKR_ATTRIBUTE_SENSITIVE</c>, <c>ulValueLen</c> = <c>CK_UNAVAILABLE_INFORMATION</c>). Not yet reported
+    /// upstream. BouncyHsmQuirkTests.SensitivePqcPrivateKey_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmHidesSensitivePqcPrivateKeys = false;
+
     /// <summary>Gate for the short mechanism list case: see <see cref="BouncyHsmReportsTheMechanismCountOnAShortList"/>.</summary>
     public static bool ShortMechanismListAvailable => BouncyHsmAvailable && BouncyHsmReportsTheMechanismCountOnAShortList;
 

@@ -61,4 +61,8 @@ public sealed class ObjectConformanceTests_WolfPkcs11(WolfPkcs11BackendFixture b
         ObjectConformanceTestCases.Assert_MalformedTemplate_CreatesNothing(
             _backend, malformed, [CKR.CKR_TEMPLATE_INCOMPLETE], acceptedByTheBackend: malformed == "an AES key of 13 bytes");
     }
+
+    [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void SensitivePrivateKey_HidesItsSecretParts(string keyType) => ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
 }

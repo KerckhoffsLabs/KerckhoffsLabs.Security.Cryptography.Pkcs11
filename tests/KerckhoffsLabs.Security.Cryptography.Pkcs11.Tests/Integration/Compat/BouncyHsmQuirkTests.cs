@@ -156,4 +156,26 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"C_GetMechanismList into a list one short no longer leaves *pulCount as given (got {rv}, {reported} of {count}): set " +
             "BouncyHsmBackendFixture.BouncyHsmReportsTheMechanismCountOnAShortList to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SensitivePqcPrivateKey_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        CKR rv;
+        ulong length;
+        try
+        {
+            var (publicKey, privateKey) = TestKeys.GenerateMlDsaKeyPair(session, CkpMlDsa.CKP_ML_DSA_44);
+            CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_VALUE }];
+            rv = _backend.Library.LowLevelLibrary!.C_GetAttributeValue((NativeCULong)session.SessionId, (NativeCULong)privateKey.ObjectId, template);
+            length = (ulong)template[0].valueLen;
+            session.DestroyObject(privateKey);
+            session.DestroyObject(publicKey);
+        }
+        finally { session.Logout(); }
+
+        Assert.True(rv == CKR.CKR_OK && length != CK.CK_UNAVAILABLE_INFORMATION,
+            $"A sensitive ML-DSA private key no longer reveals the length of its CKA_VALUE (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmHidesSensitivePqcPrivateKeys to true and delete this test.");
+    }
 }

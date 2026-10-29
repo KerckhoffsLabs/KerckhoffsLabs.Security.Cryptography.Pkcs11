@@ -62,4 +62,13 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
         // FreeHSM creates an AES key of 13 bytes.
         ObjectConformanceTestCases.Assert_MalformedTemplate_CreatesNothing(_backend, malformed, acceptedByTheBackend: malformed == "an AES key of 13 bytes");
     }
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void SensitivePrivateKey_HidesItsSecretParts(string keyType)
+    {
+        if (keyType == "RSA" && !FreeHsmBackendFixture.FreeHsmReportsRsaPrivatePartsAsSensitive)
+            Assert.Skip("FreeHSM answers a sensitive RSA key's private exponent with CKR_ATTRIBUTE_TYPE_INVALID");
+        ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
+    }
 }

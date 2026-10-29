@@ -66,4 +66,8 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
         ObjectConformanceTestCases.Assert_MalformedTemplate_CreatesNothing(_backend, malformed,
             acceptedByTheBackend: malformed == "an AES key of 13 bytes", leavesAnObjectBehind: malformed == "an AES key with no value");
     }
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void SensitivePrivateKey_HidesItsSecretParts(string keyType) => ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
 }

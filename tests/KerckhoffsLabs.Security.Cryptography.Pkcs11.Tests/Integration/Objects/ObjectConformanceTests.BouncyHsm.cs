@@ -75,4 +75,13 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
         // BouncyHsm refuses an AES key with no value, or of 13 bytes, with CKR_GENERAL_ERROR.
         ObjectConformanceTestCases.Assert_MalformedTemplate_CreatesNothing(_backend, malformed, [CKR.CKR_GENERAL_ERROR]);
     }
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void SensitivePrivateKey_HidesItsSecretParts(string keyType)
+    {
+        if (keyType is "ML-DSA" or "ML-KEM" && !BouncyHsmBackendFixture.BouncyHsmHidesSensitivePqcPrivateKeys)
+            Assert.Skip("BouncyHsm reveals the CKA_VALUE of a sensitive ML-DSA or ML-KEM private key");
+        ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
+    }
 }

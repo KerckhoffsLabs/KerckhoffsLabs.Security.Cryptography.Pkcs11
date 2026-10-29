@@ -1,7 +1,11 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -341,6 +345,118 @@ internal static class ObjectConformanceTestCases
                 Assert.Equal((ulong)CKK.CKK_AES, read[3].GetValueAsUlong());
             }
             finally { session.DestroyObject(key); }
+        });
+    }
+
+    public static TheoryData<string> SensitivePrivateKeyTypes => ["RSA", "EC", "ML-DSA", "ML-KEM"];
+
+    // A private key generated CKA_SENSITIVE = TRUE does not reveal its secret parts (footnote 7 of the RSA, EC,
+    // ML-DSA and ML-KEM private key tables, §6.1.3, §6.3.4, §6.67.3, §6.68.3). Through the raw call, so that the
+    // module's own answer is seen: C_GetAttributeValue of each part alone, with pValue NULL and with a buffer
+    // large enough, answers CKR_ATTRIBUTE_SENSITIVE, sets ulValueLen to CK_UNAVAILABLE_INFORMATION and writes
+    // nothing into the buffer (§5.7.5, case 1, which comes before the NULL and the buffer cases). The parts the
+    // tables do not require a key to have (the RSA CRT values, the ML-DSA and ML-KEM seed) may instead be
+    // CKR_ATTRIBUTE_TYPE_INVALID, the answer for an attribute the key does not hold (case 2), with the same
+    // length. Then one read of every secret part, an attribute the key type does not have, CKA_LABEL and
+    // CKA_KEY_TYPE answers one of those two codes, marks the first ones unavailable and still fills the last two.
+    internal static void Assert_SensitivePrivateKey_HidesItsSecretParts(IPkcs11Backend backend, string keyType)
+    {
+        (CKM generation, CKK type, CKA[] required, CKA[] optional, CKA foreign) = keyType switch
+        {
+            "RSA" => (CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKK.CKK_RSA, (CKA[])[CKA.CKA_PRIVATE_EXPONENT],
+                (CKA[])[CKA.CKA_PRIME_1, CKA.CKA_PRIME_2, CKA.CKA_EXPONENT_1, CKA.CKA_EXPONENT_2, CKA.CKA_COEFFICIENT], CKA.CKA_EC_POINT),
+            "EC" => (CKM.CKM_EC_KEY_PAIR_GEN, CKK.CKK_EC, [CKA.CKA_VALUE], [], CKA.CKA_MODULUS),
+            "ML-DSA" => (CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKK.CKK_ML_DSA, [CKA.CKA_VALUE], [CKA.CKA_SEED], CKA.CKA_MODULUS),
+            _ => (CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKK.CKK_ML_KEM, [CKA.CKA_VALUE], [CKA.CKA_SEED], CKA.CKA_MODULUS),
+        };
+        backend.RequireMechanism(generation);
+        if (keyType == "ML-KEM")
+            backend.RequireMlKemParameterSet(1184); // ML-KEM-768
+
+        WithSession(backend, session =>
+        {
+            string label = $"kl-sensitive-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+            using var attrPublicUse = new ObjectAttribute(keyType == "ML-KEM" ? CKA.CKA_ENCAPSULATE : CKA.CKA_VERIFY, true);
+            using var attrPrivateUse = new ObjectAttribute(keyType == "ML-KEM" ? CKA.CKA_DECAPSULATE : CKA.CKA_SIGN, true);
+            using ObjectAttribute attrKeyParameter = keyType switch
+            {
+                "RSA" => new(CKA.CKA_MODULUS_BITS, 2048UL),
+                "EC" => new(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid),
+                "ML-DSA" => new(CKA.CKA_PARAMETER_SET, (ulong)CkpMlDsa.CKP_ML_DSA_44),
+                _ => new(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768),
+            };
+            session.GenerateKeyPair(new Mechanism(generation),
+                [attrToken, attrLabel, attrPublicUse, attrKeyParameter],
+                [attrToken, attrLabel, attrPrivateUse, attrSensitive], out ObjectHandle publicKey, out ObjectHandle privateKey);
+            try
+            {
+                Assert.True(ReadBool(session, privateKey, CKA.CKA_SENSITIVE), "The private key was generated with CKA_SENSITIVE = FALSE.");
+                LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+                var sid = (NativeCULong)session.SessionId;
+                var key = (NativeCULong)privateKey.ObjectId;
+                const int bufferLength = 8192; // above every secret part here: an ML-DSA-44 sk is 2560 bytes
+                IntPtr buffer = Marshal.AllocHGlobal(bufferLength);
+                try
+                {
+                    foreach (CKA part in required.Concat(optional))
+                    {
+                        CKR[] accepted = required.Contains(part) ? [CKR.CKR_ATTRIBUTE_SENSITIVE] : [CKR.CKR_ATTRIBUTE_SENSITIVE, CKR.CKR_ATTRIBUTE_TYPE_INVALID];
+                        CK_ATTRIBUTE[] lengthQuery = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)part }];
+                        CKR rv = lowLevel.C_GetAttributeValue(sid, key, lengthQuery);
+                        Assert.True(accepted.Contains(rv), $"{keyType} {part}, pValue NULL: C_GetAttributeValue returned {rv}.");
+                        Assert.True((ulong)lengthQuery[0].valueLen == CK.CK_UNAVAILABLE_INFORMATION,
+                            $"{keyType} {part}, pValue NULL: ulValueLen is {(ulong)lengthQuery[0].valueLen}, not CK_UNAVAILABLE_INFORMATION.");
+
+                        Marshal.Copy(new byte[bufferLength], 0, buffer, bufferLength);
+                        CK_ATTRIBUTE[] read = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)part, value = buffer, valueLen = (NativeCULong)(ulong)bufferLength }];
+                        rv = lowLevel.C_GetAttributeValue(sid, key, read);
+                        Assert.True(accepted.Contains(rv), $"{keyType} {part}, with a buffer: C_GetAttributeValue returned {rv}.");
+                        Assert.True((ulong)read[0].valueLen == CK.CK_UNAVAILABLE_INFORMATION,
+                            $"{keyType} {part}, with a buffer: ulValueLen is {(ulong)read[0].valueLen}, not CK_UNAVAILABLE_INFORMATION.");
+                        byte[] written = new byte[bufferLength];
+                        Marshal.Copy(buffer, written, 0, bufferLength);
+                        Assert.True(written.All(b => b == 0), $"{keyType} {part}: the module wrote into the buffer of a value it may not reveal.");
+                    }
+
+                    // The mixed read: each attribute in its own slice of the buffer.
+                    CKA[] hidden = [.. required, .. optional, foreign];
+                    const int slice = 512;
+                    int sliceCount = hidden.Length + 2;
+                    Assert.True(sliceCount * slice <= bufferLength);
+                    CK_ATTRIBUTE[] mixed = [.. hidden.Append(CKA.CKA_LABEL).Append(CKA.CKA_KEY_TYPE).Select((attribute, i) => new CK_ATTRIBUTE
+                    {
+                        type = (NativeCULong)(ulong)attribute,
+                        value = buffer + (i * slice),
+                        valueLen = (NativeCULong)(ulong)slice,
+                    })];
+                    CKR mixedRv = lowLevel.C_GetAttributeValue(sid, key, mixed);
+                    Assert.True(mixedRv is CKR.CKR_ATTRIBUTE_SENSITIVE or CKR.CKR_ATTRIBUTE_TYPE_INVALID, $"{keyType} mixed read: C_GetAttributeValue returned {mixedRv}.");
+                    for (int i = 0; i < hidden.Length; i++)
+                    {
+                        Assert.True((ulong)mixed[i].valueLen == CK.CK_UNAVAILABLE_INFORMATION,
+                            $"{keyType} mixed read: {hidden[i]}'s ulValueLen is {(ulong)mixed[i].valueLen}, not CK_UNAVAILABLE_INFORMATION.");
+                    }
+                    byte[] labelBytes = System.Text.Encoding.UTF8.GetBytes(label);
+                    Assert.True((ulong)mixed[^2].valueLen == (ulong)labelBytes.Length, $"{keyType} mixed read: CKA_LABEL's ulValueLen is {(ulong)mixed[^2].valueLen}.");
+                    byte[] readLabel = new byte[labelBytes.Length];
+                    Marshal.Copy(mixed[^2].value, readLabel, 0, readLabel.Length);
+                    Assert.Equal(labelBytes, readLabel);
+                    int ulongSize = Unsafe.SizeOf<NativeCULong>();
+                    Assert.True((ulong)mixed[^1].valueLen == (ulong)ulongSize, $"{keyType} mixed read: CKA_KEY_TYPE's ulValueLen is {(ulong)mixed[^1].valueLen}.");
+                    byte[] readType = new byte[ulongSize];
+                    Marshal.Copy(mixed[^1].value, readType, 0, ulongSize);
+                    Assert.Equal((ulong)type, (ulong)MemoryMarshal.Read<NativeCULong>(readType));
+                }
+                finally { Marshal.FreeHGlobal(buffer); }
+            }
+            finally
+            {
+                session.DestroyObject(privateKey);
+                session.DestroyObject(publicKey);
+            }
         });
     }
 
