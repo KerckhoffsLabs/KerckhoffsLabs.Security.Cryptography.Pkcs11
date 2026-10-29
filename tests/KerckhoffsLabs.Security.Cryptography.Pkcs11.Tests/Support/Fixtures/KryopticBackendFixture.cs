@@ -149,6 +149,14 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool KryopticRefusesANullAttributeValue = false;
 
+    /// <summary>
+    /// False while <c>CKM_ECDH1_DERIVE</c> gives the derived key <c>CKA_ALWAYS_SENSITIVE = TRUE</c> from a base
+    /// key whose <c>CKA_ALWAYS_SENSITIVE</c> is FALSE (an EC private key imported sensitive with
+    /// <c>C_CreateObject</c>). PKCS#11 v3.2 §6.3.17: "If the base key has its CKA_ALWAYS_SENSITIVE attribute set to
+    /// CK_FALSE, then the derived key will as well." <c>CKM_HKDF_DERIVE</c> follows the rule.
+    /// </summary>
+    public const bool KryopticDerivesAnEcdhKeysHistoryFromTheBase = false;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();
