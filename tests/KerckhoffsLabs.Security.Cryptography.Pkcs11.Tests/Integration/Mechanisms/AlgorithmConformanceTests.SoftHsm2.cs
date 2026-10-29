@@ -111,4 +111,8 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.PrivateKeyDigestRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 digests an EC private key's scalar")]
     public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.OperationStateMisuses), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void OperationState_Misuse_IsRefused(string misuse) => AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
 }

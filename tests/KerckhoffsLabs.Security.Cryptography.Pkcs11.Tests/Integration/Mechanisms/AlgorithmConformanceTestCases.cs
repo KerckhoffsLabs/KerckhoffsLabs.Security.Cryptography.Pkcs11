@@ -25,7 +25,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// variants other than pure Ed25519; ECDSA on the curves the rest of the suite does not reach; the 224-bit
 /// digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on X448; HKDF with SHA-512 and
 /// with a salt key; SHA-256 key derivation; AES key wrap's IV and integrity check; ML-KEM and HashML-DSA under
-/// the wrong key or hash; and a saved digest state.
+/// the wrong key or hash; and a saved digest state, with the refusals of saving and restoring one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -1074,6 +1074,82 @@ internal static class AlgorithmConformanceTestCases
             byte[] own = new byte[32];
             Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestFinal(sid, own, lengthOnly: false, out _));
             Assert.Equal(SHA256.HashData(part1), own);
+        });
+    }
+
+    public static TheoryData<string> OperationStateMisuses =>
+    [
+        "save with no operation", "restore random bytes", "restore a truncated state",
+        "restore with an encryption key", "restore with an authentication key",
+    ];
+
+    // The refusals §5.6.6 and §5.6.7 name, for a SHA-256 digest's state saved after one part:
+    // C_GetOperationState with no operation active answers CKR_OPERATION_NOT_INITIALIZED; C_SetOperationState of
+    // random bytes of the saved state's length, or of the state cut by its last byte, answers
+    // CKR_SAVED_STATE_INVALID; and restoring it with an encryption or authentication key, which a digest does
+    // not use, answers CKR_KEY_NOT_NEEDED (§5.1.6). Both functions are optional: a module without them answers
+    // CKR_FUNCTION_NOT_SUPPORTED, and the rows that need a saved state skip where the module cannot save one
+    // (CKR_STATE_UNSAVEABLE), as DigestState_SavedAndRestored records per backend; there the random bytes are
+    // 64. Whether a refused restore
+    // leaves the session's operation as it was is not stated, so only the code is asserted. The state is
+    // restored into the session that saved it.
+    internal static void Assert_OperationState_Misuse_IsRefused(IPkcs11Backend backend, string misuse)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        WithSession(backend, session =>
+        {
+            var sid = (NativeCULong)session.SessionId;
+            if (misuse == "save with no operation")
+            {
+                CKR none = lowLevel.C_GetOperationState(sid, default, lengthOnly: true, out _);
+                Assert.True(none is CKR.CKR_OPERATION_NOT_INITIALIZED or CKR.CKR_FUNCTION_NOT_SUPPORTED,
+                    $"C_GetOperationState with no operation active returned {none}.");
+                return;
+            }
+
+            using (var scope = new MechanismParameterScope())
+            {
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256).Marshal(scope, out _);
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestInit(sid, in mech));
+            }
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestUpdate(sid, Message));
+            CKR rv = lowLevel.C_GetOperationState(sid, default, lengthOnly: true, out NativeCULong length);
+            if (misuse == "restore random bytes" && rv is CKR.CKR_FUNCTION_NOT_SUPPORTED or CKR.CKR_STATE_UNSAVEABLE)
+            {
+                // No state to take the length of: 64 random bytes, refused as invalid by a module that has the
+                // function, or as not supported by one that has neither.
+                CKR random = lowLevel.C_SetOperationState(sid, RandomNumberGenerator.GetBytes(64), default, default);
+                Assert.True(random is CKR.CKR_SAVED_STATE_INVALID or CKR.CKR_FUNCTION_NOT_SUPPORTED,
+                    $"C_SetOperationState of 64 random bytes returned {random} (C_GetOperationState returned {rv}).");
+                return;
+            }
+            if (rv is CKR.CKR_FUNCTION_NOT_SUPPORTED or CKR.CKR_STATE_UNSAVEABLE)
+                Assert.Skip($"The module does not save a digest's state ({rv}).");
+            Assert.Equal(CKR.CKR_OK, rv);
+            byte[] state = new byte[(int)(ulong)length];
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_GetOperationState(sid, state, lengthOnly: false, out length));
+            state = state[..(int)(ulong)length];
+
+            ObjectHandle aes = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            ObjectHandle mac = TestKeys.CreateGenericSecretKey(session, RandomNumberGenerator.GetBytes(32));
+            try
+            {
+                (CKR expected, CKR restored) = misuse switch
+                {
+                    "restore random bytes" => (CKR.CKR_SAVED_STATE_INVALID,
+                        lowLevel.C_SetOperationState(sid, RandomNumberGenerator.GetBytes(state.Length), default, default)),
+                    "restore a truncated state" => (CKR.CKR_SAVED_STATE_INVALID,
+                        lowLevel.C_SetOperationState(sid, state.AsSpan(0, state.Length - 1), default, default)),
+                    "restore with an encryption key" => (CKR.CKR_KEY_NOT_NEEDED,
+                        lowLevel.C_SetOperationState(sid, state, (NativeCULong)aes.ObjectId, default)),
+                    "restore with an authentication key" => (CKR.CKR_KEY_NOT_NEEDED,
+                        lowLevel.C_SetOperationState(sid, state, default, (NativeCULong)mac.ObjectId)),
+                    _ => throw new ArgumentOutOfRangeException(nameof(misuse), misuse, null),
+                };
+                Assert.True(restored == expected, $"C_SetOperationState ({misuse}) was expected to return {expected} but returned {restored}.");
+            }
+            finally { session.DestroyObject(mac); session.DestroyObject(aes); }
         });
     }
 }

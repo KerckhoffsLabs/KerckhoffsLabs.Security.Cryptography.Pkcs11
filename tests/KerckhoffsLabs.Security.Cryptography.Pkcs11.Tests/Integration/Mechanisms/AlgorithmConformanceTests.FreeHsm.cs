@@ -95,4 +95,8 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.OperationStateMisuses), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void OperationState_Misuse_IsRefused(string misuse) => AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
 }

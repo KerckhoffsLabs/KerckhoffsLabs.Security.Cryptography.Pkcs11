@@ -221,6 +221,14 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the tampered AES key wrap case: see <see cref="CratonHsmReportsATamperedKeyWrapBlobAsInvalid"/>.</summary>
     public static bool TamperedKeyWrapRefusalAvailable => CratonHsmAvailable && CratonHsmReportsATamperedKeyWrapBlobAsInvalid;
 
+    /// <summary>
+    /// False while <c>C_SetOperationState</c> of a saved SHA-256 digest state with an encryption or authentication
+    /// key handle, which a digest does not use, answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6 and §5.6.7:
+    /// <c>CKR_KEY_NOT_NEEDED</c> ("an attempt was made to restore a session that had been performing a message
+    /// digesting operation, and an encryption key was supplied").
+    /// </summary>
+    public const bool CratonHsmRefusesAKeyNotNeeded = false;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

@@ -105,4 +105,13 @@ public sealed class AlgorithmConformanceTests_CratonHsm(CratonHsmBackendFixture 
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.OperationStateMisuses), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void OperationState_Misuse_IsRefused(string misuse)
+    {
+        if (misuse.StartsWith("restore with an", StringComparison.Ordinal) && !CratonHsmBackendFixture.CratonHsmRefusesAKeyNotNeeded)
+            Assert.Skip("Craton HSM restores a digest state given a key it does not need");
+        AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
+    }
 }

@@ -96,4 +96,8 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.PrivateKeyDigestRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers C_DigestKey of a private key with CKR_KEY_HANDLE_INVALID")]
     public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.OperationStateMisuses), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void OperationState_Misuse_IsRefused(string misuse) => AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
 }
