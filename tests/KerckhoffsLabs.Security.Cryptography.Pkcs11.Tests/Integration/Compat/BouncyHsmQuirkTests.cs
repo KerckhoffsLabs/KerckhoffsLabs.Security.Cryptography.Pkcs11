@@ -240,4 +240,89 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
             "BouncyHsmBackendFixture.BouncyHsmChecksTheKeyPairTemplatesClassAndKeyType to true and delete this test.");
     }
+
+    private static ObjectHandle CreateDataObject(Pkcs11SessionCore session, bool isPrivate = false)
+    {
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, isPrivate);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, (byte[])[0x01]);
+        return session.CreateObject([attrClass, attrToken, attrPrivate, attrValue]);
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void CopyUniqueId_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        byte[] original, copied;
+        try
+        {
+            ObjectHandle data = CreateDataObject(session);
+            ObjectHandle copy = session.CopyObject(data, []);
+            using (var read = session.GetAttributeValue(data, [CKA.CKA_UNIQUE_ID]))
+                original = read[0].GetValueAsByteArray();
+            using (var read = session.GetAttributeValue(copy, [CKA.CKA_UNIQUE_ID]))
+                copied = read[0].GetValueAsByteArray();
+            session.DestroyObject(copy);
+            session.DestroyObject(data);
+        }
+        finally { session.Logout(); }
+
+        Assert.True(original.AsSpan().SequenceEqual(copied),
+            "A copy no longer has the original's CKA_UNIQUE_ID: set " +
+            "BouncyHsmBackendFixture.BouncyHsmGivesACopyItsOwnUniqueId to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void KeyMaterialChange_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, new byte[32]);
+        byte[] replacement = [.. Enumerable.Repeat((byte)0x07, 32)];
+        using var attrReplacement = new ObjectAttribute(CKA.CKA_VALUE, replacement);
+        Exception? ex;
+        byte[] after;
+        try
+        {
+            ObjectHandle key = session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrValue]);
+            ex = Record.Exception(() => session.SetAttributeValue(key, [attrReplacement]));
+            using (var read = session.GetAttributeValue(key, [CKA.CKA_VALUE]))
+                after = read[0].GetValueAsByteArray();
+            session.DestroyObject(key);
+        }
+        finally { session.Logout(); }
+
+        Assert.True(ex is null && after.AsSpan().SequenceEqual(replacement),
+            "C_SetAttributeValue no longer changes an AES key's CKA_VALUE " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "value unchanged"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmFixesKeyMaterial to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void PrivateFlagChange_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        Exception? ex;
+        bool after;
+        try
+        {
+            ObjectHandle data = CreateDataObject(session, isPrivate: false);
+            ex = Record.Exception(() => session.SetAttributeValue(data, [attrPrivate]));
+            using (var read = session.GetAttributeValue(data, [CKA.CKA_PRIVATE]))
+                after = read[0].GetValueAsBool();
+            session.DestroyObject(data);
+        }
+        finally { session.Logout(); }
+
+        Assert.True(ex is null && after,
+            "C_SetAttributeValue no longer makes a public object private " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "flag unchanged"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmFixesThePrivateAndModifiableFlags to true and delete this test.");
+    }
 }

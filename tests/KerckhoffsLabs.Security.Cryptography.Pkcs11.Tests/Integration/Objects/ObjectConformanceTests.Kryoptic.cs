@@ -9,7 +9,7 @@ public sealed class ObjectConformanceTests_Kryoptic(KryopticBackendFixture backe
 {
     private readonly KryopticBackendFixture _backend = backend;
 
-    public static TheoryData<CKA> ReadOnlyKeyAttributesHere => [CKA.CKA_LOCAL, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE, CKA.CKA_KEY_GEN_MECHANISM];
+    public static TheoryData<CKA> ReadOnlyKeyAttributesHere => [CKA.CKA_LOCAL, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE, CKA.CKA_KEY_GEN_MECHANISM, CKA.CKA_TOKEN, CKA.CKA_PRIVATE, CKA.CKA_MODIFIABLE];
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void SetAttributeValue_LabelAndId_RoundTrip() => ObjectConformanceTestCases.Assert_SetAttributeValue_LabelAndId_RoundTrip(_backend);
@@ -71,4 +71,20 @@ public sealed class ObjectConformanceTests_Kryoptic(KryopticBackendFixture backe
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
     public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent) => ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.UniqueIdRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic refuses a caller's CKA_UNIQUE_ID with CKR_ATTRIBUTE_TYPE_INVALID or CKR_ACTION_PROHIBITED")]
+    public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.KeyComponents), MemberType = typeof(ObjectConformanceTestCases))]
+    public void KeyComponent_IsReadOnly(string component)
+    {
+        if (component.StartsWith("AES", StringComparison.Ordinal) && !KryopticBackendFixture.KryopticFixesASecretKeysValue)
+            Assert.Skip("Kryoptic lets C_SetAttributeValue and C_CopyObject change an AES key's CKA_VALUE");
+        ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+    }
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in C_GenerateKey")]
+    [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
+    public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 }

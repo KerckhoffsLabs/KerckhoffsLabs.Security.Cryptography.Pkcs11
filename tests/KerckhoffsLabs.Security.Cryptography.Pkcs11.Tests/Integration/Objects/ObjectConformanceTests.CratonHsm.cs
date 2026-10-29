@@ -85,4 +85,15 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.InconsistentTemplateRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM makes objects whose class or key type contradicts the mechanism")]
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
     public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent) => ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.KeyComponents), MemberType = typeof(ObjectConformanceTestCases))]
+    public void KeyComponent_IsReadOnly(string component) => ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in a template")]
+    [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
+    public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 }

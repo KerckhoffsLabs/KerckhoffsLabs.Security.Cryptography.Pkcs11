@@ -102,11 +102,16 @@ internal static class ObjectConformanceTestCases
     }
 
     public static TheoryData<CKA> ReadOnlyKeyAttributes =>
-        [CKA.CKA_CLASS, CKA.CKA_KEY_TYPE, CKA.CKA_LOCAL, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE, CKA.CKA_KEY_GEN_MECHANISM, CKA.CKA_VALUE_LEN];
+    [
+        CKA.CKA_CLASS, CKA.CKA_KEY_TYPE, CKA.CKA_LOCAL, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE, CKA.CKA_KEY_GEN_MECHANISM, CKA.CKA_VALUE_LEN,
+        CKA.CKA_TOKEN, CKA.CKA_PRIVATE, CKA.CKA_MODIFIABLE,
+    ];
 
     // An attribute a module derives, or that fixes what the object is, cannot be set after creation
     // (§4.1, Table 7 footnote 4): the call is refused with CKR_ATTRIBUTE_READ_ONLY and the attribute reads as
-    // it did. ignored records a backend that returns CKR_OK and leaves the attribute as it was.
+    // it did. CKA_TOKEN, CKA_PRIVATE and CKA_MODIFIABLE change only in a copy (§4.4: "Only the CKA_LABEL
+    // attribute can be modified after the object is created"; §4.1.3). ignored records a backend that returns
+    // CKR_OK and leaves the attribute as it was.
     internal static void Assert_SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(IPkcs11Backend backend, CKA attribute, bool ignored = false)
     {
         backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
@@ -752,5 +757,173 @@ internal static class ObjectConformanceTestCases
                 created.Add(privateKey);
             }
         });
+    }
+
+    // === Read-only attributes ==================================================
+
+    // The token gives every object a CKA_UNIQUE_ID of its own, and nobody else can (§4.4.1): two objects and
+    // a copy of one have non-empty, distinct values, and a CKA_UNIQUE_ID in the template of C_CreateObject or
+    // C_CopyObject, or in C_SetAttributeValue, is refused with CKR_ATTRIBUTE_READ_ONLY, creating nothing and
+    // leaving the value as it was. Skips a token that does not report CKA_UNIQUE_ID (a PKCS#11 v2.40 one).
+    internal static void Assert_UniqueId_IsTheTokensAndReadOnly(IPkcs11Backend backend)
+    {
+        WithSession(backend, session =>
+        {
+            string label = $"kl-unique-id-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            ObjectHandle first = CreateDataObject(session, label + "-1", [0x01]);
+            ObjectHandle second = CreateDataObject(session, label + "-2", [0x02]);
+            var copies = new List<ObjectHandle>();
+            try
+            {
+                using var read = session.GetAttributeValue(first, [CKA.CKA_UNIQUE_ID]);
+                if (read[0].CannotBeRead)
+                    Assert.Skip("The backend does not report CKA_UNIQUE_ID.");
+                ObjectHandle copy = session.CopyObject(first, []);
+                copies.Add(copy);
+                byte[][] ids = [Read(session, first, CKA.CKA_UNIQUE_ID), Read(session, second, CKA.CKA_UNIQUE_ID), Read(session, copy, CKA.CKA_UNIQUE_ID)];
+                Assert.All(ids, id => Assert.NotEmpty(id));
+                Assert.Equal(3, ids.Select(Convert.ToHexString).Distinct().Count());
+
+                using var attrUniqueId = new ObjectAttribute(CKA.CKA_UNIQUE_ID, "kl-chosen-id");
+                var created = Assert.ThrowsAny<Pkcs11Exception>(() => copies.Add(CreateDataObject(session, label, [0x03], attrUniqueId)));
+                Assert.Equal(CKR.CKR_ATTRIBUTE_READ_ONLY, created.ReturnValue);
+                var copied = Assert.ThrowsAny<Pkcs11Exception>(() => copies.Add(session.CopyObject(first, [attrUniqueId, attrLabel])));
+                Assert.Equal(CKR.CKR_ATTRIBUTE_READ_ONLY, copied.ReturnValue);
+                var set = Assert.ThrowsAny<Pkcs11Exception>(() => Set(session, first, attrUniqueId));
+                Assert.Equal(CKR.CKR_ATTRIBUTE_READ_ONLY, set.ReturnValue);
+                Assert.Equal(ids[0], Read(session, first, CKA.CKA_UNIQUE_ID));
+                Assert.Empty(session.FindAllObjects([attrLabel]));
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in copies.Concat(session.FindAllObjects([attrLabel])).DistinctBy(h => h.ObjectId))
+                    session.DestroyObject(handle);
+                session.DestroyObject(second);
+                session.DestroyObject(first);
+            }
+        });
+    }
+
+    public static TheoryData<string> KeyComponents =>
+        ["AES CKA_VALUE", "RSA CKA_MODULUS", "RSA CKA_PUBLIC_EXPONENT", "EC CKA_EC_POINT", "AES CKA_VALUE in a copy"];
+
+    // A key's material is fixed once the key exists: CKA_VALUE of an AES key, CKA_MODULUS and
+    // CKA_PUBLIC_EXPONENT of an RSA public key and CKA_EC_POINT of an EC public key have no footnote 8 in their
+    // tables (§6.7, §6.1.2, §6.3.3), so C_SetAttributeValue of a new value is refused with
+    // CKR_ATTRIBUTE_READ_ONLY (§4.1.2, §4.1.1 point 3), and so is a new CKA_VALUE in the template of
+    // C_CopyObject, which may change only the modifiable attributes and four storage ones (§4.1.3). The value
+    // reads back as it was and no copy is made. Each key is imported non-sensitive, so its value can be read.
+    internal static void Assert_KeyComponent_IsReadOnly(IPkcs11Backend backend, string component)
+    {
+        WithSession(backend, session =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            string label = $"kl-component-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var rsa = RSA.Create(2048);
+            RSAParameters rsaKey = rsa.ExportParameters(includePrivateParameters: false);
+            using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            ECParameters ecKey = ecdsa.ExportParameters(includePrivateParameters: false);
+            using var other = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            ECParameters otherKey = other.ExportParameters(includePrivateParameters: false);
+
+            (ObjectHandle key, CKA attribute, byte[] changed) = component switch
+            {
+                "RSA CKA_MODULUS" => (TestKeys.ImportRsaPublicKey(session, rsaKey.Modulus!, rsaKey.Exponent!), CKA.CKA_MODULUS, RandomModulus()),
+                "RSA CKA_PUBLIC_EXPONENT" => (TestKeys.ImportRsaPublicKey(session, rsaKey.Modulus!, rsaKey.Exponent!), CKA.CKA_PUBLIC_EXPONENT, [0x03]),
+                "EC CKA_EC_POINT" => (TestKeys.ImportEcP256PublicKey(session, ecKey.Q.X!, ecKey.Q.Y!), CKA.CKA_EC_POINT, TestKeys.DerEcPoint(otherKey.Q.X!, otherKey.Q.Y!)),
+                _ => (CreateReadableAesKey(), CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32)),
+            };
+            try
+            {
+                byte[] original = Read(session, key, attribute);
+                using var attrChanged = new ObjectAttribute(attribute, changed);
+                Pkcs11Exception ex;
+                if (component.EndsWith(" in a copy", StringComparison.Ordinal))
+                    ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.DestroyObject(session.CopyObject(key, [attrChanged, attrLabel])));
+                else
+                    ex = Assert.ThrowsAny<Pkcs11Exception>(() => Set(session, key, attrChanged));
+                Assert.True(ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY, $"{component}: the change was refused with {ex.ReturnValue}, not CKR_ATTRIBUTE_READ_ONLY.");
+                Assert.Equal(original, Read(session, key, attribute));
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in session.FindAllObjects([attrLabel]))
+                    session.DestroyObject(handle);
+                session.DestroyObject(key);
+            }
+
+            ObjectHandle CreateReadableAesKey()
+            {
+                using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+                using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+                using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+                using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+                using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+                return session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrExtractable, attrEncrypt, attrValue]);
+            }
+
+            byte[] RandomModulus()
+            {
+                using var another = RSA.Create(2048);
+                return another.ExportParameters(includePrivateParameters: false).Modulus!;
+            }
+        });
+    }
+
+    public static TheoryData<string> ProvenanceInATemplate =>
+    [
+        "C_CreateObject with CKA_ALWAYS_SENSITIVE", "C_CreateObject with CKA_NEVER_EXTRACTABLE",
+        "C_GenerateKey with CKA_ALWAYS_SENSITIVE", "C_GenerateKey with CKA_NEVER_EXTRACTABLE",
+    ];
+
+    // CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE are the token's account of a key's history: footnotes 2
+    // and 4 of Table 30 say they MUST NOT be specified when the key is created or generated, and a template that
+    // gives a read-only attribute is refused with CKR_ATTRIBUTE_READ_ONLY (§4.1.1 point 3). Each template states
+    // the opposite of what the token would record (TRUE for an imported key, FALSE for a key generated sensitive
+    // and unextractable), so it cannot pass as a repeat of the module's own value (§4.1.1 point 6). Nothing is
+    // created. leavesAnObjectBehind records a backend that refuses the template but keeps the object it started.
+    internal static void Assert_ProvenanceAttributeInATemplate_IsReadOnly(IPkcs11Backend backend, string row, bool leavesAnObjectBehind = false)
+    {
+        bool generate = row.StartsWith("C_GenerateKey", StringComparison.Ordinal);
+        if (generate)
+            backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+        CKA attribute = row.EndsWith("CKA_ALWAYS_SENSITIVE", StringComparison.Ordinal) ? CKA.CKA_ALWAYS_SENSITIVE : CKA.CKA_NEVER_EXTRACTABLE;
+        WithSession(backend, session =>
+        {
+            string label = $"kl-provenance-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrProvenance = new ObjectAttribute(attribute, !generate);
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            {
+                ObjectHandle made = generate
+                    ? GenerateAesKey(session, attrLabel, attrProvenance)
+                    : CreateSensitiveAesKey(session, attrLabel, attrProvenance);
+                session.DestroyObject(made);
+            });
+            List<ObjectHandle> left = session.FindAllObjects([attrLabel]);
+            foreach (ObjectHandle handle in left)
+                session.DestroyObject(handle);
+            Assert.True(ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY, $"{row}: refused with {ex.ReturnValue}, not CKR_ATTRIBUTE_READ_ONLY.");
+            if (leavesAnObjectBehind)
+                Assert.NotEmpty(left);
+            else
+                Assert.Empty(left);
+        });
+    }
+
+    private static ObjectHandle CreateSensitiveAesKey(Pkcs11SessionCore session, params ObjectAttribute[] extra)
+    {
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        return session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrExtractable, attrEncrypt, attrValue, .. extra]);
     }
 }

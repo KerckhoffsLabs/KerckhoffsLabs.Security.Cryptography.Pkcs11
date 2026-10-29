@@ -109,6 +109,37 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the PIN length case: see <see cref="KryopticEnforcesItsMinimumPinLength"/>.</summary>
     public static bool PinLengthRangeAvailable => KryopticAvailable && KryopticEnforcesItsMinimumPinLength;
 
+    /// <summary>
+    /// False while a <c>CKA_UNIQUE_ID</c> from the caller is refused with other codes than
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>: <c>C_CreateObject</c> with one answers <c>CKR_ATTRIBUTE_TYPE_INVALID</c> and
+    /// <c>C_SetAttributeValue</c> of one <c>CKR_ACTION_PROHIBITED</c>; <c>C_CopyObject</c> answers
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>. PKCS#11 v3.2 §4.4.1: such operations "MUST fail" with
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>.
+    /// </summary>
+    public const bool KryopticRefusesAUniqueIdWithReadOnly = false;
+
+    /// <summary>
+    /// False while a secret key's <c>CKA_VALUE</c> can be changed: <c>C_SetAttributeValue</c> of a new
+    /// <c>CKA_VALUE</c> on a non-sensitive AES key, and <c>C_CopyObject</c> with one in the template, answer
+    /// <c>CKR_OK</c> and the key takes the new value. PKCS#11 v3.2 §6.7 (no footnote 8 on <c>CKA_VALUE</c>),
+    /// §4.1.2 and §4.1.3: <c>CKR_ATTRIBUTE_READ_ONLY</c>. RSA and EC public key material is refused.
+    /// </summary>
+    public const bool KryopticFixesASecretKeysValue = false;
+
+    /// <summary>
+    /// False while <c>CKA_ALWAYS_SENSITIVE</c> and <c>CKA_NEVER_EXTRACTABLE</c> in a template are not refused with
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>: <c>C_GenerateKey</c> takes either (with the opposite of what it would
+    /// record) and <c>C_CreateObject</c> answers <c>CKR_ATTRIBUTE_TYPE_INVALID</c>. PKCS#11 v3.2 §4.11 footnotes
+    /// 2 and 4 (MUST NOT be specified) and §4.1.1 point 3.
+    /// </summary>
+    public const bool KryopticRefusesProvenanceAttributesInATemplate = false;
+
+    /// <summary>Gate for the CKA_UNIQUE_ID case: see <see cref="KryopticRefusesAUniqueIdWithReadOnly"/>.</summary>
+    public static bool UniqueIdRefusalAvailable => KryopticAvailable && KryopticRefusesAUniqueIdWithReadOnly;
+
+    /// <summary>Gate for the provenance-in-a-template case: see <see cref="KryopticRefusesProvenanceAttributesInATemplate"/>.</summary>
+    public static bool ProvenanceTemplateRefusalAvailable => KryopticAvailable && KryopticRefusesProvenanceAttributesInATemplate;
+
     public KryopticBackendFixture()
     {
         string? libPath = Settings.KryopticLibraryPath ?? BuiltLibraryPath();

@@ -115,6 +115,25 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the inconsistent-template case: see <see cref="FreeHsmChecksTheTemplatesClassAndKeyType"/>.</summary>
     public static bool InconsistentTemplateRefusalAvailable => FreeHsmAvailable && FreeHsmChecksTheTemplatesClassAndKeyType;
 
+    /// <summary>
+    /// False while a change to a public key's material is refused with other codes than
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>: <c>C_SetAttributeValue</c> of <c>CKA_MODULUS</c> or
+    /// <c>CKA_PUBLIC_EXPONENT</c> on an RSA public key and of <c>CKA_EC_POINT</c> on an EC public key answers
+    /// <c>CKR_ATTRIBUTE_TYPE_INVALID</c>, and <c>C_CopyObject</c> with a new <c>CKA_VALUE</c>
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c>. PKCS#11 v3.2 §4.1.2, §4.1.3 and §4.1.1 point 3. The value is not changed.
+    /// </summary>
+    public const bool FreeHsmReportsKeyMaterialAsReadOnly = false;
+
+    /// <summary>
+    /// False while <c>CKA_ALWAYS_SENSITIVE</c> and <c>CKA_NEVER_EXTRACTABLE</c> in the template of
+    /// <c>C_CreateObject</c> or <c>C_GenerateKey</c> are taken with <c>CKR_OK</c>. PKCS#11 v3.2 §4.11 footnotes 2
+    /// and 4 (MUST NOT be specified) and §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>.
+    /// </summary>
+    public const bool FreeHsmRefusesProvenanceAttributesInATemplate = false;
+
+    /// <summary>Gate for the provenance-in-a-template case: see <see cref="FreeHsmRefusesProvenanceAttributesInATemplate"/>.</summary>
+    public static bool ProvenanceTemplateRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesProvenanceAttributesInATemplate;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

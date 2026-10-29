@@ -150,6 +150,16 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the inconsistent-template case: see <see cref="CratonHsmChecksTheTemplatesClassAndKeyType"/>.</summary>
     public static bool InconsistentTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmChecksTheTemplatesClassAndKeyType;
 
+    /// <summary>
+    /// False while <c>CKA_ALWAYS_SENSITIVE</c> and <c>CKA_NEVER_EXTRACTABLE</c> in the template of
+    /// <c>C_CreateObject</c> or <c>C_GenerateKey</c> are taken with <c>CKR_OK</c>. PKCS#11 v3.2 §4.11 footnotes 2
+    /// and 4 (MUST NOT be specified) and §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>.
+    /// </summary>
+    public const bool CratonHsmRefusesProvenanceAttributesInATemplate = false;
+
+    /// <summary>Gate for the provenance-in-a-template case: see <see cref="CratonHsmRefusesProvenanceAttributesInATemplate"/>.</summary>
+    public static bool ProvenanceTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesProvenanceAttributesInATemplate;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

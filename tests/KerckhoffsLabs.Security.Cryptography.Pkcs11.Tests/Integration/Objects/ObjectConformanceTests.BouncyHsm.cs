@@ -52,6 +52,8 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     {
         if (attribute == CKA.CKA_KEY_GEN_MECHANISM)
             Assert.Skip("BouncyHsm lets C_SetAttributeValue change CKA_KEY_GEN_MECHANISM.");
+        if (attribute is CKA.CKA_PRIVATE or CKA.CKA_MODIFIABLE && !BouncyHsmBackendFixture.BouncyHsmFixesThePrivateAndModifiableFlags)
+            Assert.Skip("BouncyHsm lets C_SetAttributeValue change CKA_PRIVATE and CKA_MODIFIABLE.");
         // BouncyHsm answers a change to CKA_CLASS with CKR_OK and leaves it as it was.
         ObjectConformanceTestCases.Assert_SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(_backend, attribute, ignored: attribute == CKA.CKA_CLASS);
     }
@@ -106,4 +108,15 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
             Assert.Skip("BouncyHsm generates an EC key pair whose templates give another class or key type");
         ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.UniqueIdAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives a copy the original's CKA_UNIQUE_ID")]
+    public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.KeyMaterialFixedAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm lets C_SetAttributeValue and C_CopyObject change a key's material")]
+    [MemberData(nameof(ObjectConformanceTestCases.KeyComponents), MemberType = typeof(ObjectConformanceTestCases))]
+    public void KeyComponent_IsReadOnly(string component) => ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
+    public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 }

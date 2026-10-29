@@ -85,4 +85,20 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.InconsistentTemplateRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM makes objects whose class or key type contradicts the mechanism")]
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
     public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent) => ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.KeyComponents), MemberType = typeof(ObjectConformanceTestCases))]
+    public void KeyComponent_IsReadOnly(string component)
+    {
+        if (component != "AES CKA_VALUE" && !FreeHsmBackendFixture.FreeHsmReportsKeyMaterialAsReadOnly)
+            Assert.Skip("FreeHSM refuses a change to public key material with CKR_ATTRIBUTE_TYPE_INVALID, a new CKA_VALUE in a copy with CKR_TEMPLATE_INCONSISTENT");
+        ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+    }
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in a template")]
+    [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
+    public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 }
