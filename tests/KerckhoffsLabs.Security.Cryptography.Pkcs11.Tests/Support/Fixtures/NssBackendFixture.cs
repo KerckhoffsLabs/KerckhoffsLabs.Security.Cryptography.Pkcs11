@@ -181,19 +181,35 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the cases that check <c>CKA_LOCAL</c> on a generated key.</summary>
     public static bool LocalOnGeneratedKeysAvailable => NssAvailable && SupportsLocalOnGeneratedKeys;
 
-    /// <summary>False while softoken refuses an HMAC key whose <c>CKA_SIGN</c> (<c>CKA_VERIFY</c>) is FALSE with
-    /// <c>CKR_KEY_TYPE_INCONSISTENT</c>, where PKCS#11 v3.2 §5.1.6 has <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c> for a
-    /// key of the right type whose attributes do not allow the use; AES keys get
-    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>. Recorded when KeyCapabilityEnforcementTestCases was first run on
-    /// NSS, which accepted any refusal then.</summary>
-    public static bool SupportsFunctionNotPermittedForMacKeys => false;
+    /// <summary>False while softoken refuses a key whose usage attribute is FALSE (<c>CKA_SIGN</c>, <c>CKA_VERIFY</c>,
+    /// <c>CKA_ENCRYPT</c>, <c>CKA_DECRYPT</c>, <c>CKA_VERIFY_RECOVER</c>) with <c>CKR_KEY_TYPE_INCONSISTENT</c>, where
+    /// PKCS#11 v3.2 §5.1.6 has <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c> for a key of the right type whose attributes do
+    /// not allow the use: <c>sftk_InitGeneric</c> in <c>lib/softoken/pkcs11c.c</c> answers the one code for a key of the
+    /// wrong class and for one without the usage. Recorded first for HMAC keys, when KeyCapabilityEnforcementTestCases
+    /// accepted any refusal; the AES and RSA rows were confirmed by a run at the pinned 34716626.</summary>
+    public static bool SupportsFunctionNotPermittedForKeyUsage => false;
 
-    /// <summary>Gate for the HMAC key-usage cases.</summary>
-    public static bool MacKeyUsageRefusalAvailable => NssAvailable && SupportsFunctionNotPermittedForMacKeys;
+    /// <summary>Gate for the key-usage cases that refuse with <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>: see
+    /// <see cref="SupportsFunctionNotPermittedForKeyUsage"/>.</summary>
+    public static bool KeyUsageRefusalAvailable => NssAvailable && SupportsFunctionNotPermittedForKeyUsage;
 
     // === Departures the wolfPKCS11-history cases found ======================
     // Each was confirmed by running the case on a softoken built from vendor/nss at the pinned 34716626, and none is
     // yet reported upstream. NSS needs no tripwire (see NssQuirkTests for the reported ones).
+
+    /// <summary>False while softoken refuses the usage attributes it does check only on some functions:
+    /// <c>C_SignRecoverInit</c> with <c>CKA_SIGN_RECOVER</c> FALSE answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssChecksCkaSignRecover = false;
+
+    /// <summary>False while <c>C_EncapsulateKey</c> with a public key whose <c>CKA_ENCAPSULATE</c> is FALSE, and
+    /// <c>C_DecapsulateKey</c> with a private key whose <c>CKA_DECAPSULATE</c> is FALSE, answer <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssChecksTheKemUsageAttributes = false;
+
+    /// <summary>False while <c>C_DeriveKey</c> (<c>CKM_HKDF_DERIVE</c>, <c>CKM_ECDH1_DERIVE</c>) from a base key whose
+    /// <c>CKA_DERIVE</c> is FALSE answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssChecksCkaDerive = false;
 
     /// <summary>False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> from an EC private key answers <c>CKR_OK</c>; HKDF
     /// takes a secret key (or a data object, §6.62.3). PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_TYPE_INCONSISTENT</c>.</summary>
@@ -311,6 +327,15 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the short attribute buffer case: see <see cref="NssChecksTheAttributeBufferLength"/>.</summary>
     public static bool AttributeBufferLengthAvailable => NssAvailable && NssChecksTheAttributeBufferLength;
+
+    /// <summary>Gate for the C_SignRecover usage case: see <see cref="NssChecksCkaSignRecover"/>.</summary>
+    public static bool SignRecoverUsageRefusalAvailable => NssAvailable && NssChecksCkaSignRecover;
+
+    /// <summary>Gate for the KEM usage cases: see <see cref="NssChecksTheKemUsageAttributes"/>.</summary>
+    public static bool KemUsageRefusalAvailable => NssAvailable && NssChecksTheKemUsageAttributes;
+
+    /// <summary>Gate for the CKA_DERIVE usage case: see <see cref="NssChecksCkaDerive"/>.</summary>
+    public static bool DeriveUsageRefusalAvailable => NssAvailable && NssChecksCkaDerive;
 
     /// <summary>Gate for the private-key C_DigestKey case: see <see cref="NssRefusesToDigestAPrivateKeyAsIndigestible"/>.</summary>
     public static bool PrivateKeyDigestRefusalAvailable => NssAvailable && NssRefusesToDigestAPrivateKeyAsIndigestible;
