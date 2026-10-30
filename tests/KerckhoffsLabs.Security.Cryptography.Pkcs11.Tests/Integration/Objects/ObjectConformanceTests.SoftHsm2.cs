@@ -111,6 +111,10 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
     [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
     public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
     {
+        // SoftHSM 2.5 reads a one-byte CKA_TOKEN without looking at the pointer (extractObjectInformation,
+        // src/lib/SoftHSM.cpp:240-244 at 2.5.0; 2.7 checks it), so the NULL one kills the process.
+        if (SoftHsmBackendFixture.IsV240Leg && malformed == "C_CreateObject with CKA_TOKEN NULL and ulValueLen 1")
+            Assert.Skip("SoftHSM 2.5 dereferences a NULL CKA_TOKEN of length 1 in C_CreateObject and crashes.");
         // SoftHSM2 refuses each malformed C_CreateObject template with the right code but leaves the object behind.
         ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed,
             leavesAnObjectBehind: malformed.StartsWith("C_CreateObject", StringComparison.Ordinal));
