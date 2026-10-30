@@ -326,6 +326,16 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.</summary>
     public const bool NssRefusesAnHkdfValueLenPastTheLimit = false;
 
+    /// <summary>False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a nine-byte
+    /// <c>CKA_PUBLIC_EXPONENT</c> (2^64 + 65537) answers <c>CKR_ARGUMENTS_BAD</c>. PKCS#11 v3.2 §6.1.4: the exponent is
+    /// copied from the template, or refused with <c>CKR_TEMPLATE_INCONSISTENT</c>.</summary>
+    public const bool NssTakesOrRefusesALongRsaExponent = false;
+
+    /// <summary>False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with <c>CKA_MODULUS_BITS</c> 2^32 + 2048
+    /// makes a 2048-bit key (the length is narrowed to 32 bits); softoken reports <c>ulMaxKeySize</c> 2^32 - 1.
+    /// PKCS#11 v3.2 §6.1.4, §5.1.6: a modulus above <c>ulMaxKeySize</c> is refused.</summary>
+    public const bool NssRefusesAnRsaModulusPastTheMaximum = false;
+
     /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
     public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
 
