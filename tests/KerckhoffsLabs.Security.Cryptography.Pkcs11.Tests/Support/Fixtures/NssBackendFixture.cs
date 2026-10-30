@@ -321,6 +321,11 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// the derived key's <c>CKA_ALWAYS_SENSITIVE</c> is its <c>CKA_SENSITIVE</c> when the base's is TRUE.</summary>
     public const bool NssDerivesTheSensitivityHistoryFromTheBase = false;
 
+    /// <summary>False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with <c>CKA_VALUE_LEN</c> 2^32 + 1 answers <c>CKR_OK</c>
+    /// (the length is narrowed to 32 bits). RFC 5869 caps the output at 255 hash lengths; PKCS#11 v3.2 §6.62.3, §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.</summary>
+    public const bool NssRefusesAnHkdfValueLenPastTheLimit = false;
+
     /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
     public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
 
