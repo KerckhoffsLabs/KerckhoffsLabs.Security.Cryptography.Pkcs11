@@ -24,6 +24,8 @@ public sealed class OperationContractTests_Nss(NssBackendFixture backend)
             Assert.Skip("NSS truncates a C_Digest into a buffer too small and returns CKR_OK");
         if (operation == "AES-CBC-PAD decrypt update" && !NssBackendFixture.NssKeepsADecryptUpdateOnAShortBuffer)
             Assert.Skip("NSS consumes the last block of a C_DecryptUpdate it refuses for a short buffer");
+        if (operation == "RSA sign-recover" && !NssBackendFixture.NssReportsTheRsaSignatureLengthOnAShortBuffer)
+            Assert.Skip("NSS reports an uninitialised length for an RSA C_SignRecover it refuses for a short buffer");
         if (operation == "RSA-OAEP-SHA256")
             _backend.RequireSoftoken(3, 52, "NSS 3.51 answers an RSA-OAEP C_Decrypt into a 1-byte buffer with CKR_DEVICE_ERROR, not CKR_BUFFER_TOO_SMALL");
         OperationContractTestCases.Assert_SingleCall_BufferTooSmall_ReportsAUsableLength(_backend, operation);

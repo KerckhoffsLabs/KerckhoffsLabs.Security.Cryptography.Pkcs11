@@ -254,6 +254,14 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// §5.2: a call refused for a short buffer may be made again, the operation as it was.</summary>
     public const bool NssKeepsADecryptUpdateOnAShortBuffer = false;
 
+    /// <summary>False while a single-part RSA <c>C_Sign</c> or <c>C_SignRecover</c> (<c>CKM_RSA_PKCS</c>) into a
+    /// 1-byte buffer answers <c>CKR_BUFFER_TOO_SMALL</c> with <c>*pulSignatureLen</c> set to four bytes of the
+    /// caller's stack: <c>NSC_Sign</c> in <c>lib/softoken/pkcs11c.c</c> copies its <c>unsigned int outlen</c> out
+    /// uninitialised, as freebl's <c>RSA_Sign</c> returns before setting it when <c>maxOutputLen</c> is short. Seen
+    /// at the pinned 3.132 (0, 0x01010101, 0x41414141 or 0xFFFFFFFF, after the same bytes were left on the stack)
+    /// and on NSS 3.51 in CI. PKCS#11 v3.2 §5.2: <c>*pulBufLen</c> is set to at least the length needed.</summary>
+    public const bool NssReportsTheRsaSignatureLengthOnAShortBuffer = false;
+
     /// <summary>False while <c>C_EncryptInit(CKM_AES_GCM)</c> with <c>ulIvLen</c> 0 or <c>ulTagBits</c> 136 answers
     /// <c>CKR_HOST_MEMORY</c>: freebl's <c>gcm_InitCounter</c> refuses them, and <c>sftk_CryptInit</c> reports any
     /// failed <c>AES_CreateContext</c> as out of memory. PKCS#11 v3.2 §6.13.7, §5.1.6:

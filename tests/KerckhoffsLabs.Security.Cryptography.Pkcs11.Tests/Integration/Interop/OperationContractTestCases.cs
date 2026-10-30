@@ -529,6 +529,10 @@ internal static class OperationContractTestCases
     private const int Guard = 64;
     private const byte Canary = 0xA5;
 
+    // How far past the result a reported length may go: a module may report a bound (the modulus for an RSA
+    // decryption, the ciphertext for CBC-PAD), not an exact length; a length past this is not one to allocate.
+    private const int MaxLengthSlack = 4096;
+
     // The 1-byte buffer is the start of a larger one, room for the whole result and more, whose other bytes
     // must come back as they were: a module that ignores the declared length writes into memory this case
     // owns rather than past an allocation.
@@ -542,7 +546,8 @@ internal static class OperationContractTestCases
         int past = guarded.AsSpan(1).IndexOfAnyExcept(Canary);
         Assert.True(past < 0, $"A call with a 1-byte buffer for a {length}-byte result (it returned {rv}) wrote past it, at byte {1 + past}.");
         Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL, $"A 1-byte buffer for a {length}-byte result returned {rv}.");
-        Assert.True((ulong)reported >= (ulong)length || (ulong)reported <= (ulong)tiny.Length,
+        // At least the result (or no length), and not more than a caller could sensibly allocate for it.
+        Assert.True(((ulong)reported >= (ulong)length && (ulong)reported <= (ulong)(length + MaxLengthSlack)) || (ulong)reported <= (ulong)tiny.Length,
             $"CKR_BUFFER_TOO_SMALL reported {reported} bytes for a {length}-byte result.");
 
         if ((ulong)reported <= (ulong)tiny.Length)
@@ -550,6 +555,8 @@ internal static class OperationContractTestCases
             // No length reported: ask for it, as the library does.
             (rv, reported) = CallAgain(init, () => call([], true));
             AssertOk(rv, "the length query");
+            Assert.True((ulong)reported >= (ulong)length && (ulong)reported <= (ulong)(length + MaxLengthSlack),
+                $"The length query reported {reported} bytes for a {length}-byte result.");
         }
         byte[] buffer = new byte[Math.Max((int)(ulong)reported, length)];
         (rv, NativeCULong written) = CallAgain(init, () => call(buffer, false));
