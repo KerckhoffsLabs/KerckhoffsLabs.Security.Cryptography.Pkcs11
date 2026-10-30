@@ -394,8 +394,14 @@ internal static class ObjectConformanceTestCases
                 "ML-DSA" => new(CKA.CKA_PARAMETER_SET, (ulong)CkpMlDsa.CKP_ML_DSA_44),
                 _ => new(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768),
             };
+            // The RSA public exponent is given, though §6.1.4 lets it be left out: NSS softoken refuses a template
+            // without it, and the case is about the private key's parts, not the default exponent.
+            using var attrExponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
+            List<ObjectAttribute> publicTemplate = keyType == "RSA"
+                ? [attrToken, attrLabel, attrPublicUse, attrKeyParameter, attrExponent]
+                : [attrToken, attrLabel, attrPublicUse, attrKeyParameter];
             session.GenerateKeyPair(new Mechanism(generation),
-                [attrToken, attrLabel, attrPublicUse, attrKeyParameter],
+                publicTemplate,
                 [attrToken, attrLabel, attrPrivateUse, attrSensitive], out ObjectHandle publicKey, out ObjectHandle privateKey);
             try
             {

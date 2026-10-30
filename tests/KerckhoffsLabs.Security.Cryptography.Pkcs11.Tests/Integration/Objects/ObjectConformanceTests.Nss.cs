@@ -71,22 +71,39 @@ public sealed class ObjectConformanceTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
-    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent) => ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent)
+    {
+        if (inconsistent is not ("private key of type CKK_AES" or "data object from an HKDF derive") && !NssBackendFixture.NssChecksTheTemplatesClassAndKeyType)
+            Assert.Skip("NSS makes objects whose class or key type contradicts the mechanism");
+        if (inconsistent == "data object from an HKDF derive" && !NssBackendFixture.NssRefusesADataObjectFromHkdfAsInconsistent)
+            Assert.Skip("NSS refuses a data object from HKDF with CKR_TEMPLATE_INCOMPLETE");
+        ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.KeyComponents), MemberType = typeof(ObjectConformanceTestCases))]
-    public void KeyComponent_IsReadOnly(string component) => ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+    public void KeyComponent_IsReadOnly(string component)
+    {
+        if (component == "EC CKA_EC_POINT" && !NssBackendFixture.NssKeepsTheEcPointReadOnly)
+            Assert.Skip("NSS lets C_SetAttributeValue change CKA_EC_POINT");
+        ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+    }
 
-    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [Theory(SkipUnless = nameof(NssBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in a template")]
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
-    public void MalformedAttribute_IsRefusedHarmlessly(string malformed) => ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
+    {
+        if (malformed.StartsWith("C_CreateObject", StringComparison.Ordinal) && !NssBackendFixture.NssRefusesMalformedAttributeValues)
+            Assert.Skip("NSS creates objects from malformed attribute values");
+        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void CopyObject_KeepsCkaToken() => ObjectConformanceTestCases.Assert_CopyObject_KeepsCkaToken(_backend);
@@ -94,13 +111,18 @@ public sealed class ObjectConformanceTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void CopyObject_KeepsADataObjectsFields() => ObjectConformanceTestCases.Assert_CopyObject_KeepsADataObjectsFields(_backend);
 
-    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.CopyableAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS has no CKA_COPYABLE")]
     public void UncopyableObject_StaysUncopyable() => ObjectConformanceTestCases.Assert_UncopyableObject_StaysUncopyable(_backend);
 
-    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.CopyableAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS has no CKA_COPYABLE")]
     public void StorageControls_DefaultToTrue() => ObjectConformanceTestCases.Assert_StorageControls_DefaultToTrue(_backend);
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.RefusedKeyPairs), MemberType = typeof(ObjectConformanceTestCases))]
-    public void RefusedKeyPairGeneration_LeavesNothing(string refused) => ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
+    public void RefusedKeyPairGeneration_LeavesNothing(string refused)
+    {
+        if (refused.StartsWith("CKA_UNIQUE_ID", StringComparison.Ordinal) && !NssBackendFixture.NssRefusesAUniqueIdInATemplate)
+            Assert.Skip("NSS takes CKA_UNIQUE_ID in a key pair template");
+        ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
+    }
 }

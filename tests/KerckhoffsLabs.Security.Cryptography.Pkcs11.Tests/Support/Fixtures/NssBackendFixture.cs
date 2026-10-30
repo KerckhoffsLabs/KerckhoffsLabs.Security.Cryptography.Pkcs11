@@ -336,6 +336,45 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// PKCS#11 v3.2 §6.1.4, §5.1.6: a modulus above <c>ulMaxKeySize</c> is refused.</summary>
     public const bool NssRefusesAnRsaModulusPastTheMaximum = false;
 
+    /// <summary>False while <c>CKA_ALWAYS_SENSITIVE</c> or <c>CKA_NEVER_EXTRACTABLE</c> in the template of
+    /// <c>C_CreateObject</c> or <c>C_GenerateKey</c> is taken. PKCS#11 v3.2 §4.11 footnotes 2 and 4, §4.1.1 point 3:
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>.</summary>
+    public const bool NssRefusesProvenanceAttributesInATemplate = false;
+
+    /// <summary>False while <c>C_SetAttributeValue</c> of a new <c>CKA_EC_POINT</c> on an EC public key answers
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §6.3.3 (no footnote 8), §4.1.2: <c>CKR_ATTRIBUTE_READ_ONLY</c>.</summary>
+    public const bool NssKeepsTheEcPointReadOnly = false;
+
+    /// <summary>False while <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKA_UNIQUE_ID</c> in the private key's
+    /// template makes the pair (softoken has no <c>CKA_UNIQUE_ID</c>). PKCS#11 v3.2 §4.4.1 (the token assigns it, it may
+    /// not be given), §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>.</summary>
+    public const bool NssRefusesAUniqueIdInATemplate = false;
+
+    /// <summary>False while softoken has no <c>CKA_COPYABLE</c>: an object created without it has none to read, and one
+    /// created with <c>CKA_COPYABLE</c> FALSE lets <c>C_SetAttributeValue</c> set it back to TRUE. PKCS#11 v3.2 §4.4,
+    /// Table 19: <c>CKA_COPYABLE</c> defaults to TRUE and "can't be set to TRUE once it is set to FALSE". The storage-controls case reads CKA_COPYABLE with
+    /// CKA_MODIFIABLE and CKA_DESTROYABLE, so its other two checks do not run here either.</summary>
+    public const bool NssHasCkaCopyable = false;
+
+    /// <summary>False while malformed attribute values are taken: <c>C_CreateObject</c> of a data object with a 4-byte
+    /// <c>CKA_TOKEN</c>, a <c>{NULL, 1}</c> <c>CKA_TOKEN</c> or a <c>{NULL, 16}</c> <c>CKA_VALUE</c> answers <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §4.1.1 point 2: <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>). The searches with
+    /// such values are handled as they should be.</summary>
+    public const bool NssRefusesMalformedAttributeValues = false;
+
+    /// <summary>False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against the mechanism
+    /// or each other: <c>C_GenerateKey(CKM_AES_KEY_GEN)</c> with <c>CKK_GENERIC_SECRET</c> or <c>CKO_DATA</c>,
+    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or <c>CKO_PRIVATE_KEY</c>
+    /// for the public one, and <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type <c>CKK_EC</c> answer
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §5.18.1, §5.18.2, §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c>. A private key of
+    /// type <c>CKK_AES</c> is refused as it should be.</summary>
+    public const bool NssChecksTheTemplatesClassAndKeyType = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with a template asking for <c>CKO_DATA</c> answers
+    /// <c>CKR_TEMPLATE_INCOMPLETE</c>, though nothing is missing. PKCS#11 v3.2 §6.62.3 (the mechanism contributes a
+    /// secret key's class), §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c> (or <c>CKR_ATTRIBUTE_VALUE_INVALID</c>).</summary>
+    public const bool NssRefusesADataObjectFromHkdfAsInconsistent = false;
+
     /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
     public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
 
@@ -371,6 +410,12 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the derived-key history case: see <see cref="NssDerivesTheSensitivityHistoryFromTheBase"/>.</summary>
     public static bool DerivedKeyHistoryAvailable => NssAvailable && NssDerivesTheSensitivityHistoryFromTheBase;
+
+    /// <summary>Gate for the provenance-attribute template case: see <see cref="NssRefusesProvenanceAttributesInATemplate"/>.</summary>
+    public static bool ProvenanceTemplateRefusalAvailable => NssAvailable && NssRefusesProvenanceAttributesInATemplate;
+
+    /// <summary>Gate for the CKA_COPYABLE cases: see <see cref="NssHasCkaCopyable"/>.</summary>
+    public static bool CopyableAvailable => NssAvailable && NssHasCkaCopyable;
 
     /// <summary>
     /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
