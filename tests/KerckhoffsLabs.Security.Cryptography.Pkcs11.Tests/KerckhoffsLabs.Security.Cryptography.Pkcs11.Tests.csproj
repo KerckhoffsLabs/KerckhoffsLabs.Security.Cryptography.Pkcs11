@@ -73,7 +73,7 @@
   </ItemGroup>
 
   <!-- SkipNativeBuilds=true skips every native build below (pkcs11-mock, the ABI oracle, the gate
-       shims, SoftHSM, Kryoptic, BouncyHsm, Craton HSM and FreeHSM), for a managed-only build that needs neither the submodules nor a
+       shims, SoftHSM, Kryoptic, BouncyHsm, Craton HSM, FreeHSM and wolfPKCS11), for a managed-only build that needs neither the submodules nor a
        C toolchain. Each target keeps its own Skip* switch; a value passed on the command line still
        wins over this one. -->
   <PropertyGroup Condition="'$(SkipNativeBuilds)' == 'true'">
@@ -85,6 +85,7 @@
     <BuildBouncyHsm>false</BuildBouncyHsm>
     <BuildCratonHsm>false</BuildCratonHsm>
     <BuildFreeHsm>false</BuildFreeHsm>
+    <BuildWolfPkcs11>false</BuildWolfPkcs11>
   </PropertyGroup>
 
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
@@ -180,6 +181,18 @@
       <_FreeHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_FreeHsmOutputDir>
     </PropertyGroup>
     <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-freehsm.sh&quot; &quot;$(_FreeHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <!-- wolfPKCS11: opt-in like FreeHSM — default OFF, flip it on with -p:BuildWolfPkcs11=true (or the
+       env var of the same name). Needs a C toolchain and autotools; it builds its own static wolfSSL
+       from vendor/wolfssl. Wired into CI on the ubuntu-latest leg only (see ci.yml);
+       build-wolfpkcs11.sh no-ops on non-Linux and skips the rebuild when both submodules are
+       unchanged. -->
+  <Target Name="BuildWolfPkcs11" BeforeTargets="PrepareForBuild" Condition="'$(BuildWolfPkcs11)' == 'true' AND $([MSBuild]::IsOSPlatform('Linux'))">
+    <PropertyGroup>
+      <_WolfPkcs11OutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_WolfPkcs11OutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-wolfpkcs11.sh&quot; &quot;$(_WolfPkcs11OutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
 </Project>

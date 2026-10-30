@@ -36,3 +36,12 @@
 	path = vendor/freehsm
 	url = https://github.com/afchine1337/freehsm.git
 	ignore = untracked
+[submodule "vendor/wolfssl"]
+	path = vendor/wolfssl
+	url = https://github.com/wolfSSL/wolfssl.git
+	shallow = true
+	ignore = untracked
+[submodule "vendor/wolfpkcs11"]
+	path = vendor/wolfpkcs11
+	url = https://github.com/wolfSSL/wolfPKCS11.git
+	ignore = untracked

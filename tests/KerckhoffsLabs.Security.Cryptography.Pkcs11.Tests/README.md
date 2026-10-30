@@ -53,13 +53,13 @@ So **every test class under `Integration/` must declare one of two things**:
 
 | Declaration | When |
 |-------------|------|
-| `[Collection("Mock" \| "SoftHsm" \| "Nss" \| "OpenCryptoki" \| "Kryoptic" \| "BouncyHsm" \| "CratonHsm" \| "FreeHsm" \| "MemoryLeaks")]` | It drives that backend — the collection serializes its tests and owns the module lifetime. |
+| `[Collection("Mock" \| "SoftHsm" \| "Nss" \| "OpenCryptoki" \| "Kryoptic" \| "BouncyHsm" \| "CratonHsm" \| "FreeHsm" \| "WolfPkcs11" \| "MemoryLeaks")]` | It drives that backend — the collection serializes its tests and owns the module lifetime. |
 | `[NoBackendCollection("why")]` | It touches no process-global native state (in-process `ManagedSoftToken`, or a static `File.Exists` availability probe). |
 
 `Unit/Architecture/TestCollectionConventionTests` enforces this, so a forgotten `[Collection]` fails
 deterministically at the moment the class is added instead of surfacing later as an intermittent
 native-state corruption. It also checks, across the whole assembly (`Algorithms/` included), that a
-class named `*_Mock` / `*_SoftHsm` / `*_Nss` / `*_OpenCryptoki` / `*_Kryoptic` / `*_BouncyHsm` / `*_CratonHsm` / `*_FreeHsm` joins the matching collection, that
+class named `*_Mock` / `*_SoftHsm` / `*_Nss` / `*_OpenCryptoki` / `*_Kryoptic` / `*_BouncyHsm` / `*_CratonHsm` / `*_FreeHsm` / `*_WolfPkcs11` joins the matching collection, that
 an injected collection fixture is actually supplied by the declared collection, and that no
 `[Collection]` names a definition that doesn't exist.
 
@@ -103,3 +103,20 @@ ends. The build is signed with upstream's `make integrity`, and the fixture sets
 `FHSM_INTEGRITY_ALLOW_UNSIGNED`, upstream's development switch, so the module runs on OpenSSL's default
 provider rather than requiring the FIPS provider. The FreeHSM backend is Linux-only. Known FreeHSM deviations
 are left out of its wrappers or pinned there, each with the reason.
+
+## Running against wolfPKCS11 locally
+
+wolfPKCS11 is built from `vendor/wolfpkcs11` by an opt-in target, against its own static wolfSSL built from
+`vendor/wolfssl`. It needs a C toolchain and autotools, and it builds both out of tree, in `obj/wolfssl` and
+`obj/wolfpkcs11`:
+
+```bash
+git submodule update --init vendor/wolfssl vendor/wolfpkcs11
+dotnet test --project tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests -c Release -p:BuildWolfPkcs11=true
+```
+
+`WolfPkcs11BackendFixture` provisions its own token in a fresh temporary directory named by
+`WOLFPKCS11_TOKEN_PATH` (never `~/.wolfPKCS11`) and deletes it when the run ends. The build raises the
+module's object limits and lowers its PIN-hash cost for the test run (see `build/build-wolfpkcs11.sh`). The
+wolfPKCS11 backend is Linux-only. Known wolfPKCS11 bugs are gated on `WolfPkcs11BackendFixture` (see
+`WolfPkcs11QuirkTests`).

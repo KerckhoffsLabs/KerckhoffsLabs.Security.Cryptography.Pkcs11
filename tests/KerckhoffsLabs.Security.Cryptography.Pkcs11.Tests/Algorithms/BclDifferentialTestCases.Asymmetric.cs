@@ -43,8 +43,8 @@ internal static partial class BclDifferentialTestCases
     }
 
     // The token decrypts any OAEP ciphertext the BCL makes for its public key, for every message length
-    // the key and hash allow.
-    internal static void Assert_RsaOaep_DecryptsBclCiphertext(IPkcs11Backend backend, string hashName)
+    // the key and hash allow; emptyData false leaves the empty message out, for a token that refuses it.
+    internal static void Assert_RsaOaep_DecryptsBclCiphertext(IPkcs11Backend backend, string hashName, bool emptyData = true)
     {
         var hash = new HashAlgorithmName(hashName);
         RSAEncryptionPadding padding = RSAEncryptionPadding.CreateOaep(hash);
@@ -59,7 +59,7 @@ internal static partial class BclDifferentialTestCases
 
             RequireOaepHash(() => rsa.Decrypt(bcl.Encrypt([1], padding), padding));
 
-            CsInputs.Check(CsInputs.Bytes(0, maxLength), data =>
+            CsInputs.Check(CsInputs.Bytes(emptyData ? 0 : 1, maxLength), data =>
                 Assert.Equal(data, rsa.Decrypt(bcl.Encrypt(data, padding), padding)));
         });
     }

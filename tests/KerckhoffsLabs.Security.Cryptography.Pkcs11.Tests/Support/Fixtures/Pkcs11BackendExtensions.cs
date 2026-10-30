@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -40,6 +41,40 @@ internal static class Pkcs11BackendExtensions
         Pkcs11Slot slot = backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)backend.SlotId);
         if (!hasFlags(slot.GetMechanismInfo(mechanism).MechanismFlags))
             Assert.Skip($"Backend advertises {mechanism} without {operation}.");
+    }
+
+    /// <summary>
+    /// Runs <paramref name="create"/>, which makes a key of <paramref name="keySizeInBits"/> bits for
+    /// <paramref name="mechanism"/>, and skips the test when the token refuses it and the size is outside the
+    /// key-size range its <c>C_GetMechanismInfo</c> reports: the modulus for the RSA mechanisms, the field size
+    /// for the EC ones (PKCS#11 v3.2 §6.1, §6.3). PKCS#11 has no per-curve capability, and tokens refuse a
+    /// curve or modulus they lack with different codes; the range is the closest a token comes to saying
+    /// what it has. A key the token makes runs whatever its range says (BouncyHsm reports ECDSA from 192
+    /// bits but handles secp160r1), and a refusal inside the range still fails. A range of [0, 0] reports
+    /// nothing, so it skips nothing, as for <see cref="RequireMlKemParameterSet"/>.
+    /// </summary>
+    internal static T SkipIfRefusedOutsideKeySize<T>(this IPkcs11Backend backend, CKM mechanism, int keySizeInBits, Func<T> create)
+    {
+        try
+        {
+            return create();
+        }
+        catch (Pkcs11Exception ex) when (OutsideKeySize(backend, mechanism, keySizeInBits) is { } range)
+        {
+            Assert.Skip($"Backend refused a {keySizeInBits}-bit key ({ex.ReturnValue}) outside its {mechanism} " +
+                $"key-size range {range}.");
+            throw; // unreachable: Assert.Skip throws
+        }
+    }
+
+    // The token's key-size range for the mechanism, when it reports one that leaves the size out.
+    private static string? OutsideKeySize(IPkcs11Backend backend, CKM mechanism, int keySizeInBits)
+    {
+        Pkcs11Slot slot = backend.Library.GetSlotList().First(s => s.SlotId.Value == (ulong)backend.SlotId);
+        MechanismInfo info = slot.GetMechanismInfo(mechanism);
+        bool outside = info.MaxKeySize != 0 &&
+            ((ulong)keySizeInBits < info.MinKeySize || (ulong)keySizeInBits > info.MaxKeySize);
+        return outside ? $"[{info.MinKeySize}, {info.MaxKeySize}]" : null;
     }
 
     /// <summary>

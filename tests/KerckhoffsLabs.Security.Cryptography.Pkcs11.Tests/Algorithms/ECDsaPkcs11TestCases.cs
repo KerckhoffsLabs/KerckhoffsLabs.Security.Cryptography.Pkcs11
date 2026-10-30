@@ -433,7 +433,7 @@ internal static class ECDsaPkcs11TestCases
 
     // Imports the vector's public key and runs the body on it. The curves are below the default policy's
     // floor, so the body runs under AllowInsecure. Tokens don't agree on the error for a curve they don't
-    // implement, so these cases are wired only into the backends that take secp160r1 and secp224k1.
+    // implement; one that refuses the key skips when its CKM_ECDSA key-size range leaves the curve out.
     private static void WithVectorKey(IPkcs11Backend backend, WycheproofVector v, Action<ECDsaPkcs11> body)
     {
         backend.RequireMechanism(CKM.CKM_ECDSA);
@@ -446,7 +446,7 @@ internal static class ECDsaPkcs11TestCases
             .Verify()
             .OnToken(false)
             .Build();
-        using var key = session.ImportKey(template);
+        using var key = backend.SkipIfRefusedOutsideKeySize(CKM.CKM_ECDSA, info.FieldSizeBits, () => session.ImportKey(template));
         using var ec = new ECDsaPkcs11(key);
         body(ec);
     }
@@ -530,7 +530,8 @@ internal static class ECDsaPkcs11TestCases
         Assert.True(Pkcs11CurveCatalog.Default.TryGetByName(curve, out Pkcs11CurveInfo? info));
         using var session = OpenSession(backend);
         using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var key = GenerateEcKey(session, info.ToCurve().GetEcParams());
+        using var key = backend.SkipIfRefusedOutsideKeySize(CKM.CKM_EC_KEY_PAIR_GEN, info.FieldSizeBits,
+            () => GenerateEcKey(session, info.ToCurve().GetEcParams()));
         try
         {
             using var ec = new ECDsaPkcs11(key);

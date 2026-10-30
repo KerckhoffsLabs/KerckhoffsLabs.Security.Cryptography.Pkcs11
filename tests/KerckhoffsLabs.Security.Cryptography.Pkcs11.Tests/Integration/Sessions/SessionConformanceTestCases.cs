@@ -221,7 +221,7 @@ internal static class SessionConformanceTestCases
 
     // === Access without a login ================================================
 
-    // With nobody logged in, a session sees the token's public objects and none of its private ones (§4.4.1),
+    // With nobody logged in, a session sees the token's public objects and none of its private ones (§4.4),
     // and the search itself succeeds. The objects are token objects created for the case and destroyed after it.
     internal static void Assert_PrivateObjects_AreHiddenWithoutALogin(IPkcs11Backend backend)
     {
@@ -311,7 +311,7 @@ internal static class SessionConformanceTestCases
         AssertRv(CKR.CKR_SLOT_ID_INVALID, lowLevel.C_OpenSession((NativeCULong)0x7EADBEEFUL, (NativeCULong)CKF.CKF_SERIAL_SESSION, out _), "C_OpenSession on a slot that does not exist");
     }
 
-    // A session object belongs to the application, not to the session that made it (§4.4.1): another session
+    // A session object belongs to the application, not to the session that made it (§5.6.2): another session
     // sees it while the first is open, and nobody does once the first is closed.
     internal static void Assert_SessionObject_OutlivesNoSessionOfIts(IPkcs11Backend backend)
     {

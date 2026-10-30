@@ -118,6 +118,14 @@ public static class Settings
     public static string? FreeHsmLibraryPath =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_FREEHSM_LIBRARY");
 
+    /// <summary>
+    /// Optional path to a wolfPKCS11 library (<c>libwolfpkcs11.so</c>) — another fully independent real
+    /// backend. Falls back to the path the BuildWolfPkcs11 MSBuild target places next to the test
+    /// assembly. Tests that require it skip themselves when this resolves to null.
+    /// </summary>
+    public static string? WolfPkcs11LibraryPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_WOLFPKCS11_LIBRARY");
+
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;
