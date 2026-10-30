@@ -28,7 +28,7 @@ public sealed class KeyProvenanceTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Pbkdf2Key_RecordsItsGeneration() => KeyProvenanceTestCases.Assert_Pbkdf2Key_RecordsItsGeneration(_backend, checkLocal: NssBackendFixture.SupportsLocalOnGeneratedKeys);
 
-    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [Theory(SkipUnless = nameof(NssBackendFixture.DerivedKeyHistoryAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS reports CKA_ALWAYS_SENSITIVE false on a key derived from an always-sensitive base")]
     [MemberData(nameof(KeyProvenanceTestCases.DerivationMechanisms), MemberType = typeof(KeyProvenanceTestCases))]
     public void DerivedKey_TakesItsHistoryFromTheBase(string derivation) => KeyProvenanceTestCases.Assert_DerivedKey_TakesItsHistoryFromTheBase(_backend, derivation);
 }

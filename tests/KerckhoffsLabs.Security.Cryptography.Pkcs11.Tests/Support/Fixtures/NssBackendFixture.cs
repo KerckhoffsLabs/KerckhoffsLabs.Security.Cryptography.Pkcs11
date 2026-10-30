@@ -316,6 +316,11 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKR_DATA_LEN_RANGE</c>, or <c>CKR_SIGNATURE_INVALID</c>.</summary>
     public const bool NssRefusesOverlongRawRsaVerifyData = false;
 
+    /// <summary>False while a key derived (<c>CKM_HKDF_DERIVE</c>, <c>CKM_ECDH1_DERIVE</c>) sensitive from a base whose
+    /// <c>CKA_ALWAYS_SENSITIVE</c> is TRUE reports <c>CKA_ALWAYS_SENSITIVE</c> FALSE. PKCS#11 v3.2 §6.62.3 and §6.3.17:
+    /// the derived key's <c>CKA_ALWAYS_SENSITIVE</c> is its <c>CKA_SENSITIVE</c> when the base's is TRUE.</summary>
+    public const bool NssDerivesTheSensitivityHistoryFromTheBase = false;
+
     /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
     public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
 
@@ -348,6 +353,9 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the RSA-OAEP unwrap length case: see <see cref="NssRefusesAShortCiphertextAsEncryptedDataLenRange"/>.</summary>
     public static bool WrappedKeyLenRangeAvailable => NssAvailable && NssRefusesAShortCiphertextAsEncryptedDataLenRange;
+
+    /// <summary>Gate for the derived-key history case: see <see cref="NssDerivesTheSensitivityHistoryFromTheBase"/>.</summary>
+    public static bool DerivedKeyHistoryAvailable => NssAvailable && NssDerivesTheSensitivityHistoryFromTheBase;
 
     /// <summary>
     /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
