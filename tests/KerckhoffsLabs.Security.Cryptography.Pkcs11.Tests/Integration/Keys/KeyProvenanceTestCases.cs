@@ -129,8 +129,9 @@ internal static class KeyProvenanceTestCases
     // CKA_KEY_GEN_MECHANISM names the mechanism that generated it); made sensitive and unextractable, it is also
     // CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE (§4.11). CKA_KEY_GEN_MECHANISM, CKA_ALWAYS_SENSITIVE and
     // CKA_NEVER_EXTRACTABLE are checked where the token reports them; ObjectConformanceTestCases'
-    // provenance case pins which ones each backend does.
-    internal static void Assert_Pbkdf2Key_RecordsItsGeneration(IPkcs11Backend backend)
+    // provenance case pins which ones each backend does. checkLocal false leaves CKA_LOCAL out, for a backend that
+    // records it wrongly on every key it generates, so that the other three are still checked there.
+    internal static void Assert_Pbkdf2Key_RecordsItsGeneration(IPkcs11Backend backend, bool checkLocal = true)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
         using Pkcs11SessionCore session = TestKeys.OpenLoggedInSession(backend);
@@ -148,7 +149,8 @@ internal static class KeyProvenanceTestCases
             try
             {
                 using var read = session.GetAttributeValue(key, [CKA.CKA_LOCAL, CKA.CKA_KEY_GEN_MECHANISM, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE]);
-                Assert.True(read[0].GetValueAsBool(), "A key generated with CKM_PKCS5_PBKD2 reports CKA_LOCAL false.");
+                if (checkLocal)
+                    Assert.True(read[0].GetValueAsBool(), "A key generated with CKM_PKCS5_PBKD2 reports CKA_LOCAL false.");
                 if (!read[1].CannotBeRead)
                     Assert.Equal((ulong)CKM.CKM_PKCS5_PBKD2, read[1].GetValueAsUlong());
                 if (!read[2].CannotBeRead)

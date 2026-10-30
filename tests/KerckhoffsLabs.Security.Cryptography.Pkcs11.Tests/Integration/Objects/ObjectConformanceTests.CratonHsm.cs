@@ -75,9 +75,16 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
     [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
     public void SensitivePrivateKey_HidesItsSecretParts(string keyType) => ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
 
-    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.IncompleteTemplateRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM makes keys from templates without the attributes they need")]
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
-    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete) => ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
+    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete)
+    {
+        // C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN) without CKA_EC_PARAMS is refused as it should be; every other row is
+        // CratonHsmRequiresTheKeyAttributes.
+        if (incomplete != "EC key pair without CKA_EC_PARAMS" && !CratonHsmBackendFixture.IncompleteTemplateRefusalAvailable)
+            Assert.Skip("Craton HSM makes keys from templates without the attributes they need");
+        ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
+    }
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.InconsistentTemplateRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM makes objects whose class or key type contradicts the mechanism")]
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
@@ -94,9 +101,16 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 
-    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.MalformedAttributeRefusalAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM takes malformed attribute values")]
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
-    public void MalformedAttribute_IsRefusedHarmlessly(string malformed) => ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
+    {
+        // A search with a {NULL, 4} CKA_LABEL is handled as it should be; every other row is
+        // CratonHsmRefusesMalformedAttributeValues.
+        if (malformed != "C_FindObjectsInit with CKA_LABEL NULL and ulValueLen 4" && !CratonHsmBackendFixture.MalformedAttributeRefusalAvailable)
+            Assert.Skip("Craton HSM takes malformed attribute values");
+        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
+    }
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void CopyObject_KeepsCkaToken() => ObjectConformanceTestCases.Assert_CopyObject_KeepsCkaToken(_backend);

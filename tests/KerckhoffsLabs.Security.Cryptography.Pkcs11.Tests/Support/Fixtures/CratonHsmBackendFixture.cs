@@ -131,6 +131,8 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// without <c>CKA_EC_PARAMS</c> (§6.1.2, §6.3.3, §6.3.4, footnote 1) and a secret key without
     /// <c>CKA_KEY_TYPE</c> (§4.8, footnote 1) answer <c>CKR_OK</c>; an RSA private key without <c>CKA_MODULUS</c>
     /// is refused with <c>CKR_TEMPLATE_INCONSISTENT</c>. §4.1.1 point 4: <c>CKR_TEMPLATE_INCOMPLETE</c>.
+    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> without <c>CKA_EC_PARAMS</c> is refused with
+    /// <c>CKR_TEMPLATE_INCOMPLETE</c>, so that row runs.
     /// </summary>
     public const bool CratonHsmRequiresTheKeyAttributes = false;
 
@@ -184,7 +186,8 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKA_TOKEN</c>, a <c>{NULL, 1}</c> <c>CKA_TOKEN</c> or a <c>{NULL, 16}</c> <c>CKA_VALUE</c> answers
     /// <c>CKR_OK</c>, and a search with a 4-byte <c>CKA_TOKEN</c> of zeros finds a session object. PKCS#11 v3.2
     /// §4.1.1 point 2: <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>); §5.7.7: a search matches
-    /// only objects whose attributes match the template.
+    /// only objects whose attributes match the template. A search with a <c>{NULL, 4}</c> <c>CKA_LABEL</c> is
+    /// refused or matches nothing, as it should, so that row runs.
     /// </summary>
     public const bool CratonHsmRefusesMalformedAttributeValues = false;
 
