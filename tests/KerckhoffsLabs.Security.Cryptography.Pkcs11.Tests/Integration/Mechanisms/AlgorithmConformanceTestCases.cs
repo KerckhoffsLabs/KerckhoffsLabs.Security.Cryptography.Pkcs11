@@ -1357,14 +1357,15 @@ internal static class AlgorithmConformanceTestCases
 
     // The refusals §5.6.6 and §5.6.7 name, for a SHA-256 digest's state saved after one part:
     // C_GetOperationState with no operation active answers CKR_OPERATION_NOT_INITIALIZED; C_SetOperationState of
-    // random bytes of the saved state's length, or of the state cut by its last byte, answers
-    // CKR_SAVED_STATE_INVALID; and restoring it with an encryption or authentication key, which a digest does
-    // not use, answers CKR_KEY_NOT_NEEDED (§5.1.6). Both functions are optional: a module without them answers
-    // CKR_FUNCTION_NOT_SUPPORTED, and the rows that need a saved state skip where the module cannot save one
-    // (CKR_STATE_UNSAVEABLE), as DigestState_SavedAndRestored records per backend; there the random bytes are
-    // 64. Whether a refused restore
-    // leaves the session's operation as it was is not stated, so only the code is asserted. The state is
-    // restored into the session that saved it.
+    // the state cut by its last byte answers CKR_SAVED_STATE_INVALID; and restoring it with an encryption or
+    // authentication key, which a digest does not use, answers CKR_KEY_NOT_NEEDED (§5.1.6). Random bytes of the
+    // saved state's length answer CKR_SAVED_STATE_INVALID or CKR_OK: §5.6.7 asks for the refusal only of a state
+    // the module "can determine is not valid", and a state with no integrity check of its own can be any bytes of
+    // that length; a module that takes them ends the digest they restored with C_DigestFinal. Both functions are
+    // optional: a module without them answers CKR_FUNCTION_NOT_SUPPORTED, and the rows that need a saved state skip
+    // where the module cannot save one (CKR_STATE_UNSAVEABLE), as DigestState_SavedAndRestored records per backend;
+    // there the random bytes are 64, and refused. Whether a refused restore leaves the session's operation as it
+    // was is not stated, so only the code is asserted. The state is restored into the session that saved it.
     internal static void Assert_OperationState_Misuse_IsRefused(IPkcs11Backend backend, string misuse)
     {
         backend.RequireMechanism(CKM.CKM_SHA256);
@@ -1419,6 +1420,12 @@ internal static class AlgorithmConformanceTestCases
                         lowLevel.C_SetOperationState(sid, state, default, (NativeCULong)mac.ObjectId)),
                     _ => throw new ArgumentOutOfRangeException(nameof(misuse), misuse, null),
                 };
+                if (misuse == "restore random bytes" && restored == CKR.CKR_OK)
+                {
+                    // Whatever digest the bytes restored is ended; its value means nothing.
+                    _ = lowLevel.C_DigestFinal(sid, new byte[64], lengthOnly: false, out _);
+                    return;
+                }
                 Assert.True(restored == expected, $"C_SetOperationState ({misuse}) was expected to return {expected} but returned {restored}.");
             }
             finally { session.DestroyObject(mac); session.DestroyObject(aes); }
