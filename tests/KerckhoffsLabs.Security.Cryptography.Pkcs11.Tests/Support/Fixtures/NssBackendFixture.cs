@@ -236,6 +236,13 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKR_BUFFER_TOO_SMALL</c>, and no value returned.</summary>
     public const bool NssChecksTheAttributeBufferLength = false;
 
+    /// <summary>False while <c>C_GetMechanismList</c> into a list shorter than the mechanism count writes every
+    /// mechanism, past the end of the caller's list, and answers <c>CKR_OK</c>: <c>NSC_GetMechanismList</c> in
+    /// <c>lib/softoken/pkcs11.c</c> never compares <c>*pulCount</c> with the count. The library refuses the answer
+    /// (it reports writing more than it was given), but the caller's memory is overwritten. PKCS#11 v3.2 §5.5.5:
+    /// <c>CKR_BUFFER_TOO_SMALL</c>.</summary>
+    public const bool NssChecksTheMechanismListLength = false;
+
     /// <summary>False while <c>C_Digest(CKM_SHA256)</c> into a 1-byte buffer writes the first byte of the digest,
     /// answers <c>CKR_OK</c> and ends the operation (<c>NSC_Digest</c> passes the length on to the hash's end, which
     /// truncates). PKCS#11 v3.2 §5.2: <c>CKR_BUFFER_TOO_SMALL</c>.</summary>
@@ -386,6 +393,9 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the short attribute buffer case: see <see cref="NssChecksTheAttributeBufferLength"/>.</summary>
     public static bool AttributeBufferLengthAvailable => NssAvailable && NssChecksTheAttributeBufferLength;
+
+    /// <summary>Gate for the one-short mechanism list case: see <see cref="NssChecksTheMechanismListLength"/>.</summary>
+    public static bool MechanismListLengthAvailable => NssAvailable && NssChecksTheMechanismListLength;
 
     /// <summary>Gate for the C_SignRecover usage case: see <see cref="NssChecksCkaSignRecover"/>.</summary>
     public static bool SignRecoverUsageRefusalAvailable => NssAvailable && NssChecksCkaSignRecover;
