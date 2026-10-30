@@ -383,6 +383,11 @@ internal static class SessionConformanceTestCases
     {
         if (!backend.RequiresUserLogin)
             Assert.Skip("The backend has no login.");
+        // While CKF_SO_PIN_TO_BE_CHANGED is set (an SO PIN still at its default, as a CI token may be provisioned),
+        // the SO's login succeeds "but only the C_SetPIN function can be called", and every other call answers
+        // CKR_PIN_EXPIRED (§3.2, the notes on CK_TOKEN_INFO's flags), so there is nothing to test.
+        if (Slot(backend).GetTokenInfo().TokenFlags.SoPinToBeChanged)
+            Assert.Skip("The token's SO PIN is to be changed (CKF_SO_PIN_TO_BE_CHANGED), so an SO session answers CKR_PIN_EXPIRED.");
         LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
         LogOutTheToken(lowLevel, backend.SlotId);
 
@@ -647,7 +652,9 @@ internal static class SessionConformanceTestCases
                         session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN),
                             [attrSession, attrPublic, attrMlKem768, attrEncapsulate, attrInput],
                             [attrSession, attrPublic, attrDecapsulate, attrInput], out ObjectHandle publicKey, out ObjectHandle privateKey);
-                        List<ObjectAttribute> template = [attrSecret, attrGeneric, attrSession, attrPrivate, attrLabel];
+                        // ML-KEM's shared secret is 32 bytes (FIPS 203), and a token may want the generic secret's
+                        // CKA_VALUE_LEN given (opencryptoki's ml_kem_get_key_type_key_len does).
+                        List<ObjectAttribute> template = [attrSecret, attrGeneric, attrLen32, attrSession, attrPrivate, attrLabel];
                         if (call == "EncapsulateKey")
                         {
                             refused = () => session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey, template, expectedCiphertextLen: 1088);
@@ -659,7 +666,7 @@ internal static class SessionConformanceTestCases
                                 Assert.Skip("The token made the ML-KEM private key private though the template asked for a public one.");
                         }
                         (byte[] ciphertext, _) = session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey,
-                            [attrSecret, attrGeneric, attrSession, attrPublic, attrInput], expectedCiphertextLen: 1088);
+                            [attrSecret, attrGeneric, attrLen32, attrSession, attrPublic, attrInput], expectedCiphertextLen: 1088);
                         refused = () => session.DecapsulateKey(new Mechanism(CKM.CKM_ML_KEM), privateKey, ciphertext, template);
                         break;
                     }

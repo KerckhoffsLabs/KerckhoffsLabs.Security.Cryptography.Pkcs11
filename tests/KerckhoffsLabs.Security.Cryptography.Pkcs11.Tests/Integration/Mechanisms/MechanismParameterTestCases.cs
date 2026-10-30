@@ -197,7 +197,8 @@ internal static class MechanismParameterTestCases
     // PKCS#11 v3.2 §6.11.2: ulCounterBits "shall be such that 0 < ulCounterBits ≤ 128. For any values outside
     // this range the mechanism shall return CKR_MECHANISM_PARAM_INVALID", at C_EncryptInit and C_DecryptInit
     // alike. After each refusal the same session runs the Init with a 128-bit counter, and its result is the
-    // BCL's.
+    // BCL's. That check runs over two whole blocks: what a token does with a partial last block is the AES-CTR
+    // length query case's to see, not this one's.
     internal static void Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(IPkcs11Backend backend, ulong counterBits)
     {
         backend.RequireMechanismFlags(CKM.CKM_AES_CTR, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT and CKF_DECRYPT");
@@ -208,7 +209,8 @@ internal static class MechanismParameterTestCases
             try
             {
                 byte[] counter = RandomNumberGenerator.GetBytes(16);
-                byte[] expected = AesCtr(rawKey, counter, Message);
+                byte[] message = Message[..32];
+                byte[] expected = AesCtr(rawKey, counter, message);
                 foreach (bool encrypt in (bool[])[true, false])
                 {
                     string op = encrypt ? "C_EncryptInit" : "C_DecryptInit";
@@ -217,13 +219,13 @@ internal static class MechanismParameterTestCases
                     Assert.True(rv == CKR.CKR_MECHANISM_PARAM_INVALID, $"{op}(CKM_AES_CTR) with ulCounterBits {counterBits} returned {rv}.");
 
                     AssertOk(Init(init, sid, Ctr(128, counter), key), $"{op}(CKM_AES_CTR) with a 128-bit counter after the refusal");
-                    byte[] input = encrypt ? Message : expected;
+                    byte[] input = encrypt ? message : expected;
                     byte[] output = new byte[input.Length];
                     rv = encrypt
                         ? lowLevel.C_Encrypt(sid, input, output, lengthOnly: false, out NativeCULong written)
                         : lowLevel.C_Decrypt(sid, input, output, lengthOnly: false, out written);
                     AssertOk(rv, encrypt ? "C_Encrypt" : "C_Decrypt");
-                    Assert.Equal(encrypt ? expected : Message, output.AsSpan(0, (int)(ulong)written).ToArray());
+                    Assert.Equal(encrypt ? expected : message, output.AsSpan(0, (int)(ulong)written).ToArray());
                 }
             }
             finally { session.DestroyObject(key); }
