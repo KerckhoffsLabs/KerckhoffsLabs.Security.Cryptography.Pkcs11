@@ -195,6 +195,43 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     // Each was confirmed by running the case on a softoken built from vendor/nss at the pinned 34716626, and none is
     // yet reported upstream. NSS needs no tripwire (see NssQuirkTests for the reported ones).
 
+    /// <summary>False while <c>C_EncryptInit(CKM_AES_GCM)</c> with <c>ulIvLen</c> 0 or <c>ulTagBits</c> 136 answers
+    /// <c>CKR_HOST_MEMORY</c>: freebl's <c>gcm_InitCounter</c> refuses them, and <c>sftk_CryptInit</c> reports any
+    /// failed <c>AES_CreateContext</c> as out of memory. PKCS#11 v3.2 §6.13.7, §5.1.6:
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAnOutOfRangeGcmParameterAsInvalid = false;
+
+    /// <summary>False while <c>C_EncryptInit(CKM_AES_CTR)</c> with <c>ulCounterBits</c> 0 or 129 answers
+    /// <c>CKR_HOST_MEMORY</c> (the same <c>AES_CreateContext</c> failure). PKCS#11 v3.2 §6.11.2:
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid = false;
+
+    /// <summary>False while <c>C_Encrypt(CKM_AES_CTR)</c> under a 2-bit counter starting at 1 refuses three blocks with
+    /// <c>CKR_DATA_LEN_RANGE</c>: freebl's <c>CTR_Update</c> (<c>lib/freebl/ctr.c</c>) allows at most 2^counterBits - 2
+    /// blocks, wherever the counter starts. PKCS#11 v3.2 §6.11.3 gives this very example: "only 3 blocks of data can
+    /// be processed".</summary>
+    public const bool NssRunsTheCtrBlocksItsCounterAllows = false;
+
+    /// <summary>False while <c>C_SignInit</c> with <c>CKM_SHA256_HMAC_GENERAL</c> or <c>CKM_AES_CMAC_GENERAL</c> answers
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c> for every MAC length, 16 (8) included: <c>sftk_doMACInit</c> hands the
+    /// <c>_GENERAL</c> mechanism to <c>sftk_MAC_InitRaw</c> (<c>lib/softoken/sftkhmac.c</c>), which knows only the
+    /// full-length ones. Both are advertised with <c>CKF_SIGN</c>. PKCS#11 v3.2 §6.22.3, §6.14.3.</summary>
+    public const bool NssRunsTheGeneralLengthMacs = false;
+
+    /// <summary>False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a key of <c>ulMaxKeySize / 8 + 1</c>
+    /// bytes: softoken reports <c>ulMaxKeySize</c> 32 and takes 5 bytes. PKCS#11 v3.2 §6.8.3 gives the sizes in bits;
+    /// §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.</summary>
+    public const bool NssBoundsAGenericSecretByItsMaximum = false;
+
+    /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
+    public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
+
+    /// <summary>Gate for the AES-CTR counter overflow case: see <see cref="NssRunsTheCtrBlocksItsCounterAllows"/>.</summary>
+    public static bool CtrBlockCountAvailable => NssAvailable && NssRunsTheCtrBlocksItsCounterAllows;
+
+    /// <summary>Gate for the general-length MAC case: see <see cref="NssRunsTheGeneralLengthMacs"/>.</summary>
+    public static bool GeneralLengthMacAvailable => NssAvailable && NssRunsTheGeneralLengthMacs;
+
     /// <summary>
     /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
     /// non-zero <c>ulIvLen</c>, or a NULL <c>pAAD</c> behind a non-zero <c>ulAADLen</c>, ends the test process with
