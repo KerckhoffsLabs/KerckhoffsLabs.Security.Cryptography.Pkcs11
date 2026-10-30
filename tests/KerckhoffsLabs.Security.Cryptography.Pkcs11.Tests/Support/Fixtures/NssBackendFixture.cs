@@ -195,6 +195,14 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     // Each was confirmed by running the case on a softoken built from vendor/nss at the pinned 34716626, and none is
     // yet reported upstream. NSS needs no tripwire (see NssQuirkTests for the reported ones).
 
+    /// <summary>False while a ciphertext or wrapped key no encryption gives, by its length, is refused with
+    /// <c>CKR_DATA_LEN_RANGE</c>: <c>C_Decrypt</c> of an AES-GCM ciphertext shorter than its tag or of an AES key-wrap
+    /// (with padding) blob of 8 or 20 bytes, <c>C_UnwrapKey</c> of such a key-wrap blob and of a 255-byte RSA-OAEP
+    /// blob under a 2048-bit key. PKCS#11 v3.2 §5.10.2 has <c>C_Decrypt</c> answer <c>CKR_ENCRYPTED_DATA_LEN_RANGE</c>
+    /// (or <c>CKR_ENCRYPTED_DATA_INVALID</c>), and §5.18.4 <c>C_UnwrapKey</c> <c>CKR_WRAPPED_KEY_LEN_RANGE</c>;
+    /// <c>CKR_DATA_LEN_RANGE</c> is the plaintext's code.</summary>
+    public const bool NssRefusesAShortCiphertextAsEncryptedDataLenRange = false;
+
     /// <summary>False while <c>C_EncryptInit(CKM_AES_GCM)</c> with <c>ulIvLen</c> 0 or <c>ulTagBits</c> 136 answers
     /// <c>CKR_HOST_MEMORY</c>: freebl's <c>gcm_InitCounter</c> refuses them, and <c>sftk_CryptInit</c> reports any
     /// failed <c>AES_CreateContext</c> as out of memory. PKCS#11 v3.2 §6.13.7, §5.1.6:
@@ -223,6 +231,47 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.</summary>
     public const bool NssBoundsAGenericSecretByItsMaximum = false;
 
+    /// <summary>False while <c>C_DigestKey</c> of an EC private key answers <c>CKR_KEY_TYPE_INCONSISTENT</c>. PKCS#11
+    /// v3.2 §5.12.4 digests "the value of a secret key", and §5.1.6 has a key that cannot be digested answer
+    /// <c>CKR_KEY_INDIGESTIBLE</c>.</summary>
+    public const bool NssRefusesToDigestAPrivateKeyAsIndigestible = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is no point on the curve answers
+    /// <c>CKR_ARGUMENTS_BAD</c> (1 KiB) or <c>CKR_KEY_SIZE_RANGE</c> (a DER OCTET STRING whose length byte promises more
+    /// than follows). PKCS#11 v3.2 §6.3.16, §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAMalformedEcdhPeerAsInvalid = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 for a generic secret with <c>CKA_VALUE_LEN</c>
+    /// 33, one byte more than the secret, answers <c>CKR_OK</c>. PKCS#11 v3.2 §6.3.17 (the mechanism only truncates),
+    /// §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>.</summary>
+    public const bool NssRefusesAnEcdhValueLenAboveTheSecret = false;
+
+    /// <summary>False while <c>C_SignInit(CKM_SHA256_RSA_PKCS_PSS)</c> takes an <c>sLen</c> of 2^32 + 32 and
+    /// <c>C_Sign</c> signs (the length is narrowed to 32 bits). PKCS#11 v3.2 §6.1.9, §5.1.6:
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAnOutOfRangePssParameterAsInvalid = false;
+
+    /// <summary>False while <c>C_SetOperationState</c> of a saved SHA-256 digest state cut by its last byte answers
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §5.6.7: <c>CKR_SAVED_STATE_INVALID</c>.</summary>
+    public const bool NssChecksTheLengthOfARestoredState = false;
+
+    /// <summary>False while <c>C_SetOperationState</c> of a saved SHA-256 digest state with an encryption or
+    /// authentication key handle, which a digest does not use, answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6, §5.6.7:
+    /// <c>CKR_KEY_NOT_NEEDED</c>.</summary>
+    public const bool NssRefusesAKeyNotNeeded = false;
+
+    /// <summary>False while <c>C_Verify(CKM_RSA_X_509)</c> of <c>m[1..]</c> under a signature over a full 256-byte block
+    /// <c>m</c> whose top byte is not zero answers <c>CKR_OK</c>: the data is compared with the recovered block's
+    /// trailing bytes only. PKCS#11 v3.2 §6.1.12 converts the data to an integer, so only leading zero bytes may be
+    /// left out; §5.15.2: <c>CKR_SIGNATURE_INVALID</c>.</summary>
+    public const bool NssVerifiesRawRsaOverTheWholeBlock = false;
+
+    /// <summary>False while <c>C_Verify(CKM_RSA_X_509)</c> of 257 bytes under a 2048-bit key answers
+    /// <c>CKR_DEVICE_ERROR</c>. PKCS#11 v3.2 §6.1.12 (Table 45: at most k bytes) and §5.15.2:
+    /// <c>CKR_DATA_LEN_RANGE</c>, or <c>CKR_SIGNATURE_INVALID</c>.</summary>
+    public const bool NssRefusesOverlongRawRsaVerifyData = false;
+
     /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
     public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
 
@@ -231,6 +280,18 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the general-length MAC case: see <see cref="NssRunsTheGeneralLengthMacs"/>.</summary>
     public static bool GeneralLengthMacAvailable => NssAvailable && NssRunsTheGeneralLengthMacs;
+
+    /// <summary>Gate for the private-key C_DigestKey case: see <see cref="NssRefusesToDigestAPrivateKeyAsIndigestible"/>.</summary>
+    public static bool PrivateKeyDigestRefusalAvailable => NssAvailable && NssRefusesToDigestAPrivateKeyAsIndigestible;
+
+    /// <summary>Gate for the raw RSA leading-bytes case: see <see cref="NssVerifiesRawRsaOverTheWholeBlock"/>.</summary>
+    public static bool RawRsaWholeBlockVerifyAvailable => NssAvailable && NssVerifiesRawRsaOverTheWholeBlock;
+
+    /// <summary>Gate for the over-long raw RSA verify case: see <see cref="NssRefusesOverlongRawRsaVerifyData"/>.</summary>
+    public static bool OverlongRawRsaVerifyAvailable => NssAvailable && NssRefusesOverlongRawRsaVerifyData;
+
+    /// <summary>Gate for the RSA-OAEP unwrap length case: see <see cref="NssRefusesAShortCiphertextAsEncryptedDataLenRange"/>.</summary>
+    public static bool WrappedKeyLenRangeAvailable => NssAvailable && NssRefusesAShortCiphertextAsEncryptedDataLenRange;
 
     /// <summary>
     /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
