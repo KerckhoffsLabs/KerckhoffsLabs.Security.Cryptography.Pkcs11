@@ -57,7 +57,7 @@ public sealed class ObjectConformanceTests_WolfPkcs11(WolfPkcs11BackendFixture b
     {
         // wolfPKCS11 answers an undefined CKA_CLASS with CKR_TEMPLATE_INCOMPLETE, where PKCS#11 v3.2 has
         // CKR_ATTRIBUTE_VALUE_INVALID for a value it does not know, and creates an AES key of 13 bytes,
-        // which §6.7 does not allow.
+        // which §6.10.2 does not allow.
         ObjectConformanceTestCases.Assert_MalformedTemplate_CreatesNothing(
             _backend, malformed, [CKR.CKR_TEMPLATE_INCOMPLETE], acceptedByTheBackend: malformed == "an AES key of 13 bytes");
     }

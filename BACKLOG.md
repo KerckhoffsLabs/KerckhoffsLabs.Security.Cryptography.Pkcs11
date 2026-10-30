@@ -969,7 +969,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Severity:** Low
 - **Effort:** S
 - **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11AcceptsWrapTemplates`, `WrapTemplateAvailable`)
-- **Problem:** `CKA_WRAP_TEMPLATE` or `CKA_UNWRAP_TEMPLATE` makes `C_GenerateKey` fail with `CKR_ATTRIBUTE_VALUE_INVALID`: wolfPKCS11 lists them as byte arrays (`src/crypto.c`) rather than the attribute arrays PKCS#11 v3.2 §4.10 defines, so `Pkcs11Session.GenerateAesKeyEncryptionKey` cannot work on it and the KEK cases skip. Not yet reported upstream; the draft is with the maintainer.
+- **Problem:** `CKA_WRAP_TEMPLATE` or `CKA_UNWRAP_TEMPLATE` makes `C_GenerateKey` fail with `CKR_ATTRIBUTE_VALUE_INVALID`: wolfPKCS11 lists them as byte arrays (`src/crypto.c`) rather than the attribute arrays PKCS#11 v3.2 §4.11 defines, so `Pkcs11Session.GenerateAesKeyEncryptionKey` cannot work on it and the KEK cases skip. Not yet reported upstream; the draft is with the maintainer.
 - **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.WrapTemplate_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** wolfPKCS11 backend
@@ -989,7 +989,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Severity:** Low
 - **Effort:** S
 - **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/WolfPkcs11BackendFixture.cs` (`WolfPkcs11SharesSessionObjectsAcrossSessions`, `SharedSessionObjectsAvailable`)
-- **Problem:** wolfPKCS11 keeps session objects per session: another session of the application does not find one and cannot use its handle. PKCS#11 v3.2 §4.4.1 makes a session object the application's, seen by every session until the one that made it closes. Not yet reported upstream; the draft is with the maintainer.
+- **Problem:** wolfPKCS11 keeps session objects per session: another session of the application does not find one and cannot use its handle. PKCS#11 v3.2 §5.6.2 (`C_CloseSession`) has a session object used by the application's other sessions until the one that made it closes. Not yet reported upstream; the draft is with the maintainer.
 - **Proposed action:** Report it upstream. After a `vendor/wolfpkcs11` bump with the fix, `WolfPkcs11QuirkTests.SessionObjectVisibility_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** wolfPKCS11 backend

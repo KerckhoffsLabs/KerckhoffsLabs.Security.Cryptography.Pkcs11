@@ -92,7 +92,7 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// <summary>
     /// False while <c>CKA_WRAP_TEMPLATE</c> and <c>CKA_UNWRAP_TEMPLATE</c> make <c>C_GenerateKey</c> fail with
     /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>: wolfPKCS11 lists them as byte arrays (<c>src/crypto.c</c>) rather
-    /// than the attribute arrays PKCS#11 v3.2 §4.10 defines, so no key-encryption key with a template can be
+    /// than the attribute arrays PKCS#11 v3.2 §4.11 defines, so no key-encryption key with a template can be
     /// made, and <see cref="Pkcs11Session.GenerateAesKeyEncryptionKey"/> fails.
     /// </summary>
     public const bool WolfPkcs11AcceptsWrapTemplates = false;
@@ -107,8 +107,8 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// <summary>
     /// False while a session object is visible only to the session that made it: wolfPKCS11 keeps session
     /// objects per session, so another session of the application finds nothing and its handle is invalid
-    /// there. PKCS#11 v3.2 §4.4.1 makes a session object the application's, seen by all its sessions until
-    /// the session that made it closes.
+    /// there. PKCS#11 v3.2 §5.6.2 (<c>C_CloseSession</c>) has a session object used by the application's other
+    /// sessions until the session that made it closes.
     /// </summary>
     public const bool WolfPkcs11SharesSessionObjectsAcrossSessions = false;
 

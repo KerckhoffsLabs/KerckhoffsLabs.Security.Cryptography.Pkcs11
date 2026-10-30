@@ -2,7 +2,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 
-/// <summary>Raw Salsa20 over wolfPKCS11, the only backend that offers it — thin wrapper over <see cref="RawSalsa20TestCases"/>.</summary>
+/// <summary>Raw Salsa20 over wolfPKCS11 — thin wrapper over <see cref="RawSalsa20TestCases"/>. wolfPKCS11 v2.2.0 has no
+/// Salsa20, so the cases skip on the mechanism check.</summary>
 [Collection("WolfPkcs11")]
 public sealed class RawSalsa20Tests_WolfPkcs11(WolfPkcs11BackendFixture backend)
 {
