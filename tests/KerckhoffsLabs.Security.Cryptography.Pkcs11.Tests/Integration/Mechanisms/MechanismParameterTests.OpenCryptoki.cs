@@ -10,13 +10,20 @@ public sealed class MechanismParameterTests_OpenCryptoki(OpenCryptokiBackendFixt
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.AeadParameterFaults), MemberType = typeof(MechanismParameterTestCases))]
-    public void AeadParameter_OutOfRange_IsMechanismParamInvalid(string fault) => MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
+    public void AeadParameter_OutOfRange_IsMechanismParamInvalid(string fault)
+    {
+        if (fault is "GCM pIv NULL" or "GCM pAAD NULL" && !OpenCryptokiBackendFixture.OpenCryptokiRefusesANullGcmPointer)
+            Assert.Skip("opencryptoki takes a NULL GCM pIv or pAAD behind a length");
+        if (fault is "GCM ulTagBits 136" or "GCM ulIvLen 0" && !OpenCryptokiBackendFixture.OpenCryptokiRefusesAGcmParameterAsInvalid)
+            Assert.Skip("opencryptoki refuses a GCM parameter out of range with CKR_FUNCTION_FAILED");
+        MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
+    }
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.AesCtrCounterBitsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
     public void AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(ulong counterBits) => MechanismParameterTestCases.Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(_backend, counterBits);
 
-    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.AesCtrCounterOverflowAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "opencryptoki refuses an AES-CTR counter that is not a whole number of bytes")]
     public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]

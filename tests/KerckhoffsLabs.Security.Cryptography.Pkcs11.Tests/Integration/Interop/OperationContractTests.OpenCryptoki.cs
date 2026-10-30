@@ -44,7 +44,7 @@ public sealed class OperationContractTests_OpenCryptoki(OpenCryptokiBackendFixtu
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void CbcPad_MultipartEncrypt_MatchesBcl() => OperationContractTestCases.Assert_CbcPad_MultipartEncrypt_MatchesBcl(_backend);
 
-    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.AesCtrPartialBlockAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "opencryptoki refuses a single-part AES-CTR message that ends in a partial block")]
     public void AesCtr_LengthQuery_ReportsTheInputLength() => OperationContractTestCases.Assert_AesCtr_LengthQuery_ReportsTheInputLength(_backend);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]

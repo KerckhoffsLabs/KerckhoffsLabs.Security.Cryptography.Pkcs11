@@ -25,5 +25,10 @@ public sealed class KeyProvenanceTests_OpenCryptoki(OpenCryptokiBackendFixture b
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(KeyProvenanceTestCases.DerivationMechanisms), MemberType = typeof(KeyProvenanceTestCases))]
-    public void DerivedKey_TakesItsHistoryFromTheBase(string derivation) => KeyProvenanceTestCases.Assert_DerivedKey_TakesItsHistoryFromTheBase(_backend, derivation);
+    public void DerivedKey_TakesItsHistoryFromTheBase(string derivation)
+    {
+        if (derivation == "ECDH" && !OpenCryptokiBackendFixture.OpenCryptokiDerivesAnEcdhKeysHistoryFromTheBase)
+            Assert.Skip("opencryptoki makes a key derived with ECDH from a sensitive generated base not CKA_ALWAYS_SENSITIVE");
+        KeyProvenanceTestCases.Assert_DerivedKey_TakesItsHistoryFromTheBase(_backend, derivation);
+    }
 }

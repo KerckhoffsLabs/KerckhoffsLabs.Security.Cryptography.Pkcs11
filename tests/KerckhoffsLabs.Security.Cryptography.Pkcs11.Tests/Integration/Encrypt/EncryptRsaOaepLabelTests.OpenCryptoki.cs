@@ -16,7 +16,7 @@ public sealed class EncryptRsaOaepLabelTests_OpenCryptoki(OpenCryptokiBackendFix
     public void OaepWithWrongLabel_FailsToDecrypt() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepWithWrongLabel_FailsToDecrypt(_backend);
 
-    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.NullOaepLabelRefusalAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "opencryptoki takes a NULL OAEP label behind a length as the empty label")]
     public void OaepNullLabelWithLength_IsRefused() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepNullLabelWithLength_IsRefused(_backend);
 }

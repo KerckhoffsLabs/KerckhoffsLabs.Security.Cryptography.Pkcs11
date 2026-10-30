@@ -61,11 +61,21 @@ public sealed class ObjectConformanceTests_OpenCryptoki(OpenCryptokiBackendFixtu
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
-    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete) => ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
+    public void IncompleteTemplate_IsTemplateIncomplete(string incomplete)
+    {
+        if (incomplete == "secret key without CKA_KEY_TYPE" && !OpenCryptokiBackendFixture.OpenCryptokiReportsAMissingKeyTypeAsIncomplete)
+            Assert.Skip("opencryptoki refuses a secret key without CKA_KEY_TYPE with CKR_TEMPLATE_INCONSISTENT");
+        ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
+    }
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
-    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent) => ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent)
+    {
+        if (inconsistent == "EC key pair with an RSA private key" && !OpenCryptokiBackendFixture.OpenCryptokiChecksAPrivateKeyTypeOfZero)
+            Assert.Skip("opencryptoki does not see CKK_RSA (0) in an EC key pair's private template, and fails later with CKR_TEMPLATE_INCOMPLETE");
+        ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    }
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
