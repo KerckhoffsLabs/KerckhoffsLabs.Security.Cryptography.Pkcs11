@@ -203,6 +203,13 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKR_DATA_LEN_RANGE</c> is the plaintext's code.</summary>
     public const bool NssRefusesAShortCiphertextAsEncryptedDataLenRange = false;
 
+    /// <summary>False while <c>C_GetAttributeValue</c> of a session object's attribute into a buffer shorter than the
+    /// value copies the whole value past the end of the caller's buffer and answers <c>CKR_OK</c>:
+    /// <c>NSC_GetAttributeValue</c> in <c>lib/softoken/pkcs11.c</c> <c>memcpy</c>s <c>attrib.ulValueLen</c> bytes
+    /// without comparing them with <c>ulValueLen</c>. A heap overflow in the caller. PKCS#11 v3.2 §5.7.5:
+    /// <c>CKR_BUFFER_TOO_SMALL</c>, and no value returned.</summary>
+    public const bool NssChecksTheAttributeBufferLength = false;
+
     /// <summary>False while <c>C_EncryptInit(CKM_AES_GCM)</c> with <c>ulIvLen</c> 0 or <c>ulTagBits</c> 136 answers
     /// <c>CKR_HOST_MEMORY</c>: freebl's <c>gcm_InitCounter</c> refuses them, and <c>sftk_CryptInit</c> reports any
     /// failed <c>AES_CreateContext</c> as out of memory. PKCS#11 v3.2 §6.13.7, §5.1.6:
@@ -280,6 +287,9 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the general-length MAC case: see <see cref="NssRunsTheGeneralLengthMacs"/>.</summary>
     public static bool GeneralLengthMacAvailable => NssAvailable && NssRunsTheGeneralLengthMacs;
+
+    /// <summary>Gate for the short attribute buffer case: see <see cref="NssChecksTheAttributeBufferLength"/>.</summary>
+    public static bool AttributeBufferLengthAvailable => NssAvailable && NssChecksTheAttributeBufferLength;
 
     /// <summary>Gate for the private-key C_DigestKey case: see <see cref="NssRefusesToDigestAPrivateKeyAsIndigestible"/>.</summary>
     public static bool PrivateKeyDigestRefusalAvailable => NssAvailable && NssRefusesToDigestAPrivateKeyAsIndigestible;
