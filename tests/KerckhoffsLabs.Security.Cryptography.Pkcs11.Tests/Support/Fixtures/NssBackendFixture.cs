@@ -210,6 +210,17 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKR_BUFFER_TOO_SMALL</c>, and no value returned.</summary>
     public const bool NssChecksTheAttributeBufferLength = false;
 
+    /// <summary>False while <c>C_Digest(CKM_SHA256)</c> into a 1-byte buffer writes the first byte of the digest,
+    /// answers <c>CKR_OK</c> and ends the operation (<c>NSC_Digest</c> passes the length on to the hash's end, which
+    /// truncates). PKCS#11 v3.2 §5.2: <c>CKR_BUFFER_TOO_SMALL</c>.</summary>
+    public const bool NssRefusesASinglePartDigestIntoAShortBuffer = false;
+
+    /// <summary>False while <c>C_DecryptUpdate(CKM_AES_CBC_PAD)</c> into a 1-byte buffer answers
+    /// <c>CKR_BUFFER_TOO_SMALL</c> after moving the input's last block into its padding buffer
+    /// (<c>NSC_DecryptUpdate</c>), so the retry with a buffer large enough decrypts the wrong blocks. PKCS#11 v3.2
+    /// §5.2: a call refused for a short buffer may be made again, the operation as it was.</summary>
+    public const bool NssKeepsADecryptUpdateOnAShortBuffer = false;
+
     /// <summary>False while <c>C_EncryptInit(CKM_AES_GCM)</c> with <c>ulIvLen</c> 0 or <c>ulTagBits</c> 136 answers
     /// <c>CKR_HOST_MEMORY</c>: freebl's <c>gcm_InitCounter</c> refuses them, and <c>sftk_CryptInit</c> reports any
     /// failed <c>AES_CreateContext</c> as out of memory. PKCS#11 v3.2 §6.13.7, §5.1.6:
