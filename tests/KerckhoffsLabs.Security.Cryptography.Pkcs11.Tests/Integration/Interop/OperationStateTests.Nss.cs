@@ -45,7 +45,12 @@ public sealed class OperationStateTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(OperationStateTestCases.KeysOfTheWrongType), MemberType = typeof(OperationStateTestCases))]
-    public void KeyOfTheWrongType_IsRefused(string misuse) => OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
+    public void KeyOfTheWrongType_IsRefused(string misuse)
+    {
+        if (misuse == "HKDF derive from an EC private key" && !NssBackendFixture.NssChecksTheHkdfBaseKeyType)
+            Assert.Skip("NSS derives HKDF from an EC private key");
+        OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
+    }
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(OperationStateTestCases.UsesOfADestroyedKey), MemberType = typeof(OperationStateTestCases))]
@@ -75,7 +80,12 @@ public sealed class OperationStateTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(OperationStateTestCases.NonKeyObjectsAsKeys), MemberType = typeof(OperationStateTestCases))]
-    public void NonKeyObject_IsRefusedAsAKey(string misuse) => OperationStateTestCases.Assert_NonKeyObject_IsRefusedAsAKey(_backend, misuse);
+    public void NonKeyObject_IsRefusedAsAKey(string misuse)
+    {
+        if ((misuse.StartsWith("C_WrapKey", StringComparison.Ordinal) || misuse.StartsWith("C_UnwrapKey", StringComparison.Ordinal)) && !NssBackendFixture.NssNamesTheWrappingKeyInARefusal)
+            Assert.Skip("NSS refuses a wrapping key that is no key with CKR_KEY_TYPE_INCONSISTENT");
+        OperationStateTestCases.Assert_NonKeyObject_IsRefusedAsAKey(_backend, misuse);
+    }
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(OperationStateTestCases.OperationsWhoseKeyIsDestroyed), MemberType = typeof(OperationStateTestCases))]
@@ -88,5 +98,10 @@ public sealed class OperationStateTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
-    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext) => OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext)
+    {
+        if (!ciphertext.StartsWith("AES-CBC-PAD", StringComparison.Ordinal) && !NssBackendFixture.NssRefusesAShortCiphertextAsEncryptedDataLenRange)
+            Assert.Skip("NSS refuses an AES-GCM or key-wrap ciphertext of a wrong length with CKR_DATA_LEN_RANGE");
+        OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
+    }
 }

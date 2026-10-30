@@ -64,6 +64,15 @@ internal static class OperationStateTestCases
         return init(sid, in mech, (NativeCULong)key.ObjectId);
     }
 
+    // As above, with the parameters laid out for the session's module, as the library sends them: CK_GCM_PARAMS
+    // carries ulIvBits only for a module bound through a v3.x interface, which may refuse it as 0.
+    private static CKR Init(KeyedInit init, Pkcs11SessionCore session, Mechanism mechanism, ObjectHandle key)
+    {
+        using var scope = new SessionParameterScope(session);
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        return init((NativeCULong)session.SessionId, in mech, (NativeCULong)key.ObjectId);
+    }
+
     private static CKR DigestInit(LowLevelPkcs11Library lowLevel, NativeCULong sid, Mechanism mechanism)
     {
         using var scope = new MechanismParameterScope();
@@ -567,7 +576,13 @@ internal static class OperationStateTestCases
                 using var attrX509 = new ObjectAttribute(CKA.CKA_CERTIFICATE_TYPE, CKC.CKC_X_509);
                 using var attrSubject = new ObjectAttribute(CKA.CKA_SUBJECT, cert.SubjectName.RawData);
                 using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, cert.RawData);
-                notAKey = session.CreateObject([attrCertificate, attrX509, attrToken, attrLabel, attrSubject, attrValue]);
+                // CKA_ISSUER and CKA_SERIAL_NUMBER default to empty (§4.6.3), but NSS softoken refuses a certificate
+                // without them; they are the certificate's own, so any token takes them.
+                using var attrIssuer = new ObjectAttribute(CKA.CKA_ISSUER, cert.IssuerName.RawData);
+                var serial = new System.Formats.Asn1.AsnWriter(System.Formats.Asn1.AsnEncodingRules.DER);
+                serial.WriteIntegerUnsigned(cert.SerialNumberBytes.Span);
+                using var attrSerial = new ObjectAttribute(CKA.CKA_SERIAL_NUMBER, serial.Encode());
+                notAKey = session.CreateObject([attrCertificate, attrX509, attrToken, attrLabel, attrSubject, attrValue, attrIssuer, attrSerial]);
             }
             ObjectHandle aesKey = TestKeys.ImportExtractableAesKey(session, RandomNumberGenerator.GetBytes(32));
             try
@@ -896,7 +911,7 @@ internal static class OperationStateTestCases
                     _ => new Mechanism(mechanism),
                 };
                 byte[] input = RandomNumberGenerator.GetBytes(length);
-                AssertRv(CKR.CKR_OK, Init(lowLevel.C_DecryptInit, sid, m, key), "C_DecryptInit");
+                AssertRv(CKR.CKR_OK, Init(lowLevel.C_DecryptInit, session, m, key), "C_DecryptInit");
                 CKR rv = lowLevel.C_Decrypt(sid, input, [], lengthOnly: true, out _);
                 if (rv == CKR.CKR_OK)
                 {
@@ -908,7 +923,7 @@ internal static class OperationStateTestCases
                 {
                     AssertRvIn(accepted, rv, $"C_Decrypt length query of {length} bytes with {mechanism}");
                 }
-                AssertRv(keepsTheOperation ? CKR.CKR_OPERATION_ACTIVE : CKR.CKR_OK, Init(lowLevel.C_DecryptInit, sid, m, key),
+                AssertRv(keepsTheOperation ? CKR.CKR_OPERATION_ACTIVE : CKR.CKR_OK, Init(lowLevel.C_DecryptInit, session, m, key),
                     "C_DecryptInit after the refused C_Decrypt");
             }
             finally { session.DestroyObject(key); }

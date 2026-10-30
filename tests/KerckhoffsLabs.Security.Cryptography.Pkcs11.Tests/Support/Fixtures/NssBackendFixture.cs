@@ -195,6 +195,16 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     // Each was confirmed by running the case on a softoken built from vendor/nss at the pinned 34716626, and none is
     // yet reported upstream. NSS needs no tripwire (see NssQuirkTests for the reported ones).
 
+    /// <summary>False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> from an EC private key answers <c>CKR_OK</c>; HKDF
+    /// takes a secret key (or a data object, §6.62.3). PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_TYPE_INCONSISTENT</c>.</summary>
+    public const bool NssChecksTheHkdfBaseKeyType = false;
+
+    /// <summary>False while <c>C_WrapKey</c> with a data object as the wrapping key, and <c>C_UnwrapKey</c> with a
+    /// certificate as the unwrapping key, answer <c>CKR_KEY_TYPE_INCONSISTENT</c> (<c>sftk_InitGeneric</c>). PKCS#11
+    /// v3.2 §5.1.6 names the wrapping (unwrapping) key's own codes: <c>CKR_WRAPPING_KEY_HANDLE_INVALID</c> or
+    /// <c>CKR_WRAPPING_KEY_TYPE_INCONSISTENT</c> (the unwrapping ones), or <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssNamesTheWrappingKeyInARefusal = false;
+
     /// <summary>False while a ciphertext or wrapped key no encryption gives, by its length, is refused with
     /// <c>CKR_DATA_LEN_RANGE</c>: <c>C_Decrypt</c> of an AES-GCM ciphertext shorter than its tag or of an AES key-wrap
     /// (with padding) blob of 8 or 20 bytes, <c>C_UnwrapKey</c> of such a key-wrap blob and of a 255-byte RSA-OAEP
