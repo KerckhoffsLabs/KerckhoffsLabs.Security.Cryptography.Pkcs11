@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -70,16 +70,9 @@ public sealed class KeyMaterialExportOptInAnalyzer : DiagnosticAnalyzer
     // The kinds as written, when every element is a KeyMaterialExportKind member named in the source
     // ([KeyMaterialExportKind.KdfOutput], new[] { ... }); anything else (a variable, a cast, a LINQ query)
     // is not known until run time.
-    [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified with LINQ expressions",
-        Justification = "Runs on every Allow call site and on each keystroke in the IDE; as in the other analyzers here, foreach over ImmutableArray uses the struct enumerator and allocates nothing, where LINQ would box it and allocate an iterator per call.")]
     private static string DescribeKinds(IInvocationOperation invocation, INamedTypeSymbol kind)
     {
-        IArgumentOperation? kindsArgument = null;
-        foreach (IArgumentOperation argument in invocation.Arguments)
-        {
-            if (argument.Parameter?.Ordinal == 0)
-                kindsArgument = argument;
-        }
+        IArgumentOperation? kindsArgument = invocation.Arguments.Where(a => a.Parameter?.Ordinal == 0).LastOrDefault();
 
         ImmutableArray<IOperation> elements = kindsArgument is null ? default : Elements(Unwrap(kindsArgument.Value));
         if (elements.IsDefaultOrEmpty)

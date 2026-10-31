@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
@@ -246,7 +247,7 @@ public sealed class KeyMaterialExportOptInTests
     {
         using var key = FakeKeys.Create(CKK.CKK_ML_KEM, ca => ca switch
         {
-            CKA.CKA_PARAMETER_SET => (CKR.CKR_OK, BitConverter.GetBytes((ulong)CkpMlKem.CKP_ML_KEM_768)),
+            CKA.CKA_PARAMETER_SET => (CKR.CKR_OK, BitConverter.GetBytes((ulong)CkpMlKem.CKP_ML_KEM_768).AsSpan(0, UnmanagedMemory.NativeULongSize).ToArray()),
             _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
         }, policy, publicOnly: publicOnly);
         using var mlkem = new MLKemPkcs11(key);
