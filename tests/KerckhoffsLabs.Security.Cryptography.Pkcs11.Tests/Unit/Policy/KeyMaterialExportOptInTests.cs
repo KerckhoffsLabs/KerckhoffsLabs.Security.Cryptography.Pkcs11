@@ -302,6 +302,50 @@ public sealed class KeyMaterialExportOptInTests
         Assert.Equal(HKDF.DeriveKey(Sha256, Ikm, 42, Salt, Info), okm);
     });
 
+    // A token that ignores CKA_VALUE_LEN hands back more or less than the caller asked for; the read-back
+    // must refuse it rather than return a truncated or oversized key.
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void DeriveBytes_TokenReturnsWrongLength_ThrowsCryptographicException(int skew)
+    {
+        var token = new ManagedSoftToken();
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var ikm = ImportIkm(session);
+        token.ValueLengthSkew = skew;
+
+        Assert.Throws<CryptographicException>(() => ikm.DeriveBytes(HkdfMechanism(), 42));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void HkdfDeriveKey_TokenReturnsWrongLength_ThrowsCryptographicException(int skew)
+    {
+        var token = new ManagedSoftToken();
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var ikm = ImportIkm(session);
+        token.ValueLengthSkew = skew; // after the import, whose CKA_VALUE read is not under test
+
+        Assert.Throws<CryptographicException>(() => HkdfPkcs11.DeriveKey(Sha256, ikm, 32, Salt, Info));
+    }
+
+    [Fact]
+    public void DeriveBytes_Sp800108Counter_TokenReturnsWrongLength_Throws()
+    {
+        var token = new ManagedSoftToken();
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var ikm = ImportIkm(session);
+        token.ValueLengthSkew = 1;
+        var mechanism = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF,
+            CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, Label, Context));
+
+        Assert.Throws<CryptographicException>(() => ikm.DeriveBytes(mechanism, 32));
+    }
+
     [Fact]
     public void DeriveBytes_KdfOutputAllowed_Sp800108Counter_MatchesBcl() => WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
     {

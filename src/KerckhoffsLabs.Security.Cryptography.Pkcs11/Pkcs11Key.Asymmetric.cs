@@ -139,7 +139,8 @@ public sealed partial class Pkcs11Key
     /// <see cref="CKK.CKK_EC_MONTGOMERY"/> key: X25519 or X448 (RFC 7748), <c>CKM_ECDH1_DERIVE</c> with
     /// <see cref="CKD.CKD_NULL"/> and the peer's raw u-coordinate, the 32- or 56-byte shared secret. Apply a
     /// KDF to it before use as key material (NIST SP 800-56A, RFC 7748 §6); for an on-token key with the KDF
-    /// applied, use <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>.
+    /// applied, use <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>, which applies to
+    /// <see cref="CKK.CKK_EC"/> keys only (an X25519 or X448 peer cannot use it).
     /// </summary>
     /// <remarks>
     /// <para>
