@@ -222,7 +222,13 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         ICryptoPolicy policy = _effectivePolicy;
         PolicyDecision decision = policy.Evaluate(request);
         if (decision.IsAllowed)
+        {
+            // One warning per export: the read-back templates and KDF requests the library derives from
+            // an export are not KeyMaterialExportRequests, so they log nothing here.
+            if (request is KeyMaterialExportRequest export)
+                Log.KeyMaterialExportAllowed(_logger, (ulong)_sessionId, policy.Name, export.Kind);
             return;
+        }
 
         Log.PolicyDenied(_logger, (ulong)_sessionId, policy.Name, request.Describe());
         throw new CryptoPolicyViolationException(policy.Name, request, decision.Reason!);
