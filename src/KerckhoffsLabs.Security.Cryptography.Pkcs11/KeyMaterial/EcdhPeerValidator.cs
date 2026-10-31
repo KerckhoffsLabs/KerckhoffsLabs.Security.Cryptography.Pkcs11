@@ -31,7 +31,7 @@ internal readonly record struct ValidatedEcdhPeer(int FieldSizeBytes, byte[] X, 
 /// <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>) reaches the
 /// encoded point only through <see cref="Validate"/>. The paths that take an already-encoded point
 /// (the <see cref="ReadOnlySpan{T}"/> overload of <c>DeriveSharedSecretEcdh</c>, or
-/// <see cref="MechanismParams.CkmEcdh1DeriveParams"/> with <see cref="Pkcs11Key.Derive"/>) cannot be
+/// <see cref="MechanismParams.CkmEcdh1DeriveParams"/> with <see cref="Pkcs11Key.Derive(Mechanism, Objects.ObjectTemplate)"/>) cannot be
 /// checked, since an octet string carries no curve, and are documented as caller-validated.
 /// </remarks>
 internal static class EcdhPeerValidator

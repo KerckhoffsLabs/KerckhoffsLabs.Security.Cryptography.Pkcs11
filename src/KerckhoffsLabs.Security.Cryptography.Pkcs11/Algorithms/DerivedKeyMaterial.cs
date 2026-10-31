@@ -28,11 +28,11 @@ internal static class DerivedKeyMaterial
             .Sensitive(false)
             .Build();
 
-        // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so the policy also judges it as a key template; the export
-        // check above is what a policy that allows such templates but not plaintext KDF output
-        // (a FIPS-style policy) relies on.
-        Pkcs11Key derived = baseKey.Derive(mechanism, template);
+        // The template asks for an extractable, non-sensitive key. It is tagged as the read-back of the
+        // KdfOutput export allowed above, so a built-in policy judges it by its export rule; a custom
+        // policy sees the tag on the KeyTemplateRequest. The export check above stays first: it is what
+        // a policy that allows such templates but not plaintext KDF output (a FIPS-style policy) relies on.
+        Pkcs11Key derived = baseKey.Derive(mechanism, template, KeyMaterialExportKind.KdfOutput);
         bool operationFailed = true;
         try
         {

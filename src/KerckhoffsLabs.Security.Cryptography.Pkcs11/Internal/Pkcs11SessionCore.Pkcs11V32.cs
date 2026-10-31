@@ -37,13 +37,15 @@ internal sealed partial class Pkcs11SessionCore
     /// side-effectful encapsulation per call, so a probe would both fail to report the size and leak an
     /// extra shared-secret object. When 0, the two-call probe is used (caller does not know the size).
     /// </param>
+    /// <param name="readBackFor">Set only by a library read-back path; see <see cref="KeyTemplateRequest.ReadBackFor"/>.</param>
     /// <returns>Tuple of (ciphertext, sharedKeyHandle).</returns>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries.</exception>
     public (byte[] Ciphertext, ObjectHandle SharedKey) EncapsulateKey(
         Mechanism mechanism,
         ObjectHandle encapsulatingPublicKey,
         List<ObjectAttribute> sharedKeyTemplate,
-        int expectedCiphertextLen = 0)
+        int expectedCiphertextLen = 0,
+        KeyMaterialExportKind? readBackFor = null)
     {
         using var _ = AcquireExclusive();
 
@@ -61,7 +63,7 @@ internal sealed partial class Pkcs11SessionCore
         // The encapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
         // insecure value requires a policy that permits it. See BuildSecureKeyDefaults.
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null, readBackFor);
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
         int idx = 0;
         for (int i = 0; i < sharedKeyTemplate.Count; i++)
@@ -134,12 +136,14 @@ internal sealed partial class Pkcs11SessionCore
     /// <paramref name="decapsulatingPrivateKey"/> (typically an ML-KEM private key)
     /// (PKCS#11 v3.2 §5.18.11).
     /// </summary>
+    /// <remarks><c>readBackFor</c> is set only by a library read-back path; see <see cref="KeyTemplateRequest.ReadBackFor"/>.</remarks>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries.</exception>
     public ObjectHandle DecapsulateKey(
         Mechanism mechanism,
         ObjectHandle decapsulatingPrivateKey,
         ReadOnlySpan<byte> ciphertext,
-        List<ObjectAttribute> sharedKeyTemplate)
+        List<ObjectAttribute> sharedKeyTemplate,
+        KeyMaterialExportKind? readBackFor = null)
     {
         using var _ = AcquireExclusive();
 
@@ -157,7 +161,7 @@ internal sealed partial class Pkcs11SessionCore
         // The decapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
         // insecure value requires a policy that permits it. See BuildSecureKeyDefaults.
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null, readBackFor);
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
         int idx = 0;
         for (int i = 0; i < sharedKeyTemplate.Count; i++)
