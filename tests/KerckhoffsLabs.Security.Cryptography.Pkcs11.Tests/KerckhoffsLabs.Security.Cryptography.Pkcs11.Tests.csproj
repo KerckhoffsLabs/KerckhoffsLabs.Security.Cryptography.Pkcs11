@@ -44,7 +44,16 @@
 
   <ItemGroup>
     <!-- coverlet.collector is the VSTest-collector shim; MTP-native runs (dotnet test's coverage
-         option) need coverlet's own MTP extension instead. -->
+         option) need coverlet's own MTP extension instead.
+         Its settings live in testconfig.json (copied to the output as <assembly>.testconfig.json).
+         That file exists to replace coverlet.MTP's default exclude-by-attribute list, which includes
+         CompilerGeneratedAttribute: that drops every auto-property accessor, and coverlet then also
+         drops any other code on the accessor's source lines, because its excluded-section check
+         compares lines, not columns. So a `{ get; } = Init();` initializer was never instrumented, and a
+         class made only of such properties (CryptoPolicy) was missing from the report entirely, which
+         Sonar shows as 0% covered. The command-line exclude-by-attribute option only appends to the
+         defaults, so only a config file can remove it. A config file also turns off coverlet.MTP's
+         dependency-based exclude filters, hence the explicit Include there. -->
     <PackageReference Include="coverlet.MTP" Version="10.1.0" />
     <!-- Property-based testing for BclDifferentialTestCases: generates inputs for the Algorithms adapters
          and the BCL alike, and on a failure shrinks them to a minimal case and reports the seed that
