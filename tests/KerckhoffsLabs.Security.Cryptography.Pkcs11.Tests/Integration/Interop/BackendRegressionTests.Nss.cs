@@ -18,5 +18,9 @@ public sealed class BackendRegressionTests_Nss(NssBackendFixture backend)
     public void GetAttributeValue_MixedTemplate_FillsTheReadableEntries() => BackendRegressionTestCases.Assert_GetAttributeValue_MixedTemplate_FillsTheReadableEntries(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void AesGcm_ClassicParameters_MatchBcl() => BackendRegressionTestCases.Assert_AesGcm_ClassicParameters_MatchBcl(_backend);
+    public void AesGcm_ClassicParameters_MatchBcl()
+    {
+        _backend.RequireClassicAesGcm();
+        BackendRegressionTestCases.Assert_AesGcm_ClassicParameters_MatchBcl(_backend);
+    }
 }
