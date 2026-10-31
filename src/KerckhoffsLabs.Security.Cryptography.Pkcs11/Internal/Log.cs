@@ -82,6 +82,10 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy override {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyOverridden(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
 
+    // Names the kind and the policy only; the exported bytes are never an argument.
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy {PolicyName} allowed export of {Kind} off the token")]
+    public static partial void KeyMaterialExportAllowed(ILogger logger, ulong sessionId, string policyName, KeyMaterialExportKind kind);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Session({SessionId}): policy restored {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyRestored(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
 
