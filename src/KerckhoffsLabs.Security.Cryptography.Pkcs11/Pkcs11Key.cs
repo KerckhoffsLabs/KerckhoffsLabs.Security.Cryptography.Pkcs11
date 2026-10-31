@@ -944,8 +944,8 @@ public sealed partial class Pkcs11Key : IDisposable
     /// value a protocol sends or compares.
     /// </para>
     /// <para>
-    /// Only KDF mechanisms with their own parameters are accepted: <c>CKM_HKDF_DERIVE</c> and
-    /// <c>CKM_HKDF_DATA</c> with <see cref="CkmHkdfParams"/>, and <c>CKM_SP800_108_COUNTER_KDF</c>,
+    /// Only KDF mechanisms with their own parameters are accepted: <c>CKM_HKDF_DERIVE</c> with
+    /// <see cref="CkmHkdfParams"/>, and <c>CKM_SP800_108_COUNTER_KDF</c>,
     /// <c>CKM_SP800_108_FEEDBACK_KDF</c> and <c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c> with
     /// <see cref="CkmSp800108KdfParams"/> of the same mode and no additional derived keys. Anything else,
     /// a key-agreement mechanism above all, is refused before the policy or the token is consulted: the
@@ -954,9 +954,8 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <see cref="Policy.KeyMaterialExportKind.EcdhSharedSecret"/> opt-in governs).
     /// </para>
     /// <para>
-    /// The output is asked for as a <see cref="CKK.CKK_GENERIC_SECRET"/> key whichever mechanism runs. PKCS#11
-    /// has <c>CKM_HKDF_DATA</c> make a data object instead, so a token that holds to that refuses the
-    /// derivation (<see cref="CKR.CKR_TEMPLATE_INCONSISTENT"/>); <c>CKM_HKDF_DERIVE</c> gives the same bytes.
+    /// <c>CKM_HKDF_DATA</c> is refused: PKCS#11 has it make a data object, which the secret-key read-back
+    /// cannot ask for. <c>CKM_HKDF_DERIVE</c> with the same parameters gives the same bytes.
     /// </para>
     /// <para>
     /// The output is derived into an extractable, non-sensitive session generic secret, read and
@@ -995,14 +994,14 @@ public sealed partial class Pkcs11Key : IDisposable
     {
         bool fits = mechanism.Type switch
         {
-            CKM.CKM_HKDF_DERIVE or CKM.CKM_HKDF_DATA => mechanism.Parameters is CkmHkdfParams,
+            CKM.CKM_HKDF_DERIVE => mechanism.Parameters is CkmHkdfParams,
             CKM.CKM_SP800_108_COUNTER_KDF or CKM.CKM_SP800_108_FEEDBACK_KDF or CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF =>
                 mechanism.Parameters is CkmSp800108KdfParams sp800108 && sp800108.IsFor(mechanism.Type),
             _ => false,
         };
         if (!fits)
             throw new ArgumentException(
-                $"Pkcs11Key.DeriveBytes takes CKM_HKDF_DERIVE or CKM_HKDF_DATA with CkmHkdfParams, or a CKM_SP800_108_*_KDF with CkmSp800108KdfParams of the same mode; got {mechanism.Type}.",
+                $"Pkcs11Key.DeriveBytes takes CKM_HKDF_DERIVE with CkmHkdfParams, or a CKM_SP800_108_*_KDF with CkmSp800108KdfParams of the same mode; got {mechanism.Type}.",
                 nameof(mechanism));
         if (mechanism.Parameters is CkmSp800108KdfParams { RequestsAdditionalDerivedKeys: true })
             throw new ArgumentException(
