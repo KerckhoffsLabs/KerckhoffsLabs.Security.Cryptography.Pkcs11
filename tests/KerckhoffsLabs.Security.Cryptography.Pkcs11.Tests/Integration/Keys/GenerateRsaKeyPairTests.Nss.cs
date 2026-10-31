@@ -19,4 +19,22 @@ public sealed class GenerateRsaKeyPairTests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void GeneratesTransportKeyPair_EncryptDecryptOnly() => GenerateRsaKeyPairTestCases.Assert_GeneratesTransportKeyPair_EncryptDecryptOnly(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(GenerateRsaKeyPairTestCases.ModulusBitsAboveTheMaximum), MemberType = typeof(GenerateRsaKeyPairTestCases))]
+    public void RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(string row)
+    {
+        if (row == "2^32 + 2048" && !NssBackendFixture.NssRefusesAnRsaModulusPastTheMaximum)
+            Assert.Skip("NSS narrows CKA_MODULUS_BITS 2^32 + 2048 and makes a 2048-bit key");
+        GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(_backend, row);
+    }
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(GenerateRsaKeyPairTestCases.PublicExponents), MemberType = typeof(GenerateRsaKeyPairTestCases))]
+    public void RsaKeyGen_PublicExponent_IsTheOneAsked(string exponent)
+    {
+        if (exponent == "2^64 + 65537" && !NssBackendFixture.NssTakesOrRefusesALongRsaExponent)
+            Assert.Skip("NSS refuses a nine-byte public exponent with CKR_ARGUMENTS_BAD");
+        GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_PublicExponent_IsTheOneAsked(_backend, exponent);
+    }
 }

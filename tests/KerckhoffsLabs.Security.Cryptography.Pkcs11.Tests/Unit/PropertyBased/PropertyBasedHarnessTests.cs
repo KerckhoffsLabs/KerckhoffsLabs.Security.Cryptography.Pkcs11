@@ -47,8 +47,10 @@ public sealed class PropertyBasedHarnessTests
     [Fact]
     public void CsInt_StaysInRange_AndDrawsBothEnds()
     {
+        // Each end is drawn about once in 95 (1 in 4 from the 31 edges, else 1 in 298 uniformly): over 500 draws one
+        // end or the other is missed in about one run in 100, over 5000 never in practice.
         var seen = new HashSet<int>();
-        CsInputs.Int(3, 300).Sample(v => { Assert.InRange(v, 3, 300); seen.Add(v); }, iter: Samples, threads: 1);
+        CsInputs.Int(3, 300).Sample(v => { Assert.InRange(v, 3, 300); seen.Add(v); }, iter: 10 * Samples, threads: 1);
 
         Assert.Contains(3, seen);
         Assert.Contains(300, seen);

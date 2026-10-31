@@ -3,6 +3,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -16,7 +17,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sessions
 /// </summary>
 /// <remarks>
 /// Nothing here changes the fixture's token beyond its own objects: a wrong PIN is tried once and followed by
-/// the right one at once, so no token counts towards a lockout; no PIN is changed; SO is never logged in.
+/// the right one at once, so no token counts towards a lockout; no PIN is changed (a C_SetPIN to a PIN of a
+/// length the token refuses is undone if the token takes it); the SO logs in with the right PIN only, and is
+/// logged out again whatever fails.
 /// </remarks>
 internal static class SessionConformanceTestCases
 {
@@ -116,6 +119,155 @@ internal static class SessionConformanceTestCases
         Assert.Equal(CKR.CKR_MECHANISM_INVALID, ex.ReturnValue);
     }
 
+    // C_GetMechanismList into a list one entry short answers CKR_BUFFER_TOO_SMALL and sets *pulCount to the
+    // number of mechanisms (§5.5.5: "In either case, the value *pulCount is set to hold the number of
+    // mechanisms"), and the retry at that count returns the whole list.
+    internal static void Assert_MechanismList_OneShort_IsBufferTooSmall(IPkcs11Backend backend)
+    {
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        AssertRv(CKR.CKR_OK, lowLevel.C_GetMechanismList(backend.SlotId, [], out NativeCULong count), "C_GetMechanismList (count)");
+        if ((ulong)count < 2)
+            Assert.Skip($"The token lists {count} mechanisms; a list one short of that would be empty, which asks for the count.");
+
+        var shortList = new CKM[(int)(ulong)count - 1];
+        AssertRv(CKR.CKR_BUFFER_TOO_SMALL, lowLevel.C_GetMechanismList(backend.SlotId, shortList, out NativeCULong reported), "C_GetMechanismList into a list one short");
+        Assert.Equal((ulong)count, (ulong)reported);
+
+        var list = new CKM[(int)(ulong)reported];
+        AssertRv(CKR.CKR_OK, lowLevel.C_GetMechanismList(backend.SlotId, list, out NativeCULong returned), "C_GetMechanismList at the reported count");
+        Assert.Equal((ulong)count, (ulong)returned);
+        Assert.Equal(backend.SupportedMechanisms.Order(), list.Order());
+    }
+
+    // === What the token advertises holds ======================================
+
+    // Every RSA mechanism of §6.1 the token lists gives its key size range in modulus bits (§6.1.4-§6.1.10: "the
+    // supported range of RSA modulus sizes, in bits"), so a token that makes a 2048-bit key reports a range
+    // containing 2048 for each, where it reports one at all (a [0, 0] range reports nothing).
+    internal static void Assert_RsaMechanisms_AdvertiseThe2048BitKeysTheyTake(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        using (var session = TestKeys.OpenLoggedInSession(backend))
+        {
+            try
+            {
+                var (pub, priv) = TestKeys.GenerateRsa2048SigningKeyPair(session);
+                session.DestroyObject(priv);
+                session.DestroyObject(pub);
+            }
+            finally { TestKeys.LogoutIfRequired(backend, session); }
+        }
+
+        Pkcs11Slot slot = Slot(backend);
+        var outside = new List<string>();
+        foreach (CKM mechanism in backend.SupportedMechanisms.Where(IsRsaModulusMechanism).Order())
+        {
+            MechanismInfo info = slot.GetMechanismInfo(mechanism);
+            if (info.MaxKeySize != 0 && (info.MinKeySize > 2048 || info.MaxKeySize < 2048))
+                outside.Add($"{mechanism} [{info.MinKeySize}, {info.MaxKeySize}]");
+        }
+        Assert.True(outside.Count == 0, $"The token makes a 2048-bit RSA key but advertises ranges without 2048 for: {string.Join(", ", outside)}.");
+    }
+
+    // The §6.1 mechanisms whose CK_MECHANISM_INFO sizes are RSA modulus bits.
+    private static bool IsRsaModulusMechanism(CKM mechanism)
+    {
+        string name = mechanism.ToString();
+        return name is "CKM_RSA_PKCS_KEY_PAIR_GEN" or "CKM_RSA_X9_31_KEY_PAIR_GEN" or "CKM_RSA_PKCS" or "CKM_RSA_X_509"
+                or "CKM_RSA_9796" or "CKM_RSA_PKCS_OAEP" or "CKM_RSA_PKCS_PSS" or "CKM_RSA_X9_31"
+            || (name.StartsWith("CKM_SHA", StringComparison.Ordinal)
+                && (name.EndsWith("_RSA_PKCS", StringComparison.Ordinal) || name.EndsWith("_RSA_PKCS_PSS", StringComparison.Ordinal)));
+    }
+
+    public static TheoryData<CKM> AdvertisedKeyWraps =>
+        [CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_PAD, CKM.CKM_AES_KEY_WRAP_KWP, CKM.CKM_AES_KEY_WRAP_PKCS7, CKM.CKM_RSA_PKCS_OAEP];
+
+    // A mechanism the token lists with CKF_WRAP wraps an extractable AES-256 key, and one it lists with CKF_UNWRAP
+    // as well unwraps the result to a key that decrypts what the original encrypts (§5.5.6: the flags say what the mechanism
+    // can be used for). The AES key wraps and RSA-OAEP (SHA-256, MGF1-SHA-256) only: the modes that wrap by
+    // encrypting (AES-ECB, AES-CBC-PAD, AES-GCM), RSA PKCS#1 v1.5 and raw RSA, and the other key types, are
+    // WrapUnwrapKeyTestCases' and the mechanism cases' to cover. The comparison runs one block through AES-ECB,
+    // or AES-CBC under one random IV, whichever the token has; the policy is relaxed for it and for the wraps,
+    // which is the token's behaviour under test, not the library's.
+    internal static void Assert_AdvertisedWrapMechanism_WrapsAnAesKey(IPkcs11Backend backend, CKM mechanism)
+    {
+        backend.RequireMechanismFlags(mechanism, f => f.Wrap, "CKF_WRAP");
+        if (mechanism == CKM.CKM_RSA_PKCS_OAEP)
+            backend.RequireMechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        else
+            backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+        bool unwraps = Slot(backend).GetMechanismInfo(mechanism).MechanismFlags.Unwrap;
+
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var created = new List<ObjectHandle>();
+        try
+        {
+            ObjectHandle wrapping, unwrapping;
+            Mechanism wrap;
+            if (mechanism == CKM.CKM_RSA_PKCS_OAEP)
+            {
+                (wrapping, unwrapping) = TestKeys.GenerateRsa2048KeyPair(session);
+                created.AddRange([wrapping, unwrapping]);
+                wrap = new Mechanism(mechanism, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
+            }
+            else
+            {
+                wrapping = unwrapping = TestKeys.GenerateAes256WrappingKey(session);
+                created.Add(wrapping);
+                wrap = new Mechanism(mechanism);
+            }
+            ObjectHandle target = TestKeys.ImportExtractableAesKey(session, RandomNumberGenerator.GetBytes(32));
+            created.Add(target);
+
+            byte[] wrapped = session.WrapKey(wrap, wrapping, target);
+            Assert.NotEmpty(wrapped);
+            if (!unwraps)
+                return;
+
+            using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+            ObjectHandle unwrapped = session.UnwrapKey(wrap, unwrapping, wrapped, [attrClass, attrKeyType, attrToken, attrDecrypt]);
+            created.Add(unwrapped);
+
+#pragma warning disable KLPKCS11009 // one block, only to tell the two keys apart, under the relaxed policy
+            Mechanism? block = backend.Supports(CKM.CKM_AES_ECB) ? new Mechanism(CKM.CKM_AES_ECB)
+                : backend.Supports(CKM.CKM_AES_CBC) ? new Mechanism(CKM.CKM_AES_CBC, RandomNumberGenerator.GetBytes(16))
+                : null;
+#pragma warning restore KLPKCS11009
+            if (block is not null)
+            {
+                byte[] data = RandomNumberGenerator.GetBytes(16);
+                Assert.Equal(data, session.Decrypt(block, unwrapped, session.Encrypt(block, target, data)));
+            }
+        }
+        finally
+        {
+            foreach (ObjectHandle handle in created)
+                session.DestroyObject(handle);
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    // A token with a clock (CKF_CLOCK_ON_TOKEN) reports the time in utcTime as YYYYMMDDhhmmss followed by two
+    // reserved '0' characters (§3.2, CK_TOKEN_INFO), a valid date and time.
+    internal static void Assert_ClockOnToken_ReportsAWellFormedUtcTime(IPkcs11Backend backend)
+    {
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        AssertRv(CKR.CKR_OK, lowLevel.C_GetTokenInfo(backend.SlotId, out CK_TOKEN_INFO info), "C_GetTokenInfo");
+        if (((ulong)info.Flags & CKF.CKF_CLOCK_ON_TOKEN) == 0)
+            Assert.Skip("The token has no clock (CKF_CLOCK_ON_TOKEN clear).");
+
+        string utcTime = System.Text.Encoding.ASCII.GetString(info.UtcTime);
+        Assert.True(utcTime.Length == 16 && utcTime.All(char.IsAsciiDigit) && utcTime.EndsWith("00", StringComparison.Ordinal),
+            $"utcTime \"{utcTime.Replace("\0", "\\0", StringComparison.Ordinal)}\" is not YYYYMMDDhhmmss00.");
+        Assert.True(DateTime.TryParseExact(utcTime[..14], "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out _),
+            $"utcTime \"{utcTime}\" is no valid date and time.");
+    }
+
     // === Session information and states ========================================
 
     // A session's state follows the token's login (§5.6): read/write or read-only, public or user. A login is
@@ -187,6 +339,79 @@ internal static class SessionConformanceTestCases
         }
     }
 
+    // The SO and the user exclude each other: with the SO logged in, C_Login(CKU_USER) from any session answers
+    // CKR_USER_ANOTHER_ALREADY_LOGGED_IN, and with the user logged in so does C_Login(CKU_SO) (§5.1.6), and the
+    // sessions stay in the state of whoever is logged in. The SO logs in from read/write sessions only (§5.6.8:
+    // a read-only one would be CKR_SESSION_READ_ONLY_EXISTS), and nobody is logged in afterwards, whatever fails.
+    internal static void Assert_SoAndUser_ExcludeEachOther(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        NativeCULong first = OpenRawSession(lowLevel, backend.SlotId);
+        NativeCULong second = OpenRawSession(lowLevel, backend.SlotId);
+        try
+        {
+            AssertRv(CKR.CKR_OK, lowLevel.C_Login(first, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO");
+            Assert.Equal(CKS.CKS_RW_SO_FUNCTIONS, (CKS)(ulong)SessionInfo(lowLevel, second).State);
+            AssertRv(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, lowLevel.C_Login(first, CKU.CKU_USER, backend.UserPin.Span), "C_Login as the user in the SO's session");
+            AssertRv(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, lowLevel.C_Login(second, CKU.CKU_USER, backend.UserPin.Span), "C_Login as the user from another session");
+            Assert.Equal(CKS.CKS_RW_SO_FUNCTIONS, (CKS)(ulong)SessionInfo(lowLevel, first).State);
+            AssertRv(CKR.CKR_OK, lowLevel.C_Logout(second), "C_Logout of the SO");
+
+            AssertRv(CKR.CKR_OK, lowLevel.C_Login(first, CKU.CKU_USER, backend.UserPin.Span), "C_Login as the user");
+            AssertRv(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, lowLevel.C_Login(second, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO with the user logged in");
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, (CKS)(ulong)SessionInfo(lowLevel, second).State);
+        }
+        finally
+        {
+            lowLevel.C_Logout(first);
+            lowLevel.C_CloseSession(second);
+            lowLevel.C_CloseSession(first);
+        }
+    }
+
+    // The SO makes no private object: "Only public objects can be created unless the normal user is logged in"
+    // (§5.7.1), so with the SO logged in C_CreateObject with CKA_PRIVATE = TRUE answers CKR_USER_NOT_LOGGED_IN
+    // (§5.1.6) and makes nothing. Nobody is logged in afterwards, whatever fails.
+    // Whether the SO may see the user's private objects is left out: [PKCS11-UG] gives the "R/W SO Functions"
+    // state the public objects only, but the specification itself says no more than that a private object needs
+    // "the user" authenticated (§4.4), and Kryoptic, BouncyHsm, Craton HSM and FreeHSM all show the SO them.
+    internal static void Assert_So_CreatesNoPrivateObject(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        // While CKF_SO_PIN_TO_BE_CHANGED is set (an SO PIN still at its default, as a CI token may be provisioned),
+        // the SO's login succeeds "but only the C_SetPIN function can be called", and every other call answers
+        // CKR_PIN_EXPIRED (§3.2, the notes on CK_TOKEN_INFO's flags), so there is nothing to test.
+        if (Slot(backend).GetTokenInfo().TokenFlags.SoPinToBeChanged)
+            Assert.Skip("The token's SO PIN is to be changed (CKF_SO_PIN_TO_BE_CHANGED), so an SO session answers CKR_PIN_EXPIRED.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        string label = $"kl-so-{Guid.NewGuid():N}";
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+
+        using var so = Slot(backend).OpenSessionCore();
+        var sid = (NativeCULong)so.SessionId;
+        AssertRv(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO");
+        try
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => so.CreateObject([attrClass, attrSession, attrPrivate, attrLabel]));
+            Assert.True(ex.ReturnValue == CKR.CKR_USER_NOT_LOGGED_IN, $"C_CreateObject of a private object as the SO returned {ex.ReturnValue}.");
+        }
+        finally { lowLevel.C_Logout(sid); }
+
+        using var user = TestKeys.OpenLoggedInSession(backend);
+        try { Assert.Empty(user.FindAllObjects([attrClass, attrLabel])); }
+        finally { user.Logout(); }
+    }
+
     // A wrong PIN is CKR_PIN_INCORRECT and logs nobody in; the right PIN right after it does. Tried once, and
     // followed at once by a successful login, so no token's retry counter is left lowered. The exception the
     // library raises for it does not carry the PIN.
@@ -217,6 +442,62 @@ internal static class SessionConformanceTestCases
         using (var pin = new SecurePin(backend.UserPin.Span))
         using (var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin))
             Assert.Equal(16, opened.GenerateRandom(16).Length);
+    }
+
+    // A PIN shorter than ulMinPinLen or longer than ulMaxPinLen (§3.2, CK_TOKEN_INFO) logs nobody in, and C_SetPIN
+    // will not set one: CKR_PIN_LEN_RANGE, "The specified PIN is too long or too short" (§5.1.6, §5.5.9), after
+    // which the old PIN still logs in. C_Login may answer CKR_PIN_LEN_RANGE or CKR_PIN_INCORRECT: §5.1.6 says the
+    // first "only applies to functions which attempt to set a PIN", yet C_Login of a PIN no token could hold is
+    // refused for its length all the same, and §5.6.8 lists neither as wrong. No wrong PIN of a valid length is
+    // ever presented, and every refusal is followed at once by a login with the right PIN, so no token is left a
+    // try short; a token that counts the refusal and then refuses the right PIN fails here, and the rest of its
+    // collection with it. A length of 0 is never tried (a NULL PIN means the protected authentication path,
+    // §5.6.8), nor one above 1024 bytes. A C_SetPIN that does take the PIN is undone.
+    internal static void Assert_PinOutsideTheLengthRange_IsRefused(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        TokenInfo token = Slot(backend).GetTokenInfo();
+        bool hasMin = token.MinPinLen != CK.CK_UNAVAILABLE_INFORMATION;
+        bool hasMax = token.MaxPinLen != 0 && token.MaxPinLen != CK.CK_UNAVAILABLE_INFORMATION; // 0: CK_EFFECTIVELY_INFINITE
+        ulong own = (ulong)backend.UserPin.Length;
+        Assert.True((!hasMin || own >= token.MinPinLen) && (!hasMax || own <= token.MaxPinLen),
+            $"The token's PIN length range [{token.MinPinLen}, {token.MaxPinLen}] leaves out the {own}-byte user PIN it was given.");
+        var outside = new List<byte[]>();
+        if (hasMin && token.MinPinLen >= 2)
+            outside.Add([.. Enumerable.Repeat((byte)'7', (int)token.MinPinLen - 1)]);
+        if (hasMax && token.MaxPinLen < 1024)
+            outside.Add([.. Enumerable.Repeat((byte)'7', (int)token.MaxPinLen + 1)]);
+        if (outside.Count == 0)
+            Assert.Skip($"The token's PIN length range [{token.MinPinLen}, {token.MaxPinLen}] leaves no length to try.");
+
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+        NativeCULong session = OpenRawSession(lowLevel, backend.SlotId);
+        try
+        {
+            foreach (byte[] pin in outside)
+            {
+                string what = $"a {pin.Length}-byte PIN (range [{token.MinPinLen}, {token.MaxPinLen}])";
+                CKR rv = lowLevel.C_Login(session, CKU.CKU_USER, pin);
+                Assert.True(rv is CKR.CKR_PIN_LEN_RANGE or CKR.CKR_PIN_INCORRECT, $"C_Login with {what} returned {rv}.");
+                Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, session).State);
+                AssertRv(CKR.CKR_OK, lowLevel.C_Login(session, CKU.CKU_USER, backend.UserPin.Span), $"C_Login with the right PIN after {what}");
+
+                rv = lowLevel.C_SetPIN(session, backend.UserPin.Span, pin);
+                if (rv == CKR.CKR_OK)
+                    AssertRv(CKR.CKR_OK, lowLevel.C_SetPIN(session, pin, backend.UserPin.Span), "C_SetPIN back to the right PIN");
+                AssertRv(CKR.CKR_PIN_LEN_RANGE, rv, $"C_SetPIN to {what}");
+                AssertRv(CKR.CKR_OK, lowLevel.C_Logout(session), "C_Logout");
+                AssertRv(CKR.CKR_OK, lowLevel.C_Login(session, CKU.CKU_USER, backend.UserPin.Span), $"C_Login with the old PIN after C_SetPIN to {what}");
+                AssertRv(CKR.CKR_OK, lowLevel.C_Logout(session), "C_Logout");
+            }
+        }
+        finally
+        {
+            lowLevel.C_Logout(session);
+            lowLevel.C_CloseSession(session);
+        }
     }
 
     // === Access without a login ================================================
@@ -257,6 +538,168 @@ internal static class SessionConformanceTestCases
         }
     }
 
+    // The AES key wraps, in order of preference; a 32-byte key needs no padding, so any of them does.
+    private static readonly CKM[] AesKeyWraps = [CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_KWP, CKM.CKM_AES_KEY_WRAP_PAD];
+
+    public static TheoryData<string> PrivateObjectCreations =>
+        ["CreateObject", "CopyObject", "GenerateKey", "GenerateKeyPair", "DeriveKey", "UnwrapKey", "EncapsulateKey", "DecapsulateKey"];
+
+    // With nobody logged in, a call that would make a CKA_PRIVATE = TRUE object answers CKR_USER_NOT_LOGGED_IN
+    // and makes nothing: "a private object cannot be created on a token unless the session attempting to create
+    // it is logged in as the normal user" (§5.1.6, CKR_USER_NOT_LOGGED_IN; §4.4, CKA_PRIVATE). Every input the
+    // call takes (a key to copy, a base key, an unwrapping key, a ciphertext) is a public session object made
+    // while logged in, which the C_Logout leaves in place (§5.6.10 destroys only the private ones), so the
+    // refusal can only be about the new object. CKA_PRIVATE is always given explicitly: its default is
+    // token-specific (§4.4). Nothing carries the case's label after a new login.
+    internal static void Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(IPkcs11Backend backend, string call)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        switch (call)
+        {
+            case "GenerateKey": backend.RequireMechanism(CKM.CKM_AES_KEY_GEN); break;
+            case "GenerateKeyPair": backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN); break;
+            case "DeriveKey": backend.RequireMechanism(CKM.CKM_HKDF_DERIVE); break;
+            case "UnwrapKey":
+                backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+                if (!AesKeyWraps.Any(backend.Supports))
+                    Assert.Skip($"Backend advertises none of {string.Join(", ", AesKeyWraps)}.");
+                break;
+            case "EncapsulateKey" or "DecapsulateKey":
+                backend.RequireMechanisms(CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM);
+                backend.RequireMlKemParameterSet(1184); // ML-KEM-768
+                break;
+        }
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        string label = $"kl-private-{Guid.NewGuid():N}";
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrInput = new ObjectAttribute(CKA.CKA_LABEL, label + "-input");
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPublic = new ObjectAttribute(CKA.CKA_PRIVATE, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrLen32 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrValue8 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(8));
+        using var attrValue32 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+        using var attrMlKem768 = new ObjectAttribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768);
+        using var attrEncapsulate = new ObjectAttribute(CKA.CKA_ENCAPSULATE, true);
+        using var attrDecapsulate = new ObjectAttribute(CKA.CKA_DECAPSULATE, true);
+
+        using var session = Slot(backend).OpenSessionCore();
+        using var pin = new SecurePin(backend.UserPin.Span);
+        session.Login(CKU.CKU_USER, pin);
+        bool loggedIn = true;
+        try
+        {
+            // The inputs first, made while logged in; then the call, to run once nobody is.
+            Action refused;
+            switch (call)
+            {
+                case "CreateObject":
+                    refused = () => session.CreateObject([attrData, attrSession, attrPrivate, attrLabel, attrValue8]);
+                    break;
+                case "CopyObject":
+                    {
+                        ObjectHandle source = session.CreateObject([attrData, attrSession, attrPublic, attrInput, attrValue8]);
+                        refused = () => session.CopyObject(source, [attrPrivate, attrLabel]);
+                        break;
+                    }
+                case "GenerateKey":
+                    refused = () => session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
+                        [attrSecret, attrAes, attrLen32, attrSession, attrPrivate, attrLabel, attrEncrypt]);
+                    break;
+                case "GenerateKeyPair":
+                    // Only the private half asks to be private, so it is the only reason to refuse.
+                    refused = () => session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN),
+                        [attrSession, attrPublic, attrEcParams, attrVerify, attrLabel],
+                        [attrSession, attrPrivate, attrSign, attrLabel], out _, out _);
+                    break;
+                case "DeriveKey":
+                    {
+                        ObjectHandle baseKey = session.CreateObject([attrSecret, attrGeneric, attrSession, attrPublic, attrDerive, attrInput, attrValue32]);
+                        var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
+                            CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
+                        refused = () => session.DeriveKey(mechanism, baseKey,
+                            [attrSecret, attrGeneric, attrLen32, attrSession, attrPrivate, attrLabel, attrSign]);
+                        break;
+                    }
+                case "UnwrapKey":
+                    {
+                        ObjectHandle kek = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
+                            [attrSecret, attrAes, attrLen32, attrSession, attrPublic, attrWrap, attrUnwrap, attrInput]);
+                        ObjectHandle target = session.CreateObject([attrSecret, attrAes, attrSession, attrPublic, attrExtractable, attrEncrypt, attrInput, attrValue32]);
+                        var wrap = new Mechanism(AesKeyWraps.First(backend.Supports));
+                        byte[] wrapped = session.WrapKey(wrap, kek, target);
+                        refused = () => session.UnwrapKey(wrap, kek, wrapped,
+                            [attrSecret, attrAes, attrSession, attrPrivate, attrLabel, attrEncrypt]);
+                        break;
+                    }
+                default: // EncapsulateKey, DecapsulateKey
+                    {
+                        session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN),
+                            [attrSession, attrPublic, attrMlKem768, attrEncapsulate, attrInput],
+                            [attrSession, attrPublic, attrDecapsulate, attrInput], out ObjectHandle publicKey, out ObjectHandle privateKey);
+                        // ML-KEM's shared secret is 32 bytes (FIPS 203), and a token may want the generic secret's
+                        // CKA_VALUE_LEN given (opencryptoki's ml_kem_get_key_type_key_len does).
+                        List<ObjectAttribute> template = [attrSecret, attrGeneric, attrLen32, attrSession, attrPrivate, attrLabel];
+                        if (call == "EncapsulateKey")
+                        {
+                            refused = () => session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey, template, expectedCiphertextLen: 1088);
+                            break;
+                        }
+                        using (var read = session.GetAttributeValue(privateKey, [CKA.CKA_PRIVATE]))
+                        {
+                            if (read[0].GetValueAsBool())
+                                Assert.Skip("The token made the ML-KEM private key private though the template asked for a public one.");
+                        }
+                        (byte[] ciphertext, _) = session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey,
+                            [attrSecret, attrGeneric, attrLen32, attrSession, attrPublic, attrInput], expectedCiphertextLen: 1088);
+                        refused = () => session.DecapsulateKey(new Mechanism(CKM.CKM_ML_KEM), privateKey, ciphertext, template);
+                        break;
+                    }
+            }
+
+            session.Logout();
+            loggedIn = false;
+            Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, (NativeCULong)session.SessionId).State);
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(refused);
+            if (call == "CopyObject")
+            {
+                // §4.1.3: a token "might not actually support modification of" CKA_PRIVATE during a copy, and then
+                // refuses the template instead, which creates nothing either.
+                Assert.True(ex.ReturnValue is CKR.CKR_USER_NOT_LOGGED_IN or CKR.CKR_ATTRIBUTE_READ_ONLY or CKR.CKR_TEMPLATE_INCONSISTENT,
+                    $"C_CopyObject to a private copy with nobody logged in returned {ex.ReturnValue}.");
+            }
+            else
+            {
+                Assert.True(ex.ReturnValue == CKR.CKR_USER_NOT_LOGGED_IN, $"{call} of a private object with nobody logged in returned {ex.ReturnValue}.");
+            }
+
+            session.Login(CKU.CKU_USER, pin);
+            loggedIn = true;
+            Assert.Empty(session.FindAllObjects([attrLabel]));
+        }
+        finally
+        {
+            if (loggedIn)
+                session.Logout();
+        }
+    }
+
     private static ObjectHandle CreateTokenDataObject(Pkcs11SessionCore session, string label, bool isPrivate, byte[]? value = null)
     {
         using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
@@ -292,6 +735,252 @@ internal static class SessionConformanceTestCases
             session.DestroyObject(sessionObject);
         }
         finally { TestKeys.LogoutIfRequired(backend, session); }
+    }
+
+    public static TheoryData<string> ReadOnlySessionWrites =>
+        ["GenerateKey", "GenerateKeyPair", "DeriveKey", "UnwrapKey", "CopyObject", "SetAttributeValue", "DestroyObject"];
+
+    // A read-only session neither makes nor changes a token object, by any call: "Only session objects can be
+    // created during a read-only session" (§5.7.1, §5.7.2 for a copy), modified (§5.7.6) or destroyed (§5.7.3),
+    // and C_GenerateKey, C_GenerateKeyPair (either half), C_DeriveKey and C_UnwrapKey answer the same
+    // CKR_SESSION_READ_ONLY (§5.1.6, §5.18). The same call on session objects succeeds. The user is logged in
+    // (from a read/write session, where the token object is made); the inputs are session objects made in the
+    // read-only session itself, so the module's session-object scope does not matter.
+    internal static void Assert_ReadOnlySession_RefusesTokenObjectWrites(IPkcs11Backend backend, string call)
+    {
+        if (!backend.SupportsTokenObjects)
+            Assert.Skip("The backend has no token objects.");
+        switch (call)
+        {
+            case "GenerateKey": backend.RequireMechanism(CKM.CKM_AES_KEY_GEN); break;
+            case "GenerateKeyPair": backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN); break;
+            case "DeriveKey":
+                if (!backend.Supports(CKM.CKM_HKDF_DERIVE))
+                    backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE);
+                break;
+            case "UnwrapKey":
+                backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+                if (!AesKeyWraps.Any(backend.Supports))
+                    Assert.Skip($"Backend advertises none of {string.Join(", ", AesKeyWraps)}.");
+                break;
+        }
+
+        string label = $"kl-rowrite-{Guid.NewGuid():N}";
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrRenamed = new ObjectAttribute(CKA.CKA_LABEL, label + "-renamed");
+        using var attrOnToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrLen32 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrValue32 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+
+        using var rw = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            ObjectHandle tokenObject = CreateTokenDataObject(rw, label, isPrivate: false);
+            using var ro = Slot(backend).OpenSessionCore(readWrite: false);
+            using var insecure = ro.UsePolicy(CryptoPolicy.AllowInsecure); // ECDH with CKD_NULL below
+            ObjectHandle sessionObject = ro.CreateObject([attrData, attrSession, attrLabel]);
+
+            // Each pair: the call on a token object, then the same call on a session object.
+            (Action Token, Action Session)[] calls;
+            switch (call)
+            {
+                case "GenerateKey":
+                    {
+                        var generate = new Mechanism(CKM.CKM_AES_KEY_GEN);
+                        calls = [(() => ro.GenerateKey(generate, [attrSecret, attrAes, attrLen32, attrOnToken, attrEncrypt, attrLabel]),
+                                  () => ro.GenerateKey(generate, [attrSecret, attrAes, attrLen32, attrSession, attrEncrypt, attrLabel]))];
+                        break;
+                    }
+                case "GenerateKeyPair":
+                    {
+                        var generate = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+                        void Pair(ObjectAttribute publicToken, ObjectAttribute privateToken) =>
+                            ro.GenerateKeyPair(generate, [publicToken, attrEcParams, attrVerify, attrLabel], [privateToken, attrSign, attrLabel], out _, out _);
+                        calls = [(() => Pair(attrOnToken, attrSession), () => Pair(attrSession, attrSession)),
+                                 (() => Pair(attrSession, attrOnToken), () => Pair(attrSession, attrSession))];
+                        break;
+                    }
+                case "DeriveKey":
+                    {
+                        Mechanism derive;
+                        ObjectHandle baseKey;
+                        if (backend.Supports(CKM.CKM_HKDF_DERIVE))
+                        {
+                            baseKey = ro.CreateObject([attrSecret, attrGeneric, attrSession, attrDerive, attrLabel, attrValue32]);
+                            derive = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
+                        }
+                        else
+                        {
+                            ro.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), [attrSession, attrEcParams, attrLabel], [attrSession, attrDerive, attrLabel], out _, out baseKey);
+                            ro.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), [attrSession, attrEcParams, attrLabel], [attrSession, attrDerive, attrLabel], out ObjectHandle peer, out _);
+                            using var point = ro.GetAttributeValue(peer, [CKA.CKA_EC_POINT]);
+                            derive = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, point[0].GetValueAsByteArray()));
+                        }
+                        calls = [(() => ro.DeriveKey(derive, baseKey, [attrSecret, attrGeneric, attrLen32, attrOnToken, attrSign, attrLabel]),
+                                  () => ro.DeriveKey(derive, baseKey, [attrSecret, attrGeneric, attrLen32, attrSession, attrSign, attrLabel]))];
+                        break;
+                    }
+                case "UnwrapKey":
+                    {
+                        ObjectHandle kek = ro.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrSecret, attrAes, attrLen32, attrSession, attrWrap, attrUnwrap, attrLabel]);
+                        ObjectHandle target = ro.CreateObject([attrSecret, attrAes, attrSession, attrExtractable, attrEncrypt, attrLabel, attrValue32]);
+                        var wrap = new Mechanism(AesKeyWraps.First(backend.Supports));
+                        byte[] wrapped = ro.WrapKey(wrap, kek, target);
+                        calls = [(() => ro.UnwrapKey(wrap, kek, wrapped, [attrSecret, attrAes, attrOnToken, attrEncrypt, attrLabel]),
+                                  () => ro.UnwrapKey(wrap, kek, wrapped, [attrSecret, attrAes, attrSession, attrEncrypt, attrLabel]))];
+                        break;
+                    }
+                case "CopyObject":
+                    calls = [(() => ro.CopyObject(tokenObject, [attrLabel]), () => ro.CopyObject(sessionObject, [attrLabel])),
+                             (() => ro.CopyObject(sessionObject, [attrOnToken, attrLabel]), () => ro.CopyObject(sessionObject, [attrLabel]))];
+                    break;
+                case "SetAttributeValue":
+                    calls = [(() => ro.SetAttributeValue(tokenObject, [attrRenamed]), () => ro.SetAttributeValue(sessionObject, [attrRenamed]))];
+                    break;
+                default: // DestroyObject
+                    calls = [(() => ro.DestroyObject(tokenObject), () => ro.DestroyObject(sessionObject))];
+                    break;
+            }
+
+            for (int i = 0; i < calls.Length; i++)
+            {
+                Exception? ex = Record.Exception(calls[i].Token);
+                Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_SESSION_READ_ONLY },
+                    $"{call} #{i + 1} of a token object in a read-only session gave {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "CKR_OK"}.");
+                calls[i].Session();
+            }
+
+            // The token object is still the only one, under its own label. Told by CKA_TOKEN rather than by the
+            // search template, and the read/write session sees no other session's session objects anyway.
+            Assert.Equal([tokenObject.ObjectId], TokenObjectsLabelled(rw, attrLabel, attrRenamed).Select(h => h.ObjectId));
+            using var read = rw.GetAttributeValue(tokenObject, [CKA.CKA_LABEL]);
+            Assert.Equal(label, read[0].GetValueAsString());
+        }
+        finally
+        {
+            foreach (ObjectHandle handle in TokenObjectsLabelled(rw, attrLabel, attrRenamed))
+                rw.DestroyObject(handle);
+            TestKeys.LogoutIfRequired(backend, rw);
+        }
+    }
+
+    private static List<ObjectHandle> TokenObjectsLabelled(Pkcs11SessionCore session, params ObjectAttribute[] labels)
+    {
+        var found = new List<ObjectHandle>();
+        foreach (ObjectAttribute label in labels)
+        {
+            foreach (ObjectHandle handle in session.FindAllObjects([label]))
+            {
+                using var read = session.GetAttributeValue(handle, [CKA.CKA_TOKEN]);
+                if (read[0].GetValueAsBool())
+                    found.Add(handle);
+            }
+        }
+        return found;
+    }
+
+    // === Logout ================================================================
+
+    // C_Logout invalidates the application's handles to private objects and destroys its private session objects
+    // (§5.6.10). With nobody logged in, the handle of a private token key is CKR_OBJECT_HANDLE_INVALID to
+    // C_GetAttributeValue, and C_EncryptInit refuses it; a private session object is found by no search and its
+    // handle stays CKR_OBJECT_HANDLE_INVALID after a new login. A public session object keeps its handle
+    // throughout. The token key's old handle is not checked after the new login: a module may give the key the
+    // same number again, and a search then finds it under that number.
+    // C_EncryptInit may answer CKR_KEY_HANDLE_INVALID or CKR_USER_NOT_LOGGED_IN, the two §5.8.1 lists for it, or
+    // CKR_OBJECT_HANDLE_INVALID: the handle is an object handle §5.6.10 made invalid, and the spec says no more
+    // about which of the two handle codes a key handle gets then.
+    // tokenKeyEncryptInit records a backend's own answer to C_EncryptInit (null: the ones above).
+    internal static void Assert_Logout_InvalidatesPrivateHandles(IPkcs11Backend backend, CKR? tokenKeyEncryptInit = null)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        string label = $"kl-logout-{Guid.NewGuid():N}";
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrOnToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrPublic = new ObjectAttribute(CKA.CKA_PRIVATE, false);
+        using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+
+        using var session = Slot(backend).OpenSessionCore();
+        var sid = (NativeCULong)session.SessionId;
+        using var pin = new SecurePin(backend.UserPin.Span);
+        session.Login(CKU.CKU_USER, pin);
+        bool loggedIn = true;
+        try
+        {
+            ObjectHandle? tokenKey = backend.SupportsTokenObjects
+                ? session.CreateObject([attrSecret, attrAes, attrOnToken, attrPrivate, attrEncrypt, attrLabel, attrValue])
+                : null;
+            ObjectHandle privateSessionObject = session.CreateObject([attrData, attrSession, attrPrivate, attrLabel]);
+            ObjectHandle publicSessionObject = session.CreateObject([attrData, attrSession, attrPublic, attrLabel]);
+
+            session.Logout();
+            loggedIn = false;
+
+            if (tokenKey is { } key)
+            {
+                AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, key), "C_GetAttributeValue on a private token key after C_Logout");
+                if (backend.Supports(CKM.CKM_AES_ECB))
+                {
+                    // ECB only because it takes no parameter; an operation it starts is ended at once.
+                    var ecb = new CK_MECHANISM { Mechanism = (NativeCULong)(ulong)CKM.CKM_AES_ECB };
+                    CKR rv = lowLevel.C_EncryptInit(sid, in ecb, (NativeCULong)key.ObjectId);
+                    if (rv == CKR.CKR_OK)
+                        lowLevel.C_EncryptFinal(sid, [], lengthOnly: false, out _);
+                    if (tokenKeyEncryptInit is { } expected)
+                        AssertRv(expected, rv, "C_EncryptInit with a private token key after C_Logout");
+                    else
+                        Assert.True(rv is CKR.CKR_KEY_HANDLE_INVALID or CKR.CKR_USER_NOT_LOGGED_IN or CKR.CKR_OBJECT_HANDLE_INVALID,
+                            $"C_EncryptInit with a private token key after C_Logout returned {rv}.");
+                }
+            }
+            AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, privateSessionObject), "C_GetAttributeValue on a private session object after C_Logout");
+            AssertRv(CKR.CKR_OK, ClassOf(lowLevel, sid, publicSessionObject), "C_GetAttributeValue on a public session object after C_Logout");
+            Assert.Equal([publicSessionObject.ObjectId], session.FindAllObjects([attrLabel]).Select(h => h.ObjectId));
+
+            session.Login(CKU.CKU_USER, pin);
+            loggedIn = true;
+            AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, privateSessionObject), "C_GetAttributeValue on a destroyed private session object after a new login");
+            Assert.DoesNotContain(session.FindAllObjects([attrData, attrLabel]), h => h.ObjectId != publicSessionObject.ObjectId);
+        }
+        finally
+        {
+            if (!loggedIn)
+                session.Login(CKU.CKU_USER, pin);
+            // Found again by label: the token key's handle may have changed with the new login.
+            foreach (ObjectHandle handle in session.FindAllObjects([attrLabel]))
+                session.DestroyObject(handle);
+            session.Logout();
+        }
+    }
+
+    // C_GetAttributeValue of CKA_CLASS, its length only, for the module's own answer about the handle.
+    private static CKR ClassOf(LowLevelPkcs11Library lowLevel, NativeCULong session, ObjectHandle handle)
+    {
+        CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_CLASS }];
+        return lowLevel.C_GetAttributeValue(session, (NativeCULong)handle.ObjectId, template);
     }
 
     // === Handles ===============================================================

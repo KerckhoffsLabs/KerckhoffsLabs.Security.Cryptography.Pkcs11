@@ -32,4 +32,13 @@ public sealed class HkdfTests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void ExtractOnly_MatchesBclViaSignProbe() => HkdfTestCases.Assert_ExtractOnly_MatchesBclViaSignProbe(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(HkdfTestCases.HkdfParameterFaults), MemberType = typeof(HkdfTestCases))]
+    public void Hkdf_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault == "CKA_VALUE_LEN 2^32 + 1" && !NssBackendFixture.NssRefusesAnHkdfValueLenPastTheLimit)
+            Assert.Skip("NSS narrows an HKDF CKA_VALUE_LEN of 2^32 + 1 and derives");
+        HkdfTestCases.Assert_Hkdf_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
 }

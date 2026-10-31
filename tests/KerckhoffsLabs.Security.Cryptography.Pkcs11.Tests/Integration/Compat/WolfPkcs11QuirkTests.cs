@@ -237,6 +237,25 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             "WolfPkcs11BackendFixture.WolfPkcs11MarksAShortBufferUnavailable to true and delete this test.");
     }
 
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void PrivateKeyOfASecretKeyType_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        Exception? ex;
+        try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrValue]))); }
+        finally { TestKeys.LogoutIfRequired(_backend, session); }
+
+        Assert.True(ex is null,
+            "C_CreateObject of a CKO_PRIVATE_KEY of type CKK_AES is now refused " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAPrivateKeyOfASecretKeyType to true and delete this test.");
+    }
+
     private static string Code(Func<bool> verify, string what)
     {
         Exception? ex = Record.Exception(() => verify());
@@ -260,5 +279,198 @@ public sealed class WolfPkcs11QuirkTests(WolfPkcs11BackendFixture backend)
             $"CKM_RSA_PKCS_KEY_PAIR_GEN now generates the {minimum}-bit minimum it advertises, or advertises 2048 or more " +
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
             "WolfPkcs11BackendFixture.WolfPkcs11GeneratesItsMinimumRsaKeySize to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void VerifyRecoverUnderASign_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+        CKR rv;
+        try
+        {
+            using (var scope = new MechanismParameterScope())
+            {
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_ECDSA).Marshal(scope, out _);
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_SignInit(sid, in mech, (NativeCULong)priv.ObjectId));
+            }
+            rv = lowLevel.C_VerifyRecover(sid, new byte[64], new byte[64], lengthOnly: false, out _);
+            lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_SIGN);
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_MECHANISM_INVALID,
+            $"C_VerifyRecover with an ECDSA C_SignInit active and no C_VerifyRecoverInit no longer answers CKR_MECHANISM_INVALID (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11ReportsAVerifyRecoverNeverStarted to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void CbcPadDecryptShortBuffer_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+        byte[] iv = RandomNumberGenerator.GetBytes(16);
+        ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+        CKR rv;
+        NativeCULong reported;
+        try
+        {
+            using var aes = Aes.Create();
+            aes.Key = rawKey;
+            byte[] ciphertext = aes.EncryptCbc(new byte[43], iv, PaddingMode.PKCS7);
+            using (var scope = new MechanismParameterScope())
+            {
+#pragma warning disable KLPKCS11009 // CKM_AES_CBC_PAD through the raw dispatch.
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_AES_CBC_PAD, iv).Marshal(scope, out _);
+#pragma warning restore KLPKCS11009
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_DecryptInit(sid, in mech, (NativeCULong)key.ObjectId));
+            }
+            rv = lowLevel.C_Decrypt(sid, ciphertext, new byte[1], lengthOnly: false, out reported);
+            lowLevel.C_SessionCancel(sid, (NativeCULong)CKF.CKF_DECRYPT);
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL && (ulong)reported == 32,
+            $"C_Decrypt(CKM_AES_CBC_PAD) of 48 bytes into a 1-byte buffer now gives {rv} with {reported} bytes: set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11ReportsTheWholeCbcPadPlaintextLength to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void KeyWrapBlobOfAPartialSemiblock_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        ObjectHandle kek = TestKeys.ImportAesWrappingKey(session, RandomNumberGenerator.GetBytes(32));
+        ObjectHandle target = TestKeys.ImportExtractableAesKey(session, RandomNumberGenerator.GetBytes(32));
+        Exception? ex;
+        try
+        {
+            var kw = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+            byte[] blob = session.WrapKey(kw, kek, target);
+            using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var enc = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            ex = Record.Exception(() => session.DestroyObject(session.UnwrapKey(kw, kek, blob[..20], [c, t, tok, enc])));
+        }
+        finally
+        {
+            session.DestroyObject(target);
+            session.DestroyObject(kek);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_WRAPPED_KEY_INVALID },
+            $"C_UnwrapKey(CKM_AES_KEY_WRAP) of a 20-byte blob no longer answers CKR_WRAPPED_KEY_INVALID (got {ex?.Message ?? "no error"}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAKeyWrapBlobByItsLength to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void OverlongRawRsaVerify_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sid = (NativeCULong)session.SessionId;
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var onToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+        using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var bits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, 2048UL);
+        using var exponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
+        session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), [pubClass, keyType, onToken, verify, bits, exponent],
+            [privClass, keyType, onToken, sign], out ObjectHandle pub, out ObjectHandle priv);
+        CKR rv, again;
+        try
+        {
+            byte[] m = RandomNumberGenerator.GetBytes(256);
+            m[0] = 0x01;
+            byte[] signature = new byte[256];
+            using var scope = new MechanismParameterScope();
+#pragma warning disable KLPKCS11008, KLPKCS11009 // CKM_RSA_X_509 through the raw dispatch.
+            CK_MECHANISM mech = new Mechanism(CKM.CKM_RSA_X_509).Marshal(scope, out _);
+#pragma warning restore KLPKCS11008, KLPKCS11009
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_SignInit(sid, in mech, (NativeCULong)priv.ObjectId));
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_Sign(sid, m, signature, lengthOnly: false, out _));
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_VerifyInit(sid, in mech, (NativeCULong)pub.ObjectId));
+            rv = lowLevel.C_Verify(sid, [.. m, 0x00], signature);
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_VerifyInit(sid, in mech, (NativeCULong)pub.ObjectId));
+            again = lowLevel.C_Verify(sid, m, signature);
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            session.DestroyObject(pub);
+            TestKeys.LogoutIfRequired(_backend, session);
+        }
+
+        Assert.Equal(CKR.CKR_OK, again);
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_Verify(CKM_RSA_X_509) of 257 bytes under a 2048-bit key no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesOverlongRawRsaDataByItsLength to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void MalformedEcdhPeer_QuirkStillPresent()
+    {
+        var (rv, _) = Mechanisms.AlgorithmConformanceTestCases.DeriveEcdhWithFault(_backend, "a DER length that lies");
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_DeriveKey(CKM_ECDH1_DERIVE) with a DER peer value whose length lies no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAMalformedEcdhPeerAsInvalid to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void HkdfOutputAboveTheRfcLimit_QuirkStillPresent()
+    {
+        var (rv, _) = Derive.HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 255 x 32 + 1");
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_DeriveKey(CKM_HKDF_DERIVE) past RFC 5869's limit no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAnHkdfOutputAboveTheRfcLimit to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void RsaExponentAbove64Bits_QuirkStillPresent()
+    {
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        CKR rv;
+        try
+        {
+            rv = Keys.GenerateRsaKeyPairTestCases.GenerateRawRsa(_backend, session, 2048, [0x01, 0, 0, 0, 0, 0, 0x01, 0x00, 0x01], out ObjectHandle pub, out ObjectHandle priv);
+            if (rv == CKR.CKR_OK)
+            {
+                session.DestroyObject(priv);
+                session.DestroyObject(pub);
+            }
+        }
+        finally { TestKeys.LogoutIfRequired(_backend, session); }
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN) with CKA_PUBLIC_EXPONENT 2^64 + 65537 no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAnRsaExponentAsInconsistent to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void GenericSecretPastItsMaximum_QuirkStillPresent()
+    {
+        var (rv, _) = Mechanisms.MechanismParameterTestCases.GenerateGenericSecret(_backend, 513);
+
+        Assert.True(rv == CKR.CKR_FUNCTION_FAILED,
+            $"C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN) of 513 bytes (ulMaxKeySize 4096 bits) no longer answers CKR_FUNCTION_FAILED (got {rv}): set " +
+            "WolfPkcs11BackendFixture.WolfPkcs11RefusesAGenericSecretLengthAsInvalid to true and delete this test.");
     }
 }

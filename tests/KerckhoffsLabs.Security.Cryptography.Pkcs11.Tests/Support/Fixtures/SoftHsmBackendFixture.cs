@@ -106,6 +106,123 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         (Settings.SoftHsmLibraryPath is { } p && File.Exists(p)) ||
         BuiltLibraryPath() is not null;
 
+    /// <summary>
+    /// False while <c>C_GenerateKey</c> and <c>C_GenerateKeyPair</c> answer a template whose <c>CKA_CLASS</c> the
+    /// mechanism does not make (<c>CKO_DATA</c> from <c>CKM_AES_KEY_GEN</c>, <c>CKO_PRIVATE_KEY</c> in the public
+    /// template of <c>CKM_EC_KEY_PAIR_GEN</c>) with <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, where PKCS#11 v3.2 §5.18.1
+    /// and §5.18.2 answer <c>CKR_TEMPLATE_INCONSISTENT</c>. Nothing is created.
+    /// </summary>
+    public const bool SoftHsmReportsAContradictoryClassAsInconsistent = false;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> of a blob that fails RFC 3394's integrity check answers
+    /// <c>CKR_GENERAL_ERROR</c>: <c>UnwrapKeySym</c> in <c>src/lib/SoftHSM.cpp</c> reports any failed decryption so.
+    /// PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_INVALID</c>. A blob of the wrong length is refused with
+    /// <c>CKR_WRAPPED_KEY_LEN_RANGE</c>, as it should be.
+    /// </summary>
+    public const bool SoftHsmReportsATamperedKeyWrapBlobAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_RSA_PKCS_OAEP)</c> of a blob that is not the modulus's length answers
+    /// <c>CKR_GENERAL_ERROR</c>: <c>UnwrapKeyAsym</c> in <c>src/lib/SoftHSM.cpp</c> does not check the length and
+    /// reports the failed decryption so. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnOaepBlobByItsLength = false;
+
+    /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="SoftHsmRefusesAnOaepBlobByItsLength"/>.</summary>
+    public static bool OaepBlobLengthRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesAnOaepBlobByItsLength;
+
+    /// <summary>
+    /// False while <c>C_Verify(CKM_RSA_X_509)</c> with more data than the modulus has bytes ends the test process:
+    /// <c>AsymVerify</c> in <c>src/lib/SoftHSM.cpp</c> zero-pads the data to the modulus's length with
+    /// <c>data.wipe(size - ulDataLen)</c>, which wraps around for <c>ulDataLen &gt; size</c>. PKCS#11 v3.2 §6.1.12
+    /// (Table 45: at most k bytes) and §5.1.6: <c>CKR_DATA_LEN_RANGE</c>. Not yet reported upstream.
+    /// </summary>
+    public const bool SoftHsmSurvivesAnOverlongRawRsaVerify = false;
+
+    /// <summary>Gate for the over-long raw RSA verify case: see <see cref="SoftHsmSurvivesAnOverlongRawRsaVerify"/>.</summary>
+    public static bool OverlongRawRsaVerifyAvailable => SoftHsmAvailable && SoftHsmSurvivesAnOverlongRawRsaVerify;
+
+    /// <summary>
+    /// False while <c>C_DigestKey</c> digests the <c>CKA_VALUE</c> of any object that has one, a sensitive EC private
+    /// key's scalar included: <c>C_DigestKey</c> in <c>src/lib/SoftHSM.cpp</c> checks neither the class nor, for
+    /// SHA-1 and SHA-2, <c>CKA_SENSITIVE</c> or <c>CKA_EXTRACTABLE</c>. Confirmed with an imported P-256 key: the
+    /// digest is SHA-256 of its private scalar. PKCS#11 v3.2 §5.12.4 digests "the value of a secret key", and
+    /// §5.1.6 has a key that is not one answer <c>CKR_KEY_INDIGESTIBLE</c>. Not yet reported upstream.
+    /// </summary>
+    public const bool SoftHsmRefusesToDigestAPrivateKey = false;
+
+    /// <summary>Gate for the private-key <c>C_DigestKey</c> case: see <see cref="SoftHsmRefusesToDigestAPrivateKey"/>.</summary>
+    public static bool PrivateKeyDigestRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesToDigestAPrivateKey;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
+    /// non-zero <c>ulIvLen</c>, or a NULL <c>pAAD</c> behind a non-zero <c>ulAADLen</c>, ends the test process:
+    /// <c>SymEncryptInit</c> and <c>SymDecryptInit</c> in <c>src/lib/SoftHSM.cpp</c> <c>memcpy</c> from the pointer
+    /// without checking it. PKCS#11 v3.2 §6.13.2 lets <c>pAAD</c> be NULL only when <c>ulAADLen</c> is 0, and
+    /// §5.1.6 has invalid parameters refused (<c>CKR_MECHANISM_PARAM_INVALID</c>, or <c>CKR_ARGUMENTS_BAD</c>).
+    /// Confirmed by running each row alone. Not yet reported upstream.
+    /// </summary>
+    public const bool SoftHsmSurvivesANullGcmPointer = false;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> takes <c>ulIvLen</c> 0 (<c>CKR_OK</c>)
+    /// and refuses <c>ulTagBits</c> 136 with <c>CKR_ARGUMENTS_BAD</c> (the same functions). PKCS#11 v3.2 §6.13.7: an
+    /// IV of 1 to 2^32 - 1 bytes, a tag of 0 to 128 bits; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnOutOfRangeGcmParameterAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_SignInit</c> and <c>C_VerifyInit(CKM_SHA256_RSA_PKCS_PSS)</c> refuse a <c>hashAlg</c> other than
+    /// <c>CKM_SHA256</c> with <c>CKR_ARGUMENTS_BAD</c> (the parameter check in <c>src/lib/SoftHSM.cpp</c>) and an
+    /// <c>sLen</c> too long for the key with <c>CKR_MECHANISM_INVALID</c> (the crypto layer's <c>signInit</c> refuses it,
+    /// <c>src/lib/crypto/OSSLRSA.cpp</c>). PKCS#11 v3.2 §6.1.9, §6.1.15 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnOutOfRangePssParameterAsInvalid = false;
+
+    /// <summary>Gate for the out-of-range PSS parameter case: see <see cref="SoftHsmRefusesAnOutOfRangePssParameterAsInvalid"/>.</summary>
+    public static bool PssParameterRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesAnOutOfRangePssParameterAsInvalid;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is no point on the curve (1 KiB, or a DER
+    /// OCTET STRING whose length byte promises more bytes than follow) answers <c>CKR_GENERAL_ERROR</c>
+    /// (<c>deriveECDH</c> in <c>src/lib/SoftHSM.cpp</c> passes the bytes to the crypto layer unchecked). PKCS#11 v3.2
+    /// §6.3.16 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAMalformedEcdhPeerAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 for a generic secret with <c>CKA_VALUE_LEN</c> 33, one
+    /// byte more than the secret, answers <c>CKR_FUNCTION_FAILED</c>. PKCS#11 v3.2 §6.3.17 (the mechanism only
+    /// truncates), §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>.
+    /// </summary>
+    public const bool SoftHsmRefusesAnEcdhValueLenAboveTheSecret = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with a <c>CKA_EC_PARAMS</c> OID that names no curve (the
+    /// P-256 OID with an arc added or its last arc dropped) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_CURVE_NOT_SUPPORTED</c> or <c>CKR_DOMAIN_PARAMS_INVALID</c> (or <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, §4.1).
+    /// </summary>
+    public const bool SoftHsmRefusesAnOidThatIsNoCurveAsNotSupported = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a key one byte longer than the
+    /// <c>ulMaxKeySize</c> it reports (0x8000000 bits, so 16 MiB + 1 bytes). PKCS#11 v3.2 §6.8.3: the range is in bits;
+    /// a length past it is <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>. 2^32 + 16 bytes is refused.
+    /// </summary>
+    public const bool SoftHsmBoundsAGenericSecretByItsMaximum = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> answers <c>CKR_GENERAL_ERROR</c> for a
+    /// <c>CKA_MODULUS_BITS</c> of 2^32 + 2048 and for a <c>CKA_PUBLIC_EXPONENT</c> of 2^64 + 65537. PKCS#11 v3.2 §6.1.4:
+    /// an exponent the implementation cannot use is <c>CKR_TEMPLATE_INCONSISTENT</c>; a size past ulMaxKeySize is
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c> (§4.1, §5.1.6).
+    /// ulMaxKeySize + 8 and the exponent 65539 pass.
+    /// </summary>
+    public const bool SoftHsmRefusesAnRsaKeyGenAttributeAsInvalid = false;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

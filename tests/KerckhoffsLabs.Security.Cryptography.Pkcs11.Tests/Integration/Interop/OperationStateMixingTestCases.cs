@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 
 /// <summary>
 /// Confirms each backend's actual behavior when a single-part call (<c>C_Digest</c>/<c>C_Sign</c>/
-/// <c>C_Encrypt</c>/<c>C_Decrypt</c>) is made while the corresponding multi-part operation
+/// <c>C_Verify</c>/<c>C_Encrypt</c>/<c>C_Decrypt</c>) is made while the corresponding multi-part operation
 /// (<c>...Init</c> + <c>...Update</c>) is still active, or when <c>...Update</c> is called after a
 /// single-part operation has already completed.
 /// </summary>
@@ -42,13 +42,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// more data than it intended -- just not the "nonsense data" failure mode CloudHSM describes.
 /// </para>
 /// <para>
-/// Confirmed matrix (Digest-1/Sign-2/Encrypt-1: single-part call while multi-part is active;
+/// Confirmed matrix (Digest-1/Sign-2/Verify-1/Encrypt-1: single-part call while multi-part is active;
 /// Digest-2: Update after a completed single-part op; Decrypt-1: single-part call while multi-part
 /// decrypt is active):
 /// <list type="table">
 /// <item><description>Digest-1: enforced on Kryoptic; NSS/SoftHSM2 treat it as a continuation.</description></item>
 /// <item><description>Digest-2: enforced on all three.</description></item>
 /// <item><description>Sign-2: enforced on SoftHSM2/Kryoptic; NSS treats it as a continuation.</description></item>
+/// <item><description>Verify-1 (HMAC-SHA256, PKCS#11 v3.2 §5.15.2): enforced on SoftHSM2/Kryoptic; NSS is
+/// wired as a continuation, as its Sign-2 is, and runs in CI only. BouncyHsm and wolfPKCS11 treat it as a
+/// continuation; FreeHSM starts over and discards the Update. Craton HSM has no HMAC, so it
+/// skips.</description></item>
 /// <item><description>Encrypt-1: enforced on Kryoptic since 1.5.4, which ends the active operation on
 /// the call and answers CKR_OPERATION_NOT_INITIALIZED; NSS and SoftHSM2 treat it as a
 /// continuation (CBC-PAD only emits whole ciphertext blocks as they become available and buffers
@@ -62,8 +66,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// Updates fed, and ends the operation (the <c>*_SinglePartAfterUpdate_DiscardsTheUpdate</c> cases).
 /// Digest-2 is enforced.</description></item>
 /// <item><description>wolfPKCS11 (not part of the three above) mixes the two: Digest-1 starts over and
-/// discards the Updates, as FreeHSM does; Sign-2 and Encrypt-1 treat the call as a continuation, as NSS
-/// does. Digest-2 and Decrypt-1 are enforced.</description></item>
+/// discards the Updates, as FreeHSM does; Sign-2, Verify-1 and Encrypt-1 treat the call as a continuation,
+/// as NSS does. Digest-2 and Decrypt-1 are enforced.</description></item>
 /// <item><description>Decrypt-1: enforced on all three (naturally, via a padding/tag mismatch
 /// downstream of the malformed combined ciphertext — not because any of them checks operation state
 /// here either).</description></item>
@@ -289,6 +293,66 @@ internal static class OperationStateMixingTestCases
             finally { session.DestroyObject(key); }
         });
     }
+
+    // === Verify ===============================================================
+
+    // C_VerifyInit(HMAC-SHA256) and C_VerifyUpdate(Data1), then the single-part C_Verify(Data2) with the
+    // signature given: its return code, after which the operation is ended if it is still active.
+    private static CKR VerifyAfterUpdate(LowLevelPkcs11Library lowLevel, NativeCULong sid, ObjectHandle key, byte[] signature, out CKR final)
+    {
+        using (var scope = new MechanismParameterScope())
+        {
+            CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256_HMAC));
+            AssertOk(lowLevel.C_VerifyInit(sid, in mech, (NativeCULong)key.ObjectId), "VerifyInit");
+        }
+        AssertOk(lowLevel.C_VerifyUpdate(sid, Data1), "VerifyUpdate");
+        CKR rv = lowLevel.C_Verify(sid, Data2, signature);
+        // Ends the operation if it is still active; what it returns tells whether it was.
+        final = lowLevel.C_VerifyFinal(sid, signature);
+        return rv;
+    }
+
+    private static void WithHmacKey(IPkcs11Backend backend, Action<LowLevelPkcs11Library, NativeCULong, ObjectHandle, byte[]> body)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
+        WithRawSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = new byte[32];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(rawKey);
+            ObjectHandle key = CreateGenericSecret(session, rawKey);
+            try { body(lowLevel, sid, key, rawKey); }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    // PKCS#11 v3.2 §5.15.2: C_Verify "cannot be used to terminate a multi-part operation" (CKR_OPERATION_ACTIVE).
+    // It is refused whichever data the signature is over: Data1 || Data2, which a module that takes the call as
+    // a continuation accepts, or Data2 alone, which one that starts over accepts.
+    internal static void Assert_Verify_SinglePartAfterUpdate_Throws(IPkcs11Backend backend) =>
+        WithHmacKey(backend, (lowLevel, sid, key, rawKey) =>
+        {
+            byte[] overBoth = System.Security.Cryptography.HMACSHA256.HashData(rawKey, (byte[])[.. Data1, .. Data2]);
+            byte[] overSecond = System.Security.Cryptography.HMACSHA256.HashData(rawKey, Data2);
+            Assert.NotEqual(CKR.CKR_OK, VerifyAfterUpdate(lowLevel, sid, key, overBoth, out _));
+            Assert.NotEqual(CKR.CKR_OK, VerifyAfterUpdate(lowLevel, sid, key, overSecond, out _));
+        });
+
+    // The single-part call verifies the signature over everything fed, Data1 || Data2.
+    internal static void Assert_Verify_SinglePartAfterUpdate_TreatsAsContinuation(IPkcs11Backend backend) =>
+        WithHmacKey(backend, (lowLevel, sid, key, rawKey) =>
+        {
+            byte[] overBoth = System.Security.Cryptography.HMACSHA256.HashData(rawKey, (byte[])[.. Data1, .. Data2]);
+            AssertOk(VerifyAfterUpdate(lowLevel, sid, key, overBoth, out _), "Verify (illegal single-part call) of the MAC over both parts");
+        });
+
+    // The single-part call verifies a MAC over its own input only, and ends the operation.
+    internal static void Assert_Verify_SinglePartAfterUpdate_DiscardsTheUpdate(IPkcs11Backend backend) =>
+        WithHmacKey(backend, (lowLevel, sid, key, rawKey) =>
+        {
+            byte[] overSecond = System.Security.Cryptography.HMACSHA256.HashData(rawKey, Data2);
+            AssertOk(VerifyAfterUpdate(lowLevel, sid, key, overSecond, out CKR final), "Verify (illegal single-part call) of the MAC over the second part");
+            Assert.Equal(CKR.CKR_OPERATION_NOT_INITIALIZED, final);
+        });
 
     // === Encrypt / Decrypt ====================================================
 

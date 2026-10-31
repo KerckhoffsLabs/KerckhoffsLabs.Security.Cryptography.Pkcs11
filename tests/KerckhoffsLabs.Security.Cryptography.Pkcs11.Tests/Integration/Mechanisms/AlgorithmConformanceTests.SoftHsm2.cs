@@ -81,7 +81,12 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
 
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.AesKeyWrapTampering), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void AesKeyWrap_TamperedBlob_IsRefused(string tampering) => AlgorithmConformanceTestCases.Assert_AesKeyWrap_TamperedBlob_IsRefused(_backend, tampering);
+    public void AesKeyWrap_TamperedBlob_IsRefused(string tampering)
+    {
+        if (!tampering.EndsWith(" bytes", StringComparison.Ordinal) && !SoftHsmBackendFixture.SoftHsmReportsATamperedKeyWrapBlobAsInvalid)
+            Assert.Skip("SoftHSM2 answers an AES key wrap blob that fails the integrity check with CKR_GENERAL_ERROR");
+        AlgorithmConformanceTestCases.Assert_AesKeyWrap_TamperedBlob_IsRefused(_backend, tampering);
+    }
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void AesKeyWrap_UnwrapWithAGenericSecret_IsRefused() => AlgorithmConformanceTestCases.Assert_AesKeyWrap_UnwrapWithAGenericSecret_IsRefused(_backend);
@@ -94,4 +99,38 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void DigestState_SavedAndRestored_FinishesTheDigest() => AlgorithmConformanceTestCases.Assert_DigestState_SavedAndRestored_FinishesTheDigest(_backend, unsaveable: CKR.CKR_FUNCTION_NOT_SUPPORTED);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 answers an RSA-OAEP blob of the wrong length with CKR_GENERAL_ERROR")]
+    public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void RsaX509_Verify_RequiresTheLeadingBytes() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_RequiresTheLeadingBytes(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.OverlongRawRsaVerifyAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 ends the process on an over-long raw RSA C_Verify")]
+    public void RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused() => AlgorithmConformanceTestCases.Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.PrivateKeyDigestRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 digests an EC private key's scalar")]
+    public void DigestKey_OfAPrivateKey_IsKeyIndigestible() => AlgorithmConformanceTestCases.Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.OperationStateMisuses), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void OperationState_Misuse_IsRefused(string misuse) => AlgorithmConformanceTestCases.Assert_OperationState_Misuse_IsRefused(_backend, misuse);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.PssParameterRefusalAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM2 refuses an out-of-range PSS parameter with CKR_ARGUMENTS_BAD or CKR_MECHANISM_INVALID")]
+    [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault) => AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault is "a 1 KiB peer value" or "a DER length that lies" && !SoftHsmBackendFixture.SoftHsmRefusesAMalformedEcdhPeerAsInvalid)
+            Assert.Skip("SoftHSM2 refuses an ECDH peer value that is no point with CKR_GENERAL_ERROR");
+        if (fault == "CKA_VALUE_LEN 33" && !SoftHsmBackendFixture.SoftHsmRefusesAnEcdhValueLenAboveTheSecret)
+            Assert.Skip("SoftHSM2 refuses a CKA_VALUE_LEN above the ECDH secret with CKR_FUNCTION_FAILED");
+        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

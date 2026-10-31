@@ -15,4 +15,8 @@ public sealed class EncryptRsaOaepLabelTests_CratonHsm(CratonHsmBackendFixture b
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void OaepWithWrongLabel_FailsToDecrypt() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepWithWrongLabel_FailsToDecrypt(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void OaepNullLabelWithLength_IsRefused() =>
+        EncryptRsaOaepLabelTestCases.Assert_OaepNullLabelWithLength_IsRefused(_backend);
 }

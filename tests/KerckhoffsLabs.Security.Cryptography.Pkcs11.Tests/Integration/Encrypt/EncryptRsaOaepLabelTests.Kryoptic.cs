@@ -15,4 +15,8 @@ public sealed class EncryptRsaOaepLabelTests_Kryoptic(KryopticBackendFixture bac
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void OaepWithWrongLabel_FailsToDecrypt() =>
         EncryptRsaOaepLabelTestCases.Assert_OaepWithWrongLabel_FailsToDecrypt(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.NullOaepLabelRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic takes a NULL OAEP label behind a length as the empty label")]
+    public void OaepNullLabelWithLength_IsRefused() =>
+        EncryptRsaOaepLabelTestCases.Assert_OaepNullLabelWithLength_IsRefused(_backend);
 }

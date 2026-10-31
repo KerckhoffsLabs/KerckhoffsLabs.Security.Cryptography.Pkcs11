@@ -1,7 +1,12 @@
 using System.Security.Cryptography;
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
@@ -24,6 +29,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// permanently gating those). Same technique <c>IkeDeriveTestCases</c> uses, itself mirroring how
 /// <c>DeriveSharedSecretEcdhTests</c> proves ECDH-derived AES keys match via a cross-party AES-GCM
 /// round trip instead of reading the raw key.
+///
+/// <c>Hkdf_ParameterOutOfRange_IsRefused</c> goes through the raw dispatch, with values the library's HKDF API
+/// refuses before any native call: an output longer than RFC 5869 allows, and a salt key that is no secret key.
 /// </summary>
 internal static class HkdfTestCases
 {
@@ -194,5 +202,163 @@ internal static class HkdfTestCases
 
             Assert.Equal(expectedMac, actualMac);
         });
+    }
+
+    // === Parameters out of range, through the raw dispatch ==================================
+
+    public static TheoryData<string> HkdfParameterFaults =>
+        ["CKA_VALUE_LEN 255 x 32 + 1", "CKA_VALUE_LEN 2^32 + 1", "a salt key that is an EC public key"];
+
+    // HKDF is RFC 5869's (PKCS#11 v3.2 §6.62.3), whose expand step gives at most 255 x HashLen bytes: with SHA-256,
+    // CKA_VALUE_LEN 8161 cannot be met, nor 2^32 + 1 where CK_ULONG is 64 bits (a module that narrows it makes a
+    // 1-byte key). C_DeriveKey refuses the length with CKR_ATTRIBUTE_VALUE_INVALID or CKR_TEMPLATE_INCONSISTENT
+    // (§4.1, §5.1.6) or CKR_KEY_SIZE_RANGE (§5.18.5). The salt of CKF_HKDF_SALT_KEY is the HMAC key of the extract
+    // step, so an EC public key (no CKA_VALUE) cannot be one; §6.62.2 names no code, so CKR_MECHANISM_PARAM_INVALID,
+    // CKR_KEY_HANDLE_INVALID or CKR_KEY_TYPE_INCONSISTENT is taken. None makes a key (found by label), and the same
+    // session then derives RFC 5869's output for 42 bytes, checked through an HMAC under it where the module has
+    // HMAC-SHA256. The base key is a 32-byte generic secret, the hash's size (§6.62.3). The library's HKDF API
+    // refuses the lengths, and takes only a key it holds as the salt, before any native call.
+    internal static void Assert_Hkdf_ParameterOutOfRange_IsRefused(IPkcs11Backend backend, string fault)
+    {
+        if (fault.Contains("2^32", StringComparison.Ordinal))
+            Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
+        bool saltKeyRow = fault.StartsWith("a salt key", StringComparison.Ordinal);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            byte[] ikm = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle baseKey = CreateDeriveKey(session, ikm);
+            ObjectHandle saltKey = default;
+            try
+            {
+                if (saltKeyRow)
+                {
+                    using var ec = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+                    ECPoint q = ec.ExportParameters(includePrivateParameters: false).Q;
+                    saltKey = TestKeys.ImportEcP256PublicKey(session, q.X!, q.Y!);
+                }
+                using var buffers = new NativeBuffers();
+                string label = $"kl-hkdf-param-{Guid.NewGuid():N}";
+                ulong valueLen = fault switch
+                {
+                    "CKA_VALUE_LEN 255 x 32 + 1" => 255 * 32 + 1,
+                    "CKA_VALUE_LEN 2^32 + 1" => (1UL << 32) + 1,
+                    _ => 42,
+                };
+                Mechanism bad = saltKeyRow ? RawHkdf(buffers, saltKey) : RawHkdf(buffers, default);
+                CKR rv = RawDerive(lowLevel, session, bad, baseKey, valueLen, label, out _);
+                CKR[] allowed = saltKeyRow
+                    ? [CKR.CKR_MECHANISM_PARAM_INVALID, CKR.CKR_KEY_HANDLE_INVALID, CKR.CKR_KEY_TYPE_INCONSISTENT]
+                    : [CKR.CKR_ATTRIBUTE_VALUE_INVALID, CKR.CKR_TEMPLATE_INCONSISTENT, CKR.CKR_KEY_SIZE_RANGE];
+                Assert.True(allowed.Contains(rv), $"C_DeriveKey(CKM_HKDF_DERIVE) with {fault} returned {rv}.");
+                using (var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label))
+                    Assert.Empty(session.FindAllObjects([labelAttribute]));
+
+                rv = RawDerive(lowLevel, session, RawHkdf(buffers, default), baseKey, 42, label, out ObjectHandle derived);
+                Assert.True(rv == CKR.CKR_OK, $"C_DeriveKey(CKM_HKDF_DERIVE) with good parameters after the refusal returned {rv}.");
+                try
+                {
+                    if (backend.Supports(CKM.CKM_SHA256_HMAC))
+                        Assert.Equal(ExpectedProbeMac(HKDF.DeriveKey(HashAlgorithmName.SHA256, ikm, 42, Salt, Info)),
+                            session.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), derived, ProbeMessage));
+                }
+                finally { session.DestroyObject(derived); }
+            }
+            finally
+            {
+                if (!saltKey.IsInvalid)
+                    session.DestroyObject(saltKey);
+                session.DestroyObject(baseKey);
+            }
+        }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
+    }
+
+    // For the tripwires: the derivation of Assert_Hkdf_ParameterOutOfRange_IsRefused with one fault, and the
+    // CKA_VALUE_LEN of the key made, if one is.
+    internal static (CKR Rv, ulong? ValueLen) DeriveHkdfWithFault(IPkcs11Backend backend, string fault)
+    {
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        ObjectHandle baseKey = CreateDeriveKey(session, RandomNumberGenerator.GetBytes(32));
+        ObjectHandle saltKey = default;
+        try
+        {
+            bool saltKeyRow = fault.StartsWith("a salt key", StringComparison.Ordinal);
+            if (saltKeyRow)
+            {
+                using var ec = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+                ECPoint q = ec.ExportParameters(includePrivateParameters: false).Q;
+                saltKey = TestKeys.ImportEcP256PublicKey(session, q.X!, q.Y!);
+            }
+            using var buffers = new NativeBuffers();
+            ulong valueLen = fault == "CKA_VALUE_LEN 2^32 + 1" ? (1UL << 32) + 1 : fault == "CKA_VALUE_LEN 255 x 32 + 1" ? 255UL * 32 + 1 : 42UL;
+            CKR rv = RawDerive(lowLevel, session, RawHkdf(buffers, saltKey), baseKey, valueLen, $"kl-hkdf-probe-{Guid.NewGuid():N}", out ObjectHandle derived);
+            if (rv != CKR.CKR_OK)
+                return (rv, null);
+            try
+            {
+                using var read = session.GetAttributeValue(derived, [CKA.CKA_VALUE_LEN]);
+                return (rv, read[0].GetValueAsUlong());
+            }
+            finally { session.DestroyObject(derived); }
+        }
+        finally
+        {
+            if (!saltKey.IsInvalid)
+                session.DestroyObject(saltKey);
+            session.DestroyObject(baseKey);
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    private static ObjectHandle CreateDeriveKey(Pkcs11SessionCore session, byte[] value)
+    {
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var derive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
+        return session.CreateObject([keyClass, keyType, token, derive, attrValue]);
+    }
+
+    // CK_HKDF_PARAMS for extract and expand with SHA-256 and Info: the salt is Salt (CKF_HKDF_SALT_DATA), or the key
+    // given (CKF_HKDF_SALT_KEY).
+    private static Mechanism RawHkdf(NativeBuffers buffers, ObjectHandle saltKey)
+    {
+        bool key = !saltKey.IsInvalid;
+        var parameter = new CK_HKDF_PARAMS
+        {
+            Extract = 1,
+            Expand = 1,
+            PrfHashMechanism = (NativeCULong)(ulong)CKM.CKM_SHA256,
+            SaltType = (NativeCULong)(ulong)(key ? HkdfSaltType.Key : HkdfSaltType.Data),
+            Salt = key ? IntPtr.Zero : buffers.Of(Salt),
+            SaltLen = (NativeCULong)(ulong)(key ? 0 : Salt.Length),
+            SaltKey = (NativeCULong)saltKey.ObjectId,
+            Info = buffers.Of(Info),
+            InfoLen = (NativeCULong)(ulong)Info.Length,
+        };
+        return RawParameter.From(CKM.CKM_HKDF_DERIVE, in parameter);
+    }
+
+    // C_DeriveKey of a session generic secret of valueLen bytes, with the label and CKA_SIGN, through the raw dispatch.
+    private static CKR RawDerive(LowLevelPkcs11Library lowLevel, Pkcs11SessionCore session, Mechanism mechanism, ObjectHandle baseKey,
+        ulong valueLen, string label, out ObjectHandle derived)
+    {
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, valueLen);
+        using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        CK_ATTRIBUTE[] template = [.. new[] { keyClass, keyType, token, length, sign, labelAttribute }.Select(a => a.CkAttribute)];
+        CKR rv = lowLevel.C_DeriveKey((NativeCULong)session.SessionId, in mech, (NativeCULong)baseKey.ObjectId, template, out NativeCULong handle);
+        derived = new ObjectHandle((ulong)handle);
+        return rv;
     }
 }

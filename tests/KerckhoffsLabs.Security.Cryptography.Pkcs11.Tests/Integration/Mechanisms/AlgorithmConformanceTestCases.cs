@@ -7,8 +7,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // The OAEP key-transport case compares two AES keys by what CKM_AES_CBC makes of one block under each, and the
@@ -20,11 +22,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 
 /// <summary>
 /// What the algorithms compute, checked on every real backend against a reference the test holds: the RSA-PSS
-/// salt and mask the token was asked for, read back out of its signatures; RSA-OAEP's randomisation and key
-/// transport; the PKCS#1 v1.5 length bound; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the
-/// curves the rest of the suite does not reach; the 224-bit digests; <c>C_DigestKey</c>; key agreement with a
-/// KDF, with the cofactor and on X448; HKDF with SHA-512 and with a salt key; SHA-256 key derivation; AES key
-/// wrap's IV and integrity check; ML-KEM and HashML-DSA under the wrong key or hash; and a saved digest state.
+/// salt and mask the token was asked for, read back out of its signatures, and the PSS parameters it refuses;
+/// RSA-OAEP's randomisation, key transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA
+/// verification; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the curves the rest of the suite
+/// does not reach; the 224-bit digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on
+/// X448, the ECDH parameters it refuses and a derived AES key of a length AES does not have; HKDF with SHA-512
+/// and with a salt key; SHA-256 key derivation; AES key wrap's IV and integrity check; ML-KEM and HashML-DSA
+/// under the wrong key or hash; and a saved digest state, with the refusals of saving and restoring one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -192,6 +196,89 @@ internal static class AlgorithmConformanceTestCases
         });
     }
 
+    public static TheoryData<string> PssParameterFaults => ["hashAlg SHA-384", "sLen 2^32 + 32"];
+
+    // CK_RSA_PKCS_PSS_PARAMS for CKM_SHA256_RSA_PKCS_PSS (PKCS#11 v3.2 §6.1.9): hashAlg "must match the hash
+    // algorithm indicated by the signature mechanism", and sLen must be at most k* - 2 - hLen (§6.1.15), 222
+    // bytes for a 2048-bit key. CKM_SHA384 in hashAlg, or an sLen of 2^32 + 32 where CK_ULONG is 64 bits (a
+    // module that narrows it to 32 bits signs with a 32-byte salt), is an invalid parameter. C_SignInit and
+    // C_VerifyInit refuse it with CKR_MECHANISM_PARAM_INVALID (§5.1.6), or a module that checks the parameters
+    // against the key only when it signs takes the Init and then refuses C_Sign (§5.13.2 names no code for it, so
+    // any error is taken) and does not verify a signature under them; nothing is ever signed. Through the raw
+    // dispatch, as the library's parameter type takes neither. After each refusal the same session signs, and
+    // verifies, with SHA-256 and a 32-byte salt. ignoresPssParameters records a module that ignores hashAlg, sLen
+    // and mgf: it takes both Inits and signs and verifies as with SHA-256 and a 32-byte salt.
+    internal static void Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(IPkcs11Backend backend, string fault, bool ignoresPssParameters = false)
+    {
+        if (fault.Contains("2^32", StringComparison.Ordinal))
+            Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        WithSession(backend, session =>
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            var sid = (NativeCULong)session.SessionId;
+            var (pub, priv) = TestKeys.GenerateRsa2048SigningKeyPair(session);
+            try
+            {
+                Mechanism bad = RawPss(fault == "hashAlg SHA-384" ? CKM.CKM_SHA384 : CKM.CKM_SHA256,
+                    fault == "hashAlg SHA-384" ? 32UL : (1UL << 32) + 32);
+                Mechanism good = RawPss(CKM.CKM_SHA256, 32);
+                byte[] signature = new byte[256];
+                CKR rv = RawInit((mech, k) => lowLevel.C_SignInit(sid, in mech, k), bad, priv);
+                if (rv == CKR.CKR_OK)
+                {
+                    rv = lowLevel.C_Sign(sid, Message, signature, lengthOnly: false, out _);
+                    if (ignoresPssParameters)
+                    {
+                        Assert.Equal(CKR.CKR_OK, rv);
+                        Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), good, pub));
+                        Assert.Equal(CKR.CKR_OK, lowLevel.C_Verify(sid, Message, signature));
+                        Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), bad, pub));
+                        Assert.Equal(CKR.CKR_OK, lowLevel.C_Verify(sid, Message, signature));
+                        return;
+                    }
+                    Assert.True(rv is not (CKR.CKR_OK or CKR.CKR_BUFFER_TOO_SMALL),
+                        $"C_Sign(CKM_SHA256_RSA_PKCS_PSS) with {fault} signed (C_SignInit took it).");
+                }
+                else
+                    Assert.True(rv == CKR.CKR_MECHANISM_PARAM_INVALID, $"C_SignInit(CKM_SHA256_RSA_PKCS_PSS) with {fault} returned {rv}.");
+                Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_SignInit(sid, in mech, k), good, priv));
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Sign(sid, Message, signature, lengthOnly: false, out NativeCULong length));
+                Assert.Equal(256UL, (ulong)length);
+
+                rv = RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), bad, pub);
+                if (rv == CKR.CKR_OK)
+                {
+                    rv = lowLevel.C_Verify(sid, Message, signature);
+                    Assert.True(rv != CKR.CKR_OK, $"C_Verify(CKM_SHA256_RSA_PKCS_PSS) with {fault} verified a signature under SHA-256 and a 32-byte salt.");
+                }
+                else
+                    Assert.True(rv == CKR.CKR_MECHANISM_PARAM_INVALID, $"C_VerifyInit(CKM_SHA256_RSA_PKCS_PSS) with {fault} returned {rv}.");
+                Assert.Equal(CKR.CKR_OK, RawInit((mech, k) => lowLevel.C_VerifyInit(sid, in mech, k), good, pub));
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Verify(sid, Message, signature));
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
+    private static Mechanism RawPss(CKM hashAlg, ulong saltLength)
+    {
+        var parameter = new CK_RSA_PKCS_PSS_PARAMS
+        {
+            HashAlg = (NativeCULong)(ulong)hashAlg,
+            Mgf = (NativeCULong)(ulong)CKG.CKG_MGF1_SHA256,
+            Len = (NativeCULong)saltLength,
+        };
+        return RawParameter.From(CKM.CKM_SHA256_RSA_PKCS_PSS, in parameter);
+    }
+
+    private static CKR RawInit(Func<CK_MECHANISM, NativeCULong, CKR> init, Mechanism mechanism, ObjectHandle key)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        return init(mech, (NativeCULong)key.ObjectId);
+    }
+
     private static Mechanism Pss(int salt, CKG mgf) =>
         new(CKM.CKM_SHA256_RSA_PKCS_PSS, new CkmRsaPkcsPssParams(CKM.CKM_SHA256, mgf, salt));
 
@@ -299,6 +386,33 @@ internal static class AlgorithmConformanceTestCases
         });
     }
 
+    // An RSA-OAEP ciphertext is exactly k bytes (RFC 8017 §7.1.2 step 1b): a blob one byte short of a 2048-bit
+    // modulus, or one byte over, is invalid by its length alone, and C_UnwrapKey refuses it with
+    // CKR_WRAPPED_KEY_LEN_RANGE (PKCS#11 v3.2 §5.1.6, §5.18.4) and creates no key. The k-byte blob then unwraps.
+    internal static void Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP);
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS_OAEP, f => f.Unwrap, "CKF_UNWRAP");
+        WithSession(backend, session =>
+        {
+            var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
+            try
+            {
+                byte[] wrapped = OrSkip(() => session.Encrypt(OaepSha256, pub, Target), "OAEP with SHA-256");
+                Assert.Equal(256, wrapped.Length);
+                using Template template = UnwrappedAesTemplate();
+                foreach (byte[] bad in (byte[][])[wrapped[..^1], [.. wrapped, 0x00]])
+                {
+                    var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(OaepSha256, priv, bad, template.Attributes));
+                    Assert.True(ex.ReturnValue == CKR.CKR_WRAPPED_KEY_LEN_RANGE,
+                        $"C_UnwrapKey of a {bad.Length}-byte RSA-OAEP blob under a 2048-bit key returned {ex.ReturnValue}.");
+                }
+                session.DestroyObject(session.UnwrapKey(OaepSha256, priv, wrapped, template.Attributes));
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
     // CKM_RSA_PKCS encrypts at most k - 11 bytes (RFC 8017 §7.2.1): 245 for a 2048-bit key round-trips, 246 is
     // refused.
     internal static void Assert_RsaPkcs1_Plaintext_IsBoundedByKMinus11(IPkcs11Backend backend)
@@ -319,6 +433,100 @@ internal static class AlgorithmConformanceTestCases
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         });
     }
+
+    // === Raw RSA ================================================================
+
+    // A 2048-bit signing key pair for CKM_RSA_X_509, on the token when asked: the lock a module takes on a token
+    // key is the one an early return can leave held.
+    private static (ObjectHandle Pub, ObjectHandle Priv) GenerateRawRsaPair(Pkcs11SessionCore session, bool onToken)
+    {
+        using var template = new Template(
+        [
+            new(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_RSA), new(CKA.CKA_TOKEN, onToken),
+            new(CKA.CKA_VERIFY, true), new(CKA.CKA_MODULUS_BITS, 2048UL), new(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]),
+        ]);
+        using var privTemplate = new Template(
+        [
+            new(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_RSA), new(CKA.CKA_TOKEN, onToken),
+            new(CKA.CKA_SENSITIVE, true), new(CKA.CKA_SIGN, true),
+        ]);
+        session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), template.Attributes, privTemplate.Attributes, out var pub, out var priv);
+        return (pub, priv);
+    }
+
+    // A full 256-byte block whose top byte is not zero and below every 2048-bit modulus's (0x80 and up).
+    private static byte[] RawRsaBlock()
+    {
+        byte[] m = RandomNumberGenerator.GetBytes(256);
+        m[0] = 0x01;
+        return m;
+    }
+
+    private static CKR RawRsa(Func<NativeCULong, CK_MECHANISM, CKR> call, NativeCULong key)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = new Mechanism(CKM.CKM_RSA_X_509).Marshal(scope, out _);
+        return call(key, mech);
+    }
+
+    private static byte[] RawRsaSign(LowLevelPkcs11Library lowLevel, NativeCULong sid, ObjectHandle priv, byte[] m)
+    {
+        Assert.Equal(CKR.CKR_OK, RawRsa((k, mech) => lowLevel.C_SignInit(sid, in mech, k), (NativeCULong)priv.ObjectId));
+        byte[] signature = new byte[256];
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_Sign(sid, m, signature, lengthOnly: false, out NativeCULong length));
+        Assert.Equal(256UL, (ulong)length);
+        return signature;
+    }
+
+    private static CKR RawRsaVerify(LowLevelPkcs11Library lowLevel, NativeCULong sid, ObjectHandle pub, ReadOnlySpan<byte> data, byte[] signature)
+    {
+        Assert.Equal(CKR.CKR_OK, RawRsa((k, mech) => lowLevel.C_VerifyInit(sid, in mech, k), (NativeCULong)pub.ObjectId));
+        return lowLevel.C_Verify(sid, data, signature);
+    }
+
+    private static void WithRawRsa(IPkcs11Backend backend, bool onToken, Action<LowLevelPkcs11Library, NativeCULong, ObjectHandle, ObjectHandle> body)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_X_509);
+        backend.RequireMechanismFlags(CKM.CKM_RSA_X_509, f => f.Sign && f.Verify, "CKF_SIGN and CKF_VERIFY");
+        WithSession(backend, session =>
+        {
+            var (pub, priv) = GenerateRawRsaPair(session, onToken);
+            try { body(backend.Library.LowLevelLibrary!, (NativeCULong)session.SessionId, pub, priv); }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
+    // Raw RSA compares the zero-padded data with the whole k-byte block the signature recovers (§6.1.12: the
+    // input is converted to an integer, so its leading zero bytes are the only ones it may leave out). A
+    // signature over a block m whose top byte is not zero therefore verifies m, and does not verify m[1..]: a
+    // module that compares only the trailing bytes accepts it for data it does not sign (CKR_SIGNATURE_INVALID,
+    // §5.15.2). Through the raw dispatch: raw RSA is outside the library's policy.
+    internal static void Assert_RsaX509_Verify_RequiresTheLeadingBytes(IPkcs11Backend backend) =>
+        WithRawRsa(backend, onToken: false, (lowLevel, sid, pub, priv) =>
+        {
+            byte[] m = RawRsaBlock();
+            byte[] signature = RawRsaSign(lowLevel, sid, priv, m);
+            Assert.Equal(CKR.CKR_OK, RawRsaVerify(lowLevel, sid, pub, m, signature));
+            CKR rv = RawRsaVerify(lowLevel, sid, pub, m.AsSpan(1), signature);
+            Assert.True(rv == CKR.CKR_SIGNATURE_INVALID, $"C_Verify(CKM_RSA_X_509) of m[1..] under a signature over m returned {rv}.");
+        });
+
+    // C_Verify with CKM_RSA_X_509 takes at most k bytes of data (§6.1.12, Table 45): 257 bytes under a 2048-bit
+    // token key are refused, with CKR_DATA_LEN_RANGE, or CKR_SIGNATURE_INVALID from a module that checks the
+    // signature against the data as given, and the refusal ends the operation (§5.15.2). The token key then
+    // verifies the right data at once: a module that kept the key locked on the error would hang or refuse it.
+    // A backend without token objects runs it with a session key pair.
+    internal static void Assert_RsaX509_Verify_OfDataLongerThanTheModulus_IsRefused(IPkcs11Backend backend) =>
+        WithRawRsa(backend, onToken: backend.SupportsTokenObjects, (lowLevel, sid, pub, priv) =>
+        {
+            byte[] m = RawRsaBlock();
+            byte[] signature = RawRsaSign(lowLevel, sid, priv, m);
+            CKR rv = RawRsaVerify(lowLevel, sid, pub, [.. m, 0x00], signature);
+            Assert.True(rv is CKR.CKR_DATA_LEN_RANGE or CKR.CKR_SIGNATURE_INVALID,
+                $"C_Verify(CKM_RSA_X_509) of 257 bytes under a 2048-bit key returned {rv}.");
+            Assert.Equal(CKR.CKR_OK, RawRsaVerify(lowLevel, sid, pub, m, signature));
+            Assert.Equal(signature, RawRsaSign(lowLevel, sid, priv, m));
+        });
 
     // === EdDSA ==================================================================
 
@@ -524,6 +732,45 @@ internal static class AlgorithmConformanceTestCases
         });
     }
 
+    // C_DigestKey digests a secret key's value only: an EC private key "cannot be digested" (CKR_KEY_INDIGESTIBLE,
+    // PKCS#11 v3.2 §5.1.6: "perhaps the key isn't a secret key"; §5.12.4). After that refusal the digest either
+    // goes on, so that C_DigestFinal gives the digest of the data fed before it, or was ended, so that
+    // C_DigestFinal answers CKR_OPERATION_NOT_INITIALIZED; either way the next C_DigestInit succeeds.
+    internal static void Assert_DigestKey_OfAPrivateKey_IsKeyIndigestible(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_SHA256, CKM.CKM_EC_KEY_PAIR_GEN);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        WithSession(backend, session =>
+        {
+            var sid = (NativeCULong)session.SessionId;
+            var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+            try
+            {
+                CKR DigestInit()
+                {
+                    using var scope = new MechanismParameterScope();
+                    CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256).Marshal(scope, out _);
+                    return lowLevel.C_DigestInit(sid, in mech);
+                }
+                Assert.Equal(CKR.CKR_OK, DigestInit());
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestUpdate(sid, Message));
+                CKR rv = lowLevel.C_DigestKey(sid, (NativeCULong)priv.ObjectId);
+                Assert.True(rv == CKR.CKR_KEY_INDIGESTIBLE, $"C_DigestKey of an EC private key returned {rv}.");
+
+                byte[] digest = new byte[32];
+                CKR final = lowLevel.C_DigestFinal(sid, digest, lengthOnly: false, out _);
+                Assert.True(final is CKR.CKR_OK or CKR.CKR_OPERATION_NOT_INITIALIZED,
+                    $"C_DigestFinal after the refused C_DigestKey returned {final}.");
+                if (final == CKR.CKR_OK)
+                    Assert.Equal(SHA256.HashData(Message), digest);
+                Assert.Equal(CKR.CKR_OK, DigestInit());
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_Digest(sid, Message, digest, lengthOnly: false, out _));
+                Assert.Equal(SHA256.HashData(Message), digest);
+            }
+            finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
     // === Key agreement ==========================================================
 
     // SP 800-56A ECC CDH for P-256 (the suite's ECDH known answer): our private scalar, the peer's point, and Z.
@@ -558,6 +805,191 @@ internal static class AlgorithmConformanceTestCases
             }
             finally { session.DestroyObject(priv); }
         });
+    }
+
+    public static TheoryData<string> EcdhParameterFaults =>
+        ["CKD_NULL with shared data", "a 1 KiB peer value", "a DER length that lies", "CKA_VALUE_LEN 33"];
+
+    // CK_ECDH1_DERIVE_PARAMS for CKM_ECDH1_DERIVE on P-256 (PKCS#11 v3.2 §6.3.16): with CKD_NULL, "pSharedData must
+    // be NULL and ulSharedDataLen must be zero"; pPublicData is the peer's point, raw or DER-encoded, so 1 KiB (a raw
+    // point padded with zeros) is none, and neither is a DER OCTET STRING whose length byte promises 65 bytes and
+    // has 40 (04 41 and 40 bytes). C_DeriveKey refuses each with CKR_MECHANISM_PARAM_INVALID (§5.1.6). A raw secret
+    // is 32 bytes on P-256 and the mechanism can only truncate it (§6.3.17), so CKA_VALUE_LEN 33 for a generic
+    // secret is an attribute it cannot meet: CKR_ATTRIBUTE_VALUE_INVALID or CKR_TEMPLATE_INCONSISTENT (§4.1,
+    // §5.1.6), or CKR_KEY_SIZE_RANGE, which C_DeriveKey lists (§5.18.5). None makes a key, and the same session then
+    // derives Z from the SP 800-56A vector (checked through an HMAC under it where the module has HMAC-SHA256).
+    // Through the raw dispatch, as the library's parameter type refuses the first three.
+    internal static void Assert_Ecdh_ParameterOutOfRange_IsRefused(IPkcs11Backend backend, string fault)
+    {
+        backend.RequireMechanisms(CKM.CKM_ECDH1_DERIVE);
+        WithSession(backend, session =>
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+            try
+            {
+                using var buffers = new NativeBuffers();
+                string label = $"kl-ecdh-param-{Guid.NewGuid():N}";
+                CKR rv = RawDerive(lowLevel, session, EcdhWithFault(buffers, fault, out ulong valueLen), priv, valueLen, label, out _);
+                CKR[] allowed = fault == "CKA_VALUE_LEN 33"
+                    ? [CKR.CKR_ATTRIBUTE_VALUE_INVALID, CKR.CKR_TEMPLATE_INCONSISTENT, CKR.CKR_KEY_SIZE_RANGE]
+                    : [CKR.CKR_MECHANISM_PARAM_INVALID];
+                Assert.True(allowed.Contains(rv), $"C_DeriveKey(CKM_ECDH1_DERIVE) with {fault} returned {rv}.");
+                using (var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label))
+                    Assert.Empty(session.FindAllObjects([labelAttribute]));
+
+                AssertDerivedOk(RawDerive(lowLevel, session, RawEcdh(buffers, EcdhPeer, []), priv, 32, label, out ObjectHandle derived));
+                try
+                {
+                    if (backend.Supports(CKM.CKM_SHA256_HMAC))
+                        Assert.Equal(HMACSHA256.HashData(EcdhZ, Message), session.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), derived, Message));
+                }
+                finally { session.DestroyObject(derived); }
+            }
+            finally { session.DestroyObject(priv); }
+        });
+
+        static void AssertDerivedOk(CKR rv) =>
+            Assert.True(rv == CKR.CKR_OK, $"C_DeriveKey(CKM_ECDH1_DERIVE) with good parameters after the refusal returned {rv}.");
+    }
+
+    // An AES key is 16, 24 or 32 bytes (PKCS#11 v3.2 §6.10.2), so C_DeriveKey asking ECDH (CKD_NULL, P-256) for a
+    // CKK_AES key with CKA_VALUE_LEN 13 is refused with CKR_ATTRIBUTE_VALUE_INVALID or CKR_TEMPLATE_INCONSISTENT
+    // (§4.1, §5.1.6) or CKR_KEY_SIZE_RANGE (§5.18.5), and makes no key; the same derivation for 16 bytes then
+    // makes a 16-byte AES key.
+    // For the tripwires: the ECDH derivation of Assert_Derive_AesKeyOfAnInvalidLength_IsRefused for a CKK_AES key of
+    // the length; a key made is destroyed.
+    internal static CKR DeriveEcdhAesKey(IPkcs11Backend backend, ulong length)
+    {
+        CKR rv = default;
+        WithSession(backend, session =>
+        {
+            ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+            try
+            {
+                using var buffers = new NativeBuffers();
+                rv = RawDerive(backend.Library.LowLevelLibrary!, session, RawEcdh(buffers, EcdhPeer, []), priv, length,
+                    $"kl-derive-aes-{Guid.NewGuid():N}", out ObjectHandle derived, CKK.CKK_AES);
+                if (rv == CKR.CKR_OK)
+                    session.DestroyObject(derived);
+            }
+            finally { session.DestroyObject(priv); }
+        });
+        return rv;
+    }
+
+    internal static void Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_ECDH1_DERIVE);
+        WithSession(backend, session =>
+        {
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+            try
+            {
+                using var buffers = new NativeBuffers();
+                string label = $"kl-derive-aes13-{Guid.NewGuid():N}";
+                CKR rv = RawDerive(lowLevel, session, RawEcdh(buffers, EcdhPeer, []), priv, 13, label, out _, CKK.CKK_AES);
+                Assert.True(rv is CKR.CKR_ATTRIBUTE_VALUE_INVALID or CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_KEY_SIZE_RANGE,
+                    $"C_DeriveKey(CKM_ECDH1_DERIVE) of a 13-byte AES key returned {rv}.");
+                using (var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label))
+                    Assert.Empty(session.FindAllObjects([labelAttribute]));
+
+                rv = RawDerive(lowLevel, session, RawEcdh(buffers, EcdhPeer, []), priv, 16, label, out ObjectHandle derived, CKK.CKK_AES);
+                Assert.True(rv == CKR.CKR_OK, $"C_DeriveKey(CKM_ECDH1_DERIVE) of a 16-byte AES key returned {rv}.");
+                try
+                {
+                    using var read = session.GetAttributeValue(derived, [CKA.CKA_VALUE_LEN]);
+                    Assert.Equal(16UL, read[0].GetValueAsUlong());
+                }
+                finally { session.DestroyObject(derived); }
+            }
+            finally { session.DestroyObject(priv); }
+        });
+    }
+
+    // The CKD_NULL derivation from the SP 800-56A vector with the fault in its parameters, and the CKA_VALUE_LEN
+    // to ask for.
+    private static Mechanism EcdhWithFault(NativeBuffers buffers, string fault, out ulong valueLen)
+    {
+        byte[] peer = fault switch
+        {
+            "a 1 KiB peer value" => [.. EcdhPeer[2..], .. new byte[1024 - 65]],
+            "a DER length that lies" => [.. EcdhPeer[..2], .. EcdhPeer[2..42]],
+            _ => EcdhPeer,
+        };
+        byte[] shared = fault == "CKD_NULL with shared data" ? "kl-ecdh-shared-info"u8.ToArray() : [];
+        valueLen = fault == "CKA_VALUE_LEN 33" ? 33UL : 32UL;
+        return RawEcdh(buffers, peer, shared);
+    }
+
+    // For the tripwires: the derivation of Assert_Ecdh_ParameterOutOfRange_IsRefused with one fault, into an
+    // extractable, non-sensitive generic secret whose value is read back when the module makes one. Z is the secret
+    // a module that ignores the fault derives.
+    internal static (CKR Rv, byte[]? Value) DeriveEcdhWithFault(IPkcs11Backend backend, string fault)
+    {
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, EcdhScalar);
+        try
+        {
+            using var buffers = new NativeBuffers();
+            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var sensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+            using var extractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM mech = EcdhWithFault(buffers, fault, out ulong valueLen).Marshal(scope, out _);
+            using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, valueLen);
+            CK_ATTRIBUTE[] template = [.. new[] { keyClass, keyType, token, length, sensitive, extractable }.Select(a => a.CkAttribute)];
+            CKR rv = lowLevel.C_DeriveKey((NativeCULong)session.SessionId, in mech, (NativeCULong)priv.ObjectId, template, out NativeCULong handle);
+            if (rv != CKR.CKR_OK)
+                return (rv, null);
+            var derived = new ObjectHandle((ulong)handle);
+            try { return (rv, ReadAttribute(session, derived, CKA.CKA_VALUE)); }
+            finally { session.DestroyObject(derived); }
+        }
+        finally
+        {
+            session.DestroyObject(priv);
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
+    /// <summary>The SP 800-56A vector's Z, which <see cref="DeriveEcdhWithFault"/> gives a module that ignores the fault.</summary>
+    internal static ReadOnlySpan<byte> EcdhSecret => EcdhZ;
+
+    private static Mechanism RawEcdh(NativeBuffers buffers, byte[] peer, byte[] shared)
+    {
+        var parameter = new CK_ECDH1_DERIVE_PARAMS
+        {
+            Kdf = (NativeCULong)(ulong)CKD.CKD_NULL,
+            SharedDataLen = (NativeCULong)(ulong)shared.Length,
+            SharedData = shared.Length == 0 ? IntPtr.Zero : buffers.Of(shared),
+            PublicDataLen = (NativeCULong)(ulong)peer.Length,
+            PublicData = buffers.Of(peer),
+        };
+        return RawParameter.From(CKM.CKM_ECDH1_DERIVE, in parameter);
+    }
+
+    // C_DeriveKey of a session generic secret of valueLen bytes, with the label and CKA_SIGN (an AES key with
+    // CKA_ENCRYPT), through the raw dispatch.
+    private static CKR RawDerive(LowLevelPkcs11Library lowLevel, Pkcs11SessionCore session, Mechanism mechanism, ObjectHandle baseKey,
+        ulong valueLen, string label, out ObjectHandle derived, CKK type = CKK.CKK_GENERIC_SECRET)
+    {
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, type);
+        using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, valueLen);
+        using var sign = new ObjectAttribute(type == CKK.CKK_AES ? CKA.CKA_ENCRYPT : CKA.CKA_SIGN, true);
+        using var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label);
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        CK_ATTRIBUTE[] template = [.. new[] { keyClass, keyType, token, length, sign, labelAttribute }.Select(a => a.CkAttribute)];
+        CKR rv = lowLevel.C_DeriveKey((NativeCULong)session.SessionId, in mech, (NativeCULong)baseKey.ObjectId, template, out NativeCULong handle);
+        derived = new ObjectHandle((ulong)handle);
+        return rv;
     }
 
     // On a curve whose cofactor is 1, cofactor ECDH (CKM_ECDH1_COFACTOR_DERIVE) agrees the same Z as plain ECDH.
@@ -740,10 +1172,14 @@ internal static class AlgorithmConformanceTestCases
         });
     }
 
-    public static TheoryData<string> AesKeyWrapTampering => ["first byte", "byte 8", "last byte", "truncated", "all 0xFF"];
+    public static TheoryData<string> AesKeyWrapTampering => ["first byte", "byte 8", "last byte", "truncated", "all 0xFF", "8 bytes", "20 bytes"];
 
     // RFC 3394's integrity check catches any change to the 40-byte blob of a wrapped 256-bit key: unwrap refuses it
-    // and creates no key, and the session unwraps the untouched blob afterwards.
+    // with CKR_WRAPPED_KEY_INVALID (PKCS#11 v3.2 §5.1.6: "the provided wrapped key is not valid"), creates no key,
+    // and the session unwraps the untouched blob afterwards. Cut by a semiblock it is still a well-formed blob of a
+    // 192-bit key that fails the check, so CKR_WRAPPED_KEY_INVALID too. A blob under two semiblocks (8 bytes), or
+    // not a whole number of them (20 bytes), is invalid by its length alone: CKR_WRAPPED_KEY_LEN_RANGE, which
+    // outranks CKR_WRAPPED_KEY_INVALID (§5.1.6). Both are in C_UnwrapKey's return values (§5.18.4).
     internal static void Assert_AesKeyWrap_TamperedBlob_IsRefused(IPkcs11Backend backend, string tampering)
     {
         WithKekAndTarget(backend, (session, kek, target) =>
@@ -758,11 +1194,15 @@ internal static class AlgorithmConformanceTestCases
                 "last byte" => Flip(blob, blob.Length - 1),
                 "truncated" => blob[..^8],
                 "all 0xFF" => [.. Enumerable.Repeat((byte)0xFF, blob.Length)],
+                "8 bytes" => blob[..8],
+                "20 bytes" => blob[..20],
                 _ => throw new ArgumentOutOfRangeException(nameof(tampering), tampering, null),
             };
+            CKR expected = bad.Length < 16 || bad.Length % 8 != 0 ? CKR.CKR_WRAPPED_KEY_LEN_RANGE : CKR.CKR_WRAPPED_KEY_INVALID;
 
             using Template template = UnwrappedAesTemplate();
-            Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(kw, kek, bad, template.Attributes));
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(kw, kek, bad, template.Attributes));
+            Assert.Equal(expected, ex.ReturnValue);
             session.DestroyObject(session.UnwrapKey(kw, kek, blob, template.Attributes));
         });
     }
@@ -906,6 +1346,89 @@ internal static class AlgorithmConformanceTestCases
             byte[] own = new byte[32];
             Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestFinal(sid, own, lengthOnly: false, out _));
             Assert.Equal(SHA256.HashData(part1), own);
+        });
+    }
+
+    public static TheoryData<string> OperationStateMisuses =>
+    [
+        "save with no operation", "restore random bytes", "restore a truncated state",
+        "restore with an encryption key", "restore with an authentication key",
+    ];
+
+    // The refusals §5.6.6 and §5.6.7 name, for a SHA-256 digest's state saved after one part:
+    // C_GetOperationState with no operation active answers CKR_OPERATION_NOT_INITIALIZED; C_SetOperationState of
+    // the state cut by its last byte answers CKR_SAVED_STATE_INVALID; and restoring it with an encryption or
+    // authentication key, which a digest does not use, answers CKR_KEY_NOT_NEEDED (§5.1.6). Random bytes of the
+    // saved state's length answer CKR_SAVED_STATE_INVALID or CKR_OK: §5.6.7 asks for the refusal only of a state
+    // the module "can determine is not valid", and a state with no integrity check of its own can be any bytes of
+    // that length; a module that takes them ends the digest they restored with C_DigestFinal. Both functions are
+    // optional: a module without them answers CKR_FUNCTION_NOT_SUPPORTED, and the rows that need a saved state skip
+    // where the module cannot save one (CKR_STATE_UNSAVEABLE), as DigestState_SavedAndRestored records per backend;
+    // there the random bytes are 64, and refused. Whether a refused restore leaves the session's operation as it
+    // was is not stated, so only the code is asserted. The state is restored into the session that saved it.
+    internal static void Assert_OperationState_Misuse_IsRefused(IPkcs11Backend backend, string misuse)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        WithSession(backend, session =>
+        {
+            var sid = (NativeCULong)session.SessionId;
+            if (misuse == "save with no operation")
+            {
+                CKR none = lowLevel.C_GetOperationState(sid, default, lengthOnly: true, out _);
+                Assert.True(none is CKR.CKR_OPERATION_NOT_INITIALIZED or CKR.CKR_FUNCTION_NOT_SUPPORTED,
+                    $"C_GetOperationState with no operation active returned {none}.");
+                return;
+            }
+
+            using (var scope = new MechanismParameterScope())
+            {
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256).Marshal(scope, out _);
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestInit(sid, in mech));
+            }
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_DigestUpdate(sid, Message));
+            CKR rv = lowLevel.C_GetOperationState(sid, default, lengthOnly: true, out NativeCULong length);
+            if (misuse == "restore random bytes" && rv is CKR.CKR_FUNCTION_NOT_SUPPORTED or CKR.CKR_STATE_UNSAVEABLE)
+            {
+                // No state to take the length of: 64 random bytes, refused as invalid by a module that has the
+                // function, or as not supported by one that has neither.
+                CKR random = lowLevel.C_SetOperationState(sid, RandomNumberGenerator.GetBytes(64), default, default);
+                Assert.True(random is CKR.CKR_SAVED_STATE_INVALID or CKR.CKR_FUNCTION_NOT_SUPPORTED,
+                    $"C_SetOperationState of 64 random bytes returned {random} (C_GetOperationState returned {rv}).");
+                return;
+            }
+            if (rv is CKR.CKR_FUNCTION_NOT_SUPPORTED or CKR.CKR_STATE_UNSAVEABLE)
+                Assert.Skip($"The module does not save a digest's state ({rv}).");
+            Assert.Equal(CKR.CKR_OK, rv);
+            byte[] state = new byte[(int)(ulong)length];
+            Assert.Equal(CKR.CKR_OK, lowLevel.C_GetOperationState(sid, state, lengthOnly: false, out length));
+            state = state[..(int)(ulong)length];
+
+            ObjectHandle aes = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            ObjectHandle mac = TestKeys.CreateGenericSecretKey(session, RandomNumberGenerator.GetBytes(32));
+            try
+            {
+                (CKR expected, CKR restored) = misuse switch
+                {
+                    "restore random bytes" => (CKR.CKR_SAVED_STATE_INVALID,
+                        lowLevel.C_SetOperationState(sid, RandomNumberGenerator.GetBytes(state.Length), default, default)),
+                    "restore a truncated state" => (CKR.CKR_SAVED_STATE_INVALID,
+                        lowLevel.C_SetOperationState(sid, state.AsSpan(0, state.Length - 1), default, default)),
+                    "restore with an encryption key" => (CKR.CKR_KEY_NOT_NEEDED,
+                        lowLevel.C_SetOperationState(sid, state, (NativeCULong)aes.ObjectId, default)),
+                    "restore with an authentication key" => (CKR.CKR_KEY_NOT_NEEDED,
+                        lowLevel.C_SetOperationState(sid, state, default, (NativeCULong)mac.ObjectId)),
+                    _ => throw new ArgumentOutOfRangeException(nameof(misuse), misuse, null),
+                };
+                if (misuse == "restore random bytes" && restored == CKR.CKR_OK)
+                {
+                    // Whatever digest the bytes restored is ended; its value means nothing.
+                    _ = lowLevel.C_DigestFinal(sid, new byte[64], lengthOnly: false, out _);
+                    return;
+                }
+                Assert.True(restored == expected, $"C_SetOperationState ({misuse}) was expected to return {expected} but returned {restored}.");
+            }
+            finally { session.DestroyObject(mac); session.DestroyObject(aes); }
         });
     }
 }

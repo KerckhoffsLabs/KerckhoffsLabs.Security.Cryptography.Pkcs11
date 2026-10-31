@@ -129,6 +129,53 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool WolfPkcs11MarksAShortBufferUnavailable = false;
 
+    /// <summary>
+    /// False while <c>C_CreateObject</c> makes a <c>CKO_PRIVATE_KEY</c> of the secret key type <c>CKK_AES</c>: the
+    /// template is taken with <c>CKR_OK</c>, where PKCS#11 v3.2 §4.1.1 point 5 refuses a set of values that cannot
+    /// hold together (<c>CKR_TEMPLATE_INCONSISTENT</c>). A <c>CKO_SECRET_KEY</c> of type <c>CKK_EC</c> is refused.
+    /// Fixed upstream after v2.2.0 (wolfSSL/wolfPKCS11#263 checks the class against the key type).
+    /// WolfPkcs11QuirkTests.PrivateKeyOfASecretKeyType_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAPrivateKeyOfASecretKeyType = false;
+
+    /// <summary>
+    /// False while <c>C_VerifyRecover</c>, with another operation active and no verification with recovery,
+    /// answers <c>CKR_MECHANISM_INVALID</c> where PKCS#11 v3.2 §5.15.6 and §5.2 give
+    /// <c>CKR_OPERATION_NOT_INITIALIZED</c>: it reads the session's one active mechanism (an ECDSA
+    /// <c>C_SignInit</c>'s, say) and refuses it before it asks whether a verify-recover was started
+    /// (<c>wp11_C_VerifyRecover</c> in <c>src/crypto.c</c>). With nothing active it answers correctly.
+    /// WolfPkcs11QuirkTests.VerifyRecoverUnderASign_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11ReportsAVerifyRecoverNeverStarted = false;
+
+    /// <summary>
+    /// False while a single-part <c>CKM_AES_CBC_PAD</c> <c>C_Decrypt</c> into a buffer too small for the plaintext
+    /// answers <c>CKR_BUFFER_TOO_SMALL</c> with the length of the blocks before the last one only (32 for a
+    /// 48-byte ciphertext of 43 bytes of plaintext): <c>WP11_AesCbcPad_Decrypt</c> in <c>src/internal.c</c> reports
+    /// what its update step needs, before the final block. PKCS#11 v3.2 §5.2: "at least the number of bytes
+    /// needed". It writes nothing past the buffer.
+    /// WolfPkcs11QuirkTests.CbcPadDecryptShortBuffer_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11ReportsTheWholeCbcPadPlaintextLength = false;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> of a blob that is not a whole number of semiblocks (20 bytes)
+    /// answers <c>CKR_WRAPPED_KEY_INVALID</c>: <c>C_UnwrapKey</c> in <c>src/crypto.c</c> maps the
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c> its <c>C_Decrypt</c> gives (a code §5.10.2 allows there) to it. PKCS#11 v3.2
+    /// §5.1.6: a wrapped key invalid by its length alone is <c>CKR_WRAPPED_KEY_LEN_RANGE</c>, which outranks
+    /// <c>CKR_WRAPPED_KEY_INVALID</c>. An 8-byte blob is refused as it should be.
+    /// WolfPkcs11QuirkTests.KeyWrapBlobOfAPartialSemiblock_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAKeyWrapBlobByItsLength = false;
+
+    /// <summary>
+    /// False while <c>C_Verify(CKM_RSA_X_509)</c> with more data than the modulus has bytes answers
+    /// <c>CKR_FUNCTION_FAILED</c> (wolfPKCS11's own test expects it). PKCS#11 v3.2 §6.1.12 (Table 45: at most k
+    /// bytes) and §5.1.6: <c>CKR_DATA_LEN_RANGE</c>. The token key verifies the right data afterwards.
+    /// WolfPkcs11QuirkTests.OverlongRawRsaVerify_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesOverlongRawRsaDataByItsLength = false;
+
     /// <summary>Gate for cases that read back a derived key: see <see cref="WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity"/>.</summary>
     public static bool DerivedKeyReadbackAvailable => WolfPkcs11Available && WolfPkcs11DerivedKeysTakeTheTemplatesSensitivity;
 
@@ -149,6 +196,44 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for cases that verify an RSA signature of the wrong length: see <see cref="WolfPkcs11RejectsWrongLengthRsaSignatures"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => WolfPkcs11Available && WolfPkcs11RejectsWrongLengthRsaSignatures;
+
+    /// <summary>Gate for the over-long raw RSA verify case: see <see cref="WolfPkcs11RefusesOverlongRawRsaDataByItsLength"/>.</summary>
+    public static bool OverlongRawRsaVerifyAvailable => WolfPkcs11Available && WolfPkcs11RefusesOverlongRawRsaDataByItsLength;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is a DER OCTET STRING whose length byte
+    /// promises 65 bytes and has 40 answers <c>CKR_FUNCTION_FAILED</c> (<c>src/crypto.c</c> hands the bytes to wolfCrypt,
+    /// whose import failure it maps so); a 1 KiB peer value is refused as it should be. PKCS#11 v3.2 §6.3.16 and
+    /// §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
+    /// WolfPkcs11QuirkTests.MalformedEcdhPeer_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAMalformedEcdhPeerAsInvalid = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with SHA-256 and <c>CKA_VALUE_LEN</c> 8161 (255 x 32 + 1, past
+    /// RFC 5869's limit) answers <c>CKR_FUNCTION_FAILED</c> (wolfCrypt's refusal, mapped so); 2^32 + 1 and a salt key
+    /// that is no secret key are refused as they should be. PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// WolfPkcs11QuirkTests.HkdfOutputAboveTheRfcLimit_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAnHkdfOutputAboveTheRfcLimit = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a <c>CKA_PUBLIC_EXPONENT</c> of 2^64 + 65537
+    /// answers <c>CKR_FUNCTION_FAILED</c>. PKCS#11 v3.2 §6.1.4: <c>CKR_TEMPLATE_INCONSISTENT</c> "shall be returned if
+    /// the implementation cannot use the supplied exponent value". 65539 is kept, as it should be.
+    /// WolfPkcs11QuirkTests.RsaExponentAbove64Bits_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAnRsaExponentAsInconsistent = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> with a <c>CKA_VALUE_LEN</c> past its ulMaxKeySize
+    /// (513 bytes for 4096 bits, and 2^32 + 16) answers <c>CKR_FUNCTION_FAILED</c>; it makes no key. PKCS#11 v3.2
+    /// §6.8.3, §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>. The in-range rows pass.
+    /// WolfPkcs11QuirkTests.GenericSecretPastItsMaximum_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool WolfPkcs11RefusesAGenericSecretLengthAsInvalid = false;
 
     public WolfPkcs11BackendFixture()
     {

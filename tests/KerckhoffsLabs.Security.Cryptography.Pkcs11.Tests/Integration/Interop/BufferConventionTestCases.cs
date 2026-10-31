@@ -60,15 +60,20 @@ internal static class BufferConventionTestCases
     // Runs a final into a 1-byte buffer first. It must answer CKR_BUFFER_TOO_SMALL and keep the operation, or
     // show one of the deviations the library tolerates: no length reported (the caller asks again), or the
     // operation ended (the caller starts it again, which start does: Init and every Update). Returns what the
-    // final produced at a size it could act on.
+    // final produced at a size it could act on. The 1-byte buffer is the start of a larger one, room for the
+    // whole output and more, whose other bytes must come back as they were: a module that ignores the declared
+    // length writes into memory this case owns rather than past an allocation.
     private static byte[] FinalWithAShortBufferFirst(Action start, FinalCall final, Func<int> neededAfterStart)
     {
         start();
         int needed = neededAfterStart();
-        byte[] tiny = new byte[1];
+        byte[] guarded = new byte[1 + needed + Guard];
+        guarded.AsSpan().Fill(Canary);
+        Span<byte> tiny = guarded.AsSpan(0, 1);
         var (rv, reported) = final(tiny, false);
+        AssertGuardIntact(guarded, 1, $"A final of at least {needed} bytes into a 1-byte buffer (it returned {rv})");
         if (rv == CKR.CKR_OK && needed <= tiny.Length)
-            return tiny.AsSpan(0, (int)reported).ToArray();
+            return tiny[..(int)reported].ToArray();
         Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL, $"A 1-byte buffer for a final of at least {needed} bytes returned {rv}.");
         Assert.True((ulong)reported >= (ulong)needed || (ulong)reported <= (ulong)tiny.Length,
             $"CKR_BUFFER_TOO_SMALL reported {reported} bytes for a final of at least {needed} bytes.");
@@ -84,6 +89,16 @@ internal static class BufferConventionTestCases
         return buffer.AsSpan(0, (int)written).ToArray();
     }
 
+    private const int Guard = 64;
+    private const byte Canary = 0xA5;
+
+    // The bytes of buffer from offset on are the canary they were filled with.
+    private static void AssertGuardIntact(ReadOnlySpan<byte> buffer, int offset, string call)
+    {
+        int written = buffer[offset..].IndexOfAnyExcept(Canary);
+        Assert.True(written < 0, $"{call} wrote past the declared length, at byte {offset + written}.");
+    }
+
     private static (CKR rv, NativeCULong length) Again(Action start, Func<(CKR rv, NativeCULong length)> call)
     {
         var result = call();
@@ -95,7 +110,8 @@ internal static class BufferConventionTestCases
 
     // === C_*Final into a buffer too small ======================================
 
-    public static TheoryData<string> MultipartFinals => ["SHA-256 digest", "ECDSA-SHA256 sign", "AES-GCM encrypt", "AES-GCM decrypt"];
+    public static TheoryData<string> MultipartFinals =>
+        ["SHA-256 digest", "ECDSA-SHA256 sign", "AES-GCM encrypt", "AES-GCM decrypt", "AES-CBC-PAD encrypt", "AES-CBC-PAD decrypt"];
 
     // A C_*Final given a buffer too small for its output answers CKR_BUFFER_TOO_SMALL with the length it needs,
     // and keeps the operation, so the same final with a large enough buffer completes it (§5.2). The library's
@@ -106,9 +122,17 @@ internal static class BufferConventionTestCases
         {
             "SHA-256 digest" => [CKM.CKM_SHA256],
             "ECDSA-SHA256 sign" => [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256],
+            "AES-CBC-PAD encrypt" or "AES-CBC-PAD decrypt" => [CKM.CKM_AES_CBC_PAD],
             _ => [CKM.CKM_AES_GCM],
         };
         backend.RequireMechanisms(needed);
+        // CBC-PAD holds back the last block: the encrypting final writes the padded last block, the decrypting
+        // one the plaintext of the last block.
+        if (operation.StartsWith("AES-CBC-PAD", StringComparison.Ordinal))
+        {
+            bool encrypt = operation.EndsWith("encrypt", StringComparison.Ordinal);
+            backend.RequireMechanismFlags(CKM.CKM_AES_CBC_PAD, f => encrypt ? f.Encrypt : f.Decrypt, encrypt ? "CKF_ENCRYPT" : "CKF_DECRYPT");
+        }
 
         WithSession(backend, (lowLevel, sid, session) =>
         {
@@ -148,6 +172,41 @@ internal static class BufferConventionTestCases
                             Assert.True(session.Verify(mechanism, pub, Message, signature));
                         }
                         finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+                        break;
+                    }
+                case "AES-CBC-PAD encrypt":
+                case "AES-CBC-PAD decrypt":
+                    {
+                        bool encrypt = operation == "AES-CBC-PAD encrypt";
+                        byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+                        ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+                        try
+                        {
+                            using var aes = Aes.Create();
+                            aes.Key = rawKey;
+                            byte[] ciphertext = aes.EncryptCbc(Message, Iv, PaddingMode.PKCS7);
+                            byte[] input = encrypt ? Message : ciphertext;
+                            byte[] expected = encrypt ? ciphertext : Message;
+                            var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv);
+                            using var updates = new MemoryStream();
+                            void Start()
+                            {
+                                updates.SetLength(0);
+                                AssertOk(Init(encrypt ? lowLevel.C_EncryptInit : lowLevel.C_DecryptInit, sid, mechanism, key), "Init");
+                                byte[] part = new byte[input.Length + 16];
+                                CKR rv = encrypt
+                                    ? lowLevel.C_EncryptUpdate(sid, input, part, lengthOnly: false, out NativeCULong n)
+                                    : lowLevel.C_DecryptUpdate(sid, input, part, lengthOnly: false, out n);
+                                AssertOk(rv, "Update");
+                                updates.Write(part, 0, (int)n);
+                            }
+                            FinalCall final = encrypt
+                                ? (buffer, lengthOnly) => (lowLevel.C_EncryptFinal(sid, buffer, lengthOnly, out NativeCULong n), n)
+                                : (buffer, lengthOnly) => (lowLevel.C_DecryptFinal(sid, buffer, lengthOnly, out NativeCULong n), n);
+                            byte[] last = FinalWithAShortBufferFirst(Start, final, () => Math.Max(expected.Length - (int)updates.Length, 1));
+                            Assert.Equal(expected, (byte[])[.. updates.ToArray(), .. last]);
+                        }
+                        finally { session.DestroyObject(key); }
                         break;
                     }
                 default:
@@ -288,6 +347,60 @@ internal static class BufferConventionTestCases
         });
     }
 
+    // === Length queries ========================================================
+
+    public static TheoryData<int> CbcPadWholeBlockLengths => [16, 32, 48];
+
+    // CBC-PAD pads a plaintext of whole blocks with a whole block more, so the length query of a single-part
+    // C_Encrypt of 16·n bytes reports at least 16·(n+1) (§5.2: "a number of bytes which would suffice to hold
+    // the cryptographic output"), and a buffer of exactly the reported size takes the ciphertext.
+    internal static void Assert_CbcPadEncrypt_LengthQuery_CoversThePaddingBlock(IPkcs11Backend backend, int length)
+    {
+        backend.RequireMechanismFlags(CKM.CKM_AES_CBC_PAD, f => f.Encrypt, "CKF_ENCRYPT");
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            byte[] rawKey = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle key = TestKeys.CreateAes256Key(session, rawKey);
+            try
+            {
+                byte[] plaintext = RandomNumberGenerator.GetBytes(length);
+                using var aes = Aes.Create();
+                aes.Key = rawKey;
+                byte[] expected = aes.EncryptCbc(plaintext, Iv, PaddingMode.PKCS7);
+                var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv);
+
+                AssertOk(Init(lowLevel.C_EncryptInit, sid, mechanism, key), "C_EncryptInit");
+                AssertOk(lowLevel.C_Encrypt(sid, plaintext, [], lengthOnly: true, out NativeCULong reported), "C_Encrypt (length query)");
+                Assert.True((ulong)reported >= (ulong)expected.Length,
+                    $"The C_Encrypt length query reported {reported} bytes for {length} bytes of plaintext, whose CBC-PAD ciphertext is {expected.Length}.");
+                byte[] output = new byte[(int)(ulong)reported];
+                AssertOk(lowLevel.C_Encrypt(sid, plaintext, output, lengthOnly: false, out NativeCULong written), $"C_Encrypt into the reported {reported} bytes");
+                Assert.Equal(expected, output.AsSpan(0, (int)written).ToArray());
+            }
+            finally { session.DestroyObject(key); }
+        });
+    }
+
+    // C_Digest with data and a NULL output is a length query (§5.2): it answers CKR_OK with the digest's 32
+    // bytes and leaves the operation active, so the next C_Digest returns the digest of the data.
+    internal static void Assert_Digest_LengthQuery_KeepsTheOperation(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA256);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            using (var scope = new MechanismParameterScope())
+            {
+                CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256).Marshal(scope, out _);
+                AssertOk(lowLevel.C_DigestInit(sid, in mech), "C_DigestInit");
+            }
+            AssertOk(lowLevel.C_Digest(sid, Message, [], lengthOnly: true, out NativeCULong reported), "C_Digest (length query)");
+            Assert.True((ulong)reported == 32UL, $"The SHA-256 C_Digest length query reported {reported} bytes.");
+            byte[] digest = new byte[32];
+            AssertOk(lowLevel.C_Digest(sid, Message, digest, lengthOnly: false, out NativeCULong written), "C_Digest after the length query");
+            Assert.Equal(SHA256.HashData(Message), digest.AsSpan(0, (int)written).ToArray());
+        });
+    }
+
     // === Stream pieces around the block size ===================================
 
     public static TheoryData<int> StreamPieceLengths => [1, 15, 17, 4095, 4097];
@@ -371,6 +484,141 @@ internal static class BufferConventionTestCases
         using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
         using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
         return session.CreateObject([attrClass, attrToken, attrLabel, attrValue]);
+    }
+
+    public static TheoryData<string> ShortBufferAttributes =>
+    [
+        "CKA_LABEL of a data object", "CKA_EC_POINT of a P-256 public key", "CKA_EC_POINT of a P-256 public key, in 65 bytes",
+        "CKA_EC_PARAMS of a P-256 public key", "CKA_MODULUS of an RSA public key",
+    ];
+
+    // C_GetAttributeValue with a buffer too small for an attribute answers CKR_BUFFER_TOO_SMALL and writes nothing
+    // (§5.7.5: it "returns no value"), above all nothing past the length it was given, and the attribute then
+    // reads in full. A 1-byte buffer, and for CKA_EC_POINT one of 65 bytes, the raw point's length, which the
+    // DER OCTET STRING around it (67 bytes) exceeds. The declared buffer is the start of a larger one filled
+    // with a canary, so a module that ignores ulValueLen writes into memory this case owns. The value the
+    // module sets ulValueLen to is GetAttributeValue_ShortBuffer_IsUnavailableInformation's.
+    internal static void Assert_GetAttributeValue_ShortBuffer_WritesNothingPastIt(IPkcs11Backend backend, string attribute)
+    {
+        if (attribute.Contains("P-256", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            var made = new List<ObjectHandle>();
+            try
+            {
+                (ObjectHandle obj, CKA type, int declared) = attribute switch
+                {
+                    "CKA_LABEL of a data object" => (Made(made, CreateDataObject(session, $"kl-short-buffer-{Guid.NewGuid():N}", [0x01])), CKA.CKA_LABEL, 1),
+                    "CKA_MODULUS of an RSA public key" => (Made(made, ImportRsaPublicKey(session)), CKA.CKA_MODULUS, 1),
+                    _ => (Made(made, GenerateEcPublicKey(session, made)), attribute.StartsWith("CKA_EC_POINT", StringComparison.Ordinal) ? CKA.CKA_EC_POINT : CKA.CKA_EC_PARAMS,
+                        attribute.EndsWith("65 bytes", StringComparison.Ordinal) ? 65 : 1),
+                };
+                using var full = session.GetAttributeValue(obj, [type]);
+                byte[] value = full[0].GetValueAsByteArray();
+
+                // Room for the whole value past the declared length, and more.
+                IntPtr buffer = Marshal.AllocHGlobal(declared + value.Length + Guard);
+                try
+                {
+                    byte[] canary = new byte[declared + value.Length + Guard];
+                    canary.AsSpan().Fill(Canary);
+                    Marshal.Copy(canary, 0, buffer, canary.Length);
+                    CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)type, value = buffer, valueLen = (NativeCULong)(ulong)declared }];
+                    CKR rv = lowLevel.C_GetAttributeValue(sid, (NativeCULong)obj.ObjectId, template);
+                    Marshal.Copy(buffer, canary, 0, canary.Length);
+                    AssertGuardIntact(canary, declared, $"C_GetAttributeValue({type}) of {value.Length} bytes into a {declared}-byte buffer (it returned {rv})");
+                    Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL, $"C_GetAttributeValue({type}) of {value.Length} bytes into a {declared}-byte buffer returned {rv}.");
+                }
+                finally { Marshal.FreeHGlobal(buffer); }
+
+                using var again = session.GetAttributeValue(obj, [type]);
+                Assert.Equal(value, again[0].GetValueAsByteArray());
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in made)
+                    session.DestroyObject(handle);
+            }
+        });
+    }
+
+    public static TheoryData<string> LargeBufferAttributes => ["CKA_LABEL of a data object", "CKA_EC_PARAMS of a P-256 public key", "CKA_PARAMETER_SET of an ML-DSA-44 public key"];
+
+    // C_GetAttributeValue into a buffer larger than the value copies it and sets ulValueLen to its exact length
+    // (§5.7.5, §5.2: "*pulBufLen is set to the exact number of bytes returned"), whatever the attribute's type:
+    // a string, a DER encoding, a CK_ULONG. The library sizes every read by a length query, so only the raw
+    // call reaches this path.
+    internal static void Assert_GetAttributeValue_LargeBuffer_SetsTheExactLength(IPkcs11Backend backend, string attribute)
+    {
+        if (attribute.Contains("P-256", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        if (attribute.Contains("ML-DSA", StringComparison.Ordinal))
+            backend.RequireMechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN);
+        WithSession(backend, (lowLevel, sid, session) =>
+        {
+            var made = new List<ObjectHandle>();
+            try
+            {
+                (ObjectHandle obj, CKA type) = attribute switch
+                {
+                    "CKA_LABEL of a data object" => (Made(made, CreateDataObject(session, $"kl-large-buffer-{Guid.NewGuid():N}", [0x01])), CKA.CKA_LABEL),
+                    "CKA_EC_PARAMS of a P-256 public key" => (Made(made, GenerateEcPublicKey(session, made)), CKA.CKA_EC_PARAMS),
+                    _ => (Made(made, GenerateMlDsaPublicKey(session, made)), CKA.CKA_PARAMETER_SET),
+                };
+                using var full = session.GetAttributeValue(obj, [type]);
+                byte[] value = full[0].GetValueAsByteArray();
+
+                int capacity = value.Length + Guard;
+                IntPtr buffer = Marshal.AllocHGlobal(capacity);
+                try
+                {
+                    CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)type, value = buffer, valueLen = (NativeCULong)(ulong)capacity }];
+                    CKR rv = lowLevel.C_GetAttributeValue(sid, (NativeCULong)obj.ObjectId, template);
+                    AssertOk(rv, $"C_GetAttributeValue({type}) into a {capacity}-byte buffer");
+                    Assert.True((ulong)template[0].valueLen == (ulong)value.Length,
+                        $"C_GetAttributeValue({type}) of {value.Length} bytes into a {capacity}-byte buffer set ulValueLen to {template[0].valueLen}.");
+                    byte[] read = new byte[value.Length];
+                    Marshal.Copy(buffer, read, 0, read.Length);
+                    Assert.Equal(value, read);
+                }
+                finally { Marshal.FreeHGlobal(buffer); }
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in made)
+                    session.DestroyObject(handle);
+            }
+        });
+    }
+
+    private static ObjectHandle Made(List<ObjectHandle> made, ObjectHandle handle)
+    {
+        if (!made.Contains(handle))
+            made.Add(handle);
+        return handle;
+    }
+
+    private static ObjectHandle ImportRsaPublicKey(Pkcs11SessionCore session)
+    {
+        using var rsa = RSA.Create(2048);
+        RSAParameters key = rsa.ExportParameters(includePrivateParameters: false);
+        return TestKeys.ImportRsaPublicKey(session, key.Modulus!, key.Exponent!);
+    }
+
+    // Generates a P-256 key pair, records both halves for the caller to destroy, and returns the public key.
+    private static ObjectHandle GenerateEcPublicKey(Pkcs11SessionCore session, List<ObjectHandle> made)
+    {
+        var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+        made.Add(priv);
+        return pub;
+    }
+
+    private static ObjectHandle GenerateMlDsaPublicKey(Pkcs11SessionCore session, List<ObjectHandle> made)
+    {
+        var (pub, priv) = TestKeys.GenerateMlDsaKeyPair(session, CkpMlDsa.CKP_ML_DSA_44);
+        made.Add(priv);
+        return pub;
     }
 
     // === A search over more than one page ======================================

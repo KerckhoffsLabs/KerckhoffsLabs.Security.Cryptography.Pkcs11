@@ -1,8 +1,12 @@
 using System.Text;
+using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
@@ -40,6 +44,49 @@ internal static class EncryptRsaOaepLabelTestCases
             // garbage padding — the token detects this and reports it as a decrypt failure.
             Assert.ThrowsAny<Pkcs11Exception>(() => session.Decrypt(Oaep(Encoding.UTF8.GetBytes("label-b")), priv, ciphertext));
         });
+    }
+
+    // pSourceData "must be NULL_PTR if the caller wants the default label" and ulSourceDataLen "must be 0" then
+    // (PKCS#11 v3.2 §6.1.7): a NULL pSourceData behind ulSourceDataLen 8 is an invalid parameter, which
+    // C_EncryptInit and C_DecryptInit refuse with CKR_MECHANISM_PARAM_INVALID, or CKR_ARGUMENTS_BAD for the NULL
+    // pointer (§5.1.6), without reading through it. Through the raw dispatch, as the library's parameter type
+    // cannot express it. After each refusal the same session encrypts (decrypts) with the empty label.
+    internal static void Assert_OaepNullLabelWithLength_IsRefused(IPkcs11Backend backend)
+    {
+        byte[] plaintext = Encoding.UTF8.GetBytes("RSA-OAEP with a NULL label behind a length");
+        WithRsaKeyPair(backend, (session, pub, priv) =>
+        {
+            byte[] ciphertext = OrSkipIfOaepHashUnsupported(() => session.Encrypt(Oaep([]), pub, plaintext));
+            LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+            var sid = (NativeCULong)session.SessionId;
+            var parameter = new CK_RSA_PKCS_OAEP_PARAMS
+            {
+                HashAlg = (NativeCULong)(ulong)CKM.CKM_SHA256,
+                Mgf = (NativeCULong)(ulong)CKG.CKG_MGF1_SHA256,
+                Source = (NativeCULong)CKZ.CKZ_DATA_SPECIFIED,
+                SourceData = IntPtr.Zero,
+                SourceDataLen = (NativeCULong)8UL,
+            };
+            Mechanism nullLabel = RawParameter.From(CKM.CKM_RSA_PKCS_OAEP, in parameter);
+            foreach (bool encrypt in (bool[])[true, false])
+            {
+                string op = encrypt ? "C_EncryptInit" : "C_DecryptInit";
+                CKR rv = RawInit(lowLevel, sid, encrypt, nullLabel, encrypt ? pub : priv);
+                Assert.True(rv is CKR.CKR_MECHANISM_PARAM_INVALID or CKR.CKR_ARGUMENTS_BAD,
+                    $"{op}(CKM_RSA_PKCS_OAEP) with a NULL pSourceData and ulSourceDataLen 8 returned {rv}.");
+                byte[] input = encrypt ? session.Encrypt(Oaep([]), pub, plaintext) : ciphertext;
+                Assert.Equal(plaintext, session.Decrypt(Oaep([]), priv, input));
+            }
+        });
+    }
+
+    private static CKR RawInit(LowLevelPkcs11Library lowLevel, NativeCULong sid, bool encrypt, Mechanism mechanism, ObjectHandle key)
+    {
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM mech = mechanism.Marshal(scope, out _);
+        return encrypt
+            ? lowLevel.C_EncryptInit(sid, in mech, (NativeCULong)key.ObjectId)
+            : lowLevel.C_DecryptInit(sid, in mech, (NativeCULong)key.ObjectId);
     }
 
     private static Mechanism Oaep(byte[] label) =>

@@ -74,6 +74,183 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the <c>CKA_LOCAL</c> cases.</summary>
     public static bool LocalAttributeAvailable => CratonHsmAvailable && SupportsLocalAttribute;
 
+    /// <summary>
+    /// False while Craton HSM refuses an object without a login only by its class: <c>C_CreateObject</c> checks
+    /// for <c>CKO_PRIVATE_KEY</c> or <c>CKO_SECRET_KEY</c> (<c>src/pkcs11_abi/functions.rs</c>) and nothing looks
+    /// at <c>CKA_PRIVATE</c>, so with nobody logged in <c>C_CreateObject</c> of a data object, <c>C_CopyObject</c>,
+    /// <c>C_GenerateKey</c>, <c>C_GenerateKeyPair</c> and <c>C_UnwrapKey</c> make a <c>CKA_PRIVATE = TRUE</c>
+    /// session object, and the SO makes one with <c>C_CreateObject</c>. PKCS#11 v3.2 §5.1.6
+    /// (<c>CKR_USER_NOT_LOGGED_IN</c>) and §5.7.1: only public objects can be created unless the normal user is
+    /// logged in.
+    /// CratonHsmQuirkTests.PrivateObjectWithoutALogin_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmRefusesPrivateObjectsWithoutALogin = false;
+
+    /// <summary>Gate for the private-object cases (nobody, or the SO, logged in): see <see cref="CratonHsmRefusesPrivateObjectsWithoutALogin"/>.</summary>
+    public static bool PrivateObjectLoginCheckAvailable => CratonHsmAvailable && CratonHsmRefusesPrivateObjectsWithoutALogin;
+
+    /// <summary>
+    /// False while <c>C_Logout</c> leaves the application's private session objects in place: a new login finds
+    /// them again under their old handles, where PKCS#11 v3.2 §5.6.10 destroys them. While nobody is logged in,
+    /// the handle of a private object (session or token) answers <c>C_GetAttributeValue</c> with
+    /// <c>CKR_USER_NOT_LOGGED_IN</c>, a code §5.7.5 does not list for it, rather than <c>CKR_OBJECT_HANDLE_INVALID</c>.
+    /// CratonHsmQuirkTests.PrivateSessionObjectAfterLogout_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmDestroysPrivateSessionObjectsOnLogout = false;
+
+    /// <summary>
+    /// False while a read-only session cannot make even a session object: <c>C_CreateObject</c> with
+    /// <c>CKA_TOKEN = FALSE</c> answers <c>CKR_SESSION_READ_ONLY</c>, where PKCS#11 v3.2 §5.7.1 refuses only token
+    /// objects there. CratonHsmQuirkTests.SessionObjectInReadOnlySession_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmMakesSessionObjectsInReadOnlySessions = false;
+
+    /// <summary>Gate for the read-only session cases: see <see cref="CratonHsmMakesSessionObjectsInReadOnlySessions"/>.</summary>
+    public static bool ReadOnlySessionObjectsAvailable => CratonHsmAvailable && CratonHsmMakesSessionObjectsInReadOnlySessions;
+
+    /// <summary>
+    /// False while any refused <c>C_Login</c> locks the right PIN out for a while: <c>C_Login</c> does not check a
+    /// PIN's length, so one shorter than <c>ulMinPinLen</c> counts as a failed login, which opens a backoff window
+    /// (<c>check_rate_limit</c> in <c>src/token/token.rs</c>) during which the right PIN is refused with
+    /// <c>CKR_PIN_LOCKED</c>, though the PIN is not locked. Every case that logs in after a refused PIN fails, and
+    /// so does the rest of the collection, so the cases that present one do not run here, and there is no
+    /// tripwire: reproducing it would lock the collection out.
+    /// </summary>
+    public const bool CratonHsmTakesTheRightPinRightAfterARefusedOne = false;
+
+    /// <summary>Gate for the cases that present a refused PIN: see <see cref="CratonHsmTakesTheRightPinRightAfterARefusedOne"/>.</summary>
+    public static bool RefusedPinRecoveryAvailable => CratonHsmAvailable && CratonHsmTakesTheRightPinRightAfterARefusedOne;
+
+    /// <summary>Gate for the C_Logout handle case: see <see cref="CratonHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
+    public static bool LogoutInvalidationAvailable => CratonHsmAvailable && CratonHsmDestroysPrivateSessionObjectsOnLogout;
+
+    /// <summary>
+    /// False while a template without an attribute PKCS#11 v3.2 says must be given still makes an object:
+    /// <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> without <c>CKA_MODULUS_BITS</c> (§6.1.2, footnote 3),
+    /// and <c>C_CreateObject</c> of an RSA public key without <c>CKA_MODULUS</c>, an EC public or private key
+    /// without <c>CKA_EC_PARAMS</c> (§6.1.2, §6.3.3, §6.3.4, footnote 1) and a secret key without
+    /// <c>CKA_KEY_TYPE</c> (§4.8, footnote 1) answer <c>CKR_OK</c>; an RSA private key without <c>CKA_MODULUS</c>
+    /// is refused with <c>CKR_TEMPLATE_INCONSISTENT</c>. §4.1.1 point 4: <c>CKR_TEMPLATE_INCOMPLETE</c>.
+    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> without <c>CKA_EC_PARAMS</c> is refused with
+    /// <c>CKR_TEMPLATE_INCOMPLETE</c>, so that row runs.
+    /// </summary>
+    public const bool CratonHsmRequiresTheKeyAttributes = false;
+
+    /// <summary>Gate for the incomplete-template case: see <see cref="CratonHsmRequiresTheKeyAttributes"/>.</summary>
+    public static bool IncompleteTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRequiresTheKeyAttributes;
+
+    /// <summary>
+    /// False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against the mechanism or
+    /// each other: <c>C_GenerateKey(CKM_AES_KEY_GEN)</c> with <c>CKK_GENERIC_SECRET</c> or <c>CKO_DATA</c>,
+    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or
+    /// <c>CKO_PRIVATE_KEY</c> for the public one, and <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type
+    /// <c>CKK_EC</c> or a <c>CKO_PRIVATE_KEY</c> of type <c>CKK_AES</c> all answer <c>CKR_OK</c>. PKCS#11 v3.2
+    /// §5.18.1, §5.18.2 and §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c>.
+    /// </summary>
+    public const bool CratonHsmChecksTheTemplatesClassAndKeyType = false;
+
+    /// <summary>Gate for the inconsistent-template case: see <see cref="CratonHsmChecksTheTemplatesClassAndKeyType"/>.</summary>
+    public static bool InconsistentTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmChecksTheTemplatesClassAndKeyType;
+
+    /// <summary>
+    /// False while <c>CKA_ALWAYS_SENSITIVE</c> and <c>CKA_NEVER_EXTRACTABLE</c> in the template of
+    /// <c>C_CreateObject</c> or <c>C_GenerateKey</c> are taken with <c>CKR_OK</c>. PKCS#11 v3.2 §4.11 footnotes 2
+    /// and 4 (MUST NOT be specified) and §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>.
+    /// </summary>
+    public const bool CratonHsmRefusesProvenanceAttributesInATemplate = false;
+
+    /// <summary>Gate for the provenance-in-a-template case: see <see cref="CratonHsmRefusesProvenanceAttributesInATemplate"/>.</summary>
+    public static bool ProvenanceTemplateRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesProvenanceAttributesInATemplate;
+
+    /// <summary>
+    /// False while <c>CKM_AES_CTR</c> takes its parameter as a bare 16-byte counter block rather than a
+    /// <c>CK_AES_CTR_PARAMS</c> (<c>ulCounterBits</c> and <c>cb[16]</c>, PKCS#11 v3.2 §6.11.2):
+    /// <c>aes_ctr_validate</c> in <c>src/crypto/encrypt.rs</c> refuses any other length, so <c>C_Encrypt</c> with a
+    /// real <c>CK_AES_CTR_PARAMS</c> answers <c>CKR_MECHANISM_PARAM_INVALID</c> (<c>C_EncryptInit</c> takes it).
+    /// </summary>
+    public const bool CratonHsmTakesAesCtrParams = false;
+
+    /// <summary>Gate for the AES-CTR cases: see <see cref="CratonHsmTakesAesCtrParams"/>.</summary>
+    public static bool AesCtrParamsAvailable => CratonHsmAvailable && CratonHsmTakesAesCtrParams;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> takes a base key of any type: from an AES key it answers
+    /// <c>CKR_OK</c> and makes a key, using the AES key's value as the P-256 private scalar (<c>C_DeriveKey</c> in
+    /// <c>src/pkcs11_abi/functions.rs</c> checks <c>CKA_DERIVE</c> but not the key type). PKCS#11 v3.2 §6.3.17 takes
+    /// an EC private key; §5.1.6: <c>CKR_KEY_TYPE_INCONSISTENT</c>.
+    /// </summary>
+    public const bool CratonHsmChecksTheDeriveBaseKeyType = false;
+
+    /// <summary>
+    /// False while malformed attribute values are taken: <c>C_CreateObject</c> of a data object with a 4-byte
+    /// <c>CKA_TOKEN</c>, a <c>{NULL, 1}</c> <c>CKA_TOKEN</c> or a <c>{NULL, 16}</c> <c>CKA_VALUE</c> answers
+    /// <c>CKR_OK</c>, and a search with a 4-byte <c>CKA_TOKEN</c> of zeros finds a session object. PKCS#11 v3.2
+    /// §4.1.1 point 2: <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>); §5.7.7: a search matches
+    /// only objects whose attributes match the template. A search with a <c>{NULL, 4}</c> <c>CKA_LABEL</c> is
+    /// refused or matches nothing, as it should, so that row runs.
+    /// </summary>
+    public const bool CratonHsmRefusesMalformedAttributeValues = false;
+
+    /// <summary>Gate for the malformed attribute case: see <see cref="CratonHsmRefusesMalformedAttributeValues"/>.</summary>
+    public static bool MalformedAttributeRefusalAvailable => CratonHsmAvailable && CratonHsmRefusesMalformedAttributeValues;
+
+    /// <summary>
+    /// False while <c>CKA_COPYABLE</c> is ignored: an object created with <c>CKA_COPYABLE = FALSE</c> reads it back
+    /// TRUE and <c>C_CopyObject</c> copies it. PKCS#11 v3.2 §4.1.3 and Table 19: <c>C_CopyObject</c> of such an
+    /// object answers <c>CKR_ACTION_PROHIBITED</c>.
+    /// </summary>
+    public const bool CratonHsmKeepsCkaCopyable = false;
+
+    /// <summary>Gate for the CKA_COPYABLE cases: see <see cref="CratonHsmKeepsCkaCopyable"/>.</summary>
+    public static bool CopyableAvailable => CratonHsmAvailable && CratonHsmKeepsCkaCopyable;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair</c> with a <c>CKA_UNIQUE_ID</c> in the private key's template makes the key
+    /// pair, though the token does not report <c>CKA_UNIQUE_ID</c> at all. PKCS#11 v3.2 §4.4.1: a
+    /// <c>CKA_UNIQUE_ID</c> in the template of an operation that creates objects "MUST fail"
+    /// (<c>CKR_ATTRIBUTE_READ_ONLY</c>; a token without the attribute answers <c>CKR_ATTRIBUTE_TYPE_INVALID</c>,
+    /// §4.1.1 point 1), and §5.18.2 makes nothing then.
+    /// </summary>
+    public const bool CratonHsmRefusesAUniqueIdInATemplate = false;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> refuses a blob that fails RFC 3394's integrity check with
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c>, and one of 8 or 20 bytes with <c>CKR_DATA_LEN_RANGE</c>: the codes of
+    /// <c>C_Decrypt</c> and <c>C_Encrypt</c>, which §5.18.4 does not list. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_WRAPPED_KEY_INVALID</c>, and <c>CKR_WRAPPED_KEY_LEN_RANGE</c> for a blob invalid by its length alone.
+    /// </summary>
+    public const bool CratonHsmReportsATamperedKeyWrapBlobAsInvalid = false;
+
+    /// <summary>Gate for the tampered AES key wrap case: see <see cref="CratonHsmReportsATamperedKeyWrapBlobAsInvalid"/>.</summary>
+    public static bool TamperedKeyWrapRefusalAvailable => CratonHsmAvailable && CratonHsmReportsATamperedKeyWrapBlobAsInvalid;
+
+    /// <summary>
+    /// False while <c>C_SetOperationState</c> of a saved SHA-256 digest state with an encryption or authentication
+    /// key handle, which a digest does not use, answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6 and §5.6.7:
+    /// <c>CKR_KEY_NOT_NEEDED</c> ("an attempt was made to restore a session that had been performing a message
+    /// digesting operation, and an encryption key was supplied").
+    /// </summary>
+    public const bool CratonHsmRefusesAKeyNotNeeded = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with <c>CKA_MODULUS_BITS</c> 2^32 + 2048 makes a
+    /// 2048-bit key (ulMaxKeySize 4096): the length is cut to its low 32 bits. PKCS#11 v3.2 §6.1.4, §4.1, §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>. ulMaxKeySize + 8
+    /// is refused.
+    /// </summary>
+    public const bool CratonHsmRefusesAModulusAbove32Bits = false;
+
+    /// <summary>
+    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a <c>CKA_PUBLIC_EXPONENT</c> of 65539
+    /// (01 00 03) or 2^64 + 65537 answers <c>CKR_OK</c> with a key whose exponent is 65537. PKCS#11 v3.2 §6.1.4: the
+    /// exponent "will be copied from the template if supplied", and <c>CKR_TEMPLATE_INCONSISTENT</c> "shall be
+    /// returned if the implementation cannot use the supplied exponent value".
+    /// </summary>
+    public const bool CratonHsmKeepsThePublicExponentAsked = false;
+
+    /// <summary>Gate for the RSA public exponent case: see <see cref="CratonHsmKeepsThePublicExponentAsked"/>.</summary>
+    public static bool PublicExponentAvailable => CratonHsmAvailable && CratonHsmKeepsThePublicExponentAsked;
+
     public CratonHsmBackendFixture()
     {
         string? libPath = Settings.CratonHsmLibraryPath ?? BuiltLibraryPath();

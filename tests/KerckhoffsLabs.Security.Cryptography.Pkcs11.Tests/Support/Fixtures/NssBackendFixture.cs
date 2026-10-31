@@ -181,6 +181,271 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the cases that check <c>CKA_LOCAL</c> on a generated key.</summary>
     public static bool LocalOnGeneratedKeysAvailable => NssAvailable && SupportsLocalOnGeneratedKeys;
 
+    /// <summary>False while softoken refuses a key whose usage attribute is FALSE (<c>CKA_SIGN</c>, <c>CKA_VERIFY</c>,
+    /// <c>CKA_ENCRYPT</c>, <c>CKA_DECRYPT</c>, <c>CKA_VERIFY_RECOVER</c>) with <c>CKR_KEY_TYPE_INCONSISTENT</c>, where
+    /// PKCS#11 v3.2 §5.1.6 has <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c> for a key of the right type whose attributes do
+    /// not allow the use: <c>sftk_InitGeneric</c> in <c>lib/softoken/pkcs11c.c</c> answers the one code for a key of the
+    /// wrong class and for one without the usage. Recorded first for HMAC keys, when KeyCapabilityEnforcementTestCases
+    /// accepted any refusal; the AES and RSA rows were confirmed by a run at the pinned 34716626.</summary>
+    public static bool SupportsFunctionNotPermittedForKeyUsage => false;
+
+    /// <summary>Gate for the key-usage cases that refuse with <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>: see
+    /// <see cref="SupportsFunctionNotPermittedForKeyUsage"/>.</summary>
+    public static bool KeyUsageRefusalAvailable => NssAvailable && SupportsFunctionNotPermittedForKeyUsage;
+
+    // === Departures the wolfPKCS11-history cases found ======================
+    // Each was confirmed by running the case on a softoken built from vendor/nss at the pinned 34716626, and none is
+    // yet reported upstream. NSS needs no tripwire (see NssQuirkTests for the reported ones).
+
+    /// <summary>False while softoken refuses the usage attributes it does check only on some functions:
+    /// <c>C_SignRecoverInit</c> with <c>CKA_SIGN_RECOVER</c> FALSE answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssChecksCkaSignRecover = false;
+
+    /// <summary>False while <c>C_EncapsulateKey</c> with a public key whose <c>CKA_ENCAPSULATE</c> is FALSE, and
+    /// <c>C_DecapsulateKey</c> with a private key whose <c>CKA_DECAPSULATE</c> is FALSE, answer <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssChecksTheKemUsageAttributes = false;
+
+    /// <summary>False while <c>C_DeriveKey</c> (<c>CKM_HKDF_DERIVE</c>, <c>CKM_ECDH1_DERIVE</c>) from a base key whose
+    /// <c>CKA_DERIVE</c> is FALSE answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssChecksCkaDerive = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> from an EC private key answers <c>CKR_OK</c>; HKDF
+    /// takes a secret key (or a data object, §6.62.3). PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_TYPE_INCONSISTENT</c>.</summary>
+    public const bool NssChecksTheHkdfBaseKeyType = false;
+
+    /// <summary>False while <c>C_WrapKey</c> with a data object as the wrapping key, and <c>C_UnwrapKey</c> with a
+    /// certificate as the unwrapping key, answer <c>CKR_KEY_TYPE_INCONSISTENT</c> (<c>sftk_InitGeneric</c>). PKCS#11
+    /// v3.2 §5.1.6 names the wrapping (unwrapping) key's own codes: <c>CKR_WRAPPING_KEY_HANDLE_INVALID</c> or
+    /// <c>CKR_WRAPPING_KEY_TYPE_INCONSISTENT</c> (the unwrapping ones), or <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>.</summary>
+    public const bool NssNamesTheWrappingKeyInARefusal = false;
+
+    /// <summary>False while a ciphertext or wrapped key no encryption gives, by its length, is refused with
+    /// <c>CKR_DATA_LEN_RANGE</c>: <c>C_Decrypt</c> of an AES-GCM ciphertext shorter than its tag or of an AES key-wrap
+    /// (with padding) blob of 8 or 20 bytes, <c>C_UnwrapKey</c> of such a key-wrap blob and of a 255-byte RSA-OAEP
+    /// blob under a 2048-bit key. PKCS#11 v3.2 §5.10.2 has <c>C_Decrypt</c> answer <c>CKR_ENCRYPTED_DATA_LEN_RANGE</c>
+    /// (or <c>CKR_ENCRYPTED_DATA_INVALID</c>), and §5.18.4 <c>C_UnwrapKey</c> <c>CKR_WRAPPED_KEY_LEN_RANGE</c>;
+    /// <c>CKR_DATA_LEN_RANGE</c> is the plaintext's code.</summary>
+    public const bool NssRefusesAShortCiphertextAsEncryptedDataLenRange = false;
+
+    /// <summary>False while <c>C_GetAttributeValue</c> of a session object's attribute into a buffer shorter than the
+    /// value copies the whole value past the end of the caller's buffer and answers <c>CKR_OK</c>:
+    /// <c>NSC_GetAttributeValue</c> in <c>lib/softoken/pkcs11.c</c> <c>memcpy</c>s <c>attrib.ulValueLen</c> bytes
+    /// without comparing them with <c>ulValueLen</c>. A heap overflow in the caller. PKCS#11 v3.2 §5.7.5:
+    /// <c>CKR_BUFFER_TOO_SMALL</c>, and no value returned.</summary>
+    public const bool NssChecksTheAttributeBufferLength = false;
+
+    /// <summary>False while <c>C_GetMechanismList</c> into a list shorter than the mechanism count writes every
+    /// mechanism, past the end of the caller's list, and answers <c>CKR_OK</c>: <c>NSC_GetMechanismList</c> in
+    /// <c>lib/softoken/pkcs11.c</c> never compares <c>*pulCount</c> with the count. The library refuses the answer
+    /// (it reports writing more than it was given), but the caller's memory is overwritten. PKCS#11 v3.2 §5.5.5:
+    /// <c>CKR_BUFFER_TOO_SMALL</c>.</summary>
+    public const bool NssChecksTheMechanismListLength = false;
+
+    /// <summary>False while <c>C_Digest(CKM_SHA256)</c> into a 1-byte buffer writes the first byte of the digest,
+    /// answers <c>CKR_OK</c> and ends the operation (<c>NSC_Digest</c> passes the length on to the hash's end, which
+    /// truncates). PKCS#11 v3.2 §5.2: <c>CKR_BUFFER_TOO_SMALL</c>.</summary>
+    public const bool NssRefusesASinglePartDigestIntoAShortBuffer = false;
+
+    /// <summary>False while <c>C_DecryptUpdate(CKM_AES_CBC_PAD)</c> into a 1-byte buffer answers
+    /// <c>CKR_BUFFER_TOO_SMALL</c> after moving the input's last block into its padding buffer
+    /// (<c>NSC_DecryptUpdate</c>), so the retry with a buffer large enough decrypts the wrong blocks. PKCS#11 v3.2
+    /// §5.2: a call refused for a short buffer may be made again, the operation as it was.</summary>
+    public const bool NssKeepsADecryptUpdateOnAShortBuffer = false;
+
+    /// <summary>False while a single-part RSA <c>C_Sign</c> or <c>C_SignRecover</c> (<c>CKM_RSA_PKCS</c>) into a
+    /// 1-byte buffer answers <c>CKR_BUFFER_TOO_SMALL</c> with <c>*pulSignatureLen</c> set to four bytes of the
+    /// caller's stack: <c>NSC_Sign</c> in <c>lib/softoken/pkcs11c.c</c> copies its <c>unsigned int outlen</c> out
+    /// uninitialised, as freebl's <c>RSA_Sign</c> returns before setting it when <c>maxOutputLen</c> is short. Seen
+    /// at the pinned 3.132 (0, 0x01010101, 0x41414141 or 0xFFFFFFFF, after the same bytes were left on the stack)
+    /// and on NSS 3.51 in CI. PKCS#11 v3.2 §5.2: <c>*pulBufLen</c> is set to at least the length needed.</summary>
+    public const bool NssReportsTheRsaSignatureLengthOnAShortBuffer = false;
+
+    /// <summary>False while <c>C_EncryptInit(CKM_AES_GCM)</c> with <c>ulIvLen</c> 0 or <c>ulTagBits</c> 136 answers
+    /// <c>CKR_HOST_MEMORY</c>: freebl's <c>gcm_InitCounter</c> refuses them, and <c>sftk_CryptInit</c> reports any
+    /// failed <c>AES_CreateContext</c> as out of memory. PKCS#11 v3.2 §6.13.7, §5.1.6:
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAnOutOfRangeGcmParameterAsInvalid = false;
+
+    /// <summary>False while <c>C_EncryptInit(CKM_AES_CTR)</c> with <c>ulCounterBits</c> 0 or 129 answers
+    /// <c>CKR_HOST_MEMORY</c> (the same <c>AES_CreateContext</c> failure). PKCS#11 v3.2 §6.11.2:
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid = false;
+
+    /// <summary>False while <c>C_Encrypt(CKM_AES_CTR)</c> under a 2-bit counter starting at 1 refuses three blocks with
+    /// <c>CKR_DATA_LEN_RANGE</c>: freebl's <c>CTR_Update</c> (<c>lib/freebl/ctr.c</c>) allows at most 2^counterBits - 2
+    /// blocks, wherever the counter starts. PKCS#11 v3.2 §6.11.3 gives this very example: "only 3 blocks of data can
+    /// be processed".</summary>
+    public const bool NssRunsTheCtrBlocksItsCounterAllows = false;
+
+    /// <summary>False while <c>C_SignInit</c> with <c>CKM_SHA256_HMAC_GENERAL</c> or <c>CKM_AES_CMAC_GENERAL</c> answers
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c> for every MAC length, 16 (8) included: <c>sftk_doMACInit</c> hands the
+    /// <c>_GENERAL</c> mechanism to <c>sftk_MAC_InitRaw</c> (<c>lib/softoken/sftkhmac.c</c>), which knows only the
+    /// full-length ones. Both are advertised with <c>CKF_SIGN</c>. PKCS#11 v3.2 §6.22.3, §6.14.3.</summary>
+    public const bool NssRunsTheGeneralLengthMacs = false;
+
+    /// <summary>False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a key of <c>ulMaxKeySize / 8 + 1</c>
+    /// bytes: softoken reports <c>ulMaxKeySize</c> 32 and takes 5 bytes. PKCS#11 v3.2 §6.8.3 gives the sizes in bits;
+    /// §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.</summary>
+    public const bool NssBoundsAGenericSecretByItsMaximum = false;
+
+    /// <summary>False while <c>C_DigestKey</c> of an EC private key answers <c>CKR_KEY_TYPE_INCONSISTENT</c>. PKCS#11
+    /// v3.2 §5.12.4 digests "the value of a secret key", and §5.1.6 has a key that cannot be digested answer
+    /// <c>CKR_KEY_INDIGESTIBLE</c>.</summary>
+    public const bool NssRefusesToDigestAPrivateKeyAsIndigestible = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is no point on the curve answers
+    /// <c>CKR_ARGUMENTS_BAD</c> (1 KiB) or <c>CKR_KEY_SIZE_RANGE</c> (a DER OCTET STRING whose length byte promises more
+    /// than follows). PKCS#11 v3.2 §6.3.16, §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAMalformedEcdhPeerAsInvalid = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 for a generic secret with <c>CKA_VALUE_LEN</c>
+    /// 33, one byte more than the secret, answers <c>CKR_OK</c>. PKCS#11 v3.2 §6.3.17 (the mechanism only truncates),
+    /// §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or
+    /// <c>CKR_KEY_SIZE_RANGE</c>.</summary>
+    public const bool NssRefusesAnEcdhValueLenAboveTheSecret = false;
+
+    /// <summary>False while <c>C_SignInit(CKM_SHA256_RSA_PKCS_PSS)</c> takes an <c>sLen</c> of 2^32 + 32 and
+    /// <c>C_Sign</c> signs (the length is narrowed to 32 bits). PKCS#11 v3.2 §6.1.9, §5.1.6:
+    /// <c>CKR_MECHANISM_PARAM_INVALID</c>.</summary>
+    public const bool NssRefusesAnOutOfRangePssParameterAsInvalid = false;
+
+    /// <summary>False while <c>C_SetOperationState</c> of a saved SHA-256 digest state cut by its last byte answers
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §5.6.7: <c>CKR_SAVED_STATE_INVALID</c>.</summary>
+    public const bool NssChecksTheLengthOfARestoredState = false;
+
+    /// <summary>False while <c>C_SetOperationState</c> of a saved SHA-256 digest state with an encryption or
+    /// authentication key handle, which a digest does not use, answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.1.6, §5.6.7:
+    /// <c>CKR_KEY_NOT_NEEDED</c>.</summary>
+    public const bool NssRefusesAKeyNotNeeded = false;
+
+    /// <summary>False while <c>C_Verify(CKM_RSA_X_509)</c> of <c>m[1..]</c> under a signature over a full 256-byte block
+    /// <c>m</c> whose top byte is not zero answers <c>CKR_OK</c>: the data is compared with the recovered block's
+    /// trailing bytes only. PKCS#11 v3.2 §6.1.12 converts the data to an integer, so only leading zero bytes may be
+    /// left out; §5.15.2: <c>CKR_SIGNATURE_INVALID</c>.</summary>
+    public const bool NssVerifiesRawRsaOverTheWholeBlock = false;
+
+    /// <summary>False while <c>C_Verify(CKM_RSA_X_509)</c> of 257 bytes under a 2048-bit key answers
+    /// <c>CKR_DEVICE_ERROR</c>. PKCS#11 v3.2 §6.1.12 (Table 45: at most k bytes) and §5.15.2:
+    /// <c>CKR_DATA_LEN_RANGE</c>, or <c>CKR_SIGNATURE_INVALID</c>.</summary>
+    public const bool NssRefusesOverlongRawRsaVerifyData = false;
+
+    /// <summary>False while a key derived (<c>CKM_HKDF_DERIVE</c>, <c>CKM_ECDH1_DERIVE</c>) sensitive from a base whose
+    /// <c>CKA_ALWAYS_SENSITIVE</c> is TRUE reports <c>CKA_ALWAYS_SENSITIVE</c> FALSE. PKCS#11 v3.2 §6.62.3 and §6.3.17:
+    /// the derived key's <c>CKA_ALWAYS_SENSITIVE</c> is its <c>CKA_SENSITIVE</c> when the base's is TRUE.</summary>
+    public const bool NssDerivesTheSensitivityHistoryFromTheBase = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with <c>CKA_VALUE_LEN</c> 2^32 + 1 answers <c>CKR_OK</c>
+    /// (the length is narrowed to 32 bits). RFC 5869 caps the output at 255 hash lengths; PKCS#11 v3.2 §6.62.3, §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.</summary>
+    public const bool NssRefusesAnHkdfValueLenPastTheLimit = false;
+
+    /// <summary>False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a nine-byte
+    /// <c>CKA_PUBLIC_EXPONENT</c> (2^64 + 65537) answers <c>CKR_ARGUMENTS_BAD</c>. PKCS#11 v3.2 §6.1.4: the exponent is
+    /// copied from the template, or refused with <c>CKR_TEMPLATE_INCONSISTENT</c>.</summary>
+    public const bool NssTakesOrRefusesALongRsaExponent = false;
+
+    /// <summary>False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with <c>CKA_MODULUS_BITS</c> 2^32 + 2048
+    /// makes a 2048-bit key (the length is narrowed to 32 bits); softoken reports <c>ulMaxKeySize</c> 2^32 - 1.
+    /// PKCS#11 v3.2 §6.1.4, §5.1.6: a modulus above <c>ulMaxKeySize</c> is refused.</summary>
+    public const bool NssRefusesAnRsaModulusPastTheMaximum = false;
+
+    /// <summary>False while <c>CKA_ALWAYS_SENSITIVE</c> or <c>CKA_NEVER_EXTRACTABLE</c> in the template of
+    /// <c>C_CreateObject</c> or <c>C_GenerateKey</c> is taken. PKCS#11 v3.2 §4.11 footnotes 2 and 4, §4.1.1 point 3:
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>.</summary>
+    public const bool NssRefusesProvenanceAttributesInATemplate = false;
+
+    /// <summary>False while <c>C_SetAttributeValue</c> of a new <c>CKA_EC_POINT</c> on an EC public key answers
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §6.3.3 (no footnote 8), §4.1.2: <c>CKR_ATTRIBUTE_READ_ONLY</c>.</summary>
+    public const bool NssKeepsTheEcPointReadOnly = false;
+
+    /// <summary>False while <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKA_UNIQUE_ID</c> in the private key's
+    /// template makes the pair (softoken has no <c>CKA_UNIQUE_ID</c>). PKCS#11 v3.2 §4.4.1 (the token assigns it, it may
+    /// not be given), §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>.</summary>
+    public const bool NssRefusesAUniqueIdInATemplate = false;
+
+    /// <summary>False while softoken has no <c>CKA_COPYABLE</c>: an object created without it has none to read, and one
+    /// created with <c>CKA_COPYABLE</c> FALSE lets <c>C_SetAttributeValue</c> set it back to TRUE. PKCS#11 v3.2 §4.4,
+    /// Table 19: <c>CKA_COPYABLE</c> defaults to TRUE and "can't be set to TRUE once it is set to FALSE". The storage-controls case reads CKA_COPYABLE with
+    /// CKA_MODIFIABLE and CKA_DESTROYABLE, so its other two checks do not run here either.</summary>
+    public const bool NssHasCkaCopyable = false;
+
+    /// <summary>False while malformed attribute values are taken: <c>C_CreateObject</c> of a data object with a 4-byte
+    /// <c>CKA_TOKEN</c>, a <c>{NULL, 1}</c> <c>CKA_TOKEN</c> or a <c>{NULL, 16}</c> <c>CKA_VALUE</c> answers <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §4.1.1 point 2: <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>). The searches with
+    /// such values are handled as they should be.</summary>
+    public const bool NssRefusesMalformedAttributeValues = false;
+
+    /// <summary>False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against the mechanism
+    /// or each other: <c>C_GenerateKey(CKM_AES_KEY_GEN)</c> with <c>CKK_GENERIC_SECRET</c> or <c>CKO_DATA</c>,
+    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or <c>CKO_PRIVATE_KEY</c>
+    /// for the public one, and <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type <c>CKK_EC</c> answer
+    /// <c>CKR_OK</c>. PKCS#11 v3.2 §5.18.1, §5.18.2, §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c>. A private key of
+    /// type <c>CKK_AES</c> is refused as it should be.</summary>
+    public const bool NssChecksTheTemplatesClassAndKeyType = false;
+
+    /// <summary>False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with a template asking for <c>CKO_DATA</c> answers
+    /// <c>CKR_TEMPLATE_INCOMPLETE</c>, though nothing is missing. PKCS#11 v3.2 §6.62.3 (the mechanism contributes a
+    /// secret key's class), §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c> (or <c>CKR_ATTRIBUTE_VALUE_INVALID</c>).</summary>
+    public const bool NssRefusesADataObjectFromHkdfAsInconsistent = false;
+
+    /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
+    public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
+
+    /// <summary>Gate for the AES-CTR counter overflow case: see <see cref="NssRunsTheCtrBlocksItsCounterAllows"/>.</summary>
+    public static bool CtrBlockCountAvailable => NssAvailable && NssRunsTheCtrBlocksItsCounterAllows;
+
+    /// <summary>Gate for the general-length MAC case: see <see cref="NssRunsTheGeneralLengthMacs"/>.</summary>
+    public static bool GeneralLengthMacAvailable => NssAvailable && NssRunsTheGeneralLengthMacs;
+
+    /// <summary>Gate for the short attribute buffer case: see <see cref="NssChecksTheAttributeBufferLength"/>.</summary>
+    public static bool AttributeBufferLengthAvailable => NssAvailable && NssChecksTheAttributeBufferLength;
+
+    /// <summary>Gate for the one-short mechanism list case: see <see cref="NssChecksTheMechanismListLength"/>.</summary>
+    public static bool MechanismListLengthAvailable => NssAvailable && NssChecksTheMechanismListLength;
+
+    /// <summary>Gate for the C_SignRecover usage case: see <see cref="NssChecksCkaSignRecover"/>.</summary>
+    public static bool SignRecoverUsageRefusalAvailable => NssAvailable && NssChecksCkaSignRecover;
+
+    /// <summary>Gate for the KEM usage cases: see <see cref="NssChecksTheKemUsageAttributes"/>.</summary>
+    public static bool KemUsageRefusalAvailable => NssAvailable && NssChecksTheKemUsageAttributes;
+
+    /// <summary>Gate for the CKA_DERIVE usage case: see <see cref="NssChecksCkaDerive"/>.</summary>
+    public static bool DeriveUsageRefusalAvailable => NssAvailable && NssChecksCkaDerive;
+
+    /// <summary>Gate for the private-key C_DigestKey case: see <see cref="NssRefusesToDigestAPrivateKeyAsIndigestible"/>.</summary>
+    public static bool PrivateKeyDigestRefusalAvailable => NssAvailable && NssRefusesToDigestAPrivateKeyAsIndigestible;
+
+    /// <summary>Gate for the raw RSA leading-bytes case: see <see cref="NssVerifiesRawRsaOverTheWholeBlock"/>.</summary>
+    public static bool RawRsaWholeBlockVerifyAvailable => NssAvailable && NssVerifiesRawRsaOverTheWholeBlock;
+
+    /// <summary>Gate for the over-long raw RSA verify case: see <see cref="NssRefusesOverlongRawRsaVerifyData"/>.</summary>
+    public static bool OverlongRawRsaVerifyAvailable => NssAvailable && NssRefusesOverlongRawRsaVerifyData;
+
+    /// <summary>Gate for the RSA-OAEP unwrap length case: see <see cref="NssRefusesAShortCiphertextAsEncryptedDataLenRange"/>.</summary>
+    public static bool WrappedKeyLenRangeAvailable => NssAvailable && NssRefusesAShortCiphertextAsEncryptedDataLenRange;
+
+    /// <summary>Gate for the derived-key history case: see <see cref="NssDerivesTheSensitivityHistoryFromTheBase"/>.</summary>
+    public static bool DerivedKeyHistoryAvailable => NssAvailable && NssDerivesTheSensitivityHistoryFromTheBase;
+
+    /// <summary>Gate for the provenance-attribute template case: see <see cref="NssRefusesProvenanceAttributesInATemplate"/>.</summary>
+    public static bool ProvenanceTemplateRefusalAvailable => NssAvailable && NssRefusesProvenanceAttributesInATemplate;
+
+    /// <summary>Gate for the CKA_COPYABLE cases: see <see cref="NssHasCkaCopyable"/>.</summary>
+    public static bool CopyableAvailable => NssAvailable && NssHasCkaCopyable;
+
+    /// <summary>
+    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with a NULL <c>pIv</c> behind a
+    /// non-zero <c>ulIvLen</c>, or a NULL <c>pAAD</c> behind a non-zero <c>ulAADLen</c>, ends the test process with
+    /// SIGSEGV: <c>sftk_CryptInit</c> in <c>lib/softoken/pkcs11c.c</c> hands both pointers on unchecked, and
+    /// freebl's <c>gcm_InitCounter</c> (<c>lib/freebl/gcm.c</c>) copies the IV and hashes the AAD from them.
+    /// PKCS#11 v3.2 §6.13.2 lets <c>pAAD</c> be NULL only when <c>ulAADLen</c> is 0, and §5.1.6 has invalid
+    /// parameters refused (<c>CKR_MECHANISM_PARAM_INVALID</c>, or <c>CKR_ARGUMENTS_BAD</c>). Confirmed by running
+    /// each row alone at the pinned 34716626 (exit code 139). Not yet reported upstream.
+    /// </summary>
+    public const bool NssSurvivesANullGcmPointer = false;
+
     public NssBackendFixture()
     {
         string? libPath = Settings.NssLibraryPath ?? BuiltLibraryPath();

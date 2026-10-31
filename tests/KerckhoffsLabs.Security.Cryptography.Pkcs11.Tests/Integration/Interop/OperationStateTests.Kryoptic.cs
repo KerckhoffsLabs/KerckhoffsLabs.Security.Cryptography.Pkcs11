@@ -34,7 +34,12 @@ public sealed class OperationStateTests_Kryoptic(KryopticBackendFixture backend)
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationStateTestCases.KeysOfTheWrongType), MemberType = typeof(OperationStateTestCases))]
-    public void KeyOfTheWrongType_IsRefused(string misuse) => OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
+    public void KeyOfTheWrongType_IsRefused(string misuse)
+    {
+        if (misuse == "HKDF derive from an EC private key" && !KryopticBackendFixture.KryopticReportsAnHkdfBaseKeyOfTheWrongTypeAsInconsistent)
+            Assert.Skip("Kryoptic answers an HKDF base key of the wrong type with CKR_KEY_HANDLE_INVALID");
+        OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
+    }
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationStateTestCases.UsesOfADestroyedKey), MemberType = typeof(OperationStateTestCases))]
@@ -61,4 +66,26 @@ public sealed class OperationStateTests_Kryoptic(KryopticBackendFixture backend)
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationStateTestCases.WrongLengthSignatures), MemberType = typeof(OperationStateTestCases))]
     public void Verify_WrongLengthSignature_EndsTheOperation(string shape) => OperationStateTestCases.Assert_Verify_WrongLengthSignature_EndsTheOperation(_backend, shape);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(OperationStateTestCases.NonKeyObjectsAsKeys), MemberType = typeof(OperationStateTestCases))]
+    public void NonKeyObject_IsRefusedAsAKey(string misuse)
+    {
+        if (misuse.Contains("wrapping key", StringComparison.Ordinal) && !KryopticBackendFixture.KryopticRefusesANonKeyObjectAsAWrappingKey)
+            Assert.Skip("Kryoptic refuses a non-key wrapping key with CKR_GENERAL_ERROR");
+        OperationStateTestCases.Assert_NonKeyObject_IsRefusedAsAKey(_backend, misuse);
+    }
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(OperationStateTestCases.OperationsWhoseKeyIsDestroyed), MemberType = typeof(OperationStateTestCases))]
+    public void KeyDestroyedMidOperation_SessionStaysUsable(string operation) => OperationStateTestCases.Assert_KeyDestroyedMidOperation_SessionStaysUsable(_backend, operation);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext)
+    {
+        if (ciphertext.EndsWith(", 8 bytes", StringComparison.Ordinal) && !KryopticBackendFixture.KryopticRefusesAOneSemiblockKeyWrapCiphertext)
+            Assert.Skip("Kryoptic answers a one-semiblock key wrap ciphertext with CKR_DEVICE_ERROR");
+        OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
+    }
 }
