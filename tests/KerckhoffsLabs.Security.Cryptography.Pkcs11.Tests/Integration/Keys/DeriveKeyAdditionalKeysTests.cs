@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -97,5 +98,112 @@ public sealed class DeriveKeyAdditionalKeysTests
         {
             primary.Destroy();
         }
+    }
+
+    // ---- Policy: each sibling template is judged and defaulted like the primary one ----
+
+    private static CkmSp800108KdfParams CounterParamsWithSibling(IReadOnlyList<ObjectAttribute> siblingTemplate) =>
+        CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+            .IterationCounter().ByteArray("label"u8.ToArray()).ByteArray([0x00]).ByteArray("context"u8.ToArray())
+            .DkmLength(Sp800108DkmLengthMethod.SumOfKeys)
+            .AddDerivedKey(siblingTemplate)
+            .Build();
+
+    [Fact]
+    public void NonSensitiveSibling_UnderRecommended_IsRefusedBeforeTheToken()
+    {
+        var token = new ManagedSoftToken();
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library, CryptoPolicy.Recommended);
+
+        using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label("sp800108-base-policy").Value(BaseKeyBytes).Derive().Build();
+        using var baseKey = session.ImportKey(baseTpl);
+
+        // The primary template is secure; only the sibling asks for readable key material.
+        using var siblingTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(16).Extractable().Sensitive(false).Build();
+        var kdfParams = CounterParamsWithSibling([.. siblingTpl.Attributes]);
+        var mechanism = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdfParams);
+        using var primaryTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+        Assert.Throws<CryptoPolicyViolationException>(() => baseKey.Derive(mechanism, primaryTpl));
+
+        Assert.Equal(0, token.DeriveKeyCallCount);
+        Assert.Empty(kdfParams.AdditionalDerivedKeys);
+    }
+
+    [Fact]
+    public void SiblingOmittingSensitiveAndExtractable_GetsTheSecureDefaults()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, CryptoPolicy.Recommended);
+
+        using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label("sp800108-base-defaults").Value(BaseKeyBytes).Derive().Build();
+        using var baseKey = session.ImportKey(baseTpl);
+
+        // Raw attributes: the template builders always set CKA_SENSITIVE / CKA_EXTRACTABLE themselves.
+        using var siblingTpl = new ReadOnlyDisposableList<ObjectAttribute>(
+        [
+            new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY),
+            new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET),
+            new ObjectAttribute(CKA.CKA_VALUE_LEN, 16UL),
+        ]);
+        var kdfParams = CounterParamsWithSibling(siblingTpl);
+        var mechanism = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdfParams);
+        using var primaryTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+        using Pkcs11Key primary = baseKey.Derive(mechanism, primaryTpl);
+        Pkcs11Key? sibling = Assert.Single(kdfParams.AdditionalDerivedKeys);
+        Assert.NotNull(sibling);
+        try
+        {
+            using var attrs = sibling.GetAttributeValue(CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE);
+            Assert.True(attrs[0].GetValueAsBool());
+            Assert.False(attrs[1].GetValueAsBool());
+        }
+        finally
+        {
+            sibling.Destroy();
+            sibling.Dispose();
+            primary.Destroy();
+        }
+    }
+
+    [Fact]
+    public void NonSensitiveSibling_UnderAllowInsecure_IsStillDerived()
+    {
+        var token = new ManagedSoftToken();
+        using var library = token.Load();
+        using var session = ManagedToken.OpenSession(library, CryptoPolicy.AllowInsecure);
+
+        using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label("sp800108-base-insecure").Value(BaseKeyBytes).Derive().Build();
+        using var baseKey = session.ImportKey(baseTpl);
+
+        using var siblingTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(16).Extractable().Sensitive(false).Build();
+        var kdfParams = CounterParamsWithSibling([.. siblingTpl.Attributes]);
+        var mechanism = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdfParams);
+        using var primaryTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+        using Pkcs11Key primary = baseKey.Derive(mechanism, primaryTpl);
+        Pkcs11Key? sibling = Assert.Single(kdfParams.AdditionalDerivedKeys);
+        Assert.NotNull(sibling);
+        try
+        {
+            // The explicit choices reach the token unchanged — no secure default is appended over them.
+            using var attrs = sibling.GetAttributeValue(CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE);
+            Assert.False(attrs[0].GetValueAsBool());
+            Assert.True(attrs[1].GetValueAsBool());
+        }
+        finally
+        {
+            sibling.Destroy();
+            sibling.Dispose();
+            primary.Destroy();
+        }
+        Assert.Equal(1, token.DeriveKeyCallCount);
     }
 }

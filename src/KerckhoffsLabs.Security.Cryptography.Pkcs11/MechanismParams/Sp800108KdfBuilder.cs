@@ -141,6 +141,12 @@ public sealed class Sp800108KdfBuilder
     /// The caller retains ownership of the <paramref name="template"/> attributes and must keep them
     /// alive (undisposed) until after the derive call.
     /// </summary>
+    /// <remarks>
+    /// The derive judges <paramref name="template"/> exactly like its primary result template: the
+    /// session's <see cref="Pkcs11Session.Policy"/> refuses a non-sensitive key unless it permits one,
+    /// and <c>CKA_SENSITIVE=true</c> / <c>CKA_EXTRACTABLE=false</c> are supplied when the template omits
+    /// them. A refused sibling fails the whole derive before the token creates any key.
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <see langword="null"/>.</exception>
     public Sp800108KdfBuilder AddDerivedKey(IReadOnlyList<ObjectAttribute> template)
     {

@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
@@ -44,6 +45,13 @@ internal sealed class ParameterKeys : IDisposable
 
     /// <summary>A scope for a call made on this session.</summary>
     public MechanismParameterScope NewScope() => new SessionParameterScope(Session.Core);
+
+    /// <summary>
+    /// A scope for a key derivation on this session, carrying the secure defaults the session would
+    /// have prepared for each SP 800-108 additional derived key.
+    /// </summary>
+    public MechanismParameterScope NewDeriveScope(IReadOnlyList<IReadOnlyList<ObjectAttribute>> additionalDerivedKeyDefaults)
+        => new SessionParameterScope(Session.Core) { AdditionalDerivedKeyDefaults = additionalDerivedKeyDefaults };
 
     /// <summary>A secret key whose single object has handle <paramref name="handle"/>.</summary>
     public Pkcs11Key Secret(ulong handle) => Key(handle, 0, CKK.CKK_GENERIC_SECRET);
