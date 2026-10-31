@@ -4,6 +4,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11AmbiguousObjectExce
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11ObjectNotFoundException
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11ObjectNotFoundException.Pkcs11ObjectNotFoundException(string! method, string? message) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.GetPrivateKey() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveBytes(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, int length) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveRawSecret(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveSecretAgreement(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Export(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat format) -> byte[]!

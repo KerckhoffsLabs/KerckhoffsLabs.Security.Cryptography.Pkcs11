@@ -43,8 +43,12 @@ internal static class CatalogueEvaluator
             // (the catalogue's CKM_HKDF_DERIVE / CKM_SP800_108_*_KDF) can turn it into keys.
             KeyAgreementKdfRequest { Kdf: CKD.CKD_NULL, ResultIsDerivationOnlySecret: true } => PolicyDecision.Allow,
             // DeriveRawSecret's CKD_NULL derivation, tagged by the session: judged as the export it serves,
-            // like a tagged KeyTemplateRequest. A caller's CKD_NULL derivation is untagged.
-            KeyAgreementKdfRequest { ReadBackFor: { } kind } => catalogue.KeyMaterialExport.Evaluate(new KeyMaterialExportRequest(kind)),
+            // like a tagged KeyTemplateRequest. A caller's CKD_NULL derivation is untagged. Only the
+            // EcdhSharedSecret tag counts: the KDF applied to a key-agreement secret is that export and no
+            // other, so a request tagged with another kind is judged as if untagged, and a KdfOutput (or KEM)
+            // opt-in can never approve a CKD_NULL derivation that would return Z.
+            KeyAgreementKdfRequest { ReadBackFor: KeyMaterialExportKind.EcdhSharedSecret } =>
+                catalogue.KeyMaterialExport.Evaluate(new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret)),
             KeyAgreementKdfRequest r => EvaluateKdf(catalogue, policyName, r.Kdf),
             KeyAgreementKeyRequest r => EvaluateKeyAgreementKeyType(catalogue, policyName, r.KeyType),
             KeyMaterialExportRequest r => catalogue.KeyMaterialExport.Evaluate(r),
