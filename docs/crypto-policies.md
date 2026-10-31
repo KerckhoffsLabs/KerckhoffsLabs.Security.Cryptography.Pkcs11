@@ -85,6 +85,7 @@ using var session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, po
 | An EC curve below the 128-bit baseline | `AllowCurve(curve, reason)` |
 | A key-agreement KDF | `AllowKeyAgreementKdf(kdf, reason)` |
 | Key agreement with an existing key of a type | `AllowKeyAgreementKeyType(keyType, reason)` |
+| Reading secret key material off the token | `WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, reason))`, see [below](#reading-secret-key-material-off-the-token) |
 
 Allowing a mechanism that is already allowed adds operations and keeps its existing parameter check (see
 [Building a policy from scratch](#building-a-policy-from-scratch)); a different check is refused, so remove
@@ -102,6 +103,54 @@ using (session.UsePolicy(CryptoPolicy.AllowInsecure))
     // decrypt one legacy archive
 }
 ```
+
+## Reading secret key material off the token
+
+Every built-in policy refuses to read secret key material off the token in the clear. Keep secrets on the
+token where you can: `Pkcs11Key.Derive` to a sensitive key, `EncapsulateKey` / `DecapsulateKey`. Where an
+application genuinely needs the bytes (a drop-in class whose contract returns a shared secret, a value a
+protocol sends or compares), opt in for exactly the kinds it needs, with a reason:
+
+```csharp
+#pragma warning disable KLPKCS11012 // the X25519 secret feeds <protocol>'s managed key schedule, see <ticket>
+ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
+    .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(
+        [KeyMaterialExportKind.EcdhSharedSecret],
+        "X25519 shared secret for <protocol>'s managed key schedule."))
+    .Build();
+#pragma warning restore KLPKCS11012
+```
+
+| Kind | What it lets the session return |
+|---|---|
+| `EcdhSharedSecret` | The raw shared secret Z of an ECDH agreement: `Pkcs11Key.DeriveRawSecret` for EC (`CKK_EC`) and X25519 / X448 (`CKK_EC_MONTGOMERY`) keys, and `ECDiffieHellmanPkcs11`'s derive methods |
+| `KemSharedSecret` | An ML-KEM shared secret: `MLKemPkcs11` encapsulate / decapsulate |
+| `KdfOutput` | KDF output: `Pkcs11Key.DeriveBytes`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11` |
+
+`Allow` copies the kinds and throws on an empty list, an undefined kind or a blank reason. It refuses every
+kind it does not name exactly as `KeyMaterialExportRule.Refuse()` does. Its reason is shown in the policy
+catalogue. Each export it allows logs a `KeyMaterialExportAllowed` warning naming the kind and the policy,
+never the secret, and every `Allow` call site is reported at build time as
+[KLPKCS11012](diagnostics.md#KLPKCS11012), so the opt-in is visible in review; suppress it with a
+justification.
+
+`Pkcs11Key.DeriveBytes(mechanism, length)` returns the output of an on-token KDF and accepts only KDFs
+with their own parameters: `CKM_HKDF_DERIVE` with `CkmHkdfParams`, and `CKM_SP800_108_COUNTER_KDF`,
+`CKM_SP800_108_FEEDBACK_KDF` and `CKM_SP800_108_DOUBLE_PIPELINE_KDF` with `CkmSp800108KdfParams` of the
+same mode and no additional derived keys. Anything else is refused before the policy or the token is
+consulted, a key-agreement mechanism above all, so a `KdfOutput` opt-in can never return an ECDH secret.
+`CKM_HKDF_DATA` is refused too (PKCS#11 has it make a data object); `CKM_HKDF_DERIVE` with the same
+parameters gives the same bytes. The mechanism and its PRF must still be allowed by the policy.
+
+To read a secret, the library has the token produce it as a short-lived extractable, non-sensitive session object,
+reads it and destroys it. A `ComposedCryptoPolicy` (every built-in, and every policy from `ToBuilder` or
+`CryptoPolicyBuilder`) judges that object's template by the export rule for the kind being read,
+**instead of** the template rule: an opt-in covers its own read-back object, and a custom
+`WithKeyTemplateRule` is not consulted for it (it still judges every template you pass yourself). Likewise
+the CKD_NULL key-agreement KDF of a raw ECDH read-back is judged by the export rule, and only for
+`EcdhSharedSecret`: a `KdfOutput` or `KemSharedSecret` opt-in never approves a derivation that would
+return Z. A custom `ICryptoPolicy` sees these requests tagged with the kind (`KeyTemplateRequest.ReadBackFor`,
+`KeyAgreementKdfRequest.ReadBackFor`), after the matching `KeyMaterialExportRequest`.
 
 ## Allowing less
 

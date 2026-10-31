@@ -12,6 +12,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 // ML-KEM encapsulation-key import is an evaluation-only BCL API.
 #pragma warning disable SYSLIB5006
 
+#pragma warning disable KLPKCS11012 // the export opt-in is the subject under test
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
