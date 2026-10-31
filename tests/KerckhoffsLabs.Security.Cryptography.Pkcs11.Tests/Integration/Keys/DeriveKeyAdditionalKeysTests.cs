@@ -155,7 +155,7 @@ public sealed class DeriveKeyAdditionalKeysTests
         using var primaryTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
 
         using Pkcs11Key primary = baseKey.Derive(mechanism, primaryTpl);
-        Pkcs11Key? sibling = Assert.Single(kdfParams.AdditionalDerivedKeys);
+        using Pkcs11Key? sibling = Assert.Single(kdfParams.AdditionalDerivedKeys);
         Assert.NotNull(sibling);
         try
         {
@@ -166,7 +166,6 @@ public sealed class DeriveKeyAdditionalKeysTests
         finally
         {
             sibling.Destroy();
-            sibling.Dispose();
             primary.Destroy();
         }
     }
@@ -189,7 +188,7 @@ public sealed class DeriveKeyAdditionalKeysTests
         using var primaryTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
 
         using Pkcs11Key primary = baseKey.Derive(mechanism, primaryTpl);
-        Pkcs11Key? sibling = Assert.Single(kdfParams.AdditionalDerivedKeys);
+        using Pkcs11Key? sibling = Assert.Single(kdfParams.AdditionalDerivedKeys);
         Assert.NotNull(sibling);
         try
         {
@@ -201,7 +200,6 @@ public sealed class DeriveKeyAdditionalKeysTests
         finally
         {
             sibling.Destroy();
-            sibling.Dispose();
             primary.Destroy();
         }
         Assert.Equal(1, token.DeriveKeyCallCount);
