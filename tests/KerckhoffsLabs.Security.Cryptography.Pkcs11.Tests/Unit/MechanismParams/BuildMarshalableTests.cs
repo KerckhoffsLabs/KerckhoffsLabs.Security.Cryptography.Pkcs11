@@ -608,6 +608,8 @@ public sealed class BuildMarshalableTests
     {
         byte[] label = [0x6C, 0x61, 0x62, 0x65, 0x6C];
         var template = new List<ObjectAttribute> { new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_AES) };
+        // What the session appends for the sibling after judging its template.
+        var secureDefaults = new List<ObjectAttribute> { new(CKA.CKA_SENSITIVE, true), new(CKA.CKA_EXTRACTABLE, false) };
         try
         {
             using var keys = new ParameterKeys();
@@ -619,7 +621,7 @@ public sealed class BuildMarshalableTests
                 .Key(keys.Secret(0xABCD))
                 .AddDerivedKey(template)
                 .Build();
-            using var scope = keys.NewScope();
+            using var scope = keys.NewDeriveScope([secureDefaults]);
 
             var s = p.BuildMarshalable(scope).Read<CK_SP800_108_KDF_PARAMS>();
 
@@ -628,7 +630,35 @@ public sealed class BuildMarshalableTests
             Assert.Equal(1UL, (ulong)s.AdditionalDerivedKeys);
 
             AssertPrfSequence(s.DataParams, label, spliceKey: 0xABCD, optionalCounterLittleEndian: false);
-            AssertDerivedKeyArray(s.AdditionalDerivedKeysPtr, template);
+            // The caller's attributes first, then the session's defaults — the primary template's layout.
+            AssertDerivedKeyArray(s.AdditionalDerivedKeysPtr, [.. template, .. secureDefaults]);
+        }
+        finally
+        {
+            foreach (var a in template) a.Dispose();
+            foreach (var a in secureDefaults) a.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A session call that did not judge the sibling templates by the key-template policy — any path
+    /// other than a key derivation — must not be able to send them to the token unchecked.
+    /// </summary>
+    [Fact]
+    public void Sp800108AdditionalDerivedKeys_InASessionScopeWithoutPolicyDefaults_AreRefused()
+    {
+        var template = new List<ObjectAttribute> { new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_SENSITIVE, false) };
+        try
+        {
+            using var keys = new ParameterKeys();
+            var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+                .IterationCounter()
+                .ByteArray([0x01])
+                .AddDerivedKey(template)
+                .Build();
+            using var scope = keys.NewScope();
+
+            Assert.Throws<InvalidOperationException>(() => p.BuildMarshalable(scope));
         }
         finally
         {

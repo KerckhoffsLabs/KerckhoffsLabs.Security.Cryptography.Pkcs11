@@ -20,8 +20,13 @@ internal sealed partial class ManagedSoftToken
     /// before 8bc65b5 when OpenSSL returned Z without its leading zeros.</summary>
     public int EcdhDropsLeadingBytes { get; set; }
 
+    /// <summary>How many times <c>C_DeriveKey</c> has been called, so a test can tell a derive refused in
+    /// managed code never reached the token.</summary>
+    public int DeriveKeyCallCount { get; private set; }
+
     protected override CKR C_DeriveKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, ref NativeCULong key)
     {
+        DeriveKeyCallCount++;
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
 
         var attrs = ReadTemplate(template);
