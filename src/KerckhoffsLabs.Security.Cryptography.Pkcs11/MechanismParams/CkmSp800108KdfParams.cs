@@ -99,6 +99,22 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     }
 
     /// <summary>
+    /// Whether these parameters are for <paramref name="mechanism"/>: counter-mode parameters for
+    /// <c>CKM_SP800_108_COUNTER_KDF</c>, feedback for <c>CKM_SP800_108_FEEDBACK_KDF</c>, double-pipeline for
+    /// <c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c>.
+    /// </summary>
+    internal bool IsFor(CKM mechanism) => mechanism switch
+    {
+        CKM.CKM_SP800_108_COUNTER_KDF => _counterMode,
+        CKM.CKM_SP800_108_FEEDBACK_KDF => _feedback,
+        CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF => !_counterMode && !_feedback,
+        _ => false,
+    };
+
+    /// <summary>Whether the derivation also creates sibling keys (<see cref="Sp800108KdfBuilder.AddDerivedKey"/>).</summary>
+    internal bool RequestsAdditionalDerivedKeys => _retainedTemplates.Count > 0;
+
+    /// <summary>
     /// The additional sibling keys derived in the same call, in the order added via
     /// <see cref="Sp800108KdfBuilder.AddDerivedKey"/>. Read after the <c>C_DeriveKey</c> call
     /// completes (i.e. after <see cref="Pkcs11Key.Derive(Mechanism, Objects.ObjectTemplate)"/> returns) — empty before that, and also
