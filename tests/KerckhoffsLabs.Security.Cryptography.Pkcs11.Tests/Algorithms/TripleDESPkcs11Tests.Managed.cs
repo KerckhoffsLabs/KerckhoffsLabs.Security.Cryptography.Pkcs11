@@ -254,6 +254,34 @@ public sealed class TripleDESPkcs11Tests_Managed
         }
     });
 
+    // === Short destination ========================================================================
+
+    // The plaintext length is known only once the token has decrypted (the base TryDecryptCbc has no
+    // pre-check to make), so a destination one byte short is reported by the return value, and nothing
+    // is written to it. One of the exact length then succeeds.
+    [Fact]
+    public void TryDecryptCbc_DestinationTooSmall_ReturnsFalse_LeavesDestinationUntouched() => WithImportedDes3((session, des3) =>
+    {
+        byte[] plaintext = new byte[12];
+        RandomNumberGenerator.Fill(plaintext);
+        using var bcl = BclDes3();
+        byte[] ciphertext = bcl.EncryptCbc(plaintext, Iv8); // 16 bytes, 12 of plaintext
+
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            byte[] destination = new byte[plaintext.Length - 1];
+            destination.AsSpan().Fill(0xA5);
+            Assert.False(des3.TryDecryptCbc(ciphertext, Iv8, destination, out int written));
+            Assert.Equal(0, written);
+            Assert.All(destination, b => Assert.Equal(0xA5, b));
+
+            destination = new byte[plaintext.Length];
+            Assert.True(des3.TryDecryptCbc(ciphertext, Iv8, destination, out written));
+            Assert.Equal(plaintext.Length, written);
+            Assert.Equal(plaintext, destination);
+        }
+    });
+
     // === NotSupported / argument surface (no token call) ===========================================
 
     [Fact]
