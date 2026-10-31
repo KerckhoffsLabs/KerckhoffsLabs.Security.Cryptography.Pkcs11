@@ -16,6 +16,10 @@ internal sealed partial class ManagedSoftToken
     /// exercise the path where the value cannot be read back.</summary>
     public bool DeriveWithholdsValue { get; set; }
 
+    /// <summary>How many leading bytes <c>CKM_ECDH1_DERIVE</c> drops from the shared secret, as SoftHSM2 did
+    /// before 8bc65b5 when OpenSSL returned Z without its leading zeros.</summary>
+    public int EcdhDropsLeadingBytes { get; set; }
+
     protected override CKR C_DeriveKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, ref NativeCULong key)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
@@ -29,7 +33,7 @@ internal sealed partial class ManagedSoftToken
             case CKM.CKM_ECDH1_DERIVE:
                 if (!_asymKeys.TryGetValue((ulong)baseKey, out var alg) || alg is not ECDsa ec)
                     return CKR.CKR_KEY_HANDLE_INVALID;
-                derived = DeriveEcdh(ec, ref mechanism, valueLen);
+                derived = DeriveEcdh(ec, ref mechanism, valueLen)[EcdhDropsLeadingBytes..];
                 break;
 
             case CKM.CKM_SP800_108_COUNTER_KDF:
