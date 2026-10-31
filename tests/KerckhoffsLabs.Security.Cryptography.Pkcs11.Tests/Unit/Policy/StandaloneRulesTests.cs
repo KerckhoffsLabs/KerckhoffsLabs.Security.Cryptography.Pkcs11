@@ -1,6 +1,8 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
+#pragma warning disable KLPKCS11012 // KeyMaterialExportRule.Allow's own contract is under test
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 public sealed class StandaloneRulesTests

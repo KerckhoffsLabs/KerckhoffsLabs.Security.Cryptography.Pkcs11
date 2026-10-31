@@ -89,7 +89,7 @@
   </ItemGroup>
 
   <!--
-    Ship the security analyzers (KLPKCS11008-KLPKCS11010) to consumers. The SecurityAnalyzers
+    Ship the security analyzers (KLPKCS11008-KLPKCS11010, KLPKCS11012) to consumers. The SecurityAnalyzers
     ProjectReference above runs them while building this library; packing them under
     analyzers/dotnet/cs is what makes them fire in a consumer's build too. The weak primitives that
     are types get their compile-time signal from [Obsolete] + DiagnosticId, but a padding or mechanism

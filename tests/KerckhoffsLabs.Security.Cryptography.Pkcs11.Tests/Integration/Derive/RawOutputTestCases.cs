@@ -8,6 +8,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+#pragma warning disable KLPKCS11012 // opting in to each raw-output kind is the subject under test
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 
 /// <summary>
