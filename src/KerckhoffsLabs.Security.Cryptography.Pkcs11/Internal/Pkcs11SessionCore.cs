@@ -222,7 +222,13 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         ICryptoPolicy policy = _effectivePolicy;
         PolicyDecision decision = policy.Evaluate(request);
         if (decision.IsAllowed)
+        {
+            // One warning per export: the read-back templates and KDF requests the library derives from
+            // an export are not KeyMaterialExportRequests, so they log nothing here.
+            if (request is KeyMaterialExportRequest export)
+                Log.KeyMaterialExportAllowed(_logger, (ulong)_sessionId, policy.Name, export.Kind);
             return;
+        }
 
         Log.PolicyDenied(_logger, (ulong)_sessionId, policy.Name, request.Describe());
         throw new CryptoPolicyViolationException(policy.Name, request, decision.Reason!);
@@ -242,18 +248,21 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         return _effectivePolicy.Evaluate(request).IsAllowed;
     }
 
-    private void Enforce(Mechanism mechanism, CryptoOperation operation, IReadOnlyList<Objects.ObjectAttribute>? resultTemplate = null)
+    private void Enforce(Mechanism mechanism, CryptoOperation operation, IReadOnlyList<Objects.ObjectAttribute>? resultTemplate = null,
+        KeyMaterialExportKind? readBackFor = null)
     {
         Enforce(new MechanismUseRequest(mechanism, operation));
 
         // The KDF an ECDH derivation or KEM applies to the shared secret is judged here, on every call
         // carrying CK_ECDH1_DERIVE_PARAMS, whichever public entry point it came through. Whether the
         // result is derivation-only is read off the template the token will receive, so a caller cannot
-        // claim it.
+        // claim it. readBackFor comes only from the library's own read-back paths (DeriveRawSecret), which
+        // have already enforced the matching KeyMaterialExportRequest; no public entry point passes it.
         if (mechanism.Parameters is CkmEcdh1DeriveParams ecdh)
             Enforce(new KeyAgreementKdfRequest(mechanism.Type, ecdh.Kdf)
             {
                 ResultIsDerivationOnlySecret = resultTemplate is not null && IsDerivationOnlySecret(resultTemplate),
+                ReadBackFor = readBackFor,
             });
     }
 

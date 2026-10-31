@@ -432,11 +432,11 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
             .Sensitive(false)
             .Build();
 
-        // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so the policy also judges it as a key template; the export
-        // check above is what a policy that allows such templates but not plaintext KDF output
-        // (a FIPS-style policy) relies on.
-        Pkcs11Key derived = session.GenerateKey(mechanism, template);
+        // The template asks for an extractable, non-sensitive key. It is tagged as the read-back of the
+        // KdfOutput export DeriveExtractable allowed, so a built-in policy judges it by its export rule;
+        // a custom policy sees the tag on the KeyTemplateRequest. The export check stays first: it is what
+        // a policy that allows such templates but not plaintext KDF output (a FIPS-style policy) relies on.
+        Pkcs11Key derived = session.GenerateKey(mechanism, template, KeyMaterialExportKind.KdfOutput);
         bool operationFailed = true;
         try
         {
@@ -445,6 +445,14 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
                 throw new InvalidOperationException(
                     "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
             byte[] derivedKey = attrs[0].GetValueAsByteArray();
+
+            // A token that ignores CKA_VALUE_LEN would hand back a truncated or oversized key.
+            if (derivedKey.Length != length)
+            {
+                CryptographicOperations.ZeroMemory(derivedKey);
+                throw new CryptographicException(
+                    $"The token returned {derivedKey.Length} bytes of derived key material; {length} were requested.");
+            }
             operationFailed = false;
             return derivedKey;
         }

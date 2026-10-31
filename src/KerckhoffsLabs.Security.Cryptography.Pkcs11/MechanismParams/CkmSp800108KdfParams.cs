@@ -99,9 +99,25 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     }
 
     /// <summary>
+    /// Whether these parameters are for <paramref name="mechanism"/>: counter-mode parameters for
+    /// <c>CKM_SP800_108_COUNTER_KDF</c>, feedback for <c>CKM_SP800_108_FEEDBACK_KDF</c>, double-pipeline for
+    /// <c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c>.
+    /// </summary>
+    internal bool IsFor(CKM mechanism) => mechanism switch
+    {
+        CKM.CKM_SP800_108_COUNTER_KDF => _counterMode,
+        CKM.CKM_SP800_108_FEEDBACK_KDF => _feedback,
+        CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF => !_counterMode && !_feedback,
+        _ => false,
+    };
+
+    /// <summary>Whether the derivation also creates sibling keys (<see cref="Sp800108KdfBuilder.AddDerivedKey"/>).</summary>
+    internal bool RequestsAdditionalDerivedKeys => _retainedTemplates.Count > 0;
+
+    /// <summary>
     /// The additional sibling keys derived in the same call, in the order added via
     /// <see cref="Sp800108KdfBuilder.AddDerivedKey"/>. Read after the <c>C_DeriveKey</c> call
-    /// completes (i.e. after <see cref="Pkcs11Key.Derive"/> returns) — empty before that, and also
+    /// completes (i.e. after <see cref="Pkcs11Key.Derive(Mechanism, Objects.ObjectTemplate)"/> returns) — empty before that, and also
     /// when none were requested. A slot the token left unwritten (<c>CK_INVALID_HANDLE</c>) is
     /// <see langword="null"/> in the list rather than a key wrapping an invalid handle.
     /// </summary>
@@ -138,7 +154,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <summary>
     /// Turns the raw handles <see cref="AbsorbOutput"/> collected into <see cref="Pkcs11Key"/>
     /// instances, populating <see cref="AdditionalDerivedKeys"/>. Called by
-    /// <see cref="Pkcs11Key.Derive"/> right after a successful <c>C_DeriveKey</c> call — the only
+    /// <see cref="Pkcs11Key.Derive(Mechanism, Objects.ObjectTemplate)"/> right after a successful <c>C_DeriveKey</c> call — the only
     /// place that has both the handles and the session needed to build them.
     /// </summary>
     internal void HydrateDerivedKeys(Pkcs11Session session)

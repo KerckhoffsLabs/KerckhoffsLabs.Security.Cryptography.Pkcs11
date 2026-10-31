@@ -59,7 +59,26 @@ public sealed record EcKeyGenerationRequest(Pkcs11ECCurve Curve) : PolicyRequest
 /// <param name="Attributes">The caller's attributes. Policies must not log their values.</param>
 public sealed record KeyTemplateRequest(CKO? ObjectClass, IReadOnlyList<ObjectAttribute> Attributes) : PolicyRequest
 {
-    internal override string Describe() => ObjectClass is { } cls ? $"key template ({cls})" : "key template";
+    /// <summary>
+    /// The kind of secret the library is about to read off the token through the key this template
+    /// creates, when the template is one of the library's own read-back paths (the byte-returning KDF
+    /// overloads, <c>Pkcs11Key.DeriveRawSecret</c>, <c>MLKemPkcs11</c>); otherwise <see langword="null"/>.
+    /// Set by the library, never by the caller.
+    /// </summary>
+    /// <remarks>
+    /// Such a template is extractable and non-sensitive by necessity, and the session has already
+    /// asked for the matching <see cref="KeyMaterialExportRequest"/> before it is submitted. A built-in
+    /// policy judges a tagged template with its key-material export rule for that kind instead of its
+    /// key-template rule, so an explicit export opt-in covers its own read-back and nothing more: the
+    /// same template from a caller is untagged and judged as before.
+    /// </remarks>
+    public KeyMaterialExportKind? ReadBackFor { get; internal init; }
+
+    internal override string Describe()
+    {
+        string described = ObjectClass is { } cls ? $"key template ({cls})" : "key template";
+        return ReadBackFor is { } kind ? $"{described} (read-back for {kind})" : described;
+    }
 }
 
 /// <summary>The KDF applied to a key-agreement shared secret.</summary>
@@ -81,8 +100,29 @@ public sealed record KeyAgreementKdfRequest(CKM Mechanism, CKD Kdf) : PolicyRequ
     /// </remarks>
     public bool ResultIsDerivationOnlySecret { get; internal init; }
 
+    /// <summary>
+    /// The kind of secret the library is about to read off the token through the key this derivation
+    /// creates, when the derivation is one of the library's own read-back paths
+    /// (<c>Pkcs11Key.DeriveRawSecret</c>); otherwise <see langword="null"/>. Set by the session, never by
+    /// the caller.
+    /// </summary>
+    /// <remarks>
+    /// A built-in policy judges a request tagged <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> with
+    /// its key-material export rule for that kind instead of its KDF allow-list, so an explicit
+    /// <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> opt-in covers the <see cref="CKD.CKD_NULL"/>
+    /// derivation its read-back needs. A request tagged with any other kind is judged as if untagged: only
+    /// the ECDH shared-secret export may approve a derivation that returns Z. A caller's own
+    /// <see cref="CKD.CKD_NULL"/> derivation is untagged and judged as before.
+    /// </remarks>
+    public KeyMaterialExportKind? ReadBackFor { get; internal init; }
+
     internal override string Describe()
-        => ResultIsDerivationOnlySecret ? $"{Mechanism} with {Kdf} into a derivation-only secret" : $"{Mechanism} with {Kdf}";
+    {
+        string described = ResultIsDerivationOnlySecret
+            ? $"{Mechanism} with {Kdf} into a derivation-only secret"
+            : $"{Mechanism} with {Kdf}";
+        return ReadBackFor is { } kind ? $"{described} (read-back for {kind})" : described;
+    }
     internal override CKM? MechanismType => Mechanism;
 }
 

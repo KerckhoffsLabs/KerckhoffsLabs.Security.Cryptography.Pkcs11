@@ -127,6 +127,38 @@ constructors are all `[Obsolete]` in favor of its static `Pbkdf2` method. Use th
 keep the derived key on the token; the constructors remain for streaming `GetBytes` calls that
 continue one PBKDF2 byte stream across several output chunks.
 
+<a id="KLPKCS11012"></a>
+### KLPKCS11012 — Secret key material export opted in
+
+Reported by an analyzer at every `KeyMaterialExportRule.Allow(kinds, rationale)` call site. `Allow` is the
+one way to let a policy read secret key material off the token in the clear: a raw ECDH / X25519 / X448
+shared secret (`EcdhSharedSecret`), a KEM shared secret (`KemSharedSecret`), or KDF output
+(`KdfOutput`). Every built-in policy refuses all three, because once the bytes are in managed memory the
+token can no longer protect them. The message names the kinds when they are written in the source
+(`[KeyMaterialExportKind.KdfOutput]`), and says "the listed kinds" when they are only known at run time.
+
+It is a warning, not an error and not an `[Obsolete]`: some protocols need the bytes (an interop
+library whose contract returns a shared secret, a value the protocol sends or compares), and `Allow` is
+the supported way to say so. The warning keeps that decision visible in review, and the suppression
+that silences it is where its justification belongs. Before suppressing, prefer keeping the secret on
+the token: `Pkcs11Key.Derive` to a sensitive key, `EncapsulateKey` / `DecapsulateKey`.
+
+Suppress at the call site, with a reason:
+
+```csharp
+#pragma warning disable KLPKCS11012 // the X25519 secret feeds <protocol>'s managed key schedule, see <ticket>
+ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
+    .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(
+        [KeyMaterialExportKind.EcdhSharedSecret],
+        "X25519 shared secret for <protocol>'s managed key schedule."))
+    .Build();
+#pragma warning restore KLPKCS11012
+```
+
+Suppressing the diagnostic changes nothing at run time: the policy still allows only the kinds named,
+and every export it allows also logs a `KeyMaterialExportAllowed` warning (the kind and the policy name,
+never the secret). See [Reading secret key material off the token](crypto-policies.md#reading-secret-key-material-off-the-token).
+
 ## Runtime-only gates
 
 Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early
@@ -149,4 +181,4 @@ These policies are inherently runtime-only, because they depend on values rather
 | RSA key strength | Generating an RSA key pair below 2048 bits |
 | EC curve baseline | Generating an EC key on a curve below the 128-bit baseline — including one passed as a value, which the `[Obsolete]` on the named-curve properties cannot catch |
 | Secure key defaults | Creating, deriving, or unwrapping a key explicitly marked extractable or non-sensitive |
-| Key-material extraction | Reading a shared secret or private key off the token (ML-KEM encapsulate/decapsulate, ML-DSA / SLH-DSA private export) |
+| Key-material extraction | Reading a shared secret, KDF output or private key off the token (ML-KEM encapsulate/decapsulate, raw ECDH / X25519 / X448 secrets, KDF output, ML-DSA / SLH-DSA private export); the explicit opt-in that lifts it is reported by KLPKCS11012 |

@@ -64,6 +64,10 @@
          FsCheck.Xunit.v3: [Property] reports an Assert.Skip from the test body as a failure, and these
          tests skip at run time on a backend that lacks the mechanism. -->
     <PackageReference Include="FsCheck" Version="3.4.0" />
+    <!-- Drives the security analyzers over in-memory source (KeyMaterialExportOptInAnalyzerTests), for
+         the cases the tests' own build cannot show, such as code that must not be reported. The same
+         version the analyzers compile against (src/RoslynComponent.props). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageReference Include="xunit.v3" Version="4.0.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
   </ItemGroup>

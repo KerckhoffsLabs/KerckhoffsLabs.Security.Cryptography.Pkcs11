@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -17,6 +18,7 @@ internal static class DerivedKeyMaterial
     /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading KDF output off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_DeriveKey</c> or <c>C_GetAttributeValue</c>.</exception>
     /// <exception cref="InvalidOperationException">The token did not expose the derived value.</exception>
+    /// <exception cref="CryptographicException">The token returned a value of a different length than requested.</exception>
     public static byte[] DeriveAndRead(Pkcs11Key baseKey, Mechanism mechanism, int length)
     {
         baseKey.Session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
@@ -28,11 +30,11 @@ internal static class DerivedKeyMaterial
             .Sensitive(false)
             .Build();
 
-        // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so the policy also judges it as a key template; the export
-        // check above is what a policy that allows such templates but not plaintext KDF output
-        // (a FIPS-style policy) relies on.
-        Pkcs11Key derived = baseKey.Derive(mechanism, template);
+        // The template asks for an extractable, non-sensitive key. It is tagged as the read-back of the
+        // KdfOutput export allowed above, so a built-in policy judges it by its export rule; a custom
+        // policy sees the tag on the KeyTemplateRequest. The export check above stays first: it is what
+        // a policy that allows such templates but not plaintext KDF output (a FIPS-style policy) relies on.
+        Pkcs11Key derived = baseKey.Derive(mechanism, template, KeyMaterialExportKind.KdfOutput);
         bool operationFailed = true;
         try
         {
@@ -40,10 +42,18 @@ internal static class DerivedKeyMaterial
             // freeing it is what zeroizes it. Without this the secret stays in unmanaged memory
             // for the life of the process.
             using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs[0].CannotBeRead)
+            if (attrs.Count == 0 || attrs[0].CannotBeRead)
                 throw new InvalidOperationException(
                     "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
             byte[] value = attrs[0].GetValueAsByteArray();
+
+            // A token that ignores CKA_VALUE_LEN would hand back a truncated or oversized key.
+            if (value.Length != length)
+            {
+                CryptographicOperations.ZeroMemory(value);
+                throw new CryptographicException(
+                    $"The token returned {value.Length} bytes of derived key material; {length} were requested.");
+            }
             operationFailed = false;
             return value;
         }

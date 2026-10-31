@@ -1,4 +1,10 @@
+using System.Security.Cryptography;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using Microsoft.Extensions.Logging;
 
@@ -202,5 +208,78 @@ public sealed class LogTests
         Log.SessionTrace(log, 5, "Sign");
         Log.LoggingOutSession(log, 5);
         Assert.Empty(log.Entries);
+    }
+
+    // === Key-material export warning ============================================================
+
+    private static (Pkcs11Library Library, Pkcs11Session Session) OpenLogged(CapturingLogger log, ICryptoPolicy policy)
+    {
+        var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(log) });
+        return (library, ManagedToken.OpenSession(library, policy));
+    }
+
+    private static Pkcs11Key ImportIkm(Pkcs11Session session)
+    {
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Value(Convert.FromHexString("0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B")).Derive().Build();
+        return session.ImportKey(tpl);
+    }
+
+    [Fact]
+    public void KeyMaterialExportAllowed_RendersWarning()
+    {
+        var log = new CapturingLogger();
+        Log.KeyMaterialExportAllowed(log, 5, "P", KeyMaterialExportKind.KdfOutput);
+        var e = Only(log);
+        Assert.Equal(LogLevel.Warning, e.Level);
+        Assert.Equal("Session(5): policy P allowed export of KdfOutput off the token", e.Message);
+    }
+
+    [Collection(FakeModuleCollection.Name)]
+    public sealed class ExportLogging
+    {
+        [Fact]
+        public void KeyMaterialExportAllowed_LogsWarningWithKindAndPolicy_NeverTheSecret()
+        {
+            var log = new CapturingLogger();
+#pragma warning disable KLPKCS11012 // an allowed export is what the log line under test reports
+            ICryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("Opt-in")
+                .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test")).Build();
+#pragma warning restore KLPKCS11012
+            var (library, session) = OpenLogged(log, policy);
+            using (library)
+            using (session)
+            {
+                using var ikm = ImportIkm(session);
+                log.Clear();
+
+                byte[] okm = HkdfPkcs11.DeriveKey(HashAlgorithmName.SHA256, ikm, 32, [1, 2, 3], [4, 5]);
+
+                var warning = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
+                Assert.Contains("KdfOutput", warning.Message);
+                Assert.Contains("Opt-in", warning.Message);
+                string hex = Convert.ToHexString(okm);
+                Assert.DoesNotContain(log.Entries, e => e.Message.Contains(hex, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        [Fact]
+        public void RefusedExport_LogsPolicyDenied_NotKeyMaterialExportAllowed()
+        {
+            var log = new CapturingLogger();
+            var (library, session) = OpenLogged(log, CryptoPolicy.Recommended);
+            using (library)
+            using (session)
+            {
+                using var ikm = ImportIkm(session);
+                log.Clear();
+
+                Assert.Throws<CryptoPolicyViolationException>(
+                    () => HkdfPkcs11.DeriveKey(HashAlgorithmName.SHA256, ikm, 32, [1, 2, 3], [4, 5]));
+
+                Assert.Contains(log.Entries, e => e.Message.Contains("refused"));
+                Assert.DoesNotContain(log.Entries, e => e.Message.Contains("allowed export"));
+            }
+        }
     }
 }

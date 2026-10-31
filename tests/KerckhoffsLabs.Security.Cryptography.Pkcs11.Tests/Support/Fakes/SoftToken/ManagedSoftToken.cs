@@ -179,6 +179,11 @@ internal sealed partial class ManagedSoftToken : FakeModule
         return _objects.Remove((ulong)objectId) ? CKR.CKR_OK : CKR.CKR_OBJECT_HANDLE_INVALID;
     }
 
+    /// <summary>When non-zero, <c>C_GetAttributeValue</c> reports every <c>CKA_VALUE</c> this many bytes
+    /// longer (zero-padded) or shorter (truncated) than stored, as a token that ignores
+    /// <c>CKA_VALUE_LEN</c> would. Lets tests exercise the library's read-back length checks.</summary>
+    public int ValueLengthSkew { get; set; }
+
     protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
     {
         if (!_objects.TryGetValue((ulong)objectId, out var obj)) return CKR.CKR_OBJECT_HANDLE_INVALID;
@@ -194,6 +199,13 @@ internal sealed partial class ManagedSoftToken : FakeModule
                 template[i].valueLen = AttrUnavailable;
                 rv = CKR.CKR_ATTRIBUTE_TYPE_INVALID; // non-fatal in the caller's two-pass read
                 continue;
+            }
+
+            if (ValueLengthSkew != 0 && type == (ulong)CKA.CKA_VALUE)
+            {
+                byte[] skewed = new byte[Math.Max(0, val.Length + ValueLengthSkew)];
+                val.AsSpan(0, Math.Min(val.Length, skewed.Length)).CopyTo(skewed);
+                val = skewed;
             }
 
             // Pass 1 (value == NULL): report the size. Pass 2: copy into the caller's buffer.
