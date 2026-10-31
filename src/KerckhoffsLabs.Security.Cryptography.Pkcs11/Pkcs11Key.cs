@@ -840,6 +840,19 @@ public sealed partial class Pkcs11Key : IDisposable
         Mechanism mechanism,
         ObjectTemplate sharedSecretTemplate,
         int expectedCiphertextLen = 0)
+        => EncapsulateKey(mechanism, sharedSecretTemplate, expectedCiphertextLen, readBackFor: null);
+
+    /// <summary>
+    /// <see cref="EncapsulateKey(Mechanism, ObjectTemplate, int)"/> for a library read-back path, whose
+    /// shared-secret template the policy judges as a read-back of <paramref name="readBackFor"/> (see
+    /// <see cref="KeyTemplateRequest.ReadBackFor"/>). The caller must already have enforced the matching
+    /// <see cref="KeyMaterialExportRequest"/>.
+    /// </summary>
+    internal EncapsulationResult EncapsulateKey(
+        Mechanism mechanism,
+        ObjectTemplate sharedSecretTemplate,
+        int expectedCiphertextLen,
+        KeyMaterialExportKind? readBackFor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -850,7 +863,7 @@ public sealed partial class Pkcs11Key : IDisposable
                 "Pkcs11Key.EncapsulateKey (no public handle)");
 
         var (ct, sharedHandle) = _session.Core.EncapsulateKey(
-            mechanism, PublicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
+            mechanism, PublicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen, readBackFor);
         return new EncapsulationResult(ct, _session.HydrateExistingHandleAsKey(sharedHandle));
     }
 
@@ -867,6 +880,19 @@ public sealed partial class Pkcs11Key : IDisposable
         Mechanism mechanism,
         ReadOnlySpan<byte> ciphertext,
         ObjectTemplate sharedSecretTemplate)
+        => DecapsulateKey(mechanism, ciphertext, sharedSecretTemplate, readBackFor: null);
+
+    /// <summary>
+    /// <see cref="DecapsulateKey(Mechanism, ReadOnlySpan{byte}, ObjectTemplate)"/> for a library read-back
+    /// path, whose shared-secret template the policy judges as a read-back of <paramref name="readBackFor"/>
+    /// (see <see cref="KeyTemplateRequest.ReadBackFor"/>). The caller must already have enforced the
+    /// matching <see cref="KeyMaterialExportRequest"/>.
+    /// </summary>
+    internal Pkcs11Key DecapsulateKey(
+        Mechanism mechanism,
+        ReadOnlySpan<byte> ciphertext,
+        ObjectTemplate sharedSecretTemplate,
+        KeyMaterialExportKind? readBackFor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -877,7 +903,7 @@ public sealed partial class Pkcs11Key : IDisposable
                 "Pkcs11Key.DecapsulateKey (no private handle)");
 
         ObjectHandle sharedHandle = _session.Core.DecapsulateKey(
-            mechanism, PrivateHandle, ciphertext, [.. sharedSecretTemplate.Attributes]);
+            mechanism, PrivateHandle, ciphertext, [.. sharedSecretTemplate.Attributes], readBackFor);
         return _session.HydrateExistingHandleAsKey(sharedHandle);
     }
 
@@ -893,9 +919,18 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="CryptoPolicyViolationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
-        => DeriveCore(mechanism, template);
+        => DeriveCore(mechanism, template, readBackFor: null);
 
-    private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template)
+    /// <summary>
+    /// <see cref="Derive(Mechanism, ObjectTemplate)"/> for a library read-back path, whose result template
+    /// (and, for ECDH, KDF) the policy judges as a read-back of <paramref name="readBackFor"/> (see
+    /// <see cref="KeyTemplateRequest.ReadBackFor"/>). The caller must already have enforced the matching
+    /// <see cref="KeyMaterialExportRequest"/>.
+    /// </summary>
+    internal Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template, KeyMaterialExportKind? readBackFor)
+        => DeriveCore(mechanism, template, readBackFor);
+
+    private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template, KeyMaterialExportKind? readBackFor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -906,7 +941,7 @@ public sealed partial class Pkcs11Key : IDisposable
                 "Pkcs11Key.Derive (no private handle)");
 
         ObjectHandle resulting = _session.Core.DeriveKey(
-            mechanism, PrivateHandle, [.. template.Attributes]);
+            mechanism, PrivateHandle, [.. template.Attributes], readBackFor);
 
         // SP800-108 sibling keys: the params object absorbed their raw handles during the call
         // above; turn them into usable Pkcs11Key instances now, while the session is at hand.

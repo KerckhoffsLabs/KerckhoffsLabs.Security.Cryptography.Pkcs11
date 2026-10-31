@@ -19,7 +19,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// contract is required (e.g. feeding HKDF off-token for TLS 1.3 hybrid KEM).
 /// </para>
 /// <para><b>Recommended alternative:</b> when the shared secret can stay on-token, use
-/// <see cref="Pkcs11Key.EncapsulateKey"/> / <see cref="Pkcs11Key.DecapsulateKey"/> directly —
+/// <see cref="Pkcs11Key.EncapsulateKey(Mechanism, Objects.ObjectTemplate, int)"/> / <see cref="Pkcs11Key.DecapsulateKey(Mechanism, ReadOnlySpan{byte}, Objects.ObjectTemplate)"/> directly —
 /// they return a <see cref="Pkcs11Key"/> wrapping the token-resident secret with no
 /// extraction step.</para>
 /// <para><b>Gating:</b> <see cref="EncapsulateCore(Span{byte}, Span{byte})"/> /
@@ -51,7 +51,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     /// Thrown unless the owning session's <see cref="Pkcs11Session.Policy"/> permits it.
     /// Use <see cref="Pkcs11Session.UsePolicy"/> (e.g. with <c>CryptoPolicy.AllowInsecure</c>) to
     /// acknowledge that the shared secret will be extracted from the token, or use
-    /// <see cref="Pkcs11Key.EncapsulateKey"/> for the on-token-only path.
+    /// <see cref="Pkcs11Key.EncapsulateKey(Mechanism, Objects.ObjectTemplate, int)"/> for the on-token-only path.
     /// </exception>
     protected override void EncapsulateCore(Span<byte> ciphertext, Span<byte> sharedSecret)
     {
@@ -65,7 +65,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         // IDisposable precisely so the shared-secret key has an owner, and splitting it up discards
         // that owner and leaves the key to be released by hand.
         using EncapsulationResult encapsulated =
-            _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes);
+            _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes, KeyMaterialExportKind.KemSharedSecret);
 
         bool destroyAttempted = false;
         try
@@ -150,7 +150,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     private Pkcs11Key DecapsulateWith(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, bool includeValueLen)
     {
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes, includeValueLen);
-        return _key.DecapsulateKey(mechanism, ciphertext, template);
+        return _key.DecapsulateKey(mechanism, ciphertext, template, KeyMaterialExportKind.KemSharedSecret);
     }
 
     // -----------------------------------------------------------------------

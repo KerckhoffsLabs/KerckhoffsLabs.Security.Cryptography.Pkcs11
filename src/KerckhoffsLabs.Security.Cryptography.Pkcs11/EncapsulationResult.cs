@@ -1,7 +1,7 @@
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Result of <see cref="Pkcs11Key.EncapsulateKey"/> (PKCS#11 v3.2 §5.18.10): the KEM ciphertext to
+/// Result of <see cref="Pkcs11Key.EncapsulateKey(Mechanism, Objects.ObjectTemplate, int)"/> (PKCS#11 v3.2 §5.18.10): the KEM ciphertext to
 /// transmit to the holder of the decapsulation key, and the freshly created on-token key wrapping the
 /// encapsulated shared secret.
 /// </summary>
@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// is removed by <see cref="Pkcs11Key.Destroy"/> or by the token's session-object lifetime rules.
 /// </para>
 /// <para>
-/// Instances are produced exclusively by <see cref="Pkcs11Key.EncapsulateKey"/>; the constructor is
+/// Instances are produced exclusively by <see cref="Pkcs11Key.EncapsulateKey(Mechanism, Objects.ObjectTemplate, int)"/>; the constructor is
 /// <see langword="internal"/> because a result fabricated around an arbitrary key would carry a meaningless
 /// ciphertext/secret pairing. <c>default(EncapsulationResult)</c> is inert: both properties are
 /// <see langword="null"/> and <see cref="Dispose"/> is a no-op.

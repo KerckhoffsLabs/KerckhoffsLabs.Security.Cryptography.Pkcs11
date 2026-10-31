@@ -188,10 +188,12 @@ public sealed partial class Pkcs11Key
             .Sensitive(false)
             .Build();
 
-        // The template asks for an extractable, non-sensitive key, so the policy also judges it as a
-        // key template on this Derive; the export check above is what a policy that allows such
-        // templates but not a plaintext shared secret relies on.
-        Pkcs11Key derived = Derive(mechanism, template);
+        // The template asks for an extractable, non-sensitive key and the derivation applies CKD_NULL.
+        // Both are tagged as the read-back of the EcdhSharedSecret export allowed above, so a built-in
+        // policy judges them by its export rule; a custom policy sees the tag on the KeyTemplateRequest
+        // and the KeyAgreementKdfRequest. The export check stays first: it is what a policy that allows
+        // such templates but not a plaintext shared secret relies on.
+        Pkcs11Key derived = Derive(mechanism, template, Policy.KeyMaterialExportKind.EcdhSharedSecret);
         bool operationFailed = true;
         try
         {
@@ -224,7 +226,7 @@ public sealed partial class Pkcs11Key
     /// Key agreement with a peer public key that keeps the shared secret on the token: the result is
     /// a session <see cref="CKK.CKK_GENERIC_SECRET"/> key holding the raw secret Z, sensitive,
     /// non-extractable and usable only as the base key of a further derivation. Turn it into working keys
-    /// with <see cref="Derive"/> and a KDF, e.g. <c>CKM_HKDF_DERIVE</c> (<see cref="MechanismParams.CkmHkdfParams"/>),
+    /// with <see cref="Derive(Mechanism, Objects.ObjectTemplate)"/> and a KDF, e.g. <c>CKM_HKDF_DERIVE</c> (<see cref="MechanismParams.CkmHkdfParams"/>),
     /// one derivation per key; no secret byte reaches the process.
     /// </summary>
     /// <remarks>

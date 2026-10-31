@@ -699,12 +699,21 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and the session's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
     public Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template)
+        => GenerateKey(mechanism, template, readBackFor: null);
+
+    /// <summary>
+    /// <see cref="GenerateKey(Mechanism, ObjectTemplate)"/> for a library read-back path (PBKDF2 output),
+    /// whose template the policy judges as a read-back of <paramref name="readBackFor"/> (see
+    /// <see cref="KeyTemplateRequest.ReadBackFor"/>). The caller must already have enforced the matching
+    /// <see cref="KeyMaterialExportRequest"/>.
+    /// </summary>
+    internal Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template, KeyMaterialExportKind? readBackFor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
-        var handle = _core.GenerateKey(mechanism, [.. template.Attributes]);
+        var handle = _core.GenerateKey(mechanism, [.. template.Attributes], readBackFor);
         return HydrateKeyFromHandle(handle);
     }
 

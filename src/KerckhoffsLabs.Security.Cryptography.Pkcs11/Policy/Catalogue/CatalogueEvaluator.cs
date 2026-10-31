@@ -32,11 +32,19 @@ internal static class CatalogueEvaluator
             HashUseRequest r => EvaluateHash(catalogue, policyName, r.Hash, r.Operation),
             RsaKeyGenerationRequest r => EvaluateRsaKeyGeneration(catalogue, policyName, r),
             EcKeyGenerationRequest r => EvaluateCurve(catalogue, policyName, r.Curve),
+            // A library read-back (see KeyTemplateRequest.ReadBackFor) is judged as the export it serves:
+            // the session enforced that KeyMaterialExportRequest first, and an explicit opt-in for the kind
+            // must cover the extractable, non-sensitive key its read-back needs. Untagged (every caller's
+            // template) is judged by the template rule as before.
+            KeyTemplateRequest { ReadBackFor: { } kind } => catalogue.KeyMaterialExport.Evaluate(new KeyMaterialExportRequest(kind)),
             KeyTemplateRequest r => catalogue.KeyTemplate.Evaluate(r),
             // CKD_NULL keeps Z as is. Refused into a working key (SP 800-56A forbids using Z directly),
             // allowed into a derivation-only secret: Z stays in the module and only an approved KDF
             // (the catalogue's CKM_HKDF_DERIVE / CKM_SP800_108_*_KDF) can turn it into keys.
             KeyAgreementKdfRequest { Kdf: CKD.CKD_NULL, ResultIsDerivationOnlySecret: true } => PolicyDecision.Allow,
+            // DeriveRawSecret's CKD_NULL derivation, tagged by the session: judged as the export it serves,
+            // like a tagged KeyTemplateRequest. A caller's CKD_NULL derivation is untagged.
+            KeyAgreementKdfRequest { ReadBackFor: { } kind } => catalogue.KeyMaterialExport.Evaluate(new KeyMaterialExportRequest(kind)),
             KeyAgreementKdfRequest r => EvaluateKdf(catalogue, policyName, r.Kdf),
             KeyAgreementKeyRequest r => EvaluateKeyAgreementKeyType(catalogue, policyName, r.KeyType),
             KeyMaterialExportRequest r => catalogue.KeyMaterialExport.Evaluate(r),

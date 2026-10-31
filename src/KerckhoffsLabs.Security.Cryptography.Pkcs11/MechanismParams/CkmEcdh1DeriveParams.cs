@@ -32,8 +32,8 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     }
 
     /// <summary>
-    /// Builds <c>CK_ECDH1_DERIVE_PARAMS</c> for use with <see cref="Pkcs11Key.EncapsulateKey"/> /
-    /// <see cref="Pkcs11Key.DecapsulateKey"/> (PKCS#11 v3.2 §5.18.10/.11) rather than
+    /// Builds <c>CK_ECDH1_DERIVE_PARAMS</c> for use with <see cref="Pkcs11Key.EncapsulateKey(Mechanism, Objects.ObjectTemplate, int)"/> /
+    /// <see cref="Pkcs11Key.DecapsulateKey(Mechanism, ReadOnlySpan{byte}, Objects.ObjectTemplate)"/> (PKCS#11 v3.2 §5.18.10/.11) rather than
     /// <c>C_DeriveKey</c>. For that call shape the spec requires <c>pPublicData</c> to be empty: the
     /// token generates its own ephemeral EC key pair internally, computes the shared secret against
     /// the public/private key passed to Encapsulate/DecapsulateKey, and returns the ephemeral public
