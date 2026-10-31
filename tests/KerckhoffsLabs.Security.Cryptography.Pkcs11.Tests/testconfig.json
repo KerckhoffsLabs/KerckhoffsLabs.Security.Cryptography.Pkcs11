@@ -1,0 +1,8 @@
+{
+  "platformOptions": {
+    "Coverlet": {
+      "Include": "[KerckhoffsLabs.Security.Cryptography.Pkcs11*]*",
+      "ExcludeByAttribute": "ExcludeFromCodeCoverage,ExcludeFromCodeCoverageAttribute,GeneratedCodeAttribute"
+    }
+  }
+}
