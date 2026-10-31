@@ -165,6 +165,41 @@ public sealed class MD5Pkcs11_Managed
         }
     }
 
+    // === Span path: TryComputeHash reaches HashCore(ReadOnlySpan<byte>) ===================
+
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void TryComputeHash_GatedByDefault_Throws()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
+
+        // The span overload buffers through HashCore(ReadOnlySpan<byte>) and is gated like ComputeHash.
+        var ex = Assert.Throws<CryptoPolicyViolationException>(
+            () => md5.TryComputeHash(Encoding.UTF8.GetBytes("abc"), new byte[16], out _));
+        Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
+    }
+
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
+    public void TryComputeHash_WithAllowInsecure_MatchesBcl_AndATooSmallDestinationBuffersNothing()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var md5 = new MD5Pkcs11(session);
+
+        // HashAlgorithm checks the destination size before it calls HashCore, so a refused call must
+        // leave nothing behind in the buffer for the next one to pick up.
+        Assert.False(md5.TryComputeHash(Encoding.UTF8.GetBytes("discarded"), new byte[16 - 1], out int written));
+        Assert.Equal(0, written);
+
+        byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
+        byte[] destination = new byte[16];
+        Assert.True(md5.TryComputeHash(data, destination, out written));
+        Assert.Equal(16, written);
+        Assert.Equal(MD5.HashData(data), destination);
+    }
+
     // === Construction and argument validation (run before any native call) ================
 
     [Fact]
