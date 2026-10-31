@@ -2050,6 +2050,7 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.operator ==(Ker
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicy.AllowInsecure.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicy.NistApproved.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicy.Recommended.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Allow(System.Collections.Generic.IEnumerable<KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind>! kinds, string! rationale) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Refuse() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyTemplateRule.RequireSensitive() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyTemplateRule!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.MechanismChecks.CcmMacLength(int minimumBits) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.MechanismCheck!
