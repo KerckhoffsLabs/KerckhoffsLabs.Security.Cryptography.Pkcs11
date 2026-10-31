@@ -118,6 +118,20 @@ internal static class SubjectPublicKeyInfoEncoding
         return true;
     }
 
+    /// <summary>
+    /// Decodes a public key whose algorithm takes no parameters (RFC 8410 §3 for X25519 / X448: the
+    /// parameters MUST be absent): the algorithm OID and the BIT STRING's bytes. Returns
+    /// <see langword="false"/> when the bytes are not a DER <c>SubjectPublicKeyInfo</c> or carry parameters.
+    /// </summary>
+    internal static bool TryDecodeWithoutParameters(ReadOnlySpan<byte> spki, [NotNullWhen(true)] out string? algorithm, [NotNullWhen(true)] out byte[]? publicKey)
+    {
+        if (TryRead(spki, out algorithm, out ReadOnlySpan<byte> parameters, out publicKey) && parameters.IsEmpty)
+            return true;
+        algorithm = null;
+        publicKey = null;
+        return false;
+    }
+
     // Not PublicKey.CreateFromSubjectPublicKeyInfo: it ignores the BIT STRING's unused-bits count, and a
     // peer key is caller input. Every level must be consumed exactly. parameters is empty when absent: a
     // present one is at least a tag and a length.

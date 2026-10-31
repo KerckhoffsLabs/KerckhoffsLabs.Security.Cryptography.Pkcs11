@@ -930,6 +930,86 @@ public sealed partial class Pkcs11Key : IDisposable
     internal Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template, KeyMaterialExportKind? readBackFor)
         => DeriveCore(mechanism, template, readBackFor);
 
+    /// <summary>
+    /// Runs an on-token KDF with this key as its input and returns <paramref name="length"/> bytes of its
+    /// output: the PKCS#11 counterpart of <see cref="System.Security.Cryptography.HKDF"/> and
+    /// <see cref="System.Security.Cryptography.SP800108HmacCounterKdf"/> for any HKDF or SP 800-108 layout
+    /// the token supports. Reading the output off the token is an export of
+    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/>, so the session's policy must allow it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Prefer <see cref="Derive(Mechanism, ObjectTemplate)"/> where the output is a key: it stays on the
+    /// token, sensitive and non-extractable. Use this where the output must leave the token, e.g. a
+    /// value a protocol sends or compares.
+    /// </para>
+    /// <para>
+    /// Only KDF mechanisms with their own parameters are accepted: <c>CKM_HKDF_DERIVE</c> and
+    /// <c>CKM_HKDF_DATA</c> with <see cref="CkmHkdfParams"/>, and <c>CKM_SP800_108_COUNTER_KDF</c>,
+    /// <c>CKM_SP800_108_FEEDBACK_KDF</c> and <c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c> with
+    /// <see cref="CkmSp800108KdfParams"/> of the same mode and no additional derived keys. Anything else,
+    /// a key-agreement mechanism above all, is refused before the policy or the token is consulted: the
+    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in covers KDF output and nothing else, and
+    /// never the raw shared secret of an ECDH derivation (use <see cref="DeriveRawSecret"/>, which the
+    /// <see cref="Policy.KeyMaterialExportKind.EcdhSharedSecret"/> opt-in governs).
+    /// </para>
+    /// <para>
+    /// The output is asked for as a <see cref="CKK.CKK_GENERIC_SECRET"/> key whichever mechanism runs. PKCS#11
+    /// has <c>CKM_HKDF_DATA</c> make a data object instead, so a token that holds to that refuses the
+    /// derivation (<see cref="CKR.CKR_TEMPLATE_INCONSISTENT"/>); <c>CKM_HKDF_DERIVE</c> gives the same bytes.
+    /// </para>
+    /// <para>
+    /// The output is derived into an extractable, non-sensitive session generic secret, read and
+    /// destroyed. The caller owns the returned array and should zero it
+    /// (<see cref="System.Security.Cryptography.CryptographicOperations.ZeroMemory(Span{byte})"/>) once done.
+    /// </para>
+    /// </remarks>
+    /// <param name="mechanism">The KDF and its parameters.</param>
+    /// <param name="length">The number of bytes to derive.</param>
+    /// <returns>The KDF output.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="mechanism"/> is not one of the KDFs above with its own parameters, or requests additional derived keys.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="length"/> is zero or negative.</exception>
+    /// <exception cref="CryptoPolicyViolationException">
+    /// Thrown unless the session's <see cref="Pkcs11Session.Policy"/> permits reading KDF output off the
+    /// token (<see cref="Policy.KeyMaterialExportKind.KdfOutput"/>) and the mechanism and its PRF.
+    /// </exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no private or secret handle; otherwise propagated from <c>C_DeriveKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the token does not expose the derived value.</exception>
+    public byte[] DeriveBytes(Mechanism mechanism, int length)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
+        RequireKdfOutputMechanism(mechanism);
+
+        return Algorithms.DerivedKeyMaterial.DeriveAndRead(this, mechanism, length);
+    }
+
+    // DeriveBytes' allow-list. The parameters must be the KDF's own: the session raises a key-agreement KDF
+    // request for anything carrying CkmEcdh1DeriveParams, whatever the mechanism, and a parameter block of
+    // another layout is not one the token should be handed. SP 800-108 siblings would be keys this method
+    // neither returns nor destroys, created from a template the read-back tag does not cover.
+    private static void RequireKdfOutputMechanism(Mechanism mechanism)
+    {
+        bool fits = mechanism.Type switch
+        {
+            CKM.CKM_HKDF_DERIVE or CKM.CKM_HKDF_DATA => mechanism.Parameters is CkmHkdfParams,
+            CKM.CKM_SP800_108_COUNTER_KDF or CKM.CKM_SP800_108_FEEDBACK_KDF or CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF =>
+                mechanism.Parameters is CkmSp800108KdfParams sp800108 && sp800108.IsFor(mechanism.Type),
+            _ => false,
+        };
+        if (!fits)
+            throw new ArgumentException(
+                $"Pkcs11Key.DeriveBytes takes CKM_HKDF_DERIVE or CKM_HKDF_DATA with CkmHkdfParams, or a CKM_SP800_108_*_KDF with CkmSp800108KdfParams of the same mode; got {mechanism.Type}.",
+                nameof(mechanism));
+        if (mechanism.Parameters is CkmSp800108KdfParams { RequestsAdditionalDerivedKeys: true })
+            throw new ArgumentException(
+                "Pkcs11Key.DeriveBytes returns one output; SP 800-108 additional derived keys are not supported. Use Derive for them.",
+                nameof(mechanism));
+    }
+
     private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template, KeyMaterialExportKind? readBackFor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
