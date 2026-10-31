@@ -38,6 +38,8 @@ public sealed class MechanismParameterTests_Nss(NssBackendFixture backend)
     {
         if (row == "ulMaxKeySize / 8 + 1" && !NssBackendFixture.NssBoundsAGenericSecretByItsMaximum)
             Assert.Skip("NSS makes a generic secret past the ulMaxKeySize it reports");
+        if (row == "2^32 + 16")
+            _backend.RequireSoftoken(3, 53, "NSS 3.52 and older free an uninitialised pbe_param when C_GenerateKey refuses a key length, and can crash");
         MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
     }
 }
