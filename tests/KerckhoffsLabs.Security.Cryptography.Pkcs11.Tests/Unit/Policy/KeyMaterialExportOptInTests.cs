@@ -349,6 +349,8 @@ public sealed class KeyMaterialExportOptInTests
         ["AES ECB encrypt data"] = () => new Mechanism(CKM.CKM_AES_ECB_ENCRYPT_DATA),
         ["HKDF with ECDH parameters"] = () => new Mechanism(CKM.CKM_HKDF_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, PeerPoint())),
         ["HKDF with no parameters"] = () => new Mechanism(CKM.CKM_HKDF_DERIVE),
+        // CKM_HKDF_DATA makes a data object, which the secret-key read-back cannot read; CKM_HKDF_DERIVE covers it.
+        ["HKDF data"] = () => new Mechanism(CKM.CKM_HKDF_DATA, CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, Salt, Info)),
         ["SP 800-108 counter with HKDF parameters"] = () => new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF,
             CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, Salt, Info)),
         ["SP 800-108 feedback with counter parameters"] = () => new Mechanism(CKM.CKM_SP800_108_FEEDBACK_KDF,
