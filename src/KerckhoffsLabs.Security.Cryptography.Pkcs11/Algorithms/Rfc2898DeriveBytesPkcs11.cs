@@ -445,6 +445,14 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
                 throw new InvalidOperationException(
                     "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
             byte[] derivedKey = attrs[0].GetValueAsByteArray();
+
+            // A token that ignores CKA_VALUE_LEN would hand back a truncated or oversized key.
+            if (derivedKey.Length != length)
+            {
+                CryptographicOperations.ZeroMemory(derivedKey);
+                throw new CryptographicException(
+                    $"The token returned {derivedKey.Length} bytes of derived key material; {length} were requested.");
+            }
             operationFailed = false;
             return derivedKey;
         }

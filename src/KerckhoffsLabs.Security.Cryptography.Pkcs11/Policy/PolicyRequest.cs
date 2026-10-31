@@ -117,7 +117,12 @@ public sealed record KeyAgreementKdfRequest(CKM Mechanism, CKD Kdf) : PolicyRequ
     public KeyMaterialExportKind? ReadBackFor { get; internal init; }
 
     internal override string Describe()
-        => ResultIsDerivationOnlySecret ? $"{Mechanism} with {Kdf} into a derivation-only secret" : $"{Mechanism} with {Kdf}";
+    {
+        string described = ResultIsDerivationOnlySecret
+            ? $"{Mechanism} with {Kdf} into a derivation-only secret"
+            : $"{Mechanism} with {Kdf}";
+        return ReadBackFor is { } kind ? $"{described} (read-back for {kind})" : described;
+    }
     internal override CKM? MechanismType => Mechanism;
 }
 
