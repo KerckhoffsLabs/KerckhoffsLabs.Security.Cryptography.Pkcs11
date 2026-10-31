@@ -150,7 +150,7 @@ internal static class GenerateRsaKeyPairTestCases
             }
             Assert.True(KeyRefusals.Contains(rv), $"C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN) with CKA_MODULUS_BITS {bits} returned {rv}.");
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     public static TheoryData<string> PublicExponents => ["01 00 03", "2^64 + 65537"];
@@ -196,6 +196,6 @@ internal static class GenerateRsaKeyPairTestCases
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 }

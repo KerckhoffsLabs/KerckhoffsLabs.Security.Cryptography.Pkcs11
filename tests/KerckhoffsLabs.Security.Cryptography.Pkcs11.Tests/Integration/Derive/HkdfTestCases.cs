@@ -273,7 +273,7 @@ internal static class HkdfTestCases
                 session.DestroyObject(baseKey);
             }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // For the tripwires: the derivation of Assert_Hkdf_ParameterOutOfRange_IsRefused with one fault, and the

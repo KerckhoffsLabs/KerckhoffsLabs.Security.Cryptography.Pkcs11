@@ -846,11 +846,9 @@ internal static class ObjectConformanceTestCases
             {
                 byte[] original = Read(session, key, attribute);
                 using var attrChanged = new ObjectAttribute(attribute, changed);
-                Pkcs11Exception ex;
-                if (component.EndsWith(" in a copy", StringComparison.Ordinal))
-                    ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.DestroyObject(session.CopyObject(key, [attrChanged, attrLabel])));
-                else
-                    ex = Assert.ThrowsAny<Pkcs11Exception>(() => Set(session, key, attrChanged));
+                Pkcs11Exception ex = component.EndsWith(" in a copy", StringComparison.Ordinal)
+                    ? Assert.ThrowsAny<Pkcs11Exception>(() => session.DestroyObject(session.CopyObject(key, [attrChanged, attrLabel])))
+                    : Assert.ThrowsAny<Pkcs11Exception>(() => Set(session, key, attrChanged));
                 Assert.True(ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY, $"{component}: the change was refused with {ex.ReturnValue}, not CKR_ATTRIBUTE_READ_ONLY.");
                 Assert.Equal(original, Read(session, key, attribute));
             }

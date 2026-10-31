@@ -35,11 +35,9 @@ public sealed class OperationStateTests_BouncyHsm(BouncyHsmBackendFixture backen
     [MemberData(nameof(OperationStateTestCases.KeysOfTheWrongType), MemberType = typeof(OperationStateTestCases))]
     public void KeyOfTheWrongType_IsRefused(string misuse)
     {
-        if (misuse.EndsWith("with an RSA private key", StringComparison.Ordinal) || misuse.EndsWith("with an RSA public key", StringComparison.Ordinal))
-        {
-            if (!BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent)
-                Assert.Skip("BouncyHsm answers an RSA key of the wrong class with CKR_KEY_HANDLE_INVALID");
-        }
+        if ((misuse.EndsWith("with an RSA private key", StringComparison.Ordinal) || misuse.EndsWith("with an RSA public key", StringComparison.Ordinal))
+            && !BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent)
+            Assert.Skip("BouncyHsm answers an RSA key of the wrong class with CKR_KEY_HANDLE_INVALID");
         OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
     }
 

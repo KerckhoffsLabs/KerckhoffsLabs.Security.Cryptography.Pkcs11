@@ -72,6 +72,6 @@ internal static class GenerateEcKeyPairTestCases
             Assert.True(rv is CKR.CKR_CURVE_NOT_SUPPORTED or CKR.CKR_DOMAIN_PARAMS_INVALID or CKR.CKR_ATTRIBUTE_VALUE_INVALID,
                 $"C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN) with CKA_EC_PARAMS of {oid} returned {rv}.");
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 }

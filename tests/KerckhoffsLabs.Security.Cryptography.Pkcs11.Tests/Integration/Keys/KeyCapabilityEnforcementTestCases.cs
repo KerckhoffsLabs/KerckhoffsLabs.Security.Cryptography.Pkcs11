@@ -68,7 +68,7 @@ internal static class KeyCapabilityEnforcementTestCases
     internal static void Assert_Sign_WithSignFalse_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_SHA256_HMAC);
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             byte[] rawKey = new byte[32];
@@ -81,13 +81,13 @@ internal static class KeyCapabilityEnforcementTestCases
             }
             finally { session.DestroyObject(key); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     internal static void Assert_Verify_WithVerifyFalse_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_SHA256_HMAC);
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             byte[] rawKey = new byte[32];
@@ -109,13 +109,13 @@ internal static class KeyCapabilityEnforcementTestCases
             }
             finally { session.DestroyObject(verifyOff); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     internal static void Assert_Encrypt_WithEncryptFalse_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD);
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
@@ -132,13 +132,13 @@ internal static class KeyCapabilityEnforcementTestCases
             }
             finally { session.DestroyObject(key); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     internal static void Assert_Decrypt_WithDecryptFalse_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD);
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
@@ -163,7 +163,7 @@ internal static class KeyCapabilityEnforcementTestCases
             }
             finally { session.DestroyObject(decryptOff); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // === Signatures with message recovery ======================================
@@ -185,7 +185,7 @@ internal static class KeyCapabilityEnforcementTestCases
     internal static void Assert_Recover_WithRecoverFalse_IsKeyFunctionNotPermitted(IPkcs11Backend backend, bool sign)
     {
         backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => sign ? f.SignRecover : f.VerifyRecover, sign ? "CKF_SIGN_RECOVER" : "CKF_VERIFY_RECOVER");
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             using var rsa = System.Security.Cryptography.RSA.Create(2048);
@@ -202,7 +202,7 @@ internal static class KeyCapabilityEnforcementTestCases
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // === Derivation and key encapsulation ======================================
@@ -216,7 +216,7 @@ internal static class KeyCapabilityEnforcementTestCases
     internal static void Assert_Derive_WithDeriveFalse_IsKeyFunctionNotPermitted(IPkcs11Backend backend, string derivation)
     {
         backend.RequireMechanism(derivation == "ECDH" ? CKM.CKM_ECDH1_DERIVE : CKM.CKM_HKDF_DERIVE);
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             string label = $"kl-derive-false-{Guid.NewGuid():N}";
@@ -261,7 +261,7 @@ internal static class KeyCapabilityEnforcementTestCases
             }
             finally { session.DestroyObject(baseKey); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // C_EncapsulateKey with a public key whose CKA_ENCAPSULATE is FALSE, and C_DecapsulateKey with a private key
@@ -272,7 +272,7 @@ internal static class KeyCapabilityEnforcementTestCases
     {
         backend.RequireMechanisms(CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM);
         backend.RequireMlKemParameterSet(1184); // ML-KEM-768
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             string label = $"kl-kem-false-{Guid.NewGuid():N}";
@@ -303,6 +303,6 @@ internal static class KeyCapabilityEnforcementTestCases
             }
             finally { session.DestroyObject(privateKey); session.DestroyObject(publicKey); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 }
