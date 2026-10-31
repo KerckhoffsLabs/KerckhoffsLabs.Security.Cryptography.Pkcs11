@@ -242,8 +242,10 @@ public sealed class LogTests
         public void KeyMaterialExportAllowed_LogsWarningWithKindAndPolicy_NeverTheSecret()
         {
             var log = new CapturingLogger();
+#pragma warning disable KLPKCS11012 // an allowed export is what the log line under test reports
             ICryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("Opt-in")
                 .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test")).Build();
+#pragma warning restore KLPKCS11012
             var (library, session) = OpenLogged(log, policy);
             using (library)
             using (session)
