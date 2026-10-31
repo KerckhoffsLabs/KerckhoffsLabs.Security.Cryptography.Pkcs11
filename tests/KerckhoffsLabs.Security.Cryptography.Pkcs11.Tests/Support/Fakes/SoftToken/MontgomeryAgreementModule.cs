@@ -68,11 +68,8 @@ internal sealed class MontgomeryAgreementModule(byte[] ecParams, byte[] secret) 
             PublicData = UnmanagedMemory.Read(p.PublicData, (int)p.PublicDataLen);
         }
         ValueLen = null;
-        foreach (CK_ATTRIBUTE attribute in template)
-        {
-            if ((CKA)(ulong)attribute.type == CKA.CKA_VALUE_LEN)
-                ValueLen = (ulong)UnmanagedMemory.Read<NativeCULong>(attribute.value);
-        }
+        foreach (CK_ATTRIBUTE attribute in template.Where(a => (CKA)(ulong)a.type == CKA.CKA_VALUE_LEN))
+            ValueLen = (ulong)UnmanagedMemory.Read<NativeCULong>(attribute.value);
 
         key = (NativeCULong)Derived;
         return CKR.CKR_OK;

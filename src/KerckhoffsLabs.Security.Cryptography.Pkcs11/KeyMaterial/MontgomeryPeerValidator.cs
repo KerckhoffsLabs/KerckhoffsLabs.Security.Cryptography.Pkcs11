@@ -132,6 +132,8 @@ internal static class MontgomeryPeerValidator
         }
         catch (AsnContentException)
         {
+            // Not DER, or truncated: an unparseable CKA_EC_PARAMS names no curve, the same as an unknown one.
+            return null;
         }
         return null;
     }
