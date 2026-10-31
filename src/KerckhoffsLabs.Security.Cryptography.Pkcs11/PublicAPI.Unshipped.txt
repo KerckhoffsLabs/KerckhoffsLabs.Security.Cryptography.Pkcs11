@@ -29,7 +29,9 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(KerckhoffsL
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(System.ReadOnlySpan<byte> id, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key? key) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(string! label, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key? key) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenObject(KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! filter, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object? obj) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyAgreementKdfRequest.ReadBackFor.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyAgreementKdfRequest.ResultIsDerivationOnlySecret.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyTemplateRequest.ReadBackFor.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind?
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.VendorMechanismParameters.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.Pkcs11ParameterWriter! writer) -> void
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest!
 const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CK.CK_CERTIFICATE_CATEGORY_AUTHORITY = 2 -> ulong
