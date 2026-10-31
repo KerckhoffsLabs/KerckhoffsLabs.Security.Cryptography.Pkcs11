@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 using static KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.Pkcs11Operations;
@@ -366,8 +367,43 @@ internal sealed partial class Pkcs11SessionCore
     }
 
     /// <summary>
+    /// Runs <see cref="BuildSecureKeyDefaults"/> over every additional derived key an SP 800-108
+    /// mechanism requests (<c>CK_DERIVED_KEY</c>), so each sibling key is judged and defaulted exactly
+    /// like the primary one. Empty for any other mechanism.
+    /// </summary>
+    /// <remarks>
+    /// Every template is judged before anything is returned, so a refused sibling throws before the
+    /// token is asked to create any object. The returned attributes own unmanaged buffers and must be
+    /// disposed by the caller after the native call.
+    /// </remarks>
+    private ReadOnlyDisposableList<ReadOnlyDisposableList<ObjectAttribute>> BuildAdditionalDerivedKeyDefaults(Mechanism mechanism)
+    {
+        if (mechanism.Parameters is not CkmSp800108KdfParams { AdditionalDerivedKeyTemplates: { Count: > 0 } templates })
+            return ReadOnlyDisposableList<ReadOnlyDisposableList<ObjectAttribute>>.Empty;
+
+        var built = new ReadOnlyDisposableList<ObjectAttribute>[templates.Count];
+        int done = 0;
+        try
+        {
+            for (; done < templates.Count; done++)
+                built[done] = BuildSecureKeyDefaults([.. templates[done]], null);
+        }
+        finally
+        {
+            // A refused template leaves the defaults already built for the siblings before it unowned.
+            if (done < templates.Count)
+            {
+                for (int i = 0; i < done; i++)
+                    built[i].Dispose();
+            }
+        }
+        return ReadOnlyDisposableList<ReadOnlyDisposableList<ObjectAttribute>>.TakeOwnership(built);
+    }
+
+    /// <summary>
     /// Derives a key from a base key, creating a new key object. Secure defaults
-    /// (<c>CKA_SENSITIVE=true</c> / <c>CKA_EXTRACTABLE=false</c>) are applied to the result template;
+    /// (<c>CKA_SENSITIVE=true</c> / <c>CKA_EXTRACTABLE=false</c>) are applied to the result template
+    /// and to every SP 800-108 additional derived key template;
     /// an explicit insecure value requires a policy that permits it (see <see cref="ICryptoPolicy"/>).
     /// </summary>
     /// <param name="mechanism">Derivation mechanism</param>
@@ -386,13 +422,17 @@ internal sealed partial class Pkcs11SessionCore
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
-        using var scope = new SessionParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
-
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
-        // value requires a policy that permits it (throws otherwise). See BuildSecureKeyDefaults. Trusted internal
+        // value requires a policy that permits it (throws otherwise). See BuildSecureKeyDefaults.
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
+        // SP 800-108 can create sibling keys in the same call; each of their templates gets the same
+        // judgement and defaults, before anything reaches the token.
+        using ReadOnlyDisposableList<ReadOnlyDisposableList<ObjectAttribute>> siblingDefaults =
+            BuildAdditionalDerivedKeyDefaults(mechanism);
+
+        using var scope = new SessionParameterScope(this) { AdditionalDerivedKeyDefaults = siblingDefaults };
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, in ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, out NativeCULong derivedKey);
@@ -401,6 +441,7 @@ internal sealed partial class Pkcs11SessionCore
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
         GC.KeepAlive(secureDefaults);
+        GC.KeepAlive(siblingDefaults);
 
         // SP800-108 sibling-key handles live in scope-owned slots the token wrote into; copy them
         // out before `scope` is disposed.

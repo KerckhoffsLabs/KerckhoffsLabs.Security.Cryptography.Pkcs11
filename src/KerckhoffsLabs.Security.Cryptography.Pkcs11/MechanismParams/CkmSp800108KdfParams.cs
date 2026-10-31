@@ -136,6 +136,13 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     internal CKM PrfType => _prfType;
 
     /// <summary>
+    /// The caller's template for each additional derived key, in request order. The session judges
+    /// each one by the key-template policy and supplies its secure defaults before marshalling (see
+    /// <see cref="SessionParameterScope.AdditionalDerivedKeyDefaults"/>).
+    /// </summary>
+    internal IReadOnlyList<IReadOnlyList<ObjectAttribute>> AdditionalDerivedKeyTemplates => _retainedTemplates;
+
+    /// <summary>
     /// Turns the raw handles <see cref="AbsorbOutput"/> collected into <see cref="Pkcs11Key"/>
     /// instances, populating <see cref="AdditionalDerivedKeys"/>. Called by
     /// <see cref="Pkcs11Key.Derive"/> right after a successful <c>C_DeriveKey</c> call — the only
@@ -168,9 +175,10 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         IntPtr derivedKeys = IntPtr.Zero;
         if (_retainedTemplates.Count > 0)
         {
+            IReadOnlyList<IReadOnlyList<ObjectAttribute>>? defaults = AdditionalDerivedKeyDefaultsFor(scope);
             var entries = new CK_DERIVED_KEY[_retainedTemplates.Count];
             for (int j = 0; j < _retainedTemplates.Count; j++)
-                entries[j] = BuildDerivedKey(_retainedTemplates[j], scope);
+                entries[j] = BuildDerivedKey(_retainedTemplates[j], defaults?[j] ?? [], scope);
             derivedKeys = scope.WriteStructArray<CK_DERIVED_KEY>(entries);
         }
 
@@ -305,21 +313,47 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         };
     }
 
-    private static CK_DERIVED_KEY BuildDerivedKey(IReadOnlyList<ObjectAttribute> template, MechanismParameterScope scope)
+    /// <summary>
+    /// The secure defaults the session prepared for each additional derived key. A session call must
+    /// have judged every sibling template by the key-template policy first, so a session scope without
+    /// them is refused rather than letting the templates reach the token unchecked. A scope with no
+    /// session (hermetic marshalling) cannot reach a token and marshals the templates as given.
+    /// </summary>
+    private IReadOnlyList<IReadOnlyList<ObjectAttribute>>? AdditionalDerivedKeyDefaultsFor(MechanismParameterScope scope)
     {
-        IntPtr templatePtr = IntPtr.Zero;
-        if (template.Count > 0)
+        if (scope is not SessionParameterScope sessionScope)
+            return null;
+
+        if (sessionScope.AdditionalDerivedKeyDefaults is not { } defaults || defaults.Count != _retainedTemplates.Count)
         {
-            var attributes = new CK_ATTRIBUTE[template.Count];
+            throw new InvalidOperationException(
+                "SP 800-108 additional derived keys can only be requested through a key derivation " +
+                "(Pkcs11Key.Derive), which judges their templates by the session's crypto policy.");
+        }
+        return defaults;
+    }
+
+    private static CK_DERIVED_KEY BuildDerivedKey(
+        IReadOnlyList<ObjectAttribute> template, IReadOnlyList<ObjectAttribute> secureDefaults, MechanismParameterScope scope)
+    {
+        // The caller's attributes, then the secure defaults the session appended for any it omitted
+        // — the same layout the primary key's template gets.
+        int count = template.Count + secureDefaults.Count;
+        IntPtr templatePtr = IntPtr.Zero;
+        if (count > 0)
+        {
+            var attributes = new CK_ATTRIBUTE[count];
             for (int k = 0; k < template.Count; k++)
                 attributes[k] = template[k].CkAttribute;
+            for (int k = 0; k < secureDefaults.Count; k++)
+                attributes[template.Count + k] = secureDefaults[k].CkAttribute;
             templatePtr = scope.WriteStructArray<CK_ATTRIBUTE>(attributes);
         }
 
         return new CK_DERIVED_KEY
         {
             Template = templatePtr,
-            AttributeCount = (NativeCULong)(ulong)template.Count,
+            AttributeCount = (NativeCULong)(ulong)count,
             Key = scope.Allocate(UnmanagedMemory.NativeULongSize), // zero-filled = CK_INVALID_HANDLE
         };
     }

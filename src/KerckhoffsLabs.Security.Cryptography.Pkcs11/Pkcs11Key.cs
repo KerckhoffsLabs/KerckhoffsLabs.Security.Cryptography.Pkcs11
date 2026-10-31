@@ -883,14 +883,15 @@ public sealed partial class Pkcs11Key : IDisposable
 
     /// <summary>
     /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
-    /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
-    /// non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
+    /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template, and to the template of every
+    /// additional key an SP 800-108 mechanism requests (<see cref="Sp800108KdfBuilder.AddDerivedKey"/>);
+    /// deriving an extractable or non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
     /// uses the single handle; asymmetric uses the private handle (e.g. ECDH derives from the
     /// local private key — the peer's public point travels as a mechanism parameter, not a handle).
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <see langword="null"/>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the result <paramref name="template"/> or an SP 800-108 additional derived key's template requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the session's <see cref="Pkcs11Session.Policy"/> permits it. Nothing is created on the token.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
         => DeriveCore(mechanism, template);
