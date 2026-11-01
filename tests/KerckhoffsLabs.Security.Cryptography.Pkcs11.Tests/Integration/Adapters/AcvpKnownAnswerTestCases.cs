@@ -19,7 +19,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters
 /// AllowInsecure: they read a shared secret back, and some use 224-bit pre-hashes, which Recommended refuses.
 /// <c>notTakenBecause</c> declares a backend that refuses a key or a mechanism as something it does not take, as in
 /// <see cref="Mechanisms.AlgorithmConformanceTestCases"/>: the case then skips with that reason, an undeclared refusal
-/// fails, and a declared one that no longer happens fails so the declaration goes.
+/// fails, and a declared one that no longer happens fails so the declaration goes. A case with a context skips on a
+/// backend that declares it takes none (<see cref="IPkcs11Backend.SupportsPqcSignContext"/>); the empty-context cases
+/// cover it.
 /// </remarks>
 internal static class AcvpKnownAnswerTestCases
 {
@@ -101,13 +103,15 @@ internal static class AcvpKnownAnswerTestCases
 
     // ML-DSA.Sign (FIPS 204 §5.2) in its deterministic variant (rnd = 0^256) with the case's context: ACVP
     // ML-DSA-sigGen-FIPS204, deterministic external pure groups. CKH_DETERMINISTIC_REQUIRED asks the token for that
-    // variant, so its signature must be the published one byte for byte.
+    // variant, so its signature must be the published one byte for byte; the published signature must also verify
+    // under the published public key, which covers a valid signature without a context (ACVP's sigVer has none).
     internal static void Assert_MlDsa_DeterministicSignature_Acvp(IPkcs11Backend backend, string parameterSet, int tcId, string? notTakenBecause = null)
     {
         AcvpVectors.MlDsaSignature v = AcvpVectors.MlDsaDeterministicSignatures.Single(c => c.TcId == tcId);
         Assert.Equal(parameterSet, v.ParameterSet);
         backend.RequireMechanism(CKM.CKM_ML_DSA);
         var mechanism = new Mechanism(CKM.CKM_ML_DSA, new CkmPqcSignParams(CkhHedge.CKH_DETERMINISTIC_REQUIRED, v.Context));
+        RequireContextSupport(backend, v.Context);
 
         WithSession(backend, session =>
         {
@@ -119,12 +123,18 @@ internal static class AcvpKnownAnswerTestCases
             }, $"deterministic {parameterSet} signing with an imported key", notTakenBecause);
             if (notTakenBecause is not null)
                 Assert.Fail($"The backend now signs deterministic {parameterSet}; drop its notTakenBecause (\"{notTakenBecause}\").");
-            Assert.Equal(v.Signature, signature);
+            Assert.True(v.Signature.AsSpan().SequenceEqual(signature),
+                $"ACVP tcId {v.TcId}: the {parameterSet} deterministic signature differs from the published one.");
+
+            ObjectHandle pub = ImportPublicKey(session, CKK.CKK_ML_DSA, (ulong)MlDsaParameterSet(parameterSet), v.Pk);
+            try { Assert.True(session.Verify(mechanism, pub, v.Message, v.Signature), $"ACVP tcId {v.TcId}: the published signature does not verify."); }
+            finally { session.DestroyObject(pub); }
         });
     }
 
     private static void AssertVerifies(IPkcs11Backend backend, AcvpVectors.MlDsaVerification v, Mechanism mechanism, string? notTakenBecause)
     {
+        RequireContextSupport(backend, v.Context);
         WithSession(backend, session =>
         {
             bool verified = Taken(() =>
@@ -138,6 +148,13 @@ internal static class AcvpKnownAnswerTestCases
             Assert.True(verified == v.TestPassed,
                 $"ACVP tcId {v.TcId} ({v.Reason}): expected the signature to {(v.TestPassed ? "verify" : "be refused")}.");
         });
+    }
+
+    // A context is declared per backend: Craton HSM refuses a non-empty one rather than ignore it.
+    private static void RequireContextSupport(IPkcs11Backend backend, byte[] context)
+    {
+        if (context.Length > 0 && !backend.SupportsPqcSignContext)
+            Assert.Skip("The backend declares it takes no ML-DSA / SLH-DSA context (IPkcs11Backend.SupportsPqcSignContext).");
     }
 
     private static CkpMlDsa MlDsaParameterSet(string parameterSet) => parameterSet switch
