@@ -19,7 +19,13 @@ public sealed class HashPqcSignTests_FreeHsm(FreeHsmBackendFixture backend)
     public void HashSlhDsa_ExplicitHash_AgreesWithCombined(CKM hash, CKM combined) =>
         HashPqcSignTestCases.Assert_HashSlhDsa_ExplicitHash_AgreesWithCombined(_backend, hash, combined);
 
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
-    public void HashMlDsa_ExplicitHash_AgreesWithCombined() =>
-        HashPqcSignTestCases.Assert_HashMlDsa_ExplicitHash_AgreesWithCombined(_backend);
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(HashPqcSignTestCases.CombinedHashMlDsaMechanisms), MemberType = typeof(HashPqcSignTestCases))]
+    public void HashMlDsa_SignsAndVerifies(CKM combined) =>
+        HashPqcSignTestCases.Assert_HashMlDsa_SignsAndVerifies(_backend, combined);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(HashPqcSignTestCases.ExplicitHashMlDsaPairs), MemberType = typeof(HashPqcSignTestCases))]
+    public void HashMlDsa_ExplicitHash_AgreesWithCombined(CKM hash, CKM combined) =>
+        HashPqcSignTestCases.Assert_HashMlDsa_ExplicitHash_AgreesWithCombined(_backend, hash, combined);
 }
