@@ -77,6 +77,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Verbatim subsets of NIST ACVP-Server test vectors (FIPS 203 / 204 / 205), read by AcvpVectors.
+         Each file names its source file and commit. -->
+    <EmbeddedResource Include="Support\Vectors\Acvp\*.json" LogicalName="Acvp.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy" />
   </ItemGroup>
