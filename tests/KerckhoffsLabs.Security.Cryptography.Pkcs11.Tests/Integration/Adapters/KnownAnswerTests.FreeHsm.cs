@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
@@ -54,4 +55,26 @@ public sealed class KnownAnswerTests_FreeHsm(FreeHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(FreeHsmAvailable), Skip = "Requires " + nameof(FreeHsmAvailable))]
     public void EcdhP256_Kat() => KnownAnswerTestCases.Assert_EcdhP256_Kat(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmAvailable), Skip = "Requires " + nameof(FreeHsmAvailable))]
+    [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
+    public void AesEcb_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_ECB); KnownAnswerTestCases.Assert_AesEcb_Sp80038a_Kat(_backend, keyBits); }
+
+    [Theory(SkipUnless = nameof(FreeHsmAvailable), Skip = "Requires " + nameof(FreeHsmAvailable))]
+    [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
+    public void AesCbc_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_CBC); KnownAnswerTestCases.Assert_AesCbc_Sp80038a_Kat(_backend, keyBits); }
+
+    [Theory(SkipUnless = nameof(FreeHsmAvailable), Skip = "Requires " + nameof(FreeHsmAvailable))]
+    [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
+    public void AesCtr_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_CTR); KnownAnswerTestCases.Assert_AesCtr_Sp80038a_Kat(_backend, keyBits); }
+
+    [Fact(SkipUnless = nameof(FreeHsmAvailable), Skip = "Requires " + nameof(FreeHsmAvailable))]
+    public void TripleDesEcb_Kat() { _backend.RequireMechanism(CKM.CKM_DES3_ECB); KnownAnswerTestCases.Assert_TripleDesEcb_Kat(_backend); }
+
+    [Fact(SkipUnless = nameof(FreeHsmAvailable), Skip = "Requires " + nameof(FreeHsmAvailable))]
+    public void TripleDesCbc_Kat() { _backend.RequireMechanism(CKM.CKM_DES3_CBC); KnownAnswerTestCases.Assert_TripleDesCbc_Kat(_backend); }
+
+    [Theory(SkipUnless = nameof(FreeHsmAvailable), Skip = "Requires " + nameof(FreeHsmAvailable))]
+    [MemberData(nameof(KnownAnswerTestCases.DesVariableKeyRounds), MemberType = typeof(KnownAnswerTestCases))]
+    public void DesEcb_Sp80020_Kat(string key, string ciphertext) { _backend.RequireMechanism(CKM.CKM_DES_ECB); KnownAnswerTestCases.Assert_DesEcb_Sp80020_Kat(_backend, key, ciphertext); }
 }
