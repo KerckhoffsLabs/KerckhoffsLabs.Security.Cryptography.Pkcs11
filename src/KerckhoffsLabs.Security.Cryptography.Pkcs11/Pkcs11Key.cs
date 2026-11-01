@@ -924,9 +924,19 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <c>CKM_SP800_108_FEEDBACK_KDF</c> and <c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c> with
     /// <see cref="CkmSp800108KdfParams"/> of the same mode and no additional derived keys. Anything else,
     /// a key-agreement mechanism above all, is refused before the policy or the token is consulted: the
-    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in covers KDF output and nothing else, and
-    /// never the raw shared secret of an ECDH derivation (use <see cref="DeriveRawSecret"/>, which the
+    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in never returns the raw shared secret of an
+    /// ECDH derivation (use <see cref="DeriveRawSecret"/>, which the
     /// <see cref="Policy.KeyMaterialExportKind.EcdhSharedSecret"/> opt-in governs).
+    /// </para>
+    /// <para>
+    /// It does return the KDF's output over <em>this</em> key, whatever this key is. Any derive-capable key
+    /// qualifies, a derivation-only secret too (the agreed secret of <see cref="DeriveSecretAgreement"/>), so
+    /// under a <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in the bytes returned for a mechanism
+    /// are the value of any key the token derives from this key with the same mechanism, sensitive or not:
+    /// <c>DeriveBytes(hkdf, 32)</c> on Z is the AES key <c>Derive(hkdf, aes256Template)</c> made from Z on the
+    /// token. Allow <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> only in sessions that need it, and keep
+    /// the base keys of on-token key schedules (agreed secrets, master keys) out of them; use separate derive
+    /// keys for the bytes you read.
     /// </para>
     /// <para>
     /// <c>CKM_HKDF_DATA</c> is refused: PKCS#11 has it make a data object, which the secret-key read-back

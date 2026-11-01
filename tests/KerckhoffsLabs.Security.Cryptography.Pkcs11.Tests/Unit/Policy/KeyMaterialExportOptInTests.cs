@@ -838,6 +838,36 @@ public sealed class KeyMaterialExportOptInTests
             Assert.Equal(2, module.EcParamsReads);
         });
 
+    // === What a KdfOutput opt-in really allows ====================================================
+
+    // Pinned on purpose: a KdfOutput opt-in lets DeriveBytes run a KDF over ANY derive-capable key the
+    // session can use, the agreed secret Z of DeriveSecretAgreement included. Its output for the same
+    // mechanism IS the value of a key the token derived as sensitive from that base, so the opt-in can
+    // reproduce such a key's bytes. The docs say so; keep KdfOutput sessions away from those base keys.
+    [Fact]
+    public void KdfOutputOptIn_DeriveBytesOverAnAgreedSecret_ReproducesTheSensitiveKeyDerivedFromIt() =>
+        WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
+        {
+            using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            using Pkcs11Key z = alice.DeriveSecretAgreement(bob.ExportSubjectPublicKeyInfo());
+
+            // A sensitive, non-extractable MAC key, derived on the token: its value never leaves it...
+            using var macTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Sign().Build();
+            using Pkcs11Key macKey = z.Derive(HkdfMechanism(), macTemplate);
+            using (var attrs = macKey.GetAttributeValue(CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE))
+            {
+                Assert.True(attrs[0].GetValueAsBool());
+                Assert.False(attrs[1].GetValueAsBool());
+            }
+            byte[] tag = macKey.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), "probe"u8.ToArray());
+
+            // ...but the same KDF over the same base, read back under the KdfOutput opt-in, is that value.
+            byte[] bytes = z.DeriveBytes(HkdfMechanism(), 32);
+
+            Assert.Equal(tag, HMACSHA256.HashData(bytes, "probe"u8));
+        });
+
     // === A read-back template is still judged by the template rule, but for sensitivity ==========
 
     // A template rule that refuses CKA_VALUE_LEN above 32 bytes, and records what it was shown (the

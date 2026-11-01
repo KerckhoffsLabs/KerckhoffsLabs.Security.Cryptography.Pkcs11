@@ -159,12 +159,14 @@ continue one PBKDF2 byte stream across several output chunks.
 <a id="KLPKCS11012"></a>
 ### KLPKCS11012 — Secret key material export opted in
 
-Reported by an analyzer at every `KeyMaterialExportRule.Allow(kinds, rationale)` call site. `Allow` is the
+Reported by an analyzer at every `KeyMaterialExportRule.Allow(kinds, rationale)` call site, and at every
+method-group reference to it (`Func<…> allow = KeyMaterialExportRule.Allow;`). `Allow` is the
 one way to let a policy read secret key material off the token in the clear: a raw ECDH / X25519 / X448
 shared secret (`EcdhSharedSecret`), a KEM shared secret (`KemSharedSecret`), or KDF output
 (`KdfOutput`). Every built-in policy refuses all three, because once the bytes are in managed memory the
 token can no longer protect them. The message names the kinds when they are written in the source
-(`[KeyMaterialExportKind.KdfOutput]`), and says "the listed kinds" when they are only known at run time.
+(`[KeyMaterialExportKind.KdfOutput]`), and says "the listed kinds" when they are only known at run time (a
+method group always reads so).
 
 It is a warning, not an error and not an `[Obsolete]`: some protocols need the bytes (an interop
 library whose contract returns a shared secret, a value the protocol sends or compares), and `Allow` is
@@ -185,8 +187,12 @@ ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
 ```
 
 Suppressing the diagnostic changes nothing at run time: the policy still allows only the kinds named,
-and every export it allows also logs a `KeyMaterialExportAllowed` warning (the kind and the policy name,
-never the secret). See [Reading secret key material off the token](crypto-policies.md#reading-secret-key-material-off-the-token).
+and the exports it allows are logged once the secret has been read: a `KeyMaterialExportAllowed` warning
+for the first export of each kind under the policy on a session, then the same line at Debug for every later
+one (the kind and the policy name, never the secret). `KdfOutput` is the broadest kind: it reads a KDF's
+output over any derive-capable key the session can use, so it can reproduce the bytes of keys the token
+derives as sensitive from the same base; see the warning in
+[Reading secret key material off the token](crypto-policies.md#reading-secret-key-material-off-the-token).
 
 ## Runtime-only gates
 
