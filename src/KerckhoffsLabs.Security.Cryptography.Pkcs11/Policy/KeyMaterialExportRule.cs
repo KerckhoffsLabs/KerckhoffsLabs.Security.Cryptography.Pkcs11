@@ -32,9 +32,9 @@ public sealed class KeyMaterialExportRule
         ArgumentException.ThrowIfNullOrWhiteSpace(rationale);
         KeyMaterialExportKind[] copy = [.. kinds.Distinct().Order()];
         if (copy.Length == 0) throw new ArgumentException("At least one kind must be named.", nameof(kinds));
-        foreach (KeyMaterialExportKind kind in copy)
+        foreach (KeyMaterialExportKind kind in copy.Where(k => !Enum.IsDefined(k)))
         {
-            if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kinds), kind, "Not a defined KeyMaterialExportKind.");
+            throw new ArgumentOutOfRangeException(nameof(kinds), kind, "Not a defined KeyMaterialExportKind.");
         }
         HashSet<KeyMaterialExportKind> allowed = [.. copy];
         return new(
