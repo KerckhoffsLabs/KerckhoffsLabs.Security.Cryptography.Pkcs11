@@ -74,6 +74,12 @@ public static class CryptoPolicy
     /// When <c>AllowInsecure</c> is still needed, prefer a scoped
     /// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease over opening a whole session
     /// under it.
+    /// <para>
+    /// It lets PKCS#1 v1.5 decryption (<c>CKM_RSA_PKCS</c>) through. On a token that implements implicit
+    /// rejection, invalid padding then returns a synthetic plaintext instead of failing, so never treat the
+    /// success or failure of that decryption as a signal; see
+    /// <see href="https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#pkcs1-implicit-rejection">KLPKCS11008</see>.
+    /// </para>
     /// </remarks>
     public static ICryptoPolicy AllowInsecure { get; } = new AllowInsecurePolicy();
 }

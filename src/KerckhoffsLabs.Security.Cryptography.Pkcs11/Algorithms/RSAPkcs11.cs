@@ -297,18 +297,19 @@ public sealed class RSAPkcs11 : RSA
     /// otherwise answer it with a plaintext. <see cref="Pkcs11Key.Decrypt"/> checks it.
     /// </para>
     /// <para>
-    /// With PKCS#1 v1.5 padding, invalid padding does not necessarily throw. Some tokens implement
-    /// <em>implicit rejection</em> (draft-irtf-cfrg-rsa-guidance), the Marvin-attack countermeasure:
-    /// instead of failing, <c>CKM_RSA_PKCS</c> returns a synthetic plaintext derived deterministically
-    /// from the private key and the ciphertext. SoftHSMv2, Kryoptic, NSS and openCryptoki were observed
-    /// to do this; BouncyHsm throws. This departs from the <see cref="RSA.Decrypt(byte[], RSAEncryptionPadding)"/>
-    /// contract, under which bad padding throws <see cref="CryptographicException"/>.
+    /// With PKCS#1 v1.5 padding, invalid padding does not necessarily throw. Tokens that implement
+    /// <em>implicit rejection</em> (draft-irtf-cfrg-rsa-guidance), the Marvin-attack countermeasure,
+    /// return a synthetic plaintext derived deterministically from the private key and the ciphertext,
+    /// where the <see cref="RSA.Decrypt(byte[], RSAEncryptionPadding)"/> contract expects a
+    /// <see cref="CryptographicException"/>. Which tokens do so is listed under
+    /// <see href="https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#pkcs1-implicit-rejection">KLPKCS11008</see>.
     /// </para>
     /// <para>
-    /// Never use the success or failure of PKCS#1 v1.5 decryption as a signal. A returned value is
-    /// not evidence that the ciphertext was well formed, and where the token throws, any observable
-    /// difference between the two outcomes is a Bleichenbacher padding oracle. Use OAEP
-    /// (<see cref="RSAEncryptionPadding.OaepSHA256"/>), whose padding check fails with an exception.
+    /// Never use the success or failure of PKCS#1 v1.5 decryption as a signal. A returned value is not
+    /// evidence that the ciphertext was well formed, and where the token throws, any observable difference
+    /// between the two outcomes is a Bleichenbacher padding oracle. Use OAEP
+    /// (<see cref="RSAEncryptionPadding.OaepSHA256"/>), and answer its decoding failures uniformly too:
+    /// the same response and timing for every failure, or the caller rebuilds a Manger oracle.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <see langword="null"/>.</exception>
