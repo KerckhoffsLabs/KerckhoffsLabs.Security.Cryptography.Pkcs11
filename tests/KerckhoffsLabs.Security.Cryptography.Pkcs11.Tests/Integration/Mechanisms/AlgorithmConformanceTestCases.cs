@@ -72,6 +72,20 @@ internal static class AlgorithmConformanceTestCases
         }
     }
 
+    // Runs create. A refusal as something the module does not take skips with the reason the wrapper declared,
+    // and fails when it declared none: see Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer.
+    private static T Taken<T>(Func<T> create, string what, string? notTakenBecause)
+    {
+        try { return create(); }
+        catch (Pkcs11Exception ex) when (NotTaken.Contains(ex.ReturnValue))
+        {
+            if (notTakenBecause is null)
+                Assert.Fail($"The backend refused {what} ({ex.ReturnValue}); if it does not take it, declare that in its test wrapper.");
+            Assert.Skip(notTakenBecause);
+            throw;
+        }
+    }
+
     // A template that disposes its attributes with it.
     private sealed class Template(List<ObjectAttribute> attributes) : IDisposable
     {
@@ -530,12 +544,12 @@ internal static class AlgorithmConformanceTestCases
 
     // === EdDSA ==================================================================
 
-    public static TheoryData<string> EdDsaVariants => ["Ed25519ctx", "Ed25519ph", "Ed448", "Ed448ph"];
+    public static TheoryData<string> EdDsaVariants => ["Ed25519ctx", "Ed25519ph", "Ed448", "Ed448ctx", "Ed448ph"];
 
     private sealed record EdDsaVector(byte[] Oid, string Secret, string Public, string Message, string Signature, CkmEddsaParams Parameters);
 
-    // RFC 8032 §7.2 (Ed25519ctx, context "foo"), §7.3 (Ed25519ph, "abc"), §7.4 (Ed448, the 1-octet message) and
-    // §7.5 (Ed448ph, "abc").
+    // RFC 8032 §7.2 (Ed25519ctx, context "foo"), §7.3 (Ed25519ph, "abc"), §7.4 (Ed448, the 1-octet message, without
+    // and with context "foo") and §7.5 (Ed448ph, "abc").
     private static EdDsaVector EdDsaVectorFor(string variant) => variant switch
     {
         "Ed25519ctx" => new([0x06, 0x03, 0x2B, 0x65, 0x70],
@@ -557,6 +571,12 @@ internal static class AlgorithmConformanceTestCases
             "26b8f91727bd62897af15e41eb43c377efb9c610d48f2335cb0bd0087810f4352541b143c4b981b7e18f62de8ccdf633fc1bf037ab7cd779805e0dbcc0aae1cbcee1afb2e027df36bc04dcecbf154336c19f0af7e0a6472905e799f1953d2a0ff3348ab21aa4adafd1d234441cf807c03a00",
             // Ed448 has no parameter-less form (PKCS#11 v3.2 §6.3.15): pure Ed448 is phFlag false, no context.
             new CkmEddsaParams(phFlag: false)),
+        "Ed448ctx" => new([0x06, 0x03, 0x2B, 0x65, 0x71],
+            "c4eab05d357007c632f3dbb48489924d552b08fe0c353a0d4a1f00acda2c463afbea67c5e8d2877c5e3bc397a659949ef8021e954e0a12274e",
+            "43ba28f430cdff456ae531545f7ecd0ac834a55d9358c0372bfa0c6c6798c0866aea01eb00742802b8438ea4cb82169c235160627b4c3a9480",
+            "03",
+            "d4f8f6131770dd46f40867d6fd5d5055de43541f8c5e35abbcd001b32a89f7d2151f7647f11d8ca2ae279fb842d607217fce6e042f6815ea000c85741de5c8da1144a6a1aba7f96de42505d7a7298524fda538fccbbb754f578c1cad10d54d0d5428407e85dcbc98a49155c13764e66c3c00",
+            new CkmEddsaParams(phFlag: false, "foo"u8)),
         "Ed448ph" => new([0x06, 0x03, 0x2B, 0x65, 0x71],
             "833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42ef7822e0d5104127dc05d6dbefde69e3ab2cec7c867c6e2c49",
             "259b71c19f83ef77a7abd26524cbdb3161b590a48f7d17de3ee0ba9c52beb743c09428a131d6b1b57303d90d8132c276d5ed3d5d01c0f53880",
@@ -569,7 +589,11 @@ internal static class AlgorithmConformanceTestCases
     // EdDSA is deterministic, so the token signs RFC 8032's message to RFC 8032's signature, under the variant's
     // CK_EDDSA_PARAMS, and verifies it; a signature with one byte changed does not verify. signsPureEdDsa records a
     // module that ignores the parameters: its signature is then the pure EdDSA one, the one it makes without them.
-    internal static void Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer(IPkcs11Backend backend, string variant, bool signsPureEdDsa = false)
+    // notTakenBecause declares that the backend refuses this variant (its key or its signing) as something it does
+    // not take, and why. The case then skips with that reason. A refusal not declared fails, so a backend cannot
+    // drop a variant silently, and a declared refusal that no longer happens fails too, so the declaration goes.
+    internal static void Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer(
+        IPkcs11Backend backend, string variant, bool signsPureEdDsa = false, string? notTakenBecause = null)
     {
         backend.RequireMechanism(CKM.CKM_EDDSA);
         EdDsaVector v = EdDsaVectorFor(variant);
@@ -590,12 +614,14 @@ internal static class AlgorithmConformanceTestCases
                 new(CKA.CKA_TOKEN, false), new(CKA.CKA_VERIFY, true), new(CKA.CKA_EC_PARAMS, v.Oid),
                 new(CKA.CKA_EC_POINT, backend.EcxPointIsDerEncoded ? [0x04, (byte)point.Length, .. point] : point),
             ]);
-            ObjectHandle priv = OrSkip(() => session.CreateObject(privateTemplate.Attributes), $"an {variant} key");
+            ObjectHandle priv = Taken(() => session.CreateObject(privateTemplate.Attributes), $"an {variant} key", notTakenBecause);
             ObjectHandle pub = session.CreateObject(publicTemplate.Attributes);
             try
             {
                 var eddsa = new Mechanism(CKM.CKM_EDDSA, v.Parameters);
-                byte[] signature = OrSkip(() => session.Sign(eddsa, priv, message), $"{variant} signing");
+                byte[] signature = Taken(() => session.Sign(eddsa, priv, message), $"{variant} signing", notTakenBecause);
+                if (notTakenBecause is not null)
+                    Assert.Fail($"The backend now takes {variant}; drop its notTakenBecause (\"{notTakenBecause}\").");
                 if (signsPureEdDsa)
                 {
                     Assert.NotEqual(expected, signature);

@@ -21,9 +21,17 @@ public sealed class AlgorithmConformanceTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void RsaOaep_TransportsAnAesKey() => AlgorithmConformanceTestCases.Assert_RsaOaep_TransportsAnAesKey(_backend);
 
+    // NSS's C_CreateObject refuses the id-Ed448 OID, and its C_SignInit refuses any CK_EDDSA_PARAMS that selects
+    // Ed25519ctx or Ed25519ph.
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EdDsaVariants), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void EdDsa_Rfc8032Variant_SignsTheKnownAnswer(string variant) => AlgorithmConformanceTestCases.Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer(_backend, variant);
+    public void EdDsa_Rfc8032Variant_SignsTheKnownAnswer(string variant) =>
+        AlgorithmConformanceTestCases.Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer(_backend, variant, notTakenBecause: variant switch
+        {
+            "Ed448" or "Ed448ctx" or "Ed448ph" => "NSS does not take an Ed448 key (CKR_DOMAIN_PARAMS_INVALID).",
+            "Ed25519ctx" or "Ed25519ph" => "NSS signs pure Ed25519 only: CK_EDDSA_PARAMS with a context or phFlag is CKR_MECHANISM_PARAM_INVALID.",
+            _ => null,
+        });
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdsaCurves), MemberType = typeof(AlgorithmConformanceTestCases))]
