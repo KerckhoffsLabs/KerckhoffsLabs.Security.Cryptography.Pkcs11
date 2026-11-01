@@ -168,36 +168,88 @@ internal static class EncapsulateKeyTestCases
         using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
-            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
-            using var encTemplate = AesSharedKeyTemplate(algorithm.SharedSecretSizeInBytes, valueLen: true);
-            var (ciphertext, encKey) = key.EncapsulateKey(mechanism, encTemplate, algorithm.CiphertextSizeInBytes);
-            try
-            {
-                Assert.Equal(algorithm.CiphertextSizeInBytes, ciphertext.Length);
-                using Pkcs11Key decKey = DecapsulateAesKey(key, mechanism, ciphertext, algorithm.SharedSecretSizeInBytes);
-                try
-                {
-                    AssertStaysOnToken(encKey, tokenKeepsSensitive);
-                    AssertStaysOnToken(decKey, tokenKeepsSensitive);
-
-                    byte[] iv = RandomNumberGenerator.GetBytes(12);
-                    byte[] plaintext = "ML-KEM shared secret, kept on the token"u8.ToArray();
-                    byte[] sealedData = encKey.Encrypt(AesGcm(iv), plaintext);
-                    Assert.Equal(plaintext, decKey.Decrypt(AesGcm(iv), sealedData));
-                }
-                finally
-                {
-                    decKey.Destroy();
-                }
-            }
-            finally
-            {
-                using (encKey) { encKey.Destroy(); }
-            }
+            AssertRoundTripsToNonExtractableAesKey(
+                key, new Mechanism(CKM.CKM_ML_KEM), algorithm.CiphertextSizeInBytes, tokenKeepsSensitive);
         }
         finally
         {
             key.Destroy();
+        }
+    }
+
+    public static TheoryData<string> MontgomeryCurves => ["X25519", "X448"];
+
+    // The same on-token round trip as ML-KEM's, with CKM_ECDH1_DERIVE on a Montgomery key pair: the token
+    // generates the ephemeral key against the recipient's curve (pPublicData empty, PKCS#11 v3.2 §5.18.10) and
+    // the ciphertext is its public key. A token may give Montgomery keys an encapsulation path of their own
+    // (BouncyHsm does), separate from the P-256 one Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips covers.
+    // tokenKeepsSensitive: as for the ML-KEM case.
+    internal static void Assert_Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(
+        IPkcs11Backend backend, string curve, bool tokenKeepsSensitive = true)
+    {
+        byte oid = curve switch
+        {
+            "X25519" => 0x6E,
+            "X448" => 0x6F,
+            _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, null),
+        };
+        backend.RequireMechanism(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN);
+        RequireEncapsulation(backend, CKM.CKM_ECDH1_DERIVE);
+        backend.RequireMechanism(CKM.CKM_AES_GCM);
+        using var session = OpenSession(backend);
+
+        string label = $"encap-{curve.ToLowerInvariant()}-{Guid.NewGuid():N}";
+        byte[] id = TestKeys.IdFor(label);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC_MONTGOMERY)
+            .Label(label).Id(id).EcParams([0x06, 0x03, 0x2B, 0x65, oid])
+            .Attribute(CKA.CKA_ENCAPSULATE, true).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC_MONTGOMERY)
+            .Label(label).Id(id)
+            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
+
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN), pubTpl, privTpl);
+        try
+        {
+            var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForEncapsulation(CKD.CKD_SHA256_KDF));
+            AssertRoundTripsToNonExtractableAesKey(key, mechanism, expectedCiphertextLength: 0, tokenKeepsSensitive);
+        }
+        finally
+        {
+            key.Destroy();
+        }
+    }
+
+    // Encapsulates to, and decapsulates from, key into AES-256 shared keys that must stay on the token, and checks
+    // that the two agree: AES-GCM under one decrypts under the other. expectedCiphertextLength 0 checks no length.
+    private static void AssertRoundTripsToNonExtractableAesKey(
+        Pkcs11Key key, Mechanism mechanism, int expectedCiphertextLength, bool tokenKeepsSensitive)
+    {
+        const int SharedKeyLength = 32;
+        using var encTemplate = AesSharedKeyTemplate(SharedKeyLength, valueLen: true);
+        var (ciphertext, encKey) = key.EncapsulateKey(mechanism, encTemplate, expectedCiphertextLength);
+        try
+        {
+            if (expectedCiphertextLength != 0)
+                Assert.Equal(expectedCiphertextLength, ciphertext.Length);
+            using Pkcs11Key decKey = DecapsulateAesKey(key, mechanism, ciphertext, SharedKeyLength);
+            try
+            {
+                AssertStaysOnToken(encKey, tokenKeepsSensitive);
+                AssertStaysOnToken(decKey, tokenKeepsSensitive);
+
+                byte[] iv = RandomNumberGenerator.GetBytes(12);
+                byte[] plaintext = "shared secret, kept on the token"u8.ToArray();
+                byte[] sealedData = encKey.Encrypt(AesGcm(iv), plaintext);
+                Assert.Equal(plaintext, decKey.Decrypt(AesGcm(iv), sealedData));
+            }
+            finally
+            {
+                decKey.Destroy();
+            }
+        }
+        finally
+        {
+            using (encKey) { encKey.Destroy(); }
         }
     }
 

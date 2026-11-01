@@ -16,6 +16,10 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
 
     private const string Rfc8410Pkcs8 = "PKCS#8 for Ed25519 and X25519 private keys arrived in 3.131 (Bug 1993638)";
 
+    // NSS takes no X448 key: C_GenerateKeyPair refuses the id-X448 OID with CKR_DOMAIN_PARAMS_INVALID, and
+    // C_UnwrapKey of an X448 PKCS#8 answers CKR_TEMPLATE_INCOMPLETE.
+    public static bool SupportsX448 => false;
+
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Unwrap_Rfc8410Ed25519Key_SignsTheRfc8032Signature()
     {
@@ -37,6 +41,13 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
         WrapUnwrapCurve25519TestCases.Assert_Unwrap_Rfc8410X25519Key_AgreesTheRfc7748Secret(_backend);
     }
 
+    [Fact(SkipUnless = nameof(SupportsX448), Skip = "Requires " + nameof(SupportsX448))]
+    public void Unwrap_Rfc8410X448Key_AgreesTheRfc7748Secret()
+    {
+        _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
+        WrapUnwrapCurve25519TestCases.Assert_Unwrap_Rfc8410X448Key_AgreesTheRfc7748Secret(_backend);
+    }
+
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void WrapUnwrap_Ed25519PrivateKey_KeepsTheKey()
     {
@@ -49,5 +60,12 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     {
         _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
         WrapUnwrapCurve25519TestCases.Assert_WrapUnwrap_X25519PrivateKey_AgreesLikeTheOriginal(_backend);
+    }
+
+    [Fact(SkipUnless = nameof(SupportsX448), Skip = "Requires " + nameof(SupportsX448))]
+    public void WrapUnwrap_X448PrivateKey_AgreesLikeTheOriginal()
+    {
+        _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
+        WrapUnwrapCurve25519TestCases.Assert_WrapUnwrap_X448PrivateKey_AgreesLikeTheOriginal(_backend);
     }
 }

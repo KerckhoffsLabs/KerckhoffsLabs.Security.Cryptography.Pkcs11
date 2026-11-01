@@ -1036,42 +1036,58 @@ internal static class AlgorithmConformanceTestCases
         });
     }
 
-    // X25519 with a peer key of small order agrees the all-zero secret, which RFC 7748 §6.1 tells an
-    // implementation to check for and refuse. acceptsLowOrderPeer records a module that derives it anyway; the
-    // case then pins that the secret it derived is the zero one.
-    internal static void Assert_X25519_LowOrderPeer_IsRefused(IPkcs11Backend backend, bool acceptsLowOrderPeer = false)
+    // A Montgomery peer key of small order agrees the all-zero secret, which RFC 7748 §6.1 (X25519) and §6.2
+    // (X448) tell an implementation to check for and refuse. acceptsLowOrderPeer records a module that derives it
+    // anyway; the case then pins that the secret it derived is the zero one.
+    internal static void Assert_X25519_LowOrderPeer_IsRefused(IPkcs11Backend backend, bool acceptsLowOrderPeer = false) =>
+        AssertMontgomeryLowOrderPeerIsRefused(backend, 0x6E, 32, acceptsLowOrderPeer, notTakenBecause: null);
+
+    // notTakenBecause: as for Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer, for a backend that takes no X448 key.
+    internal static void Assert_X448_LowOrderPeer_IsRefused(IPkcs11Backend backend, bool acceptsLowOrderPeer = false, string? notTakenBecause = null) =>
+        AssertMontgomeryLowOrderPeerIsRefused(backend, 0x6F, 56, acceptsLowOrderPeer, notTakenBecause);
+
+    private static void AssertMontgomeryLowOrderPeerIsRefused(
+        IPkcs11Backend backend, byte oid, int length, bool acceptsLowOrderPeer, string? notTakenBecause)
     {
         backend.RequireMechanisms(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_SHA256_HMAC);
-        byte[] x25519 = [0x06, 0x03, 0x2B, 0x65, 0x6E];
+        byte[] ecParams = [0x06, 0x03, 0x2B, 0x65, oid];
+        string curve = oid == 0x6E ? "X25519" : "X448";
         WithSession(backend, session =>
         {
             using var pubTemplate = new Template(
             [
                 new(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_EC_MONTGOMERY),
-                new(CKA.CKA_TOKEN, false), new(CKA.CKA_EC_PARAMS, x25519),
+                new(CKA.CKA_TOKEN, false), new(CKA.CKA_EC_PARAMS, ecParams),
             ]);
             using var privTemplate = new Template(
             [
                 new(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_EC_MONTGOMERY),
                 new(CKA.CKA_TOKEN, false), new(CKA.CKA_SENSITIVE, true), new(CKA.CKA_DERIVE, true),
             ]);
-            session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN), pubTemplate.Attributes, privTemplate.Attributes, out ObjectHandle pub, out ObjectHandle priv);
+            var (pub, priv) = Taken(() =>
+            {
+                session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN), pubTemplate.Attributes, privTemplate.Attributes, out ObjectHandle p, out ObjectHandle k);
+                return (p, k);
+            }, $"an {curve} key pair", notTakenBecause);
             try
             {
+                if (notTakenBecause is not null)
+                    Assert.Fail($"The backend now takes {curve} keys; drop its notTakenBecause (\"{notTakenBecause}\").");
                 using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-                // u = 0, a point of order 1 (RFC 7748 §6.1; the first of the small-order points in the Curve25519 list).
-                var ecdh = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, new byte[32]));
+                // u = 0, a point of order 1 (RFC 7748 §6.1 / §6.2; the first of the small-order points).
+                var ecdh = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, new byte[length]));
                 if (acceptsLowOrderPeer)
-                    Assert.Equal(HMACSHA256.HashData(new byte[32], Message), HmacOfDerived(session, ecdh, priv, 32));
+                    Assert.Equal(HMACSHA256.HashData(new byte[length], Message), HmacOfDerived(session, ecdh, priv, (ulong)length));
                 else
-                    Assert.ThrowsAny<Pkcs11Exception>(() => HmacOfDerived(session, ecdh, priv, 32));
+                    Assert.ThrowsAny<Pkcs11Exception>(() => HmacOfDerived(session, ecdh, priv, (ulong)length));
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         });
     }
 
-    // X448, RFC 7748 §6.2: Alice's private key and Bob's public key agree the published secret.
-    internal static void Assert_X448_Rfc7748_AgreesTheKnownSecret(IPkcs11Backend backend)
+    // X448, RFC 7748 §6.2: Alice's private key and Bob's public key agree the published secret. notTakenBecause:
+    // as for Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer, for a backend that takes no X448 key.
+    internal static void Assert_X448_Rfc7748_AgreesTheKnownSecret(IPkcs11Backend backend, string? notTakenBecause = null)
     {
         backend.RequireMechanisms(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_SHA256_HMAC);
         byte[] alicePrivate = Convert.FromHexString("9a8f4925d1519f5775cf46b04b5800d4ee9ee8bae8bc5565d498c28dd9c9baf574a9419744897391006382a6f127ab1d9ac2d8c0a598726b");
@@ -1085,9 +1101,11 @@ internal static class AlgorithmConformanceTestCases
                 new(CKA.CKA_TOKEN, false), new(CKA.CKA_DERIVE, true),
                 new(CKA.CKA_EC_PARAMS, (byte[])[0x06, 0x03, 0x2B, 0x65, 0x6F]), new(CKA.CKA_VALUE, alicePrivate),
             ]);
-            ObjectHandle priv = OrSkip(() => session.CreateObject(template.Attributes), "an X448 key");
+            ObjectHandle priv = Taken(() => session.CreateObject(template.Attributes), "an X448 key", notTakenBecause);
             try
             {
+                if (notTakenBecause is not null)
+                    Assert.Fail($"The backend now takes X448 keys; drop its notTakenBecause (\"{notTakenBecause}\").");
                 using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
                 var ecdh = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, bobPublic));
                 Assert.Equal(HMACSHA256.HashData(secret, Message), HmacOfDerived(session, ecdh, priv, 56));

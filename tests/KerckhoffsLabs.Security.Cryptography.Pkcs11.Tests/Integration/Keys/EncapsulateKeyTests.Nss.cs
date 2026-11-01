@@ -22,6 +22,11 @@ public sealed class EncapsulateKeyTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
     public void Ecdh1_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(_backend);
 
+    [Theory(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
+    [MemberData(nameof(EncapsulateKeyTestCases.MontgomeryCurves), MemberType = typeof(EncapsulateKeyTestCases))]
+    public void Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(string curve) =>
+        EncapsulateKeyTestCases.Assert_Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, curve);
+
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(EncapsulateKeyTestCases.MlKemParameterSets), MemberType = typeof(EncapsulateKeyTestCases))]
     public void MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(CkpMlKem parameterSet) =>

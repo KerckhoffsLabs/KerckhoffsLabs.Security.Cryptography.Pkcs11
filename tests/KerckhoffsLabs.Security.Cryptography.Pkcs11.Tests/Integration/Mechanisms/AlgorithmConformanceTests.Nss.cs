@@ -21,6 +21,8 @@ public sealed class AlgorithmConformanceTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void RsaOaep_TransportsAnAesKey() => AlgorithmConformanceTestCases.Assert_RsaOaep_TransportsAnAesKey(_backend);
 
+    private const string NoX448 = "NSS does not take an X448 key (CKR_DOMAIN_PARAMS_INVALID).";
+
     // NSS's C_CreateObject refuses the id-Ed448 OID, and its C_SignInit refuses any CK_EDDSA_PARAMS that selects
     // Ed25519ctx or Ed25519ph.
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
@@ -58,7 +60,10 @@ public sealed class AlgorithmConformanceTests_Nss(NssBackendFixture backend)
     public void X25519_LowOrderPeer_IsRefused() => AlgorithmConformanceTestCases.Assert_X25519_LowOrderPeer_IsRefused(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void X448_Rfc7748_AgreesTheKnownSecret() => AlgorithmConformanceTestCases.Assert_X448_Rfc7748_AgreesTheKnownSecret(_backend);
+    public void X448_LowOrderPeer_IsRefused() => AlgorithmConformanceTestCases.Assert_X448_LowOrderPeer_IsRefused(_backend, notTakenBecause: NoX448);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void X448_Rfc7748_AgreesTheKnownSecret() => AlgorithmConformanceTestCases.Assert_X448_Rfc7748_AgreesTheKnownSecret(_backend, notTakenBecause: NoX448);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Hkdf_Sha512_MatchesBcl() => AlgorithmConformanceTestCases.Assert_Hkdf_Sha512_MatchesBcl(_backend);
