@@ -637,23 +637,68 @@ public sealed class KeyMaterialExportOptInTests
             Assert.Null(module.DerivedWith);
         });
 
-    // Review Focus 5: u = 0 is the low-order point every X25519/X448 secret with it is all zero for. X25519
-    // ignores the top bit of the last byte (RFC 7748 §5), so 0x00…80 is u = 0 too.
-    public static TheoryData<string, string> ZeroPeers => new()
+    // Review Focus 5: every low-order u-coordinate gives an all-zero secret whatever the private key, so each
+    // is refused before the token sees it. X25519 (cofactor 8): 0, 1, the two points of order 8, p - 1, and
+    // the non-canonical p and p + 1; X25519 ignores the top bit of the last byte (RFC 7748 §5), so each with
+    // that bit set is the same point. X448 (cofactor 4): 0, 1, p - 1, p and p + 1. (Checked against an RFC 7748
+    // ladder: each gives 0 for random scalars.)
+    private static readonly string[] X25519LowOrderHex =
+    [
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0100000000000000000000000000000000000000000000000000000000000000",
+        "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+        "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+        "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    ];
+
+    private static readonly string[] X448LowOrderHex =
+    [
+        new string('0', 112),
+        "01" + new string('0', 110),
+        "fe" + string.Concat(Enumerable.Repeat("ff", 27)) + "fe" + string.Concat(Enumerable.Repeat("ff", 27)),
+        "ff" + string.Concat(Enumerable.Repeat("ff", 27)) + "fe" + string.Concat(Enumerable.Repeat("ff", 27)),
+        new string('0', 56) + string.Concat(Enumerable.Repeat("ff", 28)),
+    ];
+
+    public static TheoryData<string, string> LowOrderPeers()
     {
-        { "X25519", new string('0', 64) },
-        { "X25519", new string('0', 62) + "80" },
-        { "X448", new string('0', 112) },
-    };
+        var data = new TheoryData<string, string>();
+        foreach (string u in X25519LowOrderHex)
+        {
+            data.Add("X25519", u);
+            byte[] topBit = Convert.FromHexString(u);
+            topBit[^1] |= 0x80;
+            data.Add("X25519", Convert.ToHexString(topBit));
+        }
+        foreach (string u in X448LowOrderHex)
+            data.Add("X448", u);
+        return data;
+    }
 
     [Theory]
-    [MemberData(nameof(ZeroPeers))]
-    public void Montgomery_ZeroPeer_ThrowsPkcs11ArgumentException(string curve, string peerHex)
+    [MemberData(nameof(LowOrderPeers))]
+    public void Montgomery_LowOrderPeer_ThrowsPkcs11ArgumentException(string curve, string peerHex)
     {
         (byte[] ecParams, string oid, _, byte[] shared) = Curve(curve);
         WithMontgomeryKey(ecParams, shared, OptIn(KeyMaterialExportKind.EcdhSharedSecret), (key, module) =>
         {
             Assert.Throws<Pkcs11ArgumentException>(() => key.DeriveRawSecret(MontgomerySpki(oid, Convert.FromHexString(peerHex))));
+            Assert.Null(module.DerivedWith);
+        });
+    }
+
+    // The one peer validation is shared: the agreement that keeps Z on the token refuses the same points,
+    // and has no all-zero check on the result to fall back on.
+    [Theory]
+    [MemberData(nameof(LowOrderPeers))]
+    public void Montgomery_DeriveSecretAgreement_LowOrderPeer_ThrowsPkcs11ArgumentException(string curve, string peerHex)
+    {
+        (byte[] ecParams, string oid, _, byte[] shared) = Curve(curve);
+        WithMontgomeryKey(ecParams, shared, CryptoPolicy.Recommended, (key, module) =>
+        {
+            Assert.Throws<Pkcs11ArgumentException>(() => key.DeriveSecretAgreement(MontgomerySpki(oid, Convert.FromHexString(peerHex))));
             Assert.Null(module.DerivedWith);
         });
     }
@@ -718,6 +763,79 @@ public sealed class KeyMaterialExportOptInTests
         {
             Assert.ThrowsAny<Pkcs11Exception>(() => key.DeriveRawSecret(MontgomerySpki("1.3.101.110", X25519BobPublic)));
             Assert.Null(module.DerivedWith);
+        });
+
+    // === DeriveSecretAgreement on a Montgomery key ================================================
+
+    private static bool TemplateBool(MontgomeryAgreementModule module, CKA type) =>
+        Assert.Single(module.DeriveTemplate, a => a.Type == type).Value.Any(b => b != 0);
+
+    // Z stays on the token, so no opt-in is needed: plain Recommended allows the derivation-only result.
+    [Theory]
+    [MemberData(nameof(MontgomeryCurves))]
+    public void Montgomery_DeriveSecretAgreement_DerivesADerivationOnlySecretFromTheRawUCoordinate(string curve)
+    {
+        (byte[] ecParams, string oid, byte[] peer, byte[] shared) = Curve(curve);
+        WithMontgomeryKey(ecParams, shared, CryptoPolicy.Recommended, (key, module) =>
+        {
+            using Pkcs11Key z = key.DeriveSecretAgreement(MontgomerySpki(oid, peer));
+
+            Assert.Equal(CKM.CKM_ECDH1_DERIVE, module.DerivedWith);
+            Assert.Equal(CKD.CKD_NULL, module.Kdf);
+            Assert.Equal(peer, module.PublicData);
+            Assert.Equal((ulong)shared.Length, module.ValueLen);
+            Assert.True(TemplateBool(module, CKA.CKA_SENSITIVE));
+            Assert.False(TemplateBool(module, CKA.CKA_EXTRACTABLE));
+            Assert.True(TemplateBool(module, CKA.CKA_DERIVE));
+            foreach (CKA usage in new[] { CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_SIGN, CKA.CKA_VERIFY, CKA.CKA_WRAP, CKA.CKA_UNWRAP })
+                Assert.False(TemplateBool(module, usage));
+            Assert.Empty(module.Destroyed);
+        });
+    }
+
+    [Theory]
+    [MemberData(nameof(WrongCurvePeers))]
+    public void X25519_DeriveSecretAgreement_WrongCurvePeer_ThrowsPkcs11ArgumentException(string peer)
+    {
+        byte[] spki = peer switch
+        {
+            "X448 peer" => MontgomerySpki("1.3.101.111", X448BobPublic),
+            "Ed25519 peer" => MontgomerySpki("1.3.101.112", X25519BobPublic),
+            _ => ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256).ExportSubjectPublicKeyInfo(),
+        };
+        WithMontgomeryKey(X25519Oid, X25519Shared, CryptoPolicy.Recommended, (key, module) =>
+        {
+            Assert.Throws<Pkcs11ArgumentException>(() => key.DeriveSecretAgreement(spki));
+            Assert.Null(module.DerivedWith);
+        });
+    }
+
+    // The local curve is read once per key: CKA_EC_PARAMS cannot change, and re-parsing it per agreement
+    // is a token round trip for nothing.
+    [Fact]
+    public void Montgomery_LocalCurve_IsReadOncePerKey() =>
+        WithMontgomeryKey(X25519Oid, X25519Shared, OptIn(KeyMaterialExportKind.EcdhSharedSecret), (key, module) =>
+        {
+            byte[] spki = MontgomerySpki("1.3.101.110", X25519BobPublic);
+
+            key.DeriveRawSecret(spki);
+            key.DeriveRawSecret(spki);
+            using (key.DeriveSecretAgreement(spki)) { }
+
+            Assert.Equal(1, module.EcParamsReads);
+        });
+
+    // A failed read is not cached: the next agreement reads the attribute again.
+    [Fact]
+    public void Montgomery_UnknownLocalCurve_IsNotCached() =>
+        WithMontgomeryKey([0x06, 0x03, 0x2B, 0x65, 0x70], X25519Shared, OptIn(KeyMaterialExportKind.EcdhSharedSecret), (key, module) =>
+        {
+            byte[] spki = MontgomerySpki("1.3.101.110", X25519BobPublic);
+
+            Assert.ThrowsAny<Pkcs11Exception>(() => key.DeriveRawSecret(spki));
+            Assert.ThrowsAny<Pkcs11Exception>(() => key.DeriveSecretAgreement(spki));
+
+            Assert.Equal(2, module.EcParamsReads);
         });
 
     // === A read-back template is still judged by the template rule, but for sensitivity ==========
