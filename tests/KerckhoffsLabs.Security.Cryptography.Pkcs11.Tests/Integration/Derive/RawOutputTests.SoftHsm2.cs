@@ -21,5 +21,14 @@ public sealed class RawOutputTests_SoftHsm(SoftHsmBackendFixture backend)
     public void X25519_ZeroPeer_Throws() => RawOutputTestCases.Assert_X25519_ZeroPeer_Throws(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void X25519_DeriveSecretAgreement_ThenHkdf_MatchesRfc7748() => RawOutputTestCases.Assert_X25519_DeriveSecretAgreement_ThenHkdf_MatchesRfc7748(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void X448_DeriveSecretAgreement_ThenHkdf_MatchesRfc7748() => RawOutputTestCases.Assert_X448_DeriveSecretAgreement_ThenHkdf_MatchesRfc7748(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void X25519_DeriveSecretAgreement_LowOrderPeer_Throws() => RawOutputTestCases.Assert_X25519_DeriveSecretAgreement_LowOrderPeer_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void DeriveBytes_Sp800108Feedback_MatchesReference() => RawOutputTestCases.Assert_DeriveBytes_Sp800108Feedback_MatchesReference(_backend);
 }

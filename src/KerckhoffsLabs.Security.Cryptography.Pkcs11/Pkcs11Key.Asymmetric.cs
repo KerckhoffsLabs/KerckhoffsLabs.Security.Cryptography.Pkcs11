@@ -158,8 +158,7 @@ public sealed partial class Pkcs11Key
     /// <see cref="CKK.CKK_EC_MONTGOMERY"/> key: X25519 or X448 (RFC 7748), <c>CKM_ECDH1_DERIVE</c> with
     /// <see cref="CKD.CKD_NULL"/> and the peer's raw u-coordinate, the 32- or 56-byte shared secret. Apply a
     /// KDF to it before use as key material (NIST SP 800-56A, RFC 7748 §6); for an on-token key with the KDF
-    /// applied, use <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>, which applies to
-    /// <see cref="CKK.CKK_EC"/> keys only (an X25519 or X448 peer cannot use it).
+    /// applied, use <see cref="DeriveSecretAgreement"/> and an on-token KDF, for either key type.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -173,9 +172,10 @@ public sealed partial class Pkcs11Key
     /// An X25519 / X448 peer must be an RFC 8410 <c>SubjectPublicKeyInfo</c> (<c>id-X25519</c> or
     /// <c>id-X448</c>, no parameters) for this key's curve, its key the curve's length. Every u-coordinate is
     /// on the curve or its twist, so the check that matters is for a low-order point, for which the secret is
-    /// all zero whatever this key: u = 0 is refused before the token sees it, and an all-zero secret from the
-    /// token is refused after (RFC 7748 §6). The curve is read from this key's <c>CKA_EC_PARAMS</c>, the
-    /// RFC 8410 OID or the PKCS#11 v3.0 curve name (<c>curve25519</c> / <c>curve448</c>).
+    /// all zero whatever this key: every low-order u-coordinate (non-canonical encodings included) is refused
+    /// before the token sees it, and an all-zero secret from the token is refused after (RFC 7748 §6). The
+    /// curve is read once, from this key's <c>CKA_EC_PARAMS</c>: the RFC 8410 OID or the PKCS#11 v3.0 curve
+    /// name (<c>curve25519</c> / <c>curve448</c>).
     /// </para>
     /// <para>
     /// The field size comes from this key, never from the peer: from the curve catalog, else from this
@@ -197,7 +197,7 @@ public sealed partial class Pkcs11Key
     /// extractable, non-sensitive object it is read from. Checked before the peer is examined.
     /// </exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="peerSubjectPublicKeyInfo"/> is not a DER <c>SubjectPublicKeyInfo</c>, is an EC key without a named curve and an uncompressed point, or is an X25519 / X448 key with algorithm parameters.</exception>
-    /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate or key lengths don't match the curve, its point does not satisfy the curve equation, or (X25519 / X448) it is u = 0 or the token returns an all-zero secret for it.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate or key lengths don't match the curve, its point does not satisfy the curve equation, or (X25519 / X448) it is a low-order point or the token returns an all-zero secret for it.</exception>
     /// <exception cref="Pkcs11Exception">Thrown if this key's <c>CKA_EC_PARAMS</c> cannot be read (or, for a Montgomery key, names neither X25519 nor X448) or the derived value is not readable; otherwise propagated from <c>C_DeriveKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c>.</exception>
     /// <exception cref="CryptographicException">Thrown if the token returns a shared secret that is not the curve's length.</exception>
     public byte[] DeriveRawSecret(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
@@ -230,9 +230,9 @@ public sealed partial class Pkcs11Key
         (actual, expected) => new CryptographicException(
             $"The token returned a {actual}-byte shared secret; this curve's is {expected} bytes."));
 
-    // RFC 7748 §6.1: a low-order peer gives an all-zero X25519 / X448 secret whatever the private key. u = 0
-    // was refused before the token saw it; the other low-order points are caught here, since PKCS#11 does not
-    // require the token to check.
+    // RFC 7748 §6.1: a low-order peer gives an all-zero X25519 / X448 secret whatever the private key. The
+    // validator refuses every low-order u-coordinate before the token sees it; this checks the token's answer
+    // too, as PKCS#11 does not require it to agree only with valid peers.
     private static void RefuseAllZeroSecret(byte[] secret)
     {
         if (MontgomeryPeerValidator.IsZero(secret))
@@ -251,10 +251,15 @@ public sealed partial class Pkcs11Key
     /// <para>
     /// The PKCS#11 counterpart of CNG's <c>NCryptSecretAgreement</c> secret handle. For a
     /// <see cref="CKK.CKK_EC"/> key: <c>CKM_ECDH1_DERIVE</c> with <see cref="CKD.CKD_NULL"/>, Z the
-    /// x-coordinate of the shared point, as many bytes as this key's field.
+    /// x-coordinate of the shared point, as many bytes as this key's field. For a
+    /// <see cref="CKK.CKK_EC_MONTGOMERY"/> key: X25519 or X448 (RFC 7748), <c>CKM_ECDH1_DERIVE</c> with
+    /// <see cref="CKD.CKD_NULL"/> and the peer's raw u-coordinate, Z the 32- or 56-byte shared secret.
     /// </para>
     /// <para>
-    /// The peer is validated exactly as for <see cref="DeriveRawSecret"/>.
+    /// The peer is validated by the same step as for <see cref="DeriveRawSecret"/>. For X25519 / X448 that
+    /// step is the only defence against a low-order peer: Z stays on the token, so the all-zero check
+    /// <see cref="DeriveRawSecret"/> also runs on the result cannot run here, and every low-order
+    /// u-coordinate is refused before the token sees it.
     /// </para>
     /// <para>
     /// Permitted by the default policies, which otherwise refuse <see cref="CKD.CKD_NULL"/>: the result
@@ -265,24 +270,24 @@ public sealed partial class Pkcs11Key
     /// and its PRF, not which step the caller runs on Z.
     /// </para>
     /// </remarks>
-    /// <param name="peerSubjectPublicKeyInfo">The peer's public key as a DER <c>SubjectPublicKeyInfo</c>; for EC, RFC 5480 with a named curve and an uncompressed point.</param>
+    /// <param name="peerSubjectPublicKeyInfo">The peer's public key as a DER <c>SubjectPublicKeyInfo</c>; for EC, RFC 5480 with a named curve and an uncompressed point; for X25519 / X448, RFC 8410.</param>
     /// <returns>The on-token shared secret. Dispose releases the wrapper; <see cref="Destroy"/> removes it from the token before the session closes.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="NotSupportedException">Thrown if <see cref="KeyType"/> is not supported.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="peerSubjectPublicKeyInfo"/> is not a DER <c>SubjectPublicKeyInfo</c>, or is an EC key without a named curve and an uncompressed point.</exception>
-    /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate lengths don't match the field size, or its point does not satisfy the curve equation.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if the session's <see cref="Pkcs11Session.Policy"/> refuses ECDH or this key's curve.</exception>
-    /// <exception cref="Pkcs11Exception">Thrown if this key's <c>CKA_EC_PARAMS</c> cannot be read; otherwise propagated from <c>C_DeriveKey</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerSubjectPublicKeyInfo"/> is not a DER <c>SubjectPublicKeyInfo</c>, is an EC key without a named curve and an uncompressed point, or is an X25519 / X448 key with algorithm parameters.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate or key lengths don't match the curve, its point does not satisfy the curve equation, or (X25519 / X448) it is a low-order point.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the session's <see cref="Pkcs11Session.Policy"/> refuses ECDH, this key's type or this key's curve.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown if this key's <c>CKA_EC_PARAMS</c> cannot be read (or, for a Montgomery key, names neither X25519 nor X448); otherwise propagated from <c>C_DeriveKey</c>.</exception>
     public Pkcs11Key DeriveSecretAgreement(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
+        const string operation = "Pkcs11Key.DeriveSecretAgreement";
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_keyType != CKK.CKK_EC)
-            throw new NotSupportedException($"Pkcs11Key.DeriveSecretAgreement supports CKK_EC keys; this key is {_keyType}.");
+        RequireAgreementKeyType(operation);
 
-        ValidatedEcdhPeer peer = ValidateEcPeer(peerSubjectPublicKeyInfo, "Pkcs11Key.DeriveSecretAgreement");
-        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.EncodedPoint));
+        AgreementPeer peer = ValidateAgreementPeer(peerSubjectPublicKeyInfo, operation);
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.PublicData));
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .ValueLen(peer.FieldSizeBytes)
+            .ValueLen(peer.SecretLength)
             .Sensitive()
             .NonExtractable()
             .OnToken(false)
@@ -318,6 +323,14 @@ public sealed partial class Pkcs11Key
         ValidatedEcdhPeer ec = ValidateEcPeer(peerSubjectPublicKeyInfo, operationName);
         return new AgreementPeer(ec.EncodedPoint, ec.FieldSizeBytes);
     }
+
+    // The curve of this CKK_EC_MONTGOMERY key, read from CKA_EC_PARAMS on first use. CKA_EC_PARAMS cannot
+    // change once the object exists, and the value is one of two immutable singletons, so a race between
+    // two first uses only reads the attribute twice; a failed read is not cached.
+    private MontgomeryCurve? _montgomeryCurve;
+
+    internal MontgomeryCurve ResolveMontgomeryCurve(string operationName)
+        => _montgomeryCurve ??= MontgomeryPeerValidator.ReadLocalCurve(this, operationName);
 
     private ValidatedEcdhPeer ValidateEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string operationName)
         => EcdhPeerValidator.Validate(

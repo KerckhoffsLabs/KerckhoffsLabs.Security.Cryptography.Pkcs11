@@ -15,7 +15,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// <summary>
 /// Backend-agnostic tests of the raw-output entry points behind the explicit export opt-in:
 /// <see cref="Pkcs11Key.DeriveRawSecret"/> on X25519 / X448 (<see cref="CKK.CKK_EC_MONTGOMERY"/>) keys, and
-/// <see cref="Pkcs11Key.DeriveBytes"/>. Each case runs under <c>Recommended</c> with
+/// <see cref="Pkcs11Key.DeriveBytes"/>; and <see cref="Pkcs11Key.DeriveSecretAgreement"/> on the same keys,
+/// which keeps the secret on the token and needs no opt-in. Each case runs under <c>Recommended</c> with
 /// <see cref="KeyMaterialExportRule.Allow"/> for its kind only, so it also shows that the opt-in is all such
 /// a read-back needs.
 /// </summary>
@@ -90,8 +91,53 @@ internal static class RawOutputTestCases
         WithAlice(backend, X25519, alice =>
             Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecret(Spki(X25519.Oid, new byte[32]))));
 
+    // === X25519 / X448 DeriveSecretAgreement ===================================================
+
+    private static readonly byte[] HkdfSalt = "kl-raw-agreement-salt"u8.ToArray();
+    private static readonly byte[] HkdfInfo = "kl-raw-agreement-mac-key"u8.ToArray();
+    private static readonly byte[] Probe = "kl-raw-agreement-probe"u8.ToArray();
+
+    internal static void Assert_X25519_DeriveSecretAgreement_ThenHkdf_MatchesRfc7748(IPkcs11Backend backend) =>
+        AssertAgreesOnTheToken(backend, X25519);
+
+    internal static void Assert_X448_DeriveSecretAgreement_ThenHkdf_MatchesRfc7748(IPkcs11Backend backend) =>
+        AssertAgreesOnTheToken(backend, X448);
+
+    // The secret never leaves the token, so no opt-in: plain Recommended. Agree into Z, HKDF Z into an HMAC
+    // key on the token, MAC a probe; the same schedule off the token over the RFC's secret gives the same MAC.
+    private static void AssertAgreesOnTheToken(IPkcs11Backend backend, Rfc7748Vector vector)
+    {
+        backend.RequireMechanisms(CKM.CKM_HKDF_DERIVE, CKM.CKM_SHA256_HMAC);
+        WithAlice(backend, vector, CryptoPolicy.Recommended, alice =>
+        {
+            using Pkcs11Key z = alice.DeriveSecretAgreement(Spki(vector.Oid, vector.BobPublic));
+            using var macTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Sign().OnToken(false).Build();
+            using Pkcs11Key macKey = z.Derive(
+                new Mechanism(CKM.CKM_HKDF_DERIVE,
+                    CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, HkdfSalt, HkdfInfo)),
+                macTemplate);
+            byte[] tag = macKey.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), Probe);
+
+            byte[] expected = HMACSHA256.HashData(HKDF.DeriveKey(HashAlgorithmName.SHA256, vector.Shared, 32, HkdfSalt, HkdfInfo), Probe);
+            Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(tag));
+        });
+    }
+
+    // A low-order peer would put an all-zero Z on the token, which nothing can check afterwards: refused first.
+    internal static void Assert_X25519_DeriveSecretAgreement_LowOrderPeer_Throws(IPkcs11Backend backend) =>
+        WithAlice(backend, X25519, CryptoPolicy.Recommended, alice =>
+        {
+            byte[] one = new byte[32];
+            one[0] = 1;
+            Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveSecretAgreement(Spki(X25519.Oid, one)));
+        });
+
     // Imports Alice's RFC 7748 private key and hands it to the body under the EcdhSharedSecret opt-in.
-    private static void WithAlice(IPkcs11Backend backend, Rfc7748Vector vector, Action<Pkcs11Key> body)
+    private static void WithAlice(IPkcs11Backend backend, Rfc7748Vector vector, Action<Pkcs11Key> body) =>
+        WithAlice(backend, vector, OptIn(KeyMaterialExportKind.EcdhSharedSecret), body);
+
+    // Imports Alice's RFC 7748 private key and hands it to the body under policy.
+    private static void WithAlice(IPkcs11Backend backend, Rfc7748Vector vector, ICryptoPolicy policy, Action<Pkcs11Key> body)
     {
         backend.RequireMechanisms(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE);
         using var session = backend.OpenSession();
@@ -102,7 +148,7 @@ internal static class RawOutputTestCases
             using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 alice = ImportAlice(session, backend, vector, label);
             using (alice)
-            using (session.UsePolicy(OptIn(KeyMaterialExportKind.EcdhSharedSecret)))
+            using (session.UsePolicy(policy))
                 body(alice);
         }
         finally
