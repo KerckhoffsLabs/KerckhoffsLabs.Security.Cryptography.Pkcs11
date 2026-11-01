@@ -34,7 +34,7 @@ public sealed class AlgorithmConformanceTests_SoftHsm(SoftHsmBackendFixture back
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void RsaPkcs1_Plaintext_IsBoundedByKMinus11() => AlgorithmConformanceTestCases.Assert_RsaPkcs1_Plaintext_IsBoundedByKMinus11(_backend);
 
-    // SoftHSM ignores CK_EDDSA_PARAMS: it signs Ed25519ctx, Ed25519ph and Ed448ph as pure EdDSA.
+    // SoftHSM ignores CK_EDDSA_PARAMS: it signs Ed25519ctx, Ed25519ph, Ed448ctx and Ed448ph as pure EdDSA.
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EdDsaVariants), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void EdDsa_Rfc8032Variant_SignsTheKnownAnswer(string variant) => AlgorithmConformanceTestCases.Assert_EdDsa_Rfc8032Variant_SignsTheKnownAnswer(_backend, variant, signsPureEdDsa: variant is not "Ed448");
