@@ -66,7 +66,12 @@ public sealed class KnownAnswerTests_SoftHsm(SoftHsmBackendFixture f)
     [Fact(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
     public void TripleDesCbc_Kat() { _backend.RequireMechanism(CKM.CKM_DES3_CBC); KnownAnswerTestCases.Assert_TripleDesCbc_Kat(_backend); }
 
-    [Theory(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
+    // SoftHSM lists CKM_DES_ECB but cannot run it: its cipher is EVP_des_ecb() (OSSLDES.cpp), which OpenSSL 3 keeps in the
+    // legacy provider SoftHSM does not load, so encryptInit fails and C_EncryptInit answers CKR_MECHANISM_INVALID
+    // (SoftHSM.cpp, SymEncryptInit).
+    public static bool SoftHsmRunsSingleDes => false;
+
+    [Theory(SkipUnless = nameof(SoftHsmRunsSingleDes), Skip = "Requires " + nameof(SoftHsmRunsSingleDes))]
     [MemberData(nameof(KnownAnswerTestCases.DesVariableKeyRounds), MemberType = typeof(KnownAnswerTestCases))]
     public void DesEcb_Sp80020_Kat(string key, string ciphertext) { _backend.RequireMechanism(CKM.CKM_DES_ECB); KnownAnswerTestCases.Assert_DesEcb_Sp80020_Kat(_backend, key, ciphertext); }
 }

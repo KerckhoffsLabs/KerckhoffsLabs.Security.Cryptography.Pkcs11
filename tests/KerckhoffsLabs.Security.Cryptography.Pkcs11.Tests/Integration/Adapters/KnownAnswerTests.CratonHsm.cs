@@ -64,7 +64,7 @@ public sealed class KnownAnswerTests_CratonHsm(CratonHsmBackendFixture backend)
     [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
     public void AesCbc_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_CBC); KnownAnswerTestCases.Assert_AesCbc_Sp80038a_Kat(_backend, keyBits); }
 
-    [Theory(SkipUnless = nameof(CratonHsmAvailable), Skip = "Requires " + nameof(CratonHsmAvailable))]
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.AesCtrParamsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM takes a bare counter block, not CK_AES_CTR_PARAMS")]
     [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
     public void AesCtr_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_CTR); KnownAnswerTestCases.Assert_AesCtr_Sp80038a_Kat(_backend, keyBits); }
 
