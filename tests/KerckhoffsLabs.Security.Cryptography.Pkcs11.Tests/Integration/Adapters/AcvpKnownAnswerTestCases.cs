@@ -10,12 +10,12 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Vectors;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
 
 /// <summary>
-/// Known-answer tests for ML-KEM (FIPS 203) and ML-DSA (FIPS 204) from NIST's ACVP-Server vectors (see
+/// Known-answer tests for ML-KEM (FIPS 203), ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) from NIST's ACVP-Server vectors (see
 /// <see cref="AcvpVectors"/>): each case imports the published key and checks the published answer, so a token or a
 /// marshalling bug that a round trip or a BCL cross-check would share cannot pass. Each case is named by its ACVP tcId.
 /// </summary>
 /// <remarks>
-/// The cases import private keys from their FIPS 203 / 204 expanded encoding (<c>CKA_VALUE</c>) and run under
+/// The cases import private keys from their FIPS 203 / 204 / 205 encoding (<c>CKA_VALUE</c>) and run under
 /// AllowInsecure: they read a shared secret back, and some use 224-bit pre-hashes, which Recommended refuses.
 /// <c>notTakenBecause</c> declares a backend that refuses a key or a mechanism as something it does not take, as in
 /// <see cref="Mechanisms.AlgorithmConformanceTestCases"/>: the case then skips with that reason, an undeclared refusal
@@ -43,6 +43,15 @@ internal static class AcvpKnownAnswerTestCases
 
     public static TheoryData<string, int> MlDsaDeterministicSignatureCases =>
         [.. AcvpVectors.MlDsaDeterministicSignatures.Select(c => (c.ParameterSet, c.TcId))];
+
+    public static TheoryData<string, int> SlhDsaPureVerificationCases =>
+        [.. AcvpVectors.SlhDsaVerifications.Where(c => c.PreHash == "pure").Select(c => (c.ParameterSet, c.TcId))];
+
+    public static TheoryData<string, int> SlhDsaPreHashVerificationCases =>
+        [.. AcvpVectors.SlhDsaVerifications.Where(c => c.PreHash == "preHash").Select(c => (c.ParameterSet, c.TcId))];
+
+    public static TheoryData<string, int> SlhDsaDeterministicSignatureCases =>
+        [.. AcvpVectors.SlhDsaDeterministicSignatures.Select(c => (c.ParameterSet, c.TcId))];
 
     // ML-KEM.Decaps (FIPS 203 §7.3): ACVP ML-KEM-encapDecap-FIPS203, decapsulation groups. A "valid decapsulation"
     // case recovers the encapsulated K; a "modified ciphertext" case must give the implicit-rejection K, J(z‖c),
@@ -84,62 +93,105 @@ internal static class AcvpKnownAnswerTestCases
     // pure groups. testPassed says whether the published signature must verify.
     internal static void Assert_MlDsa_PureVerification_Acvp(IPkcs11Backend backend, string parameterSet, int tcId, string? notTakenBecause = null)
     {
-        AcvpVectors.MlDsaVerification v = AcvpVectors.MlDsaVerifications.Single(c => c.TcId == tcId);
+        AcvpVectors.PqcVerification v = AcvpVectors.MlDsaVerifications.Single(c => c.TcId == tcId);
         Assert.Equal(("pure", parameterSet), (v.PreHash, v.ParameterSet));
         backend.RequireMechanism(CKM.CKM_ML_DSA);
-        AssertVerifies(backend, v, new Mechanism(CKM.CKM_ML_DSA, new CkmPqcSignParams(context: v.Context)), notTakenBecause);
+        AssertVerifies(backend, v, CKK.CKK_ML_DSA, (ulong)MlDsaParameterSet(parameterSet),
+            new Mechanism(CKM.CKM_ML_DSA, new CkmPqcSignParams(context: v.Context)), notTakenBecause);
     }
 
     // HashML-DSA.Verify (FIPS 204 §5.4), with the case's context: ACVP ML-DSA-sigVer-FIPS204, external-interface
     // preHash groups, through the combined CKM_HASH_ML_DSA_<H> that hashes the message itself.
     internal static void Assert_MlDsa_PreHashVerification_Acvp(IPkcs11Backend backend, string parameterSet, int tcId, string? notTakenBecause = null)
     {
-        AcvpVectors.MlDsaVerification v = AcvpVectors.MlDsaVerifications.Single(c => c.TcId == tcId);
+        AcvpVectors.PqcVerification v = AcvpVectors.MlDsaVerifications.Single(c => c.TcId == tcId);
         Assert.Equal(("preHash", parameterSet), (v.PreHash, v.ParameterSet));
         CKM combined = HashMlDsa(v.HashAlg);
         backend.RequireMechanism(combined);
-        AssertVerifies(backend, v, new Mechanism(combined, new CkmPqcSignParams(context: v.Context)), notTakenBecause);
+        AssertVerifies(backend, v, CKK.CKK_ML_DSA, (ulong)MlDsaParameterSet(parameterSet),
+            new Mechanism(combined, new CkmPqcSignParams(context: v.Context)), notTakenBecause);
     }
 
     // ML-DSA.Sign (FIPS 204 §5.2) in its deterministic variant (rnd = 0^256) with the case's context: ACVP
     // ML-DSA-sigGen-FIPS204, deterministic external pure groups. CKH_DETERMINISTIC_REQUIRED asks the token for that
-    // variant, so its signature must be the published one byte for byte; the published signature must also verify
-    // under the published public key, which covers a valid signature without a context (ACVP's sigVer has none).
+    // variant, so its signature must be the published one byte for byte.
     internal static void Assert_MlDsa_DeterministicSignature_Acvp(IPkcs11Backend backend, string parameterSet, int tcId, string? notTakenBecause = null)
     {
-        AcvpVectors.MlDsaSignature v = AcvpVectors.MlDsaDeterministicSignatures.Single(c => c.TcId == tcId);
+        AcvpVectors.PqcSignature v = AcvpVectors.MlDsaDeterministicSignatures.Single(c => c.TcId == tcId);
         Assert.Equal(parameterSet, v.ParameterSet);
         backend.RequireMechanism(CKM.CKM_ML_DSA);
-        var mechanism = new Mechanism(CKM.CKM_ML_DSA, new CkmPqcSignParams(CkhHedge.CKH_DETERMINISTIC_REQUIRED, v.Context));
-        RequireContextSupport(backend, v.Context);
+        AssertSignsDeterministically(backend, v, CKK.CKK_ML_DSA, (ulong)MlDsaParameterSet(parameterSet), CKM.CKM_ML_DSA, notTakenBecause);
+    }
 
+    // SLH-DSA.Verify (FIPS 205 §10.3), pure, with the case's context: ACVP SLH-DSA-sigVer-FIPS205, external-interface
+    // pure groups, one valid signature for each of the twelve parameter sets, and invalid ones on the 128s sets.
+    internal static void Assert_SlhDsa_PureVerification_Acvp(IPkcs11Backend backend, string parameterSet, int tcId, string? notTakenBecause = null)
+    {
+        AcvpVectors.PqcVerification v = AcvpVectors.SlhDsaVerifications.Single(c => c.TcId == tcId);
+        Assert.Equal(("pure", parameterSet), (v.PreHash, v.ParameterSet));
+        backend.RequireMechanism(CKM.CKM_SLH_DSA);
+        AssertVerifies(backend, v, CKK.CKK_SLH_DSA, (ulong)SlhDsaParameterSet(parameterSet),
+            new Mechanism(CKM.CKM_SLH_DSA, new CkmPqcSignParams(context: v.Context)), notTakenBecause);
+    }
+
+    // HashSLH-DSA.Verify (FIPS 205 §10.3), with the case's context: ACVP SLH-DSA-sigVer-FIPS205, external-interface
+    // preHash groups, through the combined CKM_HASH_SLH_DSA_<H>.
+    internal static void Assert_SlhDsa_PreHashVerification_Acvp(IPkcs11Backend backend, string parameterSet, int tcId, string? notTakenBecause = null)
+    {
+        AcvpVectors.PqcVerification v = AcvpVectors.SlhDsaVerifications.Single(c => c.TcId == tcId);
+        Assert.Equal(("preHash", parameterSet), (v.PreHash, v.ParameterSet));
+        CKM combined = HashSlhDsa(v.HashAlg);
+        backend.RequireMechanism(combined);
+        AssertVerifies(backend, v, CKK.CKK_SLH_DSA, (ulong)SlhDsaParameterSet(parameterSet),
+            new Mechanism(combined, new CkmPqcSignParams(context: v.Context)), notTakenBecause);
+    }
+
+    // SLH-DSA.Sign (FIPS 205 §10.2.1) in its deterministic variant (opt_rand = PK.seed) with the case's context: ACVP
+    // SLH-DSA-sigGen-FIPS205, deterministic external pure groups for the 128s and 128f sets.
+    internal static void Assert_SlhDsa_DeterministicSignature_Acvp(IPkcs11Backend backend, string parameterSet, int tcId, string? notTakenBecause = null)
+    {
+        AcvpVectors.PqcSignature v = AcvpVectors.SlhDsaDeterministicSignatures.Single(c => c.TcId == tcId);
+        Assert.Equal(parameterSet, v.ParameterSet);
+        backend.RequireMechanism(CKM.CKM_SLH_DSA);
+        AssertSignsDeterministically(backend, v, CKK.CKK_SLH_DSA, (ulong)SlhDsaParameterSet(parameterSet), CKM.CKM_SLH_DSA, notTakenBecause);
+    }
+
+    // CKH_DETERMINISTIC_REQUIRED asks the token for the deterministic variant, so its signature must be the
+    // published one byte for byte; the published signature must also verify under the published public key, which
+    // covers a valid signature without a context (ACVP's ML-DSA sigVer has none).
+    private static void AssertSignsDeterministically(
+        IPkcs11Backend backend, AcvpVectors.PqcSignature v, CKK keyType, ulong parameterSet, CKM mechanismType, string? notTakenBecause)
+    {
+        var mechanism = new Mechanism(mechanismType, new CkmPqcSignParams(CkhHedge.CKH_DETERMINISTIC_REQUIRED, v.Context));
+        RequireContextSupport(backend, v.Context);
         WithSession(backend, session =>
         {
             byte[] signature = Taken(() =>
             {
-                ObjectHandle priv = ImportPrivateKey(session, CKK.CKK_ML_DSA, (ulong)MlDsaParameterSet(parameterSet), v.Sk, CKA.CKA_SIGN);
+                ObjectHandle priv = ImportPrivateKey(session, keyType, parameterSet, v.Sk, CKA.CKA_SIGN);
                 try { return session.Sign(mechanism, priv, v.Message); }
                 finally { session.DestroyObject(priv); }
-            }, $"deterministic {parameterSet} signing with an imported key", notTakenBecause);
+            }, $"deterministic {v.ParameterSet} signing with an imported key", notTakenBecause);
             if (notTakenBecause is not null)
-                Assert.Fail($"The backend now signs deterministic {parameterSet}; drop its notTakenBecause (\"{notTakenBecause}\").");
+                Assert.Fail($"The backend now signs deterministic {v.ParameterSet}; drop its notTakenBecause (\"{notTakenBecause}\").");
             Assert.True(v.Signature.AsSpan().SequenceEqual(signature),
-                $"ACVP tcId {v.TcId}: the {parameterSet} deterministic signature differs from the published one.");
+                $"ACVP tcId {v.TcId}: the {v.ParameterSet} deterministic signature differs from the published one.");
 
-            ObjectHandle pub = ImportPublicKey(session, CKK.CKK_ML_DSA, (ulong)MlDsaParameterSet(parameterSet), v.Pk);
+            ObjectHandle pub = ImportPublicKey(session, keyType, parameterSet, v.Pk);
             try { Assert.True(session.Verify(mechanism, pub, v.Message, v.Signature), $"ACVP tcId {v.TcId}: the published signature does not verify."); }
             finally { session.DestroyObject(pub); }
         });
     }
 
-    private static void AssertVerifies(IPkcs11Backend backend, AcvpVectors.MlDsaVerification v, Mechanism mechanism, string? notTakenBecause)
+    private static void AssertVerifies(
+        IPkcs11Backend backend, AcvpVectors.PqcVerification v, CKK keyType, ulong parameterSet, Mechanism mechanism, string? notTakenBecause)
     {
         RequireContextSupport(backend, v.Context);
         WithSession(backend, session =>
         {
             bool verified = Taken(() =>
             {
-                ObjectHandle pub = ImportPublicKey(session, CKK.CKK_ML_DSA, (ulong)MlDsaParameterSet(v.ParameterSet), v.Pk);
+                ObjectHandle pub = ImportPublicKey(session, keyType, parameterSet, v.Pk);
                 try { return session.Verify(mechanism, pub, v.Message, v.Signature); }
                 finally { session.DestroyObject(pub); }
             }, $"{v.ParameterSet} verification ({v.PreHash}, {v.HashAlg})", notTakenBecause);
@@ -156,6 +208,25 @@ internal static class AcvpKnownAnswerTestCases
         if (context.Length > 0 && !backend.SupportsPqcSignContext)
             Assert.Skip("The backend declares it takes no ML-DSA / SLH-DSA context (IPkcs11Backend.SupportsPqcSignContext).");
     }
+
+    // "SLH-DSA-SHA2-128s" -> CKP_SLH_DSA_SHA2_128S.
+    private static CkpSlhDsa SlhDsaParameterSet(string parameterSet) =>
+        Enum.Parse<CkpSlhDsa>("CKP_" + parameterSet.Replace('-', '_').ToUpperInvariant());
+
+    private static CKM HashSlhDsa(string hashAlg) => hashAlg switch
+    {
+        "SHA2-224" => CKM.CKM_HASH_SLH_DSA_SHA224,
+        "SHA2-256" => CKM.CKM_HASH_SLH_DSA_SHA256,
+        "SHA2-384" => CKM.CKM_HASH_SLH_DSA_SHA384,
+        "SHA2-512" => CKM.CKM_HASH_SLH_DSA_SHA512,
+        "SHA3-224" => CKM.CKM_HASH_SLH_DSA_SHA3_224,
+        "SHA3-256" => CKM.CKM_HASH_SLH_DSA_SHA3_256,
+        "SHA3-384" => CKM.CKM_HASH_SLH_DSA_SHA3_384,
+        "SHA3-512" => CKM.CKM_HASH_SLH_DSA_SHA3_512,
+        "SHAKE-128" => CKM.CKM_HASH_SLH_DSA_SHAKE128,
+        "SHAKE-256" => CKM.CKM_HASH_SLH_DSA_SHAKE256,
+        _ => throw new ArgumentOutOfRangeException(nameof(hashAlg), hashAlg, null),
+    };
 
     private static CkpMlDsa MlDsaParameterSet(string parameterSet) => parameterSet switch
     {
