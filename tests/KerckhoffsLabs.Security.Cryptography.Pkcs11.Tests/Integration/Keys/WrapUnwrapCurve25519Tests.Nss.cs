@@ -38,6 +38,13 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void Unwrap_Rfc8410X448Key_AgreesTheRfc7748Secret()
+    {
+        _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
+        WrapUnwrapCurve25519TestCases.Assert_Unwrap_Rfc8410X448Key_AgreesTheRfc7748Secret(_backend);
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void WrapUnwrap_Ed25519PrivateKey_KeepsTheKey()
     {
         _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
@@ -49,5 +56,12 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     {
         _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
         WrapUnwrapCurve25519TestCases.Assert_WrapUnwrap_X25519PrivateKey_AgreesLikeTheOriginal(_backend);
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void WrapUnwrap_X448PrivateKey_AgreesLikeTheOriginal()
+    {
+        _backend.RequireSoftoken(3, 131, Rfc8410Pkcs8);
+        WrapUnwrapCurve25519TestCases.Assert_WrapUnwrap_X448PrivateKey_AgreesLikeTheOriginal(_backend);
     }
 }

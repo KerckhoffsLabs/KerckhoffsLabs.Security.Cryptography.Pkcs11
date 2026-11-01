@@ -14,8 +14,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// Backend-agnostic tests for wrapping and unwrapping Ed25519 (<see cref="CKK.CKK_EC_EDWARDS"/>) and
-/// X25519 (<see cref="CKK.CKK_EC_MONTGOMERY"/>) private keys. A wrapped private key is a PKCS#8
+/// Backend-agnostic tests for wrapping and unwrapping Ed25519 (<see cref="CKK.CKK_EC_EDWARDS"/>), and
+/// X25519 and X448 (<see cref="CKK.CKK_EC_MONTGOMERY"/>), private keys. A wrapped private key is a PKCS#8
 /// <c>OneAsymmetricKey</c> (RFC 5958), and RFC 8410 fixes its form for these curves: the curve's
 /// AlgorithmIdentifier with no parameters, and the key as a <c>CurvePrivateKey</c> OCTET STRING inside
 /// the <c>privateKey</c> OCTET STRING. Version 0 carries nothing else; version 1 may add the public key
@@ -31,8 +31,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// </para>
 /// <para>
 /// Each known-answer case also uses the key it unwrapped: the Ed25519 one signs RFC 8032's message
-/// to RFC 8032's signature, and the X25519 one agrees RFC 7748's secret. The X25519 round trip agrees
-/// a secret with the original and with the copy and compares the two; the Ed25519 one signs with both.
+/// to RFC 8032's signature, and the X25519 and X448 ones agree RFC 7748's secret. The Montgomery round
+/// trips agree a secret with the original and with the copy and compare the two; the Ed25519 one signs
+/// with both.
 /// </para>
 /// <para>
 /// A case skips unless the token advertises the curve's key-pair generation mechanism, which stands in
@@ -44,8 +45,13 @@ internal static class WrapUnwrapCurve25519TestCases
     // Last byte of each curve's OID (1.3.101.x) and its DER, as CKA_EC_PARAMS.
     private const byte Ed25519Oid = 0x70;
     private const byte X25519Oid = 0x6E;
+    private const byte X448Oid = 0x6F;
     private static readonly byte[] Ed25519Params = [0x06, 0x03, 0x2B, 0x65, Ed25519Oid];
     private static readonly byte[] X25519Params = [0x06, 0x03, 0x2B, 0x65, X25519Oid];
+    private static readonly byte[] X448Params = [0x06, 0x03, 0x2B, 0x65, X448Oid];
+
+    // RFC 8410's key and public-key lengths: 56 bytes for X448, 32 for the Curve25519 keys.
+    private static int KeyLength(byte oid) => oid == X448Oid ? 56 : 32;
 
     // RFC 8032 §7.1, TEST 2: the secret key, a one-byte message, and its signature.
     private static readonly byte[] Rfc8032Test2Secret =
@@ -66,6 +72,16 @@ internal static class WrapUnwrapCurve25519TestCases
         Convert.FromHexString("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f");
     private static readonly byte[] Rfc7748SharedSecret =
         Convert.FromHexString("4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742");
+
+    // RFC 7748 §6.2: the same for X448.
+    private static readonly byte[] Rfc7748X448AlicePrivate = Convert.FromHexString(
+        "9a8f4925d1519f5775cf46b04b5800d4ee9ee8bae8bc5565d498c28dd9c9baf574a9419744897391006382a6f127ab1d9ac2d8c0a598726b");
+    private static readonly byte[] Rfc7748X448AlicePublic = Convert.FromHexString(
+        "9b08f7cc31b7e3e67d22d5aea121074a273bd2b83de09c63faa73d2c22c5d9bbc836647241d953d40c5b12da88120d53177f80e532c41fa0");
+    private static readonly byte[] Rfc7748X448BobPublic = Convert.FromHexString(
+        "3eb7a829b0cd20f5bcfc0b599b6feccf6da4627107bdb0d4f345b43027d8b972fc3e34fb4232a13ca706dcb57aec3dae07bdc1c67bf33609");
+    private static readonly byte[] Rfc7748X448SharedSecret = Convert.FromHexString(
+        "07fff4181ac6cc95ec1c16a94a0f74d12da232ce40a77552281d282bb60c0b56fd2464c335543936521c24403085d59a449a5037514a879d");
 
     private static readonly byte[] Message = "wrapped Curve25519 key"u8.ToArray();
 
@@ -107,7 +123,7 @@ internal static class WrapUnwrapCurve25519TestCases
 
     internal static void Assert_Unwrap_Rfc8410X25519Key_AgreesTheRfc7748Secret(IPkcs11Backend backend)
     {
-        RequireX25519(backend);
+        RequireMontgomery(backend);
         RunInSession(backend, session =>
         {
             using var kek = new Kek(session);
@@ -120,6 +136,23 @@ internal static class WrapUnwrapCurve25519TestCases
             // NSS derives only non-extractable keys, so the secret is compared through an HMAC under it.
             Assert.Equal(HMACSHA256.HashData(Rfc7748SharedSecret, Message),
                          HmacUnderSharedSecret(session, key, Rfc7748BobPublic));
+        });
+    }
+
+    internal static void Assert_Unwrap_Rfc8410X448Key_AgreesTheRfc7748Secret(IPkcs11Backend backend)
+    {
+        RequireMontgomery(backend);
+        RunInSession(backend, session =>
+        {
+            using var kek = new Kek(session);
+            byte[] pkcs8 = Pkcs8(X448Oid, Rfc7748X448AlicePrivate);
+
+            ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
+
+            AssertUsage(session, key, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
+            AssertWrapsTheKey(kek.Wrap(key), X448Oid, Rfc7748X448AlicePrivate, Rfc7748X448AlicePublic);
+            Assert.Equal(HMACSHA256.HashData(Rfc7748X448SharedSecret, Message),
+                         HmacUnderSharedSecret(session, key, Rfc7748X448BobPublic, 56));
         });
     }
 
@@ -145,7 +178,7 @@ internal static class WrapUnwrapCurve25519TestCases
 
     internal static void Assert_WrapUnwrap_X25519PrivateKey_AgreesLikeTheOriginal(IPkcs11Backend backend)
     {
-        RequireX25519(backend);
+        RequireMontgomery(backend);
         RunInSession(backend, session =>
         {
             using var kek = new Kek(session);
@@ -162,13 +195,32 @@ internal static class WrapUnwrapCurve25519TestCases
         });
     }
 
+    internal static void Assert_WrapUnwrap_X448PrivateKey_AgreesLikeTheOriginal(IPkcs11Backend backend)
+    {
+        RequireMontgomery(backend);
+        RunInSession(backend, session =>
+        {
+            using var kek = new Kek(session);
+            ObjectHandle original = GenerateWrappablePrivateKey(session, CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKK.CKK_EC_MONTGOMERY, X448Params, CKA.CKA_DERIVE);
+
+            byte[] pkcs8 = kek.Wrap(original);
+            var (privateKey, publicKey) = ReadCurvePrivateKey(pkcs8, X448Oid);
+            ObjectHandle copy = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
+
+            AssertUsage(session, copy, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
+            AssertWrapsTheKey(kek.Wrap(copy), X448Oid, privateKey, publicKey);
+            Assert.Equal(HmacUnderSharedSecret(session, original, Rfc7748X448BobPublic, 56),
+                         HmacUnderSharedSecret(session, copy, Rfc7748X448BobPublic, 56));
+        });
+    }
+
     private static void RequireEd25519(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKM.CKM_EDDSA);
         RequireCbcPadKeyWrap(backend);
     }
 
-    private static void RequireX25519(IPkcs11Backend backend)
+    private static void RequireMontgomery(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_SHA256_HMAC);
         RequireCbcPadKeyWrap(backend);
@@ -196,10 +248,10 @@ internal static class WrapUnwrapCurve25519TestCases
     }
 
     // RFC 8410 §7 OneAsymmetricKey v1: version 0, the curve's AlgorithmIdentifier with no parameters,
-    // and the 32-byte key wrapped in a second OCTET STRING (CurvePrivateKey).
+    // and the key (32 bytes, or 56 for X448) wrapped in a second OCTET STRING (CurvePrivateKey).
     private static byte[] Pkcs8(byte oid, byte[] privateKey) =>
-        [0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, oid,
-         0x04, 0x22, 0x04, 0x20, .. privateKey];
+        [0x30, (byte)(14 + privateKey.Length), 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, oid,
+         0x04, (byte)(2 + privateKey.Length), 0x04, (byte)privateKey.Length, .. privateKey];
 
     // RFC 5958 OneAsymmetricKey v2 (IMPLICIT tags): version 1, the curve's AlgorithmIdentifier, the key as a
     // CurvePrivateKey, [0] attributes holding a friendlyName (PKCS#9), and [1] the public key.
@@ -228,7 +280,7 @@ internal static class WrapUnwrapCurve25519TestCases
     }
 
     // Reads a wrapped Curve25519 key as RFC 8410 has it, refusing anything else: version 0, or version 1
-    // (RFC 5958 OneAsymmetricKey v2), the curve's OID with no parameters, the 32-byte key in a
+    // (RFC 5958 OneAsymmetricKey v2), the curve's OID with no parameters, the key (KeyLength) in a
     // CurvePrivateKey OCTET STRING inside privateKey, optional [0] attributes, the [1] public key only in
     // version 1, and nothing after. Returns the private key and the public key when the token included it.
     private static (byte[] PrivateKey, byte[]? PublicKey) ReadCurvePrivateKey(byte[] pkcs8, byte oid)
@@ -245,7 +297,7 @@ internal static class WrapUnwrapCurve25519TestCases
         var curvePrivateKey = new AsnReader(info.ReadOctetString(), AsnEncodingRules.DER);
         byte[] privateKey = curvePrivateKey.ReadOctetString();
         curvePrivateKey.ThrowIfNotEmpty();
-        Assert.Equal(32, privateKey.Length);
+        Assert.Equal(KeyLength(oid), privateKey.Length);
 
         Asn1Tag attributes = new(TagClass.ContextSpecific, 0, isConstructed: true);
         if (info.HasData && info.PeekTag().HasSameClassAndValue(attributes))
@@ -257,7 +309,7 @@ internal static class WrapUnwrapCurve25519TestCases
             Assert.Equal(1, version);
             publicKey = info.ReadBitString(out int unusedBits, new Asn1Tag(TagClass.ContextSpecific, 1));
             Assert.Equal(0, unusedBits);
-            Assert.Equal(32, publicKey.Length);
+            Assert.Equal(KeyLength(oid), publicKey.Length);
         }
         info.ThrowIfNotEmpty();
         return (privateKey, publicKey);
@@ -341,14 +393,14 @@ internal static class WrapUnwrapCurve25519TestCases
         Assert.Equal(derive, attrs[2].GetValueAsBool());
     }
 
-    // Agrees a raw (CKD_NULL) secret with peerPublic as a generic secret the token can MAC with, and
-    // returns HMAC-SHA256 of Message under it.
-    private static byte[] HmacUnderSharedSecret(Pkcs11SessionCore session, ObjectHandle privateKey, byte[] peerPublic)
+    // Agrees a raw (CKD_NULL) secret of secretLength bytes (32, or 56 for X448) with peerPublic as a generic
+    // secret the token can MAC with, and returns HMAC-SHA256 of Message under it.
+    private static byte[] HmacUnderSharedSecret(Pkcs11SessionCore session, ObjectHandle privateKey, byte[] peerPublic, ulong secretLength = 32)
     {
         using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
         using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, secretLength);
         using var macSign = new ObjectAttribute(CKA.CKA_SIGN, true);
         var ecdh = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peerPublic));
         ObjectHandle secret = session.DeriveKey(ecdh, privateKey, [cls, type, token, length, macSign]);

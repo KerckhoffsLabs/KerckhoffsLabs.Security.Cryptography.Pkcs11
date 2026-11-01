@@ -19,6 +19,11 @@ public sealed class EncapsulateKeyTests_FreeHsm(FreeHsmBackendFixture backend)
     public void Ecdh1_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(_backend);
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(EncapsulateKeyTestCases.MontgomeryCurves), MemberType = typeof(EncapsulateKeyTestCases))]
+    public void Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(string curve) =>
+        EncapsulateKeyTestCases.Assert_Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, curve);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(EncapsulateKeyTestCases.MlKemParameterSets), MemberType = typeof(EncapsulateKeyTestCases))]
     public void MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(CkpMlKem parameterSet) =>
         EncapsulateKeyTestCases.Assert_MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, parameterSet);
