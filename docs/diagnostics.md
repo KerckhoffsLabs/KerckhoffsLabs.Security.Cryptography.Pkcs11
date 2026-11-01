@@ -77,6 +77,35 @@ a symbol: there is nothing to mark obsolete when a consumer writes
 Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `Recommended`
 policy check. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
 
+<a id="pkcs1-implicit-rejection"></a>
+#### PKCS#1 v1.5 decryption and implicit rejection
+
+This applies to any PKCS#1 v1.5 decryption the runtime policy lets through: `RSAPkcs11.Decrypt` with
+`RSAEncryptionPadding.Pkcs1`, or `Pkcs11Key.Decrypt` with `CKM_RSA_PKCS`, under `CryptoPolicy.AllowInsecure`
+or a policy that allows the mechanism, whether or not this diagnostic was reported or suppressed.
+
+Never treat the success or failure of PKCS#1 v1.5 decryption as a signal. Some tokens implement
+*implicit rejection* (draft-irtf-cfrg-rsa-guidance), the countermeasure to the Marvin attack: a
+ciphertext with invalid padding does not fail, and `C_Decrypt` returns a synthetic plaintext derived
+deterministically from the private key and the ciphertext. So `RSAPkcs11.Decrypt` does not always throw
+`CryptographicException` for bad padding, as the BCL `RSA.Decrypt` contract leads callers to expect,
+and a returned value is no evidence that the ciphertext was well formed. Where the token does fail,
+any observable difference between the two outcomes, in the response or in its timing, is a
+Bleichenbacher padding oracle.
+
+The test suite pins what each backend it runs against does (`Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared`).
+Behaviour depends on the token's version and configuration, so check yours:
+
+| Token | Invalid PKCS#1 v1.5 padding |
+|---|---|
+| SoftHSMv2 and FreeHSM on OpenSSL 3.2 or later, Kryoptic, current NSS, openCryptoki | Implicit rejection: a synthetic plaintext |
+| SoftHSMv2 on OpenSSL 1.1 (SoftHSM 2.5), NSS 3.51, BouncyHsm, wolfPKCS11 | `C_Decrypt` fails |
+| Craton HSM | No PKCS#1 v1.5 decryption: `CKM_RSA_PKCS` is not offered |
+
+OAEP (`RSAEncryptionPadding.OaepSHA256`, `CKM_RSA_PKCS_OAEP`) is the fix, but its decoding failures
+must be handled the same way: answer every failure with the same response and the same timing, and do
+not report which check failed, or the caller rebuilds a Manger oracle.
+
 > **RSA *signatures* are a different story.** RSASSA-PKCS#1 v1.5 with a strong hash
 > (`CKM_SHA256_RSA_PKCS` and friends) is **allowed by default** and is *not* reported: it is
 > FIPS 186-5-approved and required by JWT RS256, TLS 1.2 CertificateVerify, X.509, and code signing.

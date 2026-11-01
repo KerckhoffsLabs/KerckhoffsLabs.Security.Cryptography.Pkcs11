@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
@@ -88,6 +89,12 @@ public sealed class RSAPkcs11Tests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Decrypt_NullArguments_Throw() => RSAPkcs11TestCases.Assert_Decrypt_NullArguments_Throw(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    // Current softoken does implicit rejection (lib/freebl/rsapkcs.c); NSS 3.51, the v2.40 leg, predates it.
+    public void Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared() =>
+        RSAPkcs11TestCases.Assert_Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared(_backend,
+            NssV240ComplianceTests.ExpectV240 ? RSAPkcs11TestCases.Pkcs1InvalidPadding.Throws : RSAPkcs11TestCases.Pkcs1InvalidPadding.ImplicitRejection);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Decrypt_TamperedOaepCiphertext_Throws() => RSAPkcs11TestCases.Assert_Decrypt_TamperedOaepCiphertext_Throws(_backend);

@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -388,6 +389,114 @@ internal static class RSAPkcs11TestCases
                 Assert.Equal(plaintext, recovered);
             }
         });
+    }
+
+    /// <summary>What a token does with a PKCS#1 v1.5 ciphertext whose padding is invalid.</summary>
+    internal enum Pkcs1InvalidPadding
+    {
+        /// <summary><c>C_Decrypt</c> fails, as the BCL <c>RSA.Decrypt</c> contract expects.</summary>
+        Throws,
+
+        /// <summary>
+        /// <c>C_Decrypt</c> succeeds with a synthetic plaintext derived from the key and the ciphertext:
+        /// implicit rejection (draft-irtf-cfrg-rsa-guidance), the Marvin-attack countermeasure.
+        /// </summary>
+        ImplicitRejection,
+    }
+
+    // Each backend declares what it does with invalid PKCS#1 v1.5 padding, and the test asserts exactly
+    // that, so a token that starts or stops implicit rejection fails here and the per-token list in
+    // docs/diagnostics.md (KLPKCS11008) is updated with it.
+    internal static void Assert_Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared(IPkcs11Backend backend, Pkcs1InvalidPadding expected)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS);
+        WithRsa(backend, (session, rsa) => AssertPkcs1InvalidPaddingBehavesAsDeclared(session, rsa, expected));
+    }
+
+    internal static void AssertPkcs1InvalidPaddingBehavesAsDeclared(Pkcs11Session session, RSAPkcs11 rsa, Pkcs1InvalidPadding expected)
+    {
+        byte[] message = Encoding.UTF8.GetBytes("pkcs1 payload");
+        RSAParameters publicKey = rsa.ExportParameters(includePrivateParameters: false);
+        int k = publicKey.Modulus!.Length;
+        byte[] valid = RawEncryptWithBlockType(publicKey, message, 0x02);
+
+        // Wrong only in the block-type byte. 01 is the signature block type, and 00 / 03 are no block type.
+        byte[][] invalid = [.. new byte[] { 0x00, 0x01, 0x03 }.Select(blockType => RawEncryptWithBlockType(publicKey, message, blockType))];
+
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+            // Control: the same construction with the correct block type decrypts to the message.
+            Assert.Equal(message, rsa.Decrypt(valid, RSAEncryptionPadding.Pkcs1));
+
+            byte[]?[] first = [.. invalid.Select(c => TryDecryptPkcs1(rsa, c))];
+            byte[]?[] second = [.. invalid.Select(c => TryDecryptPkcs1(rsa, c))];
+
+            Pkcs1InvalidPadding observed = first.All(p => p is null) ? Pkcs1InvalidPadding.Throws
+                : first.All(p => p is not null) ? Pkcs1InvalidPadding.ImplicitRejection
+                : throw new Xunit.Sdk.XunitException(
+                    "Invalid PKCS#1 v1.5 padding threw for some block types and returned a plaintext for others: " +
+                    string.Join(", ", first.Select(p => p is null ? "threw" : $"{p.Length} bytes")) + " (block types 00, 01, 03).");
+            Assert.True(expected == observed,
+                $"Declared {expected} for invalid PKCS#1 v1.5 padding, but the token's behaviour is {observed}. " +
+                "Update the backend's declaration and the per-token list in docs/diagnostics.md (KLPKCS11008).");
+
+            if (observed == Pkcs1InvalidPadding.ImplicitRejection)
+            {
+                for (int i = 0; i < invalid.Length; i++)
+                {
+                    byte[] synthetic = first[i]!;
+                    Assert.NotEqual(message, synthetic);
+                    // Deterministic in the key and the ciphertext.
+                    Assert.Equal(synthetic, second[i]);
+                    // A PKCS#1 v1.5 plaintext is at most k - 11 bytes, a synthetic one included; a longer
+                    // result is the raw padded block, not implicit rejection.
+                    Assert.InRange(synthetic.Length, 0, k - 11);
+                }
+                // Derived from the ciphertext, so three ciphertexts do not all decrypt to the same
+                // value (a token that returns a constant, such as an empty array, would).
+                Assert.False(first[0]!.SequenceEqual(first[1]!) && first[1]!.SequenceEqual(first[2]!),
+                    "Three different invalid ciphertexts decrypted to the same synthetic plaintext.");
+            }
+            else
+            {
+                Assert.All(second, Assert.Null);
+            }
+
+            // The failed (or synthetic) decryptions leave the key and the session usable.
+            Assert.Equal(message, rsa.Decrypt(valid, RSAEncryptionPadding.Pkcs1));
+        }
+    }
+
+    private static byte[]? TryDecryptPkcs1(RSAPkcs11 rsa, byte[] ciphertext)
+    {
+        try
+        {
+            return rsa.Decrypt(ciphertext, RSAEncryptionPadding.Pkcs1);
+        }
+        catch (CryptographicException ex) when (ex is not CryptoPolicyViolationException)
+        {
+            return null;
+        }
+    }
+
+    // m^e mod n over 00 || blockType || PS (non-zero) || 00 || message, so the padding is wrong
+    // only in the block-type byte (02 is the one RSAES-PKCS1-v1_5 decryption accepts).
+    private static byte[] RawEncryptWithBlockType(RSAParameters publicKey, byte[] message, byte blockType)
+    {
+        int k = publicKey.Modulus!.Length;
+        byte[] block = new byte[k];
+        block[1] = blockType;
+        block.AsSpan(2, k - 3 - message.Length).Fill(0xA5);
+        message.CopyTo(block.AsSpan(k - message.Length));
+
+        BigInteger c = BigInteger.ModPow(
+            new BigInteger(block, isUnsigned: true, isBigEndian: true),
+            new BigInteger(publicKey.Exponent, isUnsigned: true, isBigEndian: true),
+            new BigInteger(publicKey.Modulus, isUnsigned: true, isBigEndian: true));
+
+        byte[] ciphertext = new byte[k];
+        c.TryWriteBytes(ciphertext.AsSpan(k - c.GetByteCount(isUnsigned: true)), out _, isUnsigned: true, isBigEndian: true);
+        return ciphertext;
     }
 
     internal static void Assert_Encrypt_NullArguments_Throw(IPkcs11Backend backend) =>
