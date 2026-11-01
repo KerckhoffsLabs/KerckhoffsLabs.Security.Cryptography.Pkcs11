@@ -61,6 +61,35 @@ public sealed class KeyMaterialExportOptInAnalyzerTests
             diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture));
     }
 
+    // A method group escapes an invocation-only analyzer: the call it stands for happens through a delegate.
+    [Theory]
+    [InlineData("System.Func<KeyMaterialExportKind[], string, KeyMaterialExportRule> allow = KeyMaterialExportRule.Allow; return allow([KeyMaterialExportKind.KdfOutput], \"r\");")]
+    [InlineData("return Apply(KeyMaterialExportRule.Allow);")]
+    public async Task Allow_MethodGroup_ReportsKLPKCS11012(string body)
+    {
+        string source = Usings +
+            "static class C {\n" +
+            "  static KeyMaterialExportRule Apply(System.Func<KeyMaterialExportKind[], string, KeyMaterialExportRule> f) => f([KeyMaterialExportKind.KdfOutput], \"r\");\n" +
+            $"  static KeyMaterialExportRule M() {{ {body} }} }}";
+
+        Diagnostic diagnostic = Assert.Single(await AnalyzeAsync(source));
+
+        Assert.Equal("KLPKCS11012", diagnostic.Id);
+        Assert.Equal("KeyMaterialExportRule.Allow", source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length));
+        Assert.Equal(
+            "KeyMaterialExportRule.Allow lets this policy read the listed kinds off the token in the clear",
+            diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task RefuseMethodGroup_ReportsNothing()
+    {
+        string source = Usings +
+            "static class C { static KeyMaterialExportRule M() { System.Func<KeyMaterialExportRule> f = KeyMaterialExportRule.Refuse; return f(); } }";
+
+        Assert.Empty(await AnalyzeAsync(source));
+    }
+
     [Fact]
     public async Task Refuse_CallSite_ReportsNothing()
     {
