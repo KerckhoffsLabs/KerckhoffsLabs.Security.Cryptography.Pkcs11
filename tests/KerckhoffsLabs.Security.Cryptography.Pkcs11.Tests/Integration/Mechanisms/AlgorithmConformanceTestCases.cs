@@ -799,12 +799,14 @@ internal static class AlgorithmConformanceTestCases
 
     // === Key agreement ==========================================================
 
-    // SP 800-56A ECC CDH for P-256 (the suite's ECDH known answer): our private scalar, the peer's point, and Z.
-    private static readonly byte[] EcdhScalar = Convert.FromHexString("9428d7f39f5a4da29e1b5d58913961d8e104af34c0334e8ec08899a3fd5b8b67");
+    // The suite's ECDH known answer: NIST CAVP KAS ECC CDH primitive test (SP 800-56A §5.7.1.2),
+    // KAS_ECC_CDH_PrimitiveTest.txt (CAVS 14.1), [P-256] COUNT = 0: dIUT (our scalar), QCAVS (the peer's point)
+    // and ZIUT. The same vector as KnownAnswerTestCases.Assert_EcdhP256_Kat.
+    private static readonly byte[] EcdhScalar = Convert.FromHexString("7d7dc5f71eb29ddaf80d6214632eeae03d9058af1fb6d22ed80badb62bc1a534");
     private static readonly byte[] EcdhPeer = TestKeys.DerEcPoint(
-        Convert.FromHexString("5e587250eb1e96f4374b119399d529c3272e530ca679be3105820570a3f6bb38"),
-        Convert.FromHexString("ec9add0f07b0315110793e437934ae1835015713f0b30a7312213d7f9a494cdc"));
-    private static readonly byte[] EcdhZ = Convert.FromHexString("05c83b263aef2b5648428467f18a7e2bb566a5a77ef5a1732cc13fedca838b71");
+        Convert.FromHexString("700c48f77f56584c5cc632ca65640db91b6bacce3a4df6b42ce7cc838833d287"),
+        Convert.FromHexString("db71e509e3fd9b060ddb20ba5c51dcc5948d46fbf640dfe0441782cab85fa4ac"));
+    private static readonly byte[] EcdhZ = Convert.FromHexString("46fc62106420ff012e54a434fbdd2d25ccc5852060561e68040dd7778997bd7b");
 
     // With CKD_SHA256_KDF, ECDH's output is the ANSI X9.63 KDF over Z and the shared data
     // (SHA-256(Z || 00000001 || sharedData) for 32 bytes), with and without shared data. counterStartsAtZero

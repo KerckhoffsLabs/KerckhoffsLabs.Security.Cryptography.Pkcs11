@@ -1,9 +1,15 @@
+using System.Buffers.Binary;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
+
+// AES-ECB/CBC/CTR, DES and Triple-DES are unauthenticated or retired, and gated by default. They are what the
+// published block-cipher vectors exercise; the warning is suppressed for this file only.
+#pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
 
@@ -11,7 +17,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters
 /// Known-answer tests (KATs) for the primary mechanisms, pinning the interop layer to
 /// published test vectors so marshalling regressions (IV/nonce/AAD/tag/params, signature encoding)
 /// surface as wrong bytes rather than silently-passing round-trips. Expected values come from the
-/// mechanism's reference vector and were independently confirmed via the BCL primitives.
+/// mechanism's reference vector, named next to each case down to its test number, and were independently
+/// confirmed (with the BCL primitives, or OpenSSL where the BCL lacks the primitive).
 /// </summary>
 internal static class KnownAnswerTestCases
 {
@@ -241,14 +248,14 @@ internal static class KnownAnswerTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
-    // RSA-OAEP (SHA-1 / MGF1-SHA1) decrypt KAT: a fixed ciphertext produced for a fixed 2048-bit key
-    // must decrypt to the known plaintext, pinning the OAEP parameter marshalling. SoftHSM implements
-    // OAEP with SHA-1 only, so the vector uses SHA-1. (BCL-produced; OAEP encryption is randomized so a
-    // decrypt KAT is the deterministic direction.)
+    // RSA-OAEP (SHA-1 / MGF1-SHA1, empty label) decrypt KAT: Wycheproof rsa_oaep_2048_sha1_mgf1sha1_test.json,
+    // tcId 2 (C2SP/wycheproof e0df04e0), a 2048-bit key decrypting to 20 zero bytes. Pins the OAEP parameter
+    // marshalling. SoftHSM implements OAEP with SHA-1 only, hence SHA-1. OAEP encryption is randomized, so
+    // decryption is the deterministic direction.
     internal static void Assert_RsaOaep_Kat(IPkcs11Backend backend)
     {
-        byte[] ct = H("2891fee133d34bea1cfe90fd7dde58eba1cf024c0d0a40dea08bc1ff4b9da8249ce010ca44a57606363a334a954177d6d9d9b29af7af9cc57d7430baa1776dcdde005baa93d17dbb097aff817f275cab23e107f1f7e53e3c8d296da0e2a6868b78da6ae22c141bff6a6fd74fa2b3b1eb25a55069e74654ecf81a05e75b13d5f33d65573ce9b43576c1942e29860ac0ef9b61c9011b0e263a22ec23cdaa320c3c7d8c15aa62225731b97f163ef049f7c886843d55b3b581372b6f6c27275d1cf9162de7c6b8631c528349c2185c79933852997a5e511156753ddf7b172a7a194cf35b4431b19dbdbbd0ec1a7cd0ae0bc9f635aec13026f1c0c4e70a652d337d4f");
-        byte[] expectedPt = H("4b41543a205253412d4f4145502d53484131206d61727368616c6c696e67");
+        byte[] ct = H("8773fdde3f148ec33d4facdfba812e44001d90861c047a9eefe6c6540212795b50dd186bb7712b8448830fc1799e0543b7093e4770f301e9216922e80280e9b50582c669e3a9a4feb08ec6f5b2428dc7efbcf6fe49feb61fd2795af1c8b23acb605812c9d7586e4f48e4d758f0695b688d1b4b563067852b1ce9db5dc82aba29ab416178f616426e5d0caf3f9903de2a5beeb970af7281e7cdacaaa00662ae36fb0365c20c653b670b3e7be4b0680932f3254d48ec3505ca1547d1be27d2414a3539f405df91057f4f97aa7796d7ccb69ed553447131fbe79611756b7e564bba7d76ce9256168446b34498a2e91d9a955a8aa98a71a43d65ee60fcea39d811fe");
+        byte[] expectedPt = new byte[20];
 
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -266,27 +273,30 @@ internal static class KnownAnswerTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
-    // RSA-PSS (SHA-256 / MGF1-SHA256, salt = 32) verify KAT: the token must accept a fixed published
-    // signature and reject a tampered one, pinning the PSS parameter marshalling. (PSS signing is
-    // randomized, so verification is the deterministic direction.)
+    // RSA-PSS (SHA-256 / MGF1-SHA256, salt = 32) verify KAT: Wycheproof rsa_pss_2048_sha256_mgf1_32_test.json,
+    // tcId 2 (C2SP/wycheproof e0df04e0), a 2048-bit key and a 20-byte zero message. The token must accept it and
+    // reject a tampered one, pinning the PSS parameter marshalling. PSS signing is randomized, so verification is
+    // the deterministic direction.
     internal static void Assert_RsaPss_Kat(IPkcs11Backend backend)
     {
-        byte[] msg = H("4b41543a205253412d5053532d534841323536206d61727368616c6c696e67");
-        byte[] sig = H("5df789229891d1de979a891cc2c6e2bae087d4d0b4b59773e2a613e31c56043caa844b67e9b6de99029ee5eb85c56d1eab65793cca81f218ae0ed3ead217b4b3e1f88fab2f72c51d799c5f8221dab8bdf446bfe6259d5b4bbd87536f038a4d3613fefd4f86568be75f7e8c4fbc65372695e2e77c3805423aeb57c50424cb8abc0a7c3ac9458a582bf3d37d0aeb398010dd83707645f0869b3adc865783aeb0ba121cda9596d3f287798279bff2495b87a99ca01a906dc121dc57a2733a0be22b4fc4586eda26c85d987f12b553fe954a42caba73d05a6605081259be0f3d10425608beb231b8669977c605ed87363626d5b4235c3cfabc9c7c029746fdc1b54c");
+        byte[] msg = new byte[20];
+        byte[] sig = H("0658c68fe0895646056d9bca422a64fe48813b4e14f0c8c4122e56d345b6813dc6286ffde014617e351c7af0a0d2c0f285def79cb734e1e055a25fa6fddc1c07da17b4b235c637413b1849c24311fa72331f4c0458c364a4916de8619b884d7e37288fad12926fc091f4851686a04fd0a504dbce3db370663a6ea6128fea86c2ca94c63e0d34d7f2c845b5d71d9a5e544451f524a451acb85c49bba7864e0a34a48613a819caf3dfd0d510c940f1df21c3373915be1f3509a557fa4d5a4e9f273e85467961133e2482c0907386454228fb0246638616fc31bbb6fa7c2361b8035994eec69a923f4c0bb0ba8696dfe8b1400c2398d7b343fdf498b1116c8de602");
 
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            ObjectHandle pub = TestKeys.ImportRsaPublicKey(session, RsaModulus, RsaPublicExponent);
+            ObjectHandle pub = TestKeys.ImportRsaPublicKey(session, PssModulus, RsaPublicExponent);
             try
             {
                 var pss = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32);
                 var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, pss);
                 bool ok = session.Verify(mech, pub, msg, sig);
-                Assert.True(ok, "RFC 8017 RSA-PSS signature should verify under the imported public key.");
+                Assert.True(ok, "Wycheproof RSA-PSS tcId 2 should verify under the imported public key.");
 
+                // The last byte, not the first: flipping the first would make the signature exceed the modulus,
+                // which a token reports as a length error rather than a signature that does not verify.
                 byte[] tampered = [.. sig];
-                tampered[0] ^= 0xFF;
+                tampered[^1] ^= 0xFF;
                 bool bad = session.Verify(mech, pub, msg, tampered);
                 Assert.False(bad, "A tampered RSA-PSS signature must not verify.");
             }
@@ -295,14 +305,17 @@ internal static class KnownAnswerTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
-    // ECDSA P-256 verify KAT over a fixed hash. CKM_ECDSA takes the raw signature as r‖s (P1363, no DER),
-    // so a passing verify pins that fixed-width concatenation marshalling; a tampered sig must fail.
+    // ECDSA P-256 verify KAT: RFC 6979 §A.2.5, the P-256 key and its signature "With SHA-256, message =
+    // "sample"" (r, s), verified over SHA-256("sample"). CKM_ECDSA takes the raw signature as r‖s (P1363, no
+    // DER), so a passing verify pins that fixed-width concatenation marshalling; a tampered sig must fail.
     internal static void Assert_EcdsaP256_Kat(IPkcs11Backend backend)
     {
-        byte[] qx = H("bf0fae3d9cab8886477c5f968aed4b2931c6fbc1fa995a5f4418f174ce3ac49b");
-        byte[] qy = H("9b5b0abee5fd0f0078c90d620b26f1d560bcfbdbac280ff4c3bc9aafb5b10613");
-        byte[] hash = H("151606195ca4c477eca06906104edce10627489ed3b69b5789d080362af5cbf8");
-        byte[] sig = H("6dffab28a14958c6cc3bc85cd55b63bf7dc33a671d001cc60b7f788841082928eb026507951d5c65c198c6996735a599ed3c51022af4840656d90b83a764a406");
+        byte[] qx = H("60fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb6");
+        byte[] qy = H("7903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299");
+        byte[] hash = System.Security.Cryptography.SHA256.HashData("sample"u8);
+        byte[] sig = H(
+            "efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716" +
+            "f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8");
 
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -312,7 +325,7 @@ internal static class KnownAnswerTestCases
             {
                 var mech = new Mechanism(CKM.CKM_ECDSA);
                 bool ok = session.Verify(mech, pub, hash, sig);
-                Assert.True(ok, "ECDSA P-256 signature should verify under the imported public key.");
+                Assert.True(ok, "RFC 6979 A.2.5's ECDSA P-256 / SHA-256 signature should verify under its public key.");
 
                 byte[] tampered = [.. sig];
                 tampered[0] ^= 0xFF;
@@ -324,15 +337,15 @@ internal static class KnownAnswerTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
-    // ECDH P-256 derive KAT (CKD_NULL → raw shared secret Z). Pins the CK_ECDH1_DERIVE_PARAMS peer-point
-    // marshalling: importing a fixed private scalar and deriving against a fixed peer point must yield
-    // the known Z (SP 800-56A ECC CDH). The ephemeral derived secret is read then destroyed.
+    // ECDH P-256 derive KAT (CKD_NULL → raw shared secret Z): NIST CAVP KAS ECC CDH primitive test
+    // (SP 800-56A §5.7.1.2), KAS_ECC_CDH_PrimitiveTest.txt (CAVS 14.1), [P-256] COUNT = 0: dIUT, QCAVS and ZIUT.
+    // Pins the CK_ECDH1_DERIVE_PARAMS peer-point marshalling. The ephemeral derived secret is read then destroyed.
     internal static void Assert_EcdhP256_Kat(IPkcs11Backend backend)
     {
-        byte[] privScalar = H("9428d7f39f5a4da29e1b5d58913961d8e104af34c0334e8ec08899a3fd5b8b67");
-        byte[] peerX = H("5e587250eb1e96f4374b119399d529c3272e530ca679be3105820570a3f6bb38");
-        byte[] peerY = H("ec9add0f07b0315110793e437934ae1835015713f0b30a7312213d7f9a494cdc");
-        byte[] expectedZ = H("05c83b263aef2b5648428467f18a7e2bb566a5a77ef5a1732cc13fedca838b71");
+        byte[] privScalar = H("7d7dc5f71eb29ddaf80d6214632eeae03d9058af1fb6d22ed80badb62bc1a534");
+        byte[] peerX = H("700c48f77f56584c5cc632ca65640db91b6bacce3a4df6b42ce7cc838833d287");
+        byte[] peerY = H("db71e509e3fd9b060ddb20ba5c51dcc5948d46fbf640dfe0441782cab85fa4ac");
+        byte[] expectedZ = H("46fc62106420ff012e54a434fbdd2d25ccc5852060561e68040dd7778997bd7b");
 
         using var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -367,18 +380,118 @@ internal static class KnownAnswerTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
-    // Fixed 2048-bit RSA key (BCL-generated) shared by the RSA-OAEP and RSA-PSS KATs.
-    private static readonly byte[] RsaModulus = H("e4daddcca4cc007891cc71c153c95f2c94407dc07ac0fffce5af7a35cea05d97475c764430289f697cfd7388440c601d50bde1a233e63ba0bc59e99549c226a503d9980e19af85a6252a75c05c3086a9b0f36965e6c672301baf69a4e9a9c85f926d434860551dccedde0f138d24a7c6058aaaa79506633000f5930e736b036739973c8ff975de17bc89fe43fb109bcce1f08a020671b1b5acb67a51a301b942d2e5d013f20ef83e4f2244da2b95d93d1ae377ac924a861c2689e2696f1d214634f6205ec3193bb2d17aafc3dcc50ddc5b7fe12ad6172e8ee3742dc5115c7114508d0acadd2730121d041959cc18775c3d3f2d1f863a33edf98d04d6d4f51737");
+    // The 2048-bit keys of the Wycheproof vectors: the private key of rsa_oaep_2048_sha1_mgf1sha1 for RSA-OAEP,
+    // and the public key of rsa_pss_2048_sha256_mgf1_32 for RSA-PSS (both with e = 65537).
+    private static readonly byte[] RsaModulus = H("bd31c7a02691d2d9587ef6a946ff788544ccadd4b2988ad62086792a6bf96c8616b4ad13317d2270b901d0fcd1d880cb8f52fb87304a5258c11b38dfeae8df670aeee7ea1d0d9df8e00e80847e41e5989ed402d44e78b30fef17b5671d3adbf8685e4dc204499ecd1863e1d5aff28a7cf66eadf31fec9236c120add13451522c647c9832a672cd64d328c1c322183f4661d09bda60b8dd5f0328da5420821424afdabb1a80c5d12763a1b0238cd89d0742bfc50b6a2fcb701d824218f9826f4f78a23a2b5aa42ace7f175376fb6cbdb2bad293ba583d4d31c6b8f9029e46b13689249855f505756e00e225a6a45a18769bd8d2b3a4acb9f1c23d3e51882561e5");
+    private static readonly byte[] PssModulus = H("a2b451a07d0aa5f96e455671513550514a8a5b462ebef717094fa1fee82224e637f9746d3f7cafd31878d80325b6ef5a1700f65903b469429e89d6eac8845097b5ab393189db92512ed8a7711a1253facd20f79c15e8247f3d3e42e46e48c98e254a2fe9765313a03eff8f17e1a029397a1fa26a8dce26f490ed81299615d9814c22da610428e09c7d9658594266f5c021d0fceca08d945a12be82de4d1ece6b4c03145b5d3495d4ed5411eb878daf05fd7afc3e09ada0f1126422f590975a1969816f48698bcbba1b4d9cae79d460d8f9f85e7975005d9bc22c4e5ac0f7c1a45d12569a62807d3b9a02e5a530e773066f453d1f5b4c2e9cf7820283f742b9d5");
     private static readonly byte[] RsaPublicExponent = H("010001");
 
     private static ObjectHandle ImportRsaPrivateKey(Pkcs11SessionCore session) => TestKeys.ImportRsaPrivateKey(
         session,
         RsaModulus,
         RsaPublicExponent,
-        privateExponent: H("03ce2a78d3c34a024112aeedb2fb271853b4bef8b41937124f69b6aaedd683cccd6d3bf8328592663ce877f93593d7417312498410d3b41aa8122fbdda169eb643f2c6dfc125d05a9914258c3f2af38cbcdcb121279a295dada65327cce08a58e6a235ef00e2c0d1ad6667e3d8fd3c01661e1d1d52792823c0c7197f3b0e273492408102b209cb063cadcb6b86fe78627b916d35be847fb5669a9256576f98081892294d6eb226bbb752df9ce518c5a2c5b20c40fb4dce844a7f02cb2dc8200bb6c156ed047cc26a898347e77200ed75a59b210693e404ea4cde0156d74555f79e6fb44668c0fa09afaca9c11bf9913da7ff0b82be667ee63af8c2923a0ec87d"),
-        prime1: H("ffef891cd4299e95cac4b90b358588a5429b027b4d0c4849eb604cf36459983ff5fc1a702c882c2682f78754de7cc611e15bcdb45d4cb7cdb4a6be1fe3d2e8551e2f4b57391e030bd7fbab4c1b255bf0d48633a8aa9a16ea2d4a9b530e96ff0d5759d95c9d208479b6c51ff7694fe1301e3c90410da8b715ce3312cd3c09927d"),
-        prime2: H("e4e996b4dde4ce1d836c3f9b80eb82d3476c42a9dac7701cd473f6740bd6b91d1ad13799d9e1b81315f272540b8d553bfd2708800128edc5977784299ab4873e83cff835f27702c929c516a3998707291b2e70d07693c0e8eaad393ad537ec168bc7147da16fb8398392fbe53a55f2f0c41efb771049e93e4375c60085ca2ac3"),
-        exponent1: H("33627e5ee161f1cb1548e5f6102add4280daea66a3138238051ff2933364a1a2c5da75dc6bb47358d016ae7f25a45b881f7cf511ef6185cdb125812a99ed306456891c5148d073c01eff12675753eadfb16bb85776d9351c93375574198bcb6d7c4a37cfd6643ef4c8f34ef5b7992817271af5c379e093d1b6f29e25c2961169"),
-        exponent2: H("7f8908f711dd655c9a1918432a0b8ca2ebdb0c3517f81fa560548f4dce3ebe79d1b418b735e605295503f3e0916317c6c95f12e44641285ffae892909f69cf23ec4a552eb13ccf27868710faeb1188d2c51b15ad7f3308ba7bed30c26f82ad9d4e1907788b15f45cceca785f192643a9128b746cbc7d815eb83508b0c7d98003"),
-        coefficient: H("394c177e4c3963473d40b7ee666201d0d1af223da40d194e8dc7ece409b4d3ecfe2ceef2fc1c7a15f9b0edc02425d3069ee6075ecc2ab59841a756c90f6e557dfe4bba8034df499ad20cffa12f7629eec7ba27190127c005008625c3b09cf64cda1997570948d51bb829672903e12981722a851d14e8a33d41d75a9ca031f707"));
+        privateExponent: H("0747d520ca9b2dfc0335cf94301140b8102fb838c92ea99917e354e25709602dc0cdef231ff26ad2dfabbc391e723072a4ef52929f3f1cf0216e44c0093030f8ac29096faef28933bc9b924287014e2e935e2145be4752ccb82cb7646271936979cab73f521eeb27855ac2a410834ae5082eb62ef6f9899ee5cbb624a8d8c04ab7edcf78fe135d0f808f63b5de6e071779bf1d9eaaf8d3ef965486f2c52625e6e57a651c7bbd0197c99c057b3860a3260c864a11b3cf22ba44de3a3b3f3117e64ebf9a91f626ebb3f3c26d1b0bb80753468d4bf6a997b28335f20ed8c384d7558360a9ae9755661fa3749846b174e6bf330e52d09941f6ccd7de5004779f9bb9"),
+        prime1: H("fe3d238d376a3856d9592fd4961c17a7fb0fa39d442e9df22e7eda115c648c5cb738df89ea92d8378558d0d9c1cf3d8bff740d3743a0140a6a7523e9176c2953b2c11d7f44691cf8bec2b34fb59c649535983319488118c03118ae7445e70df466ce98671260f05d5068ce777da97e2ba84779490500ceb4ff7f62ceca9a147f"),
+        prime2: H("be814af26bf3c27115bc7595d0d12a1af7713feca877ae6e6d858825eda3d192704774f42e1ae1b67f1739e8c45a0476388070fa545b7cc96b8a44003bc8d07fde73f5bcdd18268395dcc2842b5023ff14b352382607b7179a5ea330840fc45045d86e0acc4feb135f0ab9b7ce6b8eb5f5a575f2a2a8de299c0d3f506df4879b"),
+        exponent1: H("61bb4cf4572e0cf44ddefc0503a34ef0b31142fb0c9fc2f5bb2be656302732d1dd590e8d6cd0002fefa1c1bf43c28fcd4668ed3fa64e5e05d700aaca4ac7b867455af924d83e73f5a7171f68efce6bd7f3df4b1d5802d069e935acb263c0bb5b8d3db3d64379624cecc12d453fd82cf9495a18649a78c1fd500e3f04715ba3af"),
+        exponent2: H("6649dbe920a7a8ceb982108cd9ab857527498aae52a2b86918ab6b381a4a2cbbf94794f78b4de9c5e8a59af56d807c06d23dbcebdca1a6f62ba4f8f03b298f32294a9036d16c2739de1cc3e0ddb4d12f2479487b57882afa246c0e297daf4d94607c5e51b3f4715f5c57d0f26d867901209db02010d0a541284640a9b9f06363"),
+        coefficient: H("39ec606f5c9f1f33d964606e128e9e90cff932772c5715aa759816d504efe2c46206f3379aa61d31f88e726b50dd80b8ce8558a0d7408525f58c3399ce32e239d70941f12d21e7761c043e0b02220d25ffd03571c7ae5bbd59c31f48120676f9d7c370a749d8491bdfcea01662a136c85d349b6c710fc6f6ebf8a7a79b62adc3"));
+
+    // === Block ciphers, from NIST's published examples =======================================
+
+    // NIST SP 800-38A Appendix F: the four-block plaintext every mode example encrypts.
+    private static readonly byte[] Sp80038aPlaintext = H(
+        "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51" +
+        "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710");
+    private static readonly byte[] Sp80038aAes128Key = H("2b7e151628aed2a6abf7158809cf4f3c");
+    private static readonly byte[] Sp80038aAes256Key = H("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4");
+
+    public static TheoryData<int> AesKeyBits => [128, 256];
+
+    // AES-ECB: SP 800-38A F.1.1 (ECB-AES128.Encrypt) and F.1.5 (ECB-AES256.Encrypt).
+    internal static void Assert_AesEcb_Sp80038a_Kat(IPkcs11Backend backend, int keyBits) =>
+        AssertCipherKat(backend, CKK.CKK_AES, keyBits == 128 ? Sp80038aAes128Key : Sp80038aAes256Key,
+            new Mechanism(CKM.CKM_AES_ECB), Sp80038aPlaintext, H(keyBits == 128
+                ? "3ad77bb40d7a3660a89ecaf32466ef97f5d3d58503b9699de785895a96fdbaaf43b1cd7f598ece23881b00e3ed0306887b0c785e27e8ad3f8223207104725dd4"
+                : "f3eed1bdb5d2a03c064b5a7e3db181f8591ccb10d410ed26dc5ba74a31362870b6ed21b99ca6f4f9f153e7b1beafed1d23304b7a39f9f3ff067d8d8f9e24ecc7"));
+
+    // AES-CBC: SP 800-38A F.2.1 (CBC-AES128.Encrypt) and F.2.5 (CBC-AES256.Encrypt), IV 000102...0f.
+    internal static void Assert_AesCbc_Sp80038a_Kat(IPkcs11Backend backend, int keyBits) =>
+        AssertCipherKat(backend, CKK.CKK_AES, keyBits == 128 ? Sp80038aAes128Key : Sp80038aAes256Key,
+            new Mechanism(CKM.CKM_AES_CBC, H("000102030405060708090a0b0c0d0e0f")), Sp80038aPlaintext, H(keyBits == 128
+                ? "7649abac8119b246cee98e9b12e9197d5086cb9b507219ee95db113a917678b273bed6b8e3c1743b7116e69e222295163ff1caa1681fac09120eca307586e1a7"
+                : "f58c4c04d6e5f1ba779eabfb5f7bfbd69cfc4e967edb808d679f777bc6702c7d39f23369a9d9bacfa530e26304231461b2eb05e2c39be9fcda6c19078c6a9d1b"));
+
+    // AES-CTR: SP 800-38A F.5.1 (CTR-AES128.Encrypt) and F.5.5 (CTR-AES256.Encrypt), initial counter
+    // f0f1...feff, incremented over the whole 128-bit block (ulCounterBits = 128).
+    internal static void Assert_AesCtr_Sp80038a_Kat(IPkcs11Backend backend, int keyBits) =>
+        AssertCipherKat(backend, CKK.CKK_AES, keyBits == 128 ? Sp80038aAes128Key : Sp80038aAes256Key,
+            AesCtr(128, H("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")), Sp80038aPlaintext, H(keyBits == 128
+                ? "874d6191b620e3261bef6864990db6ce9806f66b7970fdff8617187bb9fffdff5ae4df3edbd5d35e5b4f09020db03eab1e031dda2fbe03d1792170a0f3009cee"
+                : "601ec313775789a5b7a7f504bbf3d228f443e3ca4d62b59aca84e990cacaf5c52b0930daa23de94ce87017ba2d84988ddfc9c58db67aada613c2dd08457941a6"));
+
+    // NIST's TDES example values ("Examples with Intermediate Values", TDES_ECB.pdf and TDES_CBC.pdf, cited by
+    // SP 800-67 Rev. 2 Appendix B): three-key TDEA, Key1 0123456789ABCDEF, Key2 23456789ABCDEF01,
+    // Key3 456789ABCDEF0123, and the first two blocks' worth (32 bytes) of SP 800-38A's plaintext.
+    private static readonly byte[] TdesKey = H("0123456789abcdef23456789abcdef01456789abcdef0123");
+    private static readonly byte[] TdesPlaintext = Sp80038aPlaintext[..32];
+
+    // Triple-DES ECB: TDES_ECB.pdf, ECB-TDES (Encryption), the first example.
+    internal static void Assert_TripleDesEcb_Kat(IPkcs11Backend backend) =>
+        AssertCipherKat(backend, CKK.CKK_DES3, TdesKey, new Mechanism(CKM.CKM_DES3_ECB), TdesPlaintext,
+            H("714772f339841d34267fcc4bd2949cc3ee11c22a576a303876183f99c0b6de87"));
+
+    // Triple-DES CBC: TDES_CBC.pdf, CBC-TDES (Encryption), the first example (IV F69F2445DF4F9B17).
+    internal static void Assert_TripleDesCbc_Kat(IPkcs11Backend backend) =>
+        AssertCipherKat(backend, CKK.CKK_DES3, TdesKey, new Mechanism(CKM.CKM_DES3_CBC, H("f69f2445df4f9b17")), TdesPlaintext,
+            H("2079c3d53aa763e193b79e2569ab5262516570481f25b50f73c0bda85c8e0da7"));
+
+    // Single DES ECB: NIST SP 800-20 Table A.2 (Variable Key Known Answer Test), rounds 0 and 1: keys
+    // 8001010101010101 and 4001010101010101, each encrypting the zero block. Table A.2, not A.1: A.1's key
+    // 0101010101010101 is a DES weak key, which a token may refuse to import.
+    public static TheoryData<string, string> DesVariableKeyRounds => new()
+    {
+        { "8001010101010101", "95a8d72813daa94d" },
+        { "4001010101010101", "0eec1487dd8c26d5" },
+    };
+
+    internal static void Assert_DesEcb_Sp80020_Kat(IPkcs11Backend backend, string key, string ciphertext) =>
+        AssertCipherKat(backend, CKK.CKK_DES, H(key), new Mechanism(CKM.CKM_DES_ECB), new byte[8], H(ciphertext));
+
+    // Imports key, encrypts plaintext under mechanism to expected, and decrypts it back. The session runs under
+    // AllowInsecure for the lease's span only: these modes and ciphers are gated by default.
+    private static void AssertCipherKat(IPkcs11Backend backend, CKK keyType, byte[] key, Mechanism mechanism, byte[] plaintext, byte[] expected)
+    {
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, keyType);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var encrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            using var decrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+            using var value = new ObjectAttribute(CKA.CKA_VALUE, key);
+            ObjectHandle k = session.CreateObject([cls, type, token, encrypt, decrypt, value]);
+            try
+            {
+                using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+                Assert.Equal(expected, session.Encrypt(mechanism, k, plaintext));
+                Assert.Equal(plaintext, session.Decrypt(mechanism, k, expected));
+            }
+            finally { session.DestroyObject(k); }
+        }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
+    }
+
+    // A CKM_AES_CTR mechanism: CK_AES_CTR_PARAMS is ulCounterBits (a native CK_ULONG), then the counter block.
+    private static Mechanism AesCtr(ulong counterBits, byte[] counterBlock)
+    {
+        byte[] parameter = new byte[UnmanagedMemory.NativeULongSize + 16];
+        if (UnmanagedMemory.NativeULongSize == 8)
+            BinaryPrimitives.WriteUInt64LittleEndian(parameter, counterBits);
+        else
+            BinaryPrimitives.WriteUInt32LittleEndian(parameter, checked((uint)counterBits));
+        counterBlock.CopyTo(parameter, parameter.Length - 16);
+        return new Mechanism(CKM.CKM_AES_CTR, parameter);
+    }
 }

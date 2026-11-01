@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
@@ -46,4 +47,31 @@ public sealed class KnownAnswerTests_SoftHsm(SoftHsmBackendFixture f)
 
     [Fact(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
     public void EcdhP256_Kat() => KnownAnswerTestCases.Assert_EcdhP256_Kat(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
+    [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
+    public void AesEcb_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_ECB); KnownAnswerTestCases.Assert_AesEcb_Sp80038a_Kat(_backend, keyBits); }
+
+    [Theory(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
+    [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
+    public void AesCbc_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_CBC); KnownAnswerTestCases.Assert_AesCbc_Sp80038a_Kat(_backend, keyBits); }
+
+    [Theory(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
+    [MemberData(nameof(KnownAnswerTestCases.AesKeyBits), MemberType = typeof(KnownAnswerTestCases))]
+    public void AesCtr_Sp80038a_Kat(int keyBits) { _backend.RequireMechanism(CKM.CKM_AES_CTR); KnownAnswerTestCases.Assert_AesCtr_Sp80038a_Kat(_backend, keyBits); }
+
+    [Fact(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
+    public void TripleDesEcb_Kat() { _backend.RequireMechanism(CKM.CKM_DES3_ECB); KnownAnswerTestCases.Assert_TripleDesEcb_Kat(_backend); }
+
+    [Fact(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
+    public void TripleDesCbc_Kat() { _backend.RequireMechanism(CKM.CKM_DES3_CBC); KnownAnswerTestCases.Assert_TripleDesCbc_Kat(_backend); }
+
+    // SoftHSM lists CKM_DES_ECB but cannot run it: its cipher is EVP_des_ecb() (OSSLDES.cpp), which OpenSSL 3 keeps in the
+    // legacy provider SoftHSM does not load, so encryptInit fails and C_EncryptInit answers CKR_MECHANISM_INVALID
+    // (SoftHSM.cpp, SymEncryptInit).
+    public static bool SoftHsmRunsSingleDes => false;
+
+    [Theory(SkipUnless = nameof(SoftHsmRunsSingleDes), Skip = "Requires " + nameof(SoftHsmRunsSingleDes))]
+    [MemberData(nameof(KnownAnswerTestCases.DesVariableKeyRounds), MemberType = typeof(KnownAnswerTestCases))]
+    public void DesEcb_Sp80020_Kat(string key, string ciphertext) { _backend.RequireMechanism(CKM.CKM_DES_ECB); KnownAnswerTestCases.Assert_DesEcb_Sp80020_Kat(_backend, key, ciphertext); }
 }
