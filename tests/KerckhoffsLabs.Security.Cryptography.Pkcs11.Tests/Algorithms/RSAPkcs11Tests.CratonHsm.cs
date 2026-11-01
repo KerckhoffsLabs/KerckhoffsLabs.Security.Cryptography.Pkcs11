@@ -85,9 +85,6 @@ public sealed class RSAPkcs11Tests_CratonHsm(CratonHsmBackendFixture backend)
     public void Decrypt_NullArguments_Throw() => RSAPkcs11TestCases.Assert_Decrypt_NullArguments_Throw(_backend);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared() => RSAPkcs11TestCases.Assert_Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared(_backend, RSAPkcs11TestCases.Pkcs1InvalidPadding.Throws);
-
-    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void Decrypt_TamperedOaepCiphertext_Throws() => RSAPkcs11TestCases.Assert_Decrypt_TamperedOaepCiphertext_Throws(_backend);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]

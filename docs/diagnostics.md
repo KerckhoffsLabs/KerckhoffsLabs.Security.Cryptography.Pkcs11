@@ -98,8 +98,9 @@ Behaviour depends on the token's version and configuration, so check yours:
 
 | Token | Invalid PKCS#1 v1.5 padding |
 |---|---|
-| SoftHSMv2, Kryoptic, NSS, openCryptoki, FreeHSM | Implicit rejection: a synthetic plaintext |
-| BouncyHsm, Craton HSM, wolfPKCS11 | `C_Decrypt` fails |
+| SoftHSMv2 and FreeHSM on OpenSSL 3.2 or later, Kryoptic, current NSS, openCryptoki | Implicit rejection: a synthetic plaintext |
+| SoftHSMv2 on OpenSSL 1.1 (SoftHSM 2.5), NSS 3.51, BouncyHsm, wolfPKCS11 | `C_Decrypt` fails |
+| Craton HSM | No PKCS#1 v1.5 decryption: `CKM_RSA_PKCS` is not offered |
 
 OAEP (`RSAEncryptionPadding.OaepSHA256`, `CKM_RSA_PKCS_OAEP`) is the fix, but its decoding failures
 must be handled the same way: answer every failure with the same response and the same timing, and do

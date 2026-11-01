@@ -87,7 +87,11 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void Decrypt_NullArguments_Throw() => RSAPkcs11TestCases.Assert_Decrypt_NullArguments_Throw(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared() => RSAPkcs11TestCases.Assert_Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared(_backend, RSAPkcs11TestCases.Pkcs1InvalidPadding.ImplicitRejection);
+    // SoftHSM decrypts through OpenSSL, which does implicit rejection from 3.2. The v2.40 leg's SoftHSM 2.5
+    // is the Debian buster build, linked against OpenSSL 1.1, so there bad padding fails.
+    public void Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared() =>
+        RSAPkcs11TestCases.Assert_Decrypt_Pkcs1InvalidPadding_BehavesAsDeclared(_backend,
+            SoftHsmBackendFixture.IsV240Leg ? RSAPkcs11TestCases.Pkcs1InvalidPadding.Throws : RSAPkcs11TestCases.Pkcs1InvalidPadding.ImplicitRejection);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Decrypt_TamperedOaepCiphertext_Throws() => RSAPkcs11TestCases.Assert_Decrypt_TamperedOaepCiphertext_Throws(_backend);
