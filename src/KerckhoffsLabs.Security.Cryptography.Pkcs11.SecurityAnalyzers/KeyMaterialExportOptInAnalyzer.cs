@@ -7,14 +7,16 @@ using Microsoft.CodeAnalysis.Operations;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers;
 
 /// <summary>
-/// Reports every <c>KeyMaterialExportRule.Allow</c> call site (KLPKCS11012).
+/// Reports every <c>KeyMaterialExportRule.Allow</c> call site and method-group reference (KLPKCS11012).
 /// </summary>
 /// <remarks>
 /// <c>Allow</c> is the one way to let a policy read derived, agreed or encapsulated secrets off the token
 /// in the clear. It is legitimate (a protocol that needs the bytes), so it is not <c>[Obsolete]</c>, but
 /// every use deserves a reviewer's eye: the warning makes the opt-in visible in the build, and the
-/// suppression that silences it is where its justification lives. At run time each allowed export also
-/// logs a warning (<c>KeyMaterialExportAllowed</c>); this is the compile-time half of the same signal.
+/// suppression that silences it is where its justification lives. At run time the first export of each kind a
+/// policy allows on a session also logs a warning (<c>KeyMaterialExportAllowed</c>); this is the compile-time half
+/// of the same signal. A method group (<c>Func&lt;…&gt; allow = KeyMaterialExportRule.Allow;</c>) is reported
+/// as well: it opts in as surely as a call.
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class KeyMaterialExportOptInAnalyzer : DiagnosticAnalyzer
@@ -53,19 +55,33 @@ public sealed class KeyMaterialExportOptInAnalyzer : DiagnosticAnalyzer
             if (rule is null || kind is null)
                 return;
 
-            start.RegisterOperationAction(ctx => Analyze(ctx, rule, kind), OperationKind.Invocation);
+            start.RegisterOperationAction(ctx => AnalyzeInvocation(ctx, rule, kind), OperationKind.Invocation);
+            // A method group (Func<...> allow = KeyMaterialExportRule.Allow;) opts in as surely as a call,
+            // with the kinds supplied wherever the delegate is invoked.
+            start.RegisterOperationAction(ctx => AnalyzeMethodReference(ctx, rule), OperationKind.MethodReference);
         });
     }
 
-    private static void Analyze(OperationAnalysisContext context, INamedTypeSymbol rule, INamedTypeSymbol kind)
+    private static void AnalyzeInvocation(OperationAnalysisContext context, INamedTypeSymbol rule, INamedTypeSymbol kind)
     {
         var invocation = (IInvocationOperation)context.Operation;
-        IMethodSymbol target = invocation.TargetMethod;
-        if (target.Name != "Allow" || !SymbolEqualityComparer.Default.Equals(target.ContainingType, rule))
+        if (!IsAllow(invocation.TargetMethod, rule))
             return;
 
         context.ReportDiagnostic(Diagnostic.Create(Rule, invocation.Syntax.GetLocation(), DescribeKinds(invocation, kind)));
     }
+
+    private static void AnalyzeMethodReference(OperationAnalysisContext context, INamedTypeSymbol rule)
+    {
+        var reference = (IMethodReferenceOperation)context.Operation;
+        if (!IsAllow(reference.Method, rule))
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(Rule, reference.Syntax.GetLocation(), UnknownKinds));
+    }
+
+    private static bool IsAllow(IMethodSymbol method, INamedTypeSymbol rule)
+        => method.Name == "Allow" && SymbolEqualityComparer.Default.Equals(method.ContainingType, rule);
 
     // The kinds as written, when every element is a KeyMaterialExportKind member named in the source
     // ([KeyMaterialExportKind.KdfOutput], new[] { ... }); anything else (a variable, a cast, a LINQ query)
