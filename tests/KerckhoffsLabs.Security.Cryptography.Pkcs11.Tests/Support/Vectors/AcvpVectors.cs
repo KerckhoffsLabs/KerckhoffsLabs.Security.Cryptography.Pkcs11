@@ -12,23 +12,33 @@ internal static class AcvpVectors
 {
     internal sealed record MlKemDecapsulation(int TgId, string ParameterSet, int TcId, string Reason, byte[] Dk, byte[] C, byte[] K);
 
-    internal sealed record MlDsaVerification(
+    // A signature verification or deterministic signature case of ML-DSA (FIPS 204) or SLH-DSA (FIPS 205).
+    internal sealed record PqcVerification(
         int TgId, string ParameterSet, string PreHash, int TcId, bool TestPassed, string Reason, string HashAlg,
         byte[] Pk, byte[] Message, byte[] Context, byte[] Signature);
 
-    internal sealed record MlDsaSignature(int TgId, string ParameterSet, int TcId, byte[] Sk, byte[] Pk, byte[] Message, byte[] Context, byte[] Signature);
+    internal sealed record PqcSignature(int TgId, string ParameterSet, int TcId, byte[] Sk, byte[] Pk, byte[] Message, byte[] Context, byte[] Signature);
 
     internal static IReadOnlyList<MlKemDecapsulation> MlKemDecapsulations { get; } =
         Cases("ML-KEM-encapDecap-FIPS203", (g, t) => new MlKemDecapsulation(
             Int(g, "tgId"), Str(g, "parameterSet"), Int(t, "tcId"), Str(t, "reason"), Hex(t, "dk"), Hex(t, "c"), Hex(t, "k")));
 
-    internal static IReadOnlyList<MlDsaVerification> MlDsaVerifications { get; } =
-        Cases("ML-DSA-sigVer-FIPS204", (g, t) => new MlDsaVerification(
+    internal static IReadOnlyList<PqcVerification> MlDsaVerifications { get; } =
+        Cases("ML-DSA-sigVer-FIPS204", (g, t) => new PqcVerification(
             Int(g, "tgId"), Str(g, "parameterSet"), Str(g, "preHash"), Int(t, "tcId"), t.GetProperty("testPassed").GetBoolean(),
             Str(t, "reason"), Str(t, "hashAlg"), Hex(t, "pk"), Hex(t, "message"), Hex(t, "context"), Hex(t, "signature")));
 
-    internal static IReadOnlyList<MlDsaSignature> MlDsaDeterministicSignatures { get; } =
-        Cases("ML-DSA-sigGen-FIPS204", (g, t) => new MlDsaSignature(
+    internal static IReadOnlyList<PqcSignature> MlDsaDeterministicSignatures { get; } =
+        Cases("ML-DSA-sigGen-FIPS204", (g, t) => new PqcSignature(
+            Int(g, "tgId"), Str(g, "parameterSet"), Int(t, "tcId"), Hex(t, "sk"), Hex(t, "pk"), Hex(t, "message"), Hex(t, "context"), Hex(t, "signature")));
+
+    internal static IReadOnlyList<PqcVerification> SlhDsaVerifications { get; } =
+        Cases("SLH-DSA-sigVer-FIPS205", (g, t) => new PqcVerification(
+            Int(g, "tgId"), Str(g, "parameterSet"), Str(g, "preHash"), Int(t, "tcId"), t.GetProperty("testPassed").GetBoolean(),
+            Str(t, "reason"), Str(t, "hashAlg"), Hex(t, "pk"), Hex(t, "message"), Hex(t, "context"), Hex(t, "signature")));
+
+    internal static IReadOnlyList<PqcSignature> SlhDsaDeterministicSignatures { get; } =
+        Cases("SLH-DSA-sigGen-FIPS205", (g, t) => new PqcSignature(
             Int(g, "tgId"), Str(g, "parameterSet"), Int(t, "tcId"), Hex(t, "sk"), Hex(t, "pk"), Hex(t, "message"), Hex(t, "context"), Hex(t, "signature")));
 
     private static List<T> Cases<T>(string name, Func<JsonElement, JsonElement, T> read)
