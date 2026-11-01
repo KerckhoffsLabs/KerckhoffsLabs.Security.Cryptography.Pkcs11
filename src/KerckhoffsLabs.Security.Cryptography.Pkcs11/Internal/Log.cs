@@ -82,9 +82,14 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy override {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyOverridden(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
 
-    // Names the kind and the policy only; the exported bytes are never an argument.
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy {PolicyName} allowed export of {Kind} off the token")]
+    // Both name the kind and the policy only; the exported bytes are never an argument. The warning is
+    // written for the first export of a kind a policy allows on a session, the debug line for every later
+    // one, so a hot KDF or KEM path does not flood the log at Warning.
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy {PolicyName} allowed export of {Kind} off the token; further exports of {Kind} under it log at Debug")]
     public static partial void KeyMaterialExportAllowed(ILogger logger, ulong sessionId, string policyName, KeyMaterialExportKind kind);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Session({SessionId}): policy {PolicyName} allowed export of {Kind} off the token")]
+    public static partial void KeyMaterialExported(ILogger logger, ulong sessionId, string policyName, KeyMaterialExportKind kind);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Session({SessionId}): policy restored {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyRestored(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);

@@ -1,13 +1,15 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
 /// <summary>
 /// Reads the output of an on-token KDF back into managed memory, for the adapters whose BCL contract
-/// returns bytes (<see cref="SP800108HmacCounterKdfPkcs11"/>, <see cref="HkdfPkcs11"/>).
+/// returns bytes (<see cref="SP800108HmacCounterKdfPkcs11"/>, <see cref="HkdfPkcs11"/>,
+/// <see cref="Pkcs11Key.DeriveBytes"/>).
 /// </summary>
 internal static class DerivedKeyMaterial
 {
@@ -21,70 +23,22 @@ internal static class DerivedKeyMaterial
     /// <exception cref="CryptographicException">The token returned a value of a different length than requested.</exception>
     public static byte[] DeriveAndRead(Pkcs11Key baseKey, Mechanism mechanism, int length)
     {
-        baseKey.Session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
+        // The export check comes first: it is what a policy that allows extractable templates but not
+        // plaintext KDF output (a FIPS-style policy) relies on.
+        using SecretReadBack readBack = baseKey.Session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
+        using var template = ExtractableSecretTemplate(length);
+        return readBack.Read(() => baseKey.Derive(mechanism, template), length, ReadBackFailures.KdfOutput);
+    }
 
-        // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
-        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+    /// <summary>
+    /// A session-scoped, extractable, non-sensitive generic secret of <paramref name="length"/> bytes, so its
+    /// <c>CKA_VALUE</c> can be read back. Created inside a <see cref="SecretReadBack"/>, the policy judges it as that
+    /// read-back (<see cref="KeyTemplateRequest.ReadBackFor"/>).
+    /// </summary>
+    internal static ObjectTemplate ExtractableSecretTemplate(int length) =>
+        ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .ValueLen(length)
             .Extractable()
             .Sensitive(false)
             .Build();
-
-        // The template asks for an extractable, non-sensitive key. It is tagged as the read-back of the
-        // KdfOutput export allowed above, so a built-in policy judges it by its export rule; a custom
-        // policy sees the tag on the KeyTemplateRequest. The export check above stays first: it is what
-        // a policy that allows such templates but not plaintext KDF output (a FIPS-style policy) relies on.
-        Pkcs11Key derived = baseKey.Derive(mechanism, template, KeyMaterialExportKind.KdfOutput);
-        bool operationFailed = true;
-        try
-        {
-            // ObjectAttribute owns an unmanaged buffer holding the derived key material, and
-            // freeing it is what zeroizes it. Without this the secret stays in unmanaged memory
-            // for the life of the process.
-            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                throw new InvalidOperationException(
-                    "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
-            byte[] value = attrs[0].GetValueAsByteArray();
-
-            // A token that ignores CKA_VALUE_LEN would hand back a truncated or oversized key.
-            if (value.Length != length)
-            {
-                CryptographicOperations.ZeroMemory(value);
-                throw new CryptographicException(
-                    $"The token returned {value.Length} bytes of derived key material; {length} were requested.");
-            }
-            operationFailed = false;
-            return value;
-        }
-        finally
-        {
-            DestroyEphemeral(derived, operationFailed);
-        }
-    }
-
-    /// <summary>
-    /// Destroys an ephemeral derived key without letting a cleanup failure hide a real one.
-    /// </summary>
-    /// <remarks>
-    /// A throw from <see langword="finally"/> <i>replaces</i> an exception already in flight, so a failed
-    /// <c>C_DestroyObject</c> would reach the caller in place of whatever actually went wrong. This
-    /// suppresses the destroy failure only on that path: when the operation succeeded, the destroy
-    /// failure is the only news and is allowed to surface. The key is a session object either way, so
-    /// the token collects it at <c>C_CloseSession</c> even when the eager destroy fails.
-    /// </remarks>
-    private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
-    {
-        using (derived)
-        {
-            try
-            {
-                derived.Destroy();
-            }
-            catch (Pkcs11Exception) when (operationFailed)
-            {
-                // Deliberately swallowed: see the remarks. The primary exception is the useful one.
-            }
-        }
-    }
 }

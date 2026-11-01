@@ -720,6 +720,114 @@ public sealed class KeyMaterialExportOptInTests
             Assert.Null(module.DerivedWith);
         });
 
+    // === A read-back template is still judged by the template rule, but for sensitivity ==========
+
+    // A template rule that refuses CKA_VALUE_LEN above 32 bytes, and records what it was shown (the
+    // attributes are the library's and released after the call, so only their types are kept).
+    private static (ICryptoPolicy Policy, List<(KeyMaterialExportKind? ReadBackFor, CKA[] Types)> Seen) ValueLenCappedOptIn(params KeyMaterialExportKind[] kinds)
+    {
+        var seen = new List<(KeyMaterialExportKind?, CKA[])>();
+        ICryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("Capped opt-in")
+            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, "test"))
+            .WithKeyTemplateRule(KeyTemplateRule.FromDelegate(r =>
+            {
+                seen.Add((r.ReadBackFor, [.. r.Attributes.Select(a => a.Type)]));
+                return r.Attributes.Any(a => a.Type == CKA.CKA_VALUE_LEN && a.GetValueAsUlong() > 32)
+                    ? PolicyDecision.Deny("CKA_VALUE_LEN above 32 bytes")
+                    : PolicyDecision.Allow;
+            }, "CKA_VALUE_LEN at most 32 bytes"))
+            .Build();
+        return (policy, seen);
+    }
+
+    [Fact]
+    public void ReadBackTemplate_IsStillJudgedByTheTemplateRule_WithoutSensitivityOrExtractability()
+    {
+        (ICryptoPolicy policy, var seen) = ValueLenCappedOptIn(KeyMaterialExportKind.KdfOutput);
+        WithSession(policy, session =>
+        {
+            using var ikm = ImportIkm(session);
+            seen.Clear();
+
+            Assert.Equal(32, ikm.DeriveBytes(HkdfMechanism(), 32).Length);
+
+            (KeyMaterialExportKind? readBackFor, CKA[] types) = Assert.Single(seen);
+            Assert.Equal(KeyMaterialExportKind.KdfOutput, readBackFor);
+            Assert.DoesNotContain(types, t => t is CKA.CKA_SENSITIVE or CKA.CKA_EXTRACTABLE);
+            Assert.Contains(CKA.CKA_VALUE_LEN, types);
+
+            var e = Assert.Throws<CryptoPolicyViolationException>(() => ikm.DeriveBytes(HkdfMechanism(), 33));
+            Assert.Contains("CKA_VALUE_LEN above 32 bytes", e.Message);
+        });
+    }
+
+    // The template rule is consulted only once the export rule allowed the kind; it can refuse, never allow.
+    [Fact]
+    public void ReadBackTemplate_ExportRefused_TemplateRuleNotConsulted()
+    {
+        (ICryptoPolicy policy, var seen) = ValueLenCappedOptIn(KeyMaterialExportKind.EcdhSharedSecret);
+        var tagged = new KeyTemplateRequest(CKO.CKO_SECRET_KEY, []) { ReadBackFor = KeyMaterialExportKind.KdfOutput };
+
+        Assert.False(policy.Evaluate(tagged).IsAllowed);
+        Assert.Empty(seen);
+    }
+
+    // === The read-back grant ======================================================================
+
+    // The tag is set only inside a grant: the same template from the caller, before or after, is untagged.
+    [Fact]
+    public void ReadBackGrant_TagsOnlyWhileOpen()
+    {
+        var policy = new RecordingPolicy();
+        WithSession(policy, session =>
+        {
+            using var ikm = ImportIkm(session);
+            using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Extractable().Sensitive(false).Build();
+            policy.Seen.Clear();
+
+            using (session.BeginReadBack(KeyMaterialExportKind.KdfOutput))
+            {
+                using Pkcs11Key inside = ikm.Derive(HkdfMechanism(), template);
+            }
+            using Pkcs11Key after = ikm.Derive(HkdfMechanism(), template);
+
+            KeyTemplateRequest[] templates = [.. policy.Seen.OfType<KeyTemplateRequest>()];
+            Assert.Equal(2, templates.Length);
+            Assert.Equal(KeyMaterialExportKind.KdfOutput, templates[0].ReadBackFor);
+            Assert.Null(templates[1].ReadBackFor);
+        });
+    }
+
+    // A refused export opens no grant, and leaves the session usable.
+    [Fact]
+    public void ReadBackGrant_ExportRefused_OpensNothing() => WithSession(CryptoPolicy.Recommended, session =>
+    {
+        Assert.Throws<CryptoPolicyViolationException>(() => session.BeginReadBack(KeyMaterialExportKind.KdfOutput));
+
+        // The session's lease was released: another thread can use it.
+        Exception? other = null;
+        var thread = new Thread(() => other = Record.Exception(() => session.GenerateAesKey().Dispose()));
+        thread.Start();
+        thread.Join();
+        Assert.Null(other);
+    });
+
+    // Another thread cannot use the session, so it can never be judged under the grant's tag.
+    [Fact]
+    public void ReadBackGrant_HoldsTheSessionExclusively() => WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
+    {
+        using (session.BeginReadBack(KeyMaterialExportKind.KdfOutput))
+        {
+            Exception? other = null;
+            var thread = new Thread(() => other = Record.Exception(() => session.GenerateAesKey().Dispose()));
+            thread.Start();
+            thread.Join();
+
+            Assert.IsType<InvalidOperationException>(other);
+            Assert.Throws<InvalidOperationException>(() => session.BeginReadBack(KeyMaterialExportKind.KdfOutput));
+        }
+    });
+
     // === The tag is the library's alone ==========================================================
 
     [Theory]

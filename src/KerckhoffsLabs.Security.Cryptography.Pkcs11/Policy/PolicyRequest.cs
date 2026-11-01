@@ -67,10 +67,12 @@ public sealed record KeyTemplateRequest(CKO? ObjectClass, IReadOnlyList<ObjectAt
     /// </summary>
     /// <remarks>
     /// Such a template is extractable and non-sensitive by necessity, and the session has already
-    /// asked for the matching <see cref="KeyMaterialExportRequest"/> before it is submitted. A built-in
-    /// policy judges a tagged template with its key-material export rule for that kind instead of its
-    /// key-template rule, so an explicit export opt-in covers its own read-back and nothing more: the
-    /// same template from a caller is untagged and judged as before.
+    /// asked for the matching <see cref="KeyMaterialExportRequest"/> before it is submitted: the tag is
+    /// set only inside the read-back the policy allowed, never anywhere else. A built-in policy judges a
+    /// tagged template with its key-material export rule for that kind and then with its key-template
+    /// rule, minus <c>CKA_SENSITIVE</c> and <c>CKA_EXTRACTABLE</c>: an explicit export opt-in exempts its
+    /// own read-back from exactly those two attributes and nothing more. The same template from a caller
+    /// is untagged and judged as before.
     /// </remarks>
     public KeyMaterialExportKind? ReadBackFor { get; internal init; }
 

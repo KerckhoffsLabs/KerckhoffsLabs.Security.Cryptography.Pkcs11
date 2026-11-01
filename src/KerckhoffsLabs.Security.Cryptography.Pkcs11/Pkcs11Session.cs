@@ -56,6 +56,17 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <summary>Submits <paramref name="request"/> to the session's effective policy; throws on denial.</summary>
     internal void Enforce(PolicyRequest request) => _core.Enforce(request);
 
+    /// <summary>
+    /// Opens a read-back of <paramref name="kind"/> once the policy allows it; see <see cref="SecretReadBack"/>.
+    /// </summary>
+    /// <exception cref="CryptoPolicyViolationException">The policy refuses the export.</exception>
+    /// <exception cref="InvalidOperationException">Another thread is using the session, or a read-back is already open on it.</exception>
+    internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind)
+    {
+        Pkcs11SessionCore.ReadBackGrant grant = _core.BeginReadBack(kind);
+        return new SecretReadBack(grant.ReportExport, grant);
+    }
+
     /// <summary>Evaluates <paramref name="request"/> without throwing or logging.</summary>
     internal bool IsPermitted(PolicyRequest request) => _core.IsPermitted(request);
 
@@ -699,21 +710,12 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and the session's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
     public Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template)
-        => GenerateKey(mechanism, template, readBackFor: null);
-
-    /// <summary>
-    /// <see cref="GenerateKey(Mechanism, ObjectTemplate)"/> for a library read-back path (PBKDF2 output),
-    /// whose template the policy judges as a read-back of <paramref name="readBackFor"/> (see
-    /// <see cref="KeyTemplateRequest.ReadBackFor"/>). The caller must already have enforced the matching
-    /// <see cref="KeyMaterialExportRequest"/>.
-    /// </summary>
-    internal Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template, KeyMaterialExportKind? readBackFor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
-        var handle = _core.GenerateKey(mechanism, [.. template.Attributes], readBackFor);
+        var handle = _core.GenerateKey(mechanism, [.. template.Attributes]);
         return HydrateKeyFromHandle(handle);
     }
 
