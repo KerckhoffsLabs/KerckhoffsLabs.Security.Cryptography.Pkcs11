@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -17,4 +18,12 @@ public sealed class EncapsulateKeyTests_BouncyHsm(BouncyHsmBackendFixture backen
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Ecdh1_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(_backend);
+
+    // BouncyHsm 2.3.4 clears CKA_SENSITIVE on the key C_EncapsulateKey / C_DecapsulateKey create, whatever the
+    // template asks (P11EncapsulatorBase.UpdateSecretKeyAttributes), and does not hide CKA_VALUE for
+    // CKA_EXTRACTABLE = FALSE (harrison314/BouncyHsm#134), so the shared secret reads back. Pinned until fixed.
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(EncapsulateKeyTestCases.MlKemParameterSets), MemberType = typeof(EncapsulateKeyTestCases))]
+    public void MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(CkpMlKem parameterSet) =>
+        EncapsulateKeyTestCases.Assert_MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, parameterSet, tokenKeepsSensitive: false);
 }

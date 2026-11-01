@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -12,7 +14,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// already (unlike <c>MLKemPkcs11</c>, which is ML-KEM-specific), so no new façade is needed. Only
 /// opencryptoki's soft token advertises <c>CKF_ENCAPSULATE</c>/<c>CKF_DECAPSULATE</c>
 /// for these mechanisms (confirmed in <c>soft_specific.c</c>'s mechanism table); Kryoptic, NSS, and
-/// SoftHSM2 implement key encapsulation for ML-KEM only, so their test files skip everything here.
+/// SoftHSM2 implement key encapsulation for ML-KEM only, so their test files skip the classical cases.
+/// The ML-KEM case runs on every backend: <c>MLKemPkcs11</c> drives the same functions but always into an
+/// extractable secret it reads back, so this is the only test of the on-token path, where the shared
+/// secret never leaves the token.
 /// </summary>
 internal static class EncapsulateKeyTestCases
 {
@@ -122,4 +127,117 @@ internal static class EncapsulateKeyTestCases
             key.Destroy();
         }
     }
+
+    public static TheoryData<CkpMlKem> MlKemParameterSets =>
+    [
+        CkpMlKem.CKP_ML_KEM_512,
+        CkpMlKem.CKP_ML_KEM_768,
+        CkpMlKem.CKP_ML_KEM_1024,
+    ];
+
+    // The path consumers should take: C_EncapsulateKey / C_DecapsulateKey straight into a sensitive,
+    // non-extractable AES-256 key, under the session's default policy (no AllowInsecure lease, since nothing
+    // is read off the token). The two sides agree when one key decrypts what the other encrypted, so the test
+    // never needs the secret's bytes, and it checks that the token keeps them unreadable.
+    // tokenKeepsSensitive: false pins a token that drops the template's CKA_SENSITIVE = TRUE on the shared key
+    // (BouncyHsm). The case then asserts the value is readable, so it fails, and the pin can go, once fixed.
+    internal static void Assert_MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(
+        IPkcs11Backend backend, CkpMlKem parameterSet, bool tokenKeepsSensitive = true)
+    {
+        MLKemAlgorithm algorithm = parameterSet switch
+        {
+            CkpMlKem.CKP_ML_KEM_512 => MLKemAlgorithm.MLKem512,
+            CkpMlKem.CKP_ML_KEM_768 => MLKemAlgorithm.MLKem768,
+            CkpMlKem.CKP_ML_KEM_1024 => MLKemAlgorithm.MLKem1024,
+            _ => throw new ArgumentOutOfRangeException(nameof(parameterSet)),
+        };
+        backend.RequireMlKemParameterSet(algorithm.EncapsulationKeySizeInBytes);
+        backend.RequireMechanism(CKM.CKM_AES_GCM);
+        using var session = OpenSession(backend);
+
+        string label = $"encap-mlkem-{Guid.NewGuid():N}";
+        byte[] id = TestKeys.IdFor(label);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
+            .Label(label).Id(id)
+            .Attribute(CKA.CKA_ENCAPSULATE, true)
+            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)parameterSet).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
+            .Label(label).Id(id)
+            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
+
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        try
+        {
+            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+            using var encTemplate = AesSharedKeyTemplate(algorithm.SharedSecretSizeInBytes, valueLen: true);
+            var (ciphertext, encKey) = key.EncapsulateKey(mechanism, encTemplate, algorithm.CiphertextSizeInBytes);
+            try
+            {
+                Assert.Equal(algorithm.CiphertextSizeInBytes, ciphertext.Length);
+                using Pkcs11Key decKey = DecapsulateAesKey(key, mechanism, ciphertext, algorithm.SharedSecretSizeInBytes);
+                try
+                {
+                    AssertStaysOnToken(encKey, tokenKeepsSensitive);
+                    AssertStaysOnToken(decKey, tokenKeepsSensitive);
+
+                    byte[] iv = RandomNumberGenerator.GetBytes(12);
+                    byte[] plaintext = "ML-KEM shared secret, kept on the token"u8.ToArray();
+                    byte[] sealedData = encKey.Encrypt(AesGcm(iv), plaintext);
+                    Assert.Equal(plaintext, decKey.Decrypt(AesGcm(iv), sealedData));
+                }
+                finally
+                {
+                    decKey.Destroy();
+                }
+            }
+            finally
+            {
+                using (encKey) { encKey.Destroy(); }
+            }
+        }
+        finally
+        {
+            key.Destroy();
+        }
+    }
+
+    private static ObjectTemplate AesSharedKeyTemplate(int length, bool valueLen)
+    {
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES).OnToken(false).Sensitive().NonExtractable().Encrypt().Decrypt();
+        if (valueLen)
+            builder = builder.ValueLen(length);
+        return builder.Build();
+    }
+
+    // Decapsulation creates the key with unwrap semantics: SoftHSM treats CKA_VALUE_LEN as read-only there,
+    // where opencryptoki requires it, so try with it and fall back without, as MLKemPkcs11 does.
+    private static Pkcs11Key DecapsulateAesKey(Pkcs11Key key, Mechanism mechanism, byte[] ciphertext, int length)
+    {
+        try
+        {
+            using var template = AesSharedKeyTemplate(length, valueLen: true);
+            return key.DecapsulateKey(mechanism, ciphertext, template);
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
+        {
+            using var template = AesSharedKeyTemplate(length, valueLen: false);
+            return key.DecapsulateKey(mechanism, ciphertext, template);
+        }
+    }
+
+    private static void AssertStaysOnToken(Pkcs11Key sharedKey, bool tokenKeepsSensitive)
+    {
+        using var attrs = sharedKey.GetAttributeValue(CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE, CKA.CKA_VALUE);
+        Assert.False(attrs[1].GetValueAsBool(), "the shared-secret key should not be CKA_EXTRACTABLE");
+        if (!tokenKeepsSensitive)
+        {
+            Assert.False(attrs[0].GetValueAsBool(), "the token now keeps CKA_SENSITIVE on the shared-secret key: drop its pin");
+            Assert.False(attrs[2].CannotBeRead, "the token now hides the shared-secret key's CKA_VALUE: drop its pin");
+            return;
+        }
+        Assert.True(attrs[0].GetValueAsBool(), "the shared-secret key should be CKA_SENSITIVE");
+        Assert.True(attrs[2].CannotBeRead, "the token returned the shared-secret key's CKA_VALUE");
+    }
+
+    private static Mechanism AesGcm(byte[] iv) => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(iv, [], 128));
 }
