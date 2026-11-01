@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
@@ -405,9 +406,12 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
 
     private static byte[] DeriveExtractable(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, int length)
     {
-        session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
-
-        return DeriveAndRead(session, new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), length);
+        // The export check comes first: it is what a policy that allows extractable templates but not
+        // plaintext KDF output (a FIPS-style policy) relies on.
+        using SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
+        var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf));
+        using var template = DerivedKeyMaterial.ExtractableSecretTemplate(length);
+        return readBack.Read(() => session.GenerateKey(mechanism, template), length, ReadBackFailures.KdfOutput);
     }
 
     private static void DeriveInto(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, Span<byte> destination)
@@ -420,62 +424,6 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         finally
         {
             CryptographicOperations.ZeroMemory(derived);
-        }
-    }
-
-    private static byte[] DeriveAndRead(Pkcs11Session session, Mechanism mechanism, int length)
-    {
-        // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
-        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .ValueLen(length)
-            .Extractable()
-            .Sensitive(false)
-            .Build();
-
-        // The template asks for an extractable, non-sensitive key. It is tagged as the read-back of the
-        // KdfOutput export DeriveExtractable allowed, so a built-in policy judges it by its export rule;
-        // a custom policy sees the tag on the KeyTemplateRequest. The export check stays first: it is what
-        // a policy that allows such templates but not plaintext KDF output (a FIPS-style policy) relies on.
-        Pkcs11Key derived = session.GenerateKey(mechanism, template, KeyMaterialExportKind.KdfOutput);
-        bool operationFailed = true;
-        try
-        {
-            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                throw new InvalidOperationException(
-                    "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
-            byte[] derivedKey = attrs[0].GetValueAsByteArray();
-
-            // A token that ignores CKA_VALUE_LEN would hand back a truncated or oversized key.
-            if (derivedKey.Length != length)
-            {
-                CryptographicOperations.ZeroMemory(derivedKey);
-                throw new CryptographicException(
-                    $"The token returned {derivedKey.Length} bytes of derived key material; {length} were requested.");
-            }
-            operationFailed = false;
-            return derivedKey;
-        }
-        finally
-        {
-            DestroyEphemeral(derived, operationFailed);
-        }
-    }
-
-    // See DerivedKeyMaterial.DestroyEphemeral for why the destroy failure is swallowed only
-    // when it would otherwise replace the real, in-flight exception.
-    private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
-    {
-        using (derived)
-        {
-            try
-            {
-                derived.Destroy();
-            }
-            catch (Pkcs11Exception) when (operationFailed)
-            {
-                // Deliberately swallowed: see the remarks. The primary exception is the useful one.
-            }
         }
     }
 

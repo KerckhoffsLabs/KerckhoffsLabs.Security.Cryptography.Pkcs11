@@ -14,9 +14,8 @@ internal sealed partial class Pkcs11SessionCore
     /// </summary>
     /// <param name="mechanism">Generation mechanism</param>
     /// <param name="attributes">Attributes of the new key or set of domain parameters</param>
-    /// <param name="readBackFor">Set only by a library read-back path; see <see cref="KeyTemplateRequest.ReadBackFor"/>.</param>
     /// <returns>Handle of the new key or set of domain parameters</returns>
-    public ObjectHandle GenerateKey(Mechanism mechanism, List<ObjectAttribute> attributes, KeyMaterialExportKind? readBackFor = null)
+    public ObjectHandle GenerateKey(Mechanism mechanism, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
 
@@ -28,7 +27,7 @@ internal sealed partial class Pkcs11SessionCore
 
         // A secret key: refuse a deliberately weakened template, and supply the secure defaults when
         // the caller stated nothing — the same treatment DeriveKey and UnwrapKey already gave.
-        using ReadOnlyDisposableList<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes, CKO.CKO_SECRET_KEY, readBackFor);
+        using ReadOnlyDisposableList<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes, CKO.CKO_SECRET_KEY);
         if (generatedDefaults.Count > 0)
         {
             attributes = attributes is null ? [] : [.. attributes];
@@ -329,14 +328,13 @@ internal sealed partial class Pkcs11SessionCore
     /// <summary>
     /// Submits a creation template to the policy. <paramref name="objectClass"/> is the class the
     /// creating path knows for certain; paths that take an arbitrary template pass null rather than
-    /// parse the caller's CKA_CLASS. <paramref name="readBackFor"/> tags the template as a library
-    /// read-back (see <see cref="KeyTemplateRequest.ReadBackFor"/>); only internal read-back paths,
-    /// which have already enforced the matching <see cref="KeyMaterialExportRequest"/>, pass it.
+    /// parse the caller's CKA_CLASS. Inside an open <see cref="ReadBackGrant"/> the template is tagged as
+    /// its read-back (see <see cref="KeyTemplateRequest.ReadBackFor"/>); nowhere else.
     /// </summary>
-    private void EnforceKeyTemplate(List<ObjectAttribute>? attributes, CKO? objectClass, KeyMaterialExportKind? readBackFor = null)
+    private void EnforceKeyTemplate(List<ObjectAttribute>? attributes, CKO? objectClass)
     {
         if (attributes is null) return;
-        Enforce(new KeyTemplateRequest(objectClass, attributes) { ReadBackFor = readBackFor });
+        Enforce(new KeyTemplateRequest(objectClass, attributes) { ReadBackFor = ReadBackKind });
     }
 
     /// <summary>
@@ -350,10 +348,9 @@ internal sealed partial class Pkcs11SessionCore
     /// default here, but an explicit <c>CKA_EXTRACTABLE=true</c> is not refused — only
     /// <c>CKA_SENSITIVE=false</c> is.
     /// </remarks>
-    private ReadOnlyDisposableList<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes, CKO? objectClass,
-        KeyMaterialExportKind? readBackFor = null)
+    private ReadOnlyDisposableList<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes, CKO? objectClass)
     {
-        EnforceKeyTemplate(attributes, objectClass, readBackFor);
+        EnforceKeyTemplate(attributes, objectClass);
 
         bool hasSensitive = attributes?.Any(a => a.Type == CKA.CKA_SENSITIVE) ?? false;
         bool hasExtractable = attributes?.Any(a => a.Type == CKA.CKA_EXTRACTABLE) ?? false;
@@ -377,17 +374,15 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="mechanism">Derivation mechanism</param>
     /// <param name="baseKeyHandle">Handle of base key</param>
     /// <param name="attributes">Attributes for the new key</param>
-    /// <param name="readBackFor">Set only by a library read-back path; see <see cref="KeyTemplateRequest.ReadBackFor"/>.</param>
     /// <returns>Handle of derived key</returns>
-    public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes,
-        KeyMaterialExportKind? readBackFor = null)
+    public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        Enforce(mechanism, CryptoOperation.Derive, attributes, readBackFor);
+        Enforce(mechanism, CryptoOperation.Derive, attributes);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
@@ -398,7 +393,7 @@ internal sealed partial class Pkcs11SessionCore
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
         // value requires a policy that permits it (throws otherwise). See BuildSecureKeyDefaults. Trusted internal
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null, readBackFor);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, in ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, out NativeCULong derivedKey);

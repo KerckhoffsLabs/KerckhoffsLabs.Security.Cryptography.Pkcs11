@@ -202,79 +202,42 @@ public sealed partial class Pkcs11Key
     /// <exception cref="CryptographicException">Thrown if the token returns a shared secret that is not the curve's length.</exception>
     public byte[] DeriveRawSecret(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
+        const string operation = "Pkcs11Key.DeriveRawSecret";
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_keyType is not (CKK.CKK_EC or CKK.CKK_EC_MONTGOMERY))
-            throw new NotSupportedException($"Pkcs11Key.DeriveRawSecret supports CKK_EC and CKK_EC_MONTGOMERY keys; this key is {_keyType}.");
-        _session.Enforce(new Policy.KeyMaterialExportRequest(Policy.KeyMaterialExportKind.EcdhSharedSecret));
+        RequireAgreementKeyType(operation);
+        // The export check comes before the peer is examined, and it is what a policy that allows extractable
+        // templates but not a plaintext shared secret relies on. Inside the read-back, the derivation's
+        // extractable template and CKD_NULL are judged as this read-back.
+        using SecretReadBack readBack = _session.BeginReadBack(Policy.KeyMaterialExportKind.EcdhSharedSecret);
 
-        // The public data CKM_ECDH1_DERIVE takes and the secret's length: for CKK_EC the peer's point as a
-        // DER OCTET STRING and the field size; for CKK_EC_MONTGOMERY the raw u-coordinate, as PKCS#11 v3.0's
-        // CK_ECDH1_DERIVE_PARAMS has it for Montgomery keys, and the curve's 32 or 56 bytes.
-        bool montgomery = _keyType == CKK.CKK_EC_MONTGOMERY;
-        byte[] publicData;
-        int secretLength;
-        if (montgomery)
-        {
-            ValidatedMontgomeryPeer peer = MontgomeryPeerValidator.Validate(
-                this, peerSubjectPublicKeyInfo, nameof(peerSubjectPublicKeyInfo), "Pkcs11Key.DeriveRawSecret");
-            (publicData, secretLength) = (peer.U, peer.SecretLength);
-        }
-        else
-        {
-            ValidatedEcdhPeer peer = ValidateEcPeer(peerSubjectPublicKeyInfo, "Pkcs11Key.DeriveRawSecret");
-            (publicData, secretLength) = (peer.EncodedPoint, peer.FieldSizeBytes);
-        }
+        AgreementPeer peer = ValidateAgreementPeer(peerSubjectPublicKeyInfo, operation);
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.PublicData));
+        // The private key itself remains non-extractable; only the ephemeral secret object is not.
+        using var template = Algorithms.DerivedKeyMaterial.ExtractableSecretTemplate(peer.SecretLength);
 
-        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, publicData));
-        // Raw secret read-back: derive an extractable, non-sensitive session generic secret of the
-        // secret's length. The private key itself remains non-extractable.
-        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .ValueLen(secretLength)
-            .Extractable()
-            .Sensitive(false)
-            .Build();
+        // Z is a field element, always the field size long (SEC 1 §2.3.5; RFC 7748 §5 for X25519 / X448):
+        // a token that drops its leading zero bytes (SoftHSM2 did before 8bc65b5) or returns more would
+        // hand back a different secret, which the read-back's length check refuses.
+        return readBack.Read(
+            () => Derive(mechanism, template),
+            peer.SecretLength,
+            RawSecretFailures,
+            _keyType == CKK.CKK_EC_MONTGOMERY ? RefuseAllZeroSecret : null);
+    }
 
-        // The template asks for an extractable, non-sensitive key and the derivation applies CKD_NULL.
-        // Both are tagged as the read-back of the EcdhSharedSecret export allowed above, so a built-in
-        // policy judges them by its export rule; a custom policy sees the tag on the KeyTemplateRequest
-        // and the KeyAgreementKdfRequest. The export check stays first: it is what a policy that allows
-        // such templates but not a plaintext shared secret relies on.
-        Pkcs11Key derived = Derive(mechanism, template, Policy.KeyMaterialExportKind.EcdhSharedSecret);
-        bool operationFailed = true;
-        try
-        {
-            // ObjectAttribute owns an unmanaged buffer holding the shared secret Z; disposing the
-            // list is what frees and zeroizes it.
-            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "Pkcs11Key.DeriveRawSecret (derived CKA_VALUE not readable)");
-            byte[] secret = attrs[0].GetValueAsByteArray();
+    private static readonly ReadBackFailures RawSecretFailures = new(
+        () => Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE, "Pkcs11Key.DeriveRawSecret (derived CKA_VALUE not readable)"),
+        (actual, expected) => new CryptographicException(
+            $"The token returned a {actual}-byte shared secret; this curve's is {expected} bytes."));
 
-            // Z is a field element, always the field size long (SEC 1 §2.3.5; RFC 7748 §5 for X25519 / X448).
-            // A token that drops its leading zero bytes (SoftHSM2 did before 8bc65b5) or returns more would
-            // hand back a different secret.
-            if (secret.Length != secretLength)
-            {
-                CryptographicOperations.ZeroMemory(secret);
-                throw new CryptographicException(
-                    $"The token returned a {secret.Length}-byte shared secret; this curve's is {secretLength} bytes.");
-            }
-
-            // RFC 7748 §6.1: a low-order peer gives an all-zero X25519 / X448 secret whatever the private key.
-            // u = 0 was refused above; the other low-order points are caught here, since PKCS#11 does not
-            // require the token to check.
-            if (montgomery && MontgomeryPeerValidator.IsZero(secret))
-                throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
-                    "Pkcs11Key.DeriveRawSecret (peer public key is a low-order point: the shared secret is all zero)");
-
-            operationFailed = false;
-            return secret;
-        }
-        finally
-        {
-            DestroyEphemeral(derived, operationFailed);
-        }
+    // RFC 7748 §6.1: a low-order peer gives an all-zero X25519 / X448 secret whatever the private key. u = 0
+    // was refused before the token saw it; the other low-order points are caught here, since PKCS#11 does not
+    // require the token to check.
+    private static void RefuseAllZeroSecret(byte[] secret)
+    {
+        if (MontgomeryPeerValidator.IsZero(secret))
+            throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
+                "Pkcs11Key.DeriveRawSecret (peer public key is a low-order point: the shared secret is all zero)");
     }
 
     /// <summary>
@@ -331,6 +294,31 @@ public sealed partial class Pkcs11Key
         return Derive(mechanism, template);
     }
 
+    private void RequireAgreementKeyType(string operationName)
+    {
+        if (_keyType is not (CKK.CKK_EC or CKK.CKK_EC_MONTGOMERY))
+            throw new NotSupportedException($"{operationName} supports CKK_EC and CKK_EC_MONTGOMERY keys; this key is {_keyType}.");
+    }
+
+    // A validated peer as CKM_ECDH1_DERIVE takes it, and the length of the secret it agrees.
+    private readonly record struct AgreementPeer(byte[] PublicData, int SecretLength);
+
+    // The one peer-validation step of both agreements (DeriveRawSecret, DeriveSecretAgreement). For CKK_EC
+    // the peer's point as a DER OCTET STRING and the field size; for CKK_EC_MONTGOMERY the raw u-coordinate,
+    // as PKCS#11 v3.0's CK_ECDH1_DERIVE_PARAMS has it for Montgomery keys, and the curve's 32 or 56 bytes.
+    private AgreementPeer ValidateAgreementPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string operationName)
+    {
+        if (_keyType == CKK.CKK_EC_MONTGOMERY)
+        {
+            ValidatedMontgomeryPeer u = MontgomeryPeerValidator.Validate(
+                this, peerSubjectPublicKeyInfo, nameof(peerSubjectPublicKeyInfo), operationName);
+            return new AgreementPeer(u.U, u.SecretLength);
+        }
+
+        ValidatedEcdhPeer ec = ValidateEcPeer(peerSubjectPublicKeyInfo, operationName);
+        return new AgreementPeer(ec.EncodedPoint, ec.FieldSizeBytes);
+    }
+
     private ValidatedEcdhPeer ValidateEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string operationName)
         => EcdhPeerValidator.Validate(
             this, DecodeEcPeer(peerSubjectPublicKeyInfo, operationName), nameof(peerSubjectPublicKeyInfo), operationName);
@@ -348,30 +336,5 @@ public sealed partial class Pkcs11Key
             throw new ArgumentException(
                 "Peer EC public key must name its curve (namedCurve) and carry an uncompressed point.", nameof(peerSubjectPublicKeyInfo));
         return ec;
-    }
-
-    /// <summary>
-    /// Destroys an ephemeral derived key without letting a cleanup failure hide a real one.
-    /// </summary>
-    /// <remarks>
-    /// A throw from <see langword="finally"/> <i>replaces</i> an exception already in flight, so a failed
-    /// <c>C_DestroyObject</c> would reach the caller in place of whatever actually went wrong. This
-    /// suppresses the destroy failure only on that path: when the operation succeeded, the destroy
-    /// failure is the only news and is allowed to surface. The key is a session object either way, so
-    /// the token collects it at <c>C_CloseSession</c> even when the eager destroy fails.
-    /// </remarks>
-    private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
-    {
-        using (derived)
-        {
-            try
-            {
-                derived.Destroy();
-            }
-            catch (Pkcs11Exception) when (operationFailed)
-            {
-                // Deliberately swallowed: see the remarks. The primary exception is the useful one.
-            }
-        }
     }
 }
