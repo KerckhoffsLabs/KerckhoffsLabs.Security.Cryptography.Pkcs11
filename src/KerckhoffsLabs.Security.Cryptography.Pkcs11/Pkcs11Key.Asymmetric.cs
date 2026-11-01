@@ -262,6 +262,11 @@ public sealed partial class Pkcs11Key
     /// u-coordinate is refused before the token sees it.
     /// </para>
     /// <para>
+    /// A session whose policy allows <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> can read any KDF
+    /// output over the returned key with <see cref="DeriveBytes"/>, and so the value of every key derived from
+    /// it: keep the result out of such sessions.
+    /// </para>
+    /// <para>
     /// Permitted by the default policies, which otherwise refuse <see cref="CKD.CKD_NULL"/>: the result
     /// has <c>CKA_ENCRYPT</c>, <c>CKA_DECRYPT</c>, <c>CKA_SIGN</c>, <c>CKA_VERIFY</c>, <c>CKA_WRAP</c> and
     /// <c>CKA_UNWRAP</c> false, so Z can never be used as a key itself (SP 800-56A), only through a KDF

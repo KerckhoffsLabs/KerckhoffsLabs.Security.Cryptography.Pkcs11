@@ -22,6 +22,15 @@ public sealed class KeyMaterialExportRule
     /// exactly as <see cref="Refuse()"/> does. This is an explicit opt-in: the secret leaves the token and lands in managed
     /// memory, so name only the kinds the application needs and say why.
     /// </summary>
+    /// <remarks>
+    /// An opt-in is per kind, not per key. <see cref="KeyMaterialExportKind.KdfOutput"/> in particular lets the session
+    /// run an allowed KDF over any derive-capable key it can use and read the output: over a derivation-only secret
+    /// such as the agreed secret of <c>Pkcs11Key.DeriveSecretAgreement</c> too, and the bytes are then those of any key
+    /// the token derives from that base with the same mechanism, however sensitive. It does not return the agreed secret
+    /// itself (only <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> does), but it can reproduce every key derived
+    /// from it. Use a policy that allows it only in sessions that need it, and keep the base keys of on-token key
+    /// schedules out of them.
+    /// </remarks>
     /// <param name="kinds">The kinds that may be read. Copied at call time; must be non-empty and defined.</param>
     /// <param name="rationale">Why the export is acceptable; shown in the policy catalogue. Must not be blank.</param>
     /// <exception cref="ArgumentException"><paramref name="kinds"/> is empty or <paramref name="rationale"/> is blank.</exception>

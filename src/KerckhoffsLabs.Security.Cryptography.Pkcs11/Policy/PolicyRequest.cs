@@ -152,5 +152,13 @@ public enum KeyMaterialExportKind
     /// <summary>A KEM shared secret (ML-KEM encapsulate/decapsulate through the BCL adapter).</summary>
     KemSharedSecret,
     /// <summary>Output bytes of an on-token KDF.</summary>
+    /// <remarks>
+    /// The broadest of the three: it lets the session run an allowed KDF over <em>any</em> derive-capable key
+    /// it can use and read the output, whatever that key is. That includes a secret the token keeps for
+    /// derivation only, such as the agreed secret of <c>Pkcs11Key.DeriveSecretAgreement</c>, and the bytes
+    /// it returns are those of any key the token derives from the same base with the same mechanism, sensitive
+    /// or not. Give a session that allows it only the derive keys meant for it, and keep the base keys of
+    /// on-token key schedules in sessions whose policy does not.
+    /// </remarks>
     KdfOutput,
 }

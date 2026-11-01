@@ -109,7 +109,8 @@ using (session.UsePolicy(CryptoPolicy.AllowInsecure))
 ## Reading secret key material off the token
 
 Every built-in policy refuses to read secret key material off the token in the clear. Keep secrets on the
-token where you can: `Pkcs11Key.Derive` to a sensitive key, `EncapsulateKey` / `DecapsulateKey`. Where an
+token where you can: `Pkcs11Key.DeriveSecretAgreement` (EC, X25519 and X448) then `Pkcs11Key.Derive` to a
+sensitive key, `EncapsulateKey` / `DecapsulateKey`. Where an
 application genuinely needs the bytes (a drop-in class whose contract returns a shared secret, a value a
 protocol sends or compares), opt in for exactly the kinds it needs, with a reason:
 
@@ -127,14 +128,25 @@ ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
 |---|---|
 | `EcdhSharedSecret` | The raw shared secret Z of an ECDH agreement: `Pkcs11Key.DeriveRawSecret` for EC (`CKK_EC`) and X25519 / X448 (`CKK_EC_MONTGOMERY`) keys, and `ECDiffieHellmanPkcs11`'s derive methods |
 | `KemSharedSecret` | An ML-KEM shared secret: `MLKemPkcs11` encapsulate / decapsulate |
-| `KdfOutput` | KDF output: `Pkcs11Key.DeriveBytes`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11` |
+| `KdfOutput` | KDF output over any derive-capable key the session can use: `Pkcs11Key.DeriveBytes`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11`. See the warning below |
 
 `Allow` copies the kinds and throws on an empty list, an undefined kind or a blank reason. It refuses every
 kind it does not name exactly as `KeyMaterialExportRule.Refuse()` does. Its reason is shown in the policy
-catalogue. Each export it allows logs a `KeyMaterialExportAllowed` warning naming the kind and the policy,
-never the secret, and every `Allow` call site is reported at build time as
+catalogue. An export is logged once the secret has actually been read and checked (a read-back the token or a
+later policy check stops logs nothing): the first export of a kind a policy allows on a session logs a
+`KeyMaterialExportAllowed` warning naming the kind and the policy, never the secret, and every later one of
+that kind under that policy logs the same at Debug, so a hot KDF path does not flood the log. Every `Allow`
+call site (and method-group reference) is reported at build time as
 [KLPKCS11012](diagnostics.md#KLPKCS11012), so the opt-in is visible in review; suppress it with a
 justification.
+
+> **`KdfOutput` is per kind, not per key.** It lets the session run an allowed KDF over *any* derive-capable
+> key it can use and read the output, including a derivation-only secret such as the agreed secret Z of
+> `DeriveSecretAgreement`. It never returns Z itself, but the bytes it returns for a mechanism are the value of
+> any key the token derives from the same base with the same mechanism, however sensitive:
+> `z.DeriveBytes(hkdf, 32)` is the AES key `z.Derive(hkdf, aes256Template)` made on the token. Allow
+> `KdfOutput` only in the sessions that need it, give them their own derive keys, and keep the base keys of
+> on-token key schedules (agreed secrets, master keys) in sessions whose policy does not allow it.
 
 `Pkcs11Key.DeriveBytes(mechanism, length)` returns the output of an on-token KDF and accepts only KDFs
 with their own parameters: `CKM_HKDF_DERIVE` with `CkmHkdfParams`, and `CKM_SP800_108_COUNTER_KDF`,
@@ -145,13 +157,15 @@ consulted, a key-agreement mechanism above all, so a `KdfOutput` opt-in can neve
 parameters gives the same bytes. The mechanism and its PRF must still be allowed by the policy.
 
 To read a secret, the library has the token produce it as a short-lived extractable, non-sensitive session object,
-reads it and destroys it. A `ComposedCryptoPolicy` (every built-in, and every policy from `ToBuilder` or
-`CryptoPolicyBuilder`) judges that object's template by the export rule for the kind being read,
-**instead of** the template rule: an opt-in covers its own read-back object, and a custom
-`WithKeyTemplateRule` is not consulted for it (it still judges every template you pass yourself). Likewise
-the CKD_NULL key-agreement KDF of a raw ECDH read-back is judged by the export rule, and only for
-`EcdhSharedSecret`: a `KdfOutput` or `KemSharedSecret` opt-in never approves a derivation that would
-return Z. A custom `ICryptoPolicy` sees these requests tagged with the kind (`KeyTemplateRequest.ReadBackFor`,
+reads it and destroys it. The session tags the templates it judges for that object with the kind being read, and
+only while that read-back, which the policy allowed, is in progress. A `ComposedCryptoPolicy` (every built-in,
+and every policy from `ToBuilder` or `CryptoPolicyBuilder`) judges a tagged template by the export rule for the
+kind, **and then** by the template rule without `CKA_SENSITIVE` and `CKA_EXTRACTABLE`: an opt-in exempts its own
+read-back object from exactly those two attributes, and a custom `WithKeyTemplateRule` still judges everything
+else about it (`CKA_TOKEN`, `CKA_VALUE_LEN`, …), as it judges every template you pass yourself. The CKD_NULL
+key-agreement KDF of a raw ECDH read-back is judged by the export rule, and only for `EcdhSharedSecret`: a
+`KdfOutput` or `KemSharedSecret` opt-in never approves a derivation that would return Z. A custom
+`ICryptoPolicy` sees these requests tagged with the kind (`KeyTemplateRequest.ReadBackFor`,
 `KeyAgreementKdfRequest.ReadBackFor`), after the matching `KeyMaterialExportRequest`.
 
 ## Allowing less
