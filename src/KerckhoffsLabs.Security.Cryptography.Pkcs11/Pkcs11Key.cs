@@ -894,7 +894,9 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <summary>
     /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
     /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
-    /// non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
+    /// non-sensitive key requires a policy that permits it: a scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>
+    /// lease (which lifts every other rule and is refused on <c>NistApproved</c> sessions). Reading derived bytes back is a separate
+    /// opt-in: see <see cref="DeriveBytes"/> and <see cref="Policy.KeyMaterialExportKind.KdfOutput"/>. Symmetric
     /// uses the single handle; asymmetric uses the private handle (e.g. ECDH derives from the
     /// local private key — the peer's public point travels as a mechanism parameter, not a handle).
     /// </summary>
