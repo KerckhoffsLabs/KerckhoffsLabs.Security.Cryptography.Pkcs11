@@ -25,7 +25,9 @@ internal static class DerivedKeyMaterial
     {
         // The export check comes first: it is what a policy that allows extractable templates but not
         // plaintext KDF output (a FIPS-style policy) relies on.
-        using SecretReadBack readBack = baseKey.Session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
+        // The base key is judged too: KDF output over a key the token has always protected would reproduce every
+        // key derived from it (KdfBaseKeyScope).
+        using SecretReadBack readBack = baseKey.Session.BeginReadBack(KeyMaterialExportKind.KdfOutput, baseKey);
         using var template = ExtractableSecretTemplate(length);
         return readBack.Read(() => baseKey.Derive(mechanism, template), length, ReadBackFailures.KdfOutput);
     }

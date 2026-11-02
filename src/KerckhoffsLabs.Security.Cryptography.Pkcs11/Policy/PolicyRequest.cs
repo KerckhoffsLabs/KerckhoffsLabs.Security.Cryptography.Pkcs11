@@ -142,7 +142,19 @@ public sealed record KeyAgreementKeyRequest(CKM Mechanism, CKK KeyType) : Policy
 /// <param name="Kind">What is being read.</param>
 public sealed record KeyMaterialExportRequest(KeyMaterialExportKind Kind) : PolicyRequest
 {
-    internal override string Describe() => $"export of {Kind}";
+    /// <summary>
+    /// For <see cref="KeyMaterialExportKind.KdfOutput"/>, what the library read off the KDF's base key; otherwise, and for
+    /// a KDF with no base key (PBKDF2, over a password), <see langword="null"/>. Set by the library, never by the caller.
+    /// </summary>
+    /// <remarks>
+    /// A built-in policy's <see cref="KeyMaterialExportRule"/> checks it against its <see cref="KdfBaseKeyScope"/>. A custom
+    /// policy that allows <see cref="KeyMaterialExportKind.KdfOutput"/> should judge it too: KDF output over a base key the
+    /// token has always protected reproduces every key derived from that base.
+    /// </remarks>
+    public KdfBaseKeyInfo? KdfBaseKey { get; internal init; }
+
+    internal override string Describe() =>
+        KdfBaseKey is { } baseKey ? $"export of {Kind} over a {baseKey.Describe()}" : $"export of {Kind}";
 }
 
 /// <summary>The kind of secret a <see cref="KeyMaterialExportRequest"/> reads off the token.</summary>
@@ -154,12 +166,10 @@ public enum KeyMaterialExportKind
     KemSharedSecret,
     /// <summary>Output bytes of an on-token KDF.</summary>
     /// <remarks>
-    /// The broadest of the three: it lets the session run an allowed KDF over <em>any</em> derive-capable key
-    /// it can use and read the output, whatever that key is. That includes a secret the token keeps for
-    /// derivation only, such as the agreed secret of <c>Pkcs11Key.DeriveSecretAgreement</c>, and the bytes
-    /// it returns are those of any key the token derives from the same base with the same mechanism, sensitive
-    /// or not. Give a session that allows it only the derive keys meant for it, and keep the base keys of
-    /// on-token key schedules in sessions whose policy does not.
+    /// The broadest of the three, which is why an opt-in to it is scoped by base key
+    /// (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>, <see cref="KdfBaseKeyScope"/>): the bytes are those of any key
+    /// the token derives from the same base with the same mechanism, sensitive or not, so over the agreed secret of
+    /// <c>Pkcs11Key.DeriveSecretAgreement</c> or an on-token master key they would reproduce every key derived from it.
     /// </remarks>
     KdfOutput,
 }

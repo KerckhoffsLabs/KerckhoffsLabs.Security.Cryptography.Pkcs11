@@ -43,16 +43,21 @@ internal sealed partial class Pkcs11SessionCore
     /// sets the tag.
     /// </summary>
     /// <remarks>
-    /// The policy is asked once, under the session lock. If the lock is busy (another thread is using the
-    /// session), the policy is asked before the contention is reported, so a refused export surfaces as the
-    /// <see cref="CryptoPolicyViolationException"/> callers rely on whatever the session is doing; only an
-    /// allowed one reports the contention.
+    /// The policy is asked once, under the session lock, with what <paramref name="readKdfBaseKey"/> read off the
+    /// KDF's base key (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>). If the lock is busy (another thread is
+    /// using the session), the policy is first asked about the kind alone, so a kind it refuses surfaces as the
+    /// <see cref="CryptoPolicyViolationException"/> callers rely on whatever the session is doing; otherwise the
+    /// contention is reported, as the base key cannot be read without the lock.
     /// </remarks>
+    /// <param name="kind">The kind of secret to read.</param>
+    /// <param name="readKdfBaseKey">
+    /// For <see cref="KeyMaterialExportKind.KdfOutput"/> over a base key, reads its attributes (under the lock, on
+    /// this thread); <see langword="null"/> for every other read-back, and for a KDF with no base key.
+    /// </param>
     /// <exception cref="CryptoPolicyViolationException">The policy refuses the export.</exception>
     /// <exception cref="InvalidOperationException">Another thread is using the session, or a read-back is already open on it.</exception>
-    internal ReadBackGrant BeginReadBack(KeyMaterialExportKind kind)
+    internal ReadBackGrant BeginReadBack(KeyMaterialExportKind kind, Func<KdfBaseKeyInfo>? readKdfBaseKey = null)
     {
-        var request = new KeyMaterialExportRequest(kind);
         ExclusiveLease lease;
         try
         {
@@ -60,8 +65,9 @@ internal sealed partial class Pkcs11SessionCore
         }
         catch (InvalidOperationException)
         {
-            // Contention: the refusal, if there is one, is the answer the caller acts on.
-            EnforceUnder(request);
+            // Contention: a refusal of the kind itself is the answer the caller acts on. No base key in the
+            // request means no base-key scope to fail, so this verdict is the kind's alone.
+            EnforceUnder(new KeyMaterialExportRequest(kind));
             throw;
         }
 
@@ -70,6 +76,7 @@ internal sealed partial class Pkcs11SessionCore
             if (_readBack is not null)
                 throw new InvalidOperationException("A secret read-back is already in progress on this session.");
 
+            var request = new KeyMaterialExportRequest(kind) { KdfBaseKey = readKdfBaseKey?.Invoke() };
             ICryptoPolicy policy = EnforceUnder(request);
             var grant = new ReadBackGrant(this, lease, kind, policy);
             _readBack = grant;

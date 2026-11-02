@@ -250,6 +250,26 @@ public sealed partial class Pkcs11Key : IDisposable
     }
 
     /// <summary>
+    /// What a KDF-output export policy judges about this key as a KDF's base key
+    /// (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>), read in one <c>C_GetAttributeValue</c>. An attribute the
+    /// token does not report reads as protected (<see cref="KdfBaseKeyInfo.AlwaysSensitive"/> and
+    /// <see cref="KdfBaseKeyInfo.NeverExtractable"/> <see langword="true"/>), so an unknown key never passes for an
+    /// unprotected one.
+    /// </summary>
+    internal KdfBaseKeyInfo ReadKdfBaseKeyInfo()
+    {
+        using var attrs = GetAttributeValue(
+            CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE);
+        static bool Readable(ObjectAttribute a) => !a.CannotBeRead;
+        return new KdfBaseKeyInfo(
+            KeyType: Readable(attrs[0]) ? (CKK)attrs[0].GetValueAsUlong() : null,
+            Id: Readable(attrs[1]) ? attrs[1].GetValueAsByteArray() : ReadOnlyMemory<byte>.Empty,
+            Label: Readable(attrs[2]) ? attrs[2].GetValueAsString() : null,
+            AlwaysSensitive: !Readable(attrs[3]) || attrs[3].GetValueAsBool(),
+            NeverExtractable: !Readable(attrs[4]) || attrs[4].GetValueAsBool());
+    }
+
+    /// <summary>
     /// Opens this key's X.509 certificate: the certificate object with the same <c>CKA_ID</c>. Returns
     /// <see langword="null"/> when the key has no <c>CKA_ID</c> or no certificate has it. The caller owns
     /// the returned certificate.
@@ -931,14 +951,13 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <see cref="Policy.KeyMaterialExportKind.EcdhSharedSecret"/> opt-in governs).
     /// </para>
     /// <para>
-    /// It does return the KDF's output over <em>this</em> key, whatever this key is. Any derive-capable key
-    /// qualifies, a derivation-only secret too (the agreed secret of <see cref="DeriveSecretAgreement"/>), so
-    /// under a <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in the bytes returned for a mechanism
-    /// are the value of any key the token derives from this key with the same mechanism, sensitive or not:
-    /// <c>DeriveBytes(hkdf, 32)</c> on Z is the AES key <c>Derive(hkdf, aes256Template)</c> made from Z on the
-    /// token. Allow <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> only in sessions that need it, and keep
-    /// the base keys of on-token key schedules (agreed secrets, master keys) out of them; use separate derive
-    /// keys for the bytes you read.
+    /// It returns the KDF's output over <em>this</em> key, and those bytes are the value of any key the token derives
+    /// from this key with the same mechanism, sensitive or not: <c>DeriveBytes(hkdf, 32)</c> on the agreed secret of
+    /// <see cref="DeriveSecretAgreement"/> is the AES key <c>Derive(hkdf, aes256Template)</c> makes from it. The
+    /// policy therefore judges this key too (<see cref="Policy.KeyMaterialExportRequest.KdfBaseKey"/>): by default a
+    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in covers only base keys the token has not always
+    /// protected (<see cref="Policy.KdfBaseKeyScope.NeverProtected"/>), so a <c>CKA_ALWAYS_SENSITIVE</c> agreed
+    /// secret or master key is refused unless the policy names a wider <see cref="Policy.KdfBaseKeyScope"/>.
     /// </para>
     /// <para>
     /// <c>CKM_HKDF_DATA</c> is refused: PKCS#11 has it make a data object, which the secret-key read-back

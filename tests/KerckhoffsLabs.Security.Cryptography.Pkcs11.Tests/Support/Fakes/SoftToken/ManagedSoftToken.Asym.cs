@@ -75,6 +75,8 @@ internal sealed partial class ManagedSoftToken
     private void Finish(object key, Dictionary<ulong, byte[]> pub, Dictionary<ulong, byte[]> priv,
         ref NativeCULong publicKey, ref NativeCULong privateKey)
     {
+        priv.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_PRIVATE_KEY));
+        RecordProtectionHistory(priv, generated: true);
         ulong pubH = Store(pub), privH = Store(priv);
         _asymKeys[pubH] = key;
         _asymKeys[privH] = key; // same instance carries the private material; Sign/Verify both work
