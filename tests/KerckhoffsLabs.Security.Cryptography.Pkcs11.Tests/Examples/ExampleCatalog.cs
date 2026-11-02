@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Examples;
@@ -102,7 +103,26 @@ internal static class ExampleCatalog
                 if (!ChaCha20Poly1305.IsSupported) Assert.Skip("ChaCha20-Poly1305 is not supported on this platform.");
                 Assert.Equal(Message, AeadExamples.BclChaCha20Poly1305EncryptDecrypt(Message, Header));
             }),
+
+        // AES block modes (docs/examples/aes.md)
+        new($"{nameof(AesModeExamples)}.{nameof(AesModeExamples.CbcPadUnderReviewedPolicy)}", [typeof(AesPkcs11)],
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2,
+            AssertCbcPadUnderReviewedPolicy, NeedsUserLogin: true),
+        new($"{nameof(AesModeExamples)}.{nameof(AesModeExamples.BclCbcPad)}", [], [], ExampleBackend.SoftHsm2,
+            _ => Assert.Equal(Message, AesModeExamples.BclCbcPad(Message))),
     ];
+
+    private static void AssertCbcPadUnderReviewedPolicy(IPkcs11Backend backend)
+    {
+        using (var pin = new SecurePin(backend.UserPin.Span))
+            Assert.Equal(Message, AesModeExamples.CbcPadUnderReviewedPolicy(backend.Library, backend.TokenLabel, pin, Message));
+
+        // Without the example's policy step, the default Recommended policy refuses the same call.
+        using Pkcs11Session session = backend.OpenSession();
+        using Pkcs11Key key = session.GenerateAesKey();
+        using var aes = new AesPkcs11(key);
+        Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(Message, new byte[16], System.Security.Cryptography.PaddingMode.PKCS7));
+    }
 
     private static string Name(string aeadMethod) => $"{nameof(AeadExamples)}.{aeadMethod}";
 

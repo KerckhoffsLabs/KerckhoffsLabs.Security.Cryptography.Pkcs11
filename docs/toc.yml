@@ -8,6 +8,8 @@
   items:
     - name: Authenticated encryption
       href: examples/aead.md
+    - name: AES block modes
+      href: examples/aes.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies
