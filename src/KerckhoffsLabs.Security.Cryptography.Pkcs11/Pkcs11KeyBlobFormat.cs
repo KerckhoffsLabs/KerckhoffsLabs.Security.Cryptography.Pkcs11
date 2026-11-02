@@ -15,7 +15,7 @@ public enum Pkcs11KeyBlobFormat
 
     /// <summary>
     /// The algorithm's own public-key encoding, without an algorithm identifier. EC: the uncompressed
-    /// point <c>0x04 ‖ X ‖ Y</c>.
+    /// point <c>0x04 ‖ X ‖ Y</c>. Ed25519 / Ed448 / X25519 / X448: the RFC 8032 / RFC 7748 key bytes.
     /// </summary>
     RawPublicKey = 1,
 }

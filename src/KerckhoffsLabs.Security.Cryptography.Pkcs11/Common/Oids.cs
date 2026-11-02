@@ -23,6 +23,21 @@ internal static class Oids
 
         /// <summary><c>id-dsa</c> (RFC 3279 §2.3.2).</summary>
         internal const string Dsa = "1.2.840.10040.4.1";
+
+        // Sonar S1313 reads these four-arc OIDs as IPv4 addresses; they are object identifiers.
+#pragma warning disable S1313
+        /// <summary><c>id-X25519</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an X25519 key.</summary>
+        internal const string X25519 = "1.3.101.110";
+
+        /// <summary><c>id-X448</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an X448 key.</summary>
+        internal const string X448 = "1.3.101.111";
+
+        /// <summary><c>id-Ed25519</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an Ed25519 key.</summary>
+        internal const string Ed25519 = "1.3.101.112";
+
+        /// <summary><c>id-Ed448</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an Ed448 key.</summary>
+        internal const string Ed448 = "1.3.101.113";
+#pragma warning restore S1313
     }
 
     /// <summary>X.509 certificate extension OIDs (<c>extnID</c>).</summary>

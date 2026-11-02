@@ -115,6 +115,25 @@ internal static class EcPointEncoding
         return coordinateLength > 0;
     }
 
+    /// <summary>
+    /// The public key of an Edwards or Montgomery key (RFC 8032 / RFC 7748 encoding) from its
+    /// <c>CKA_EC_POINT</c>: the raw key, as PKCS#11 v3.1 specifies, or the raw key in a DER OCTET STRING, as
+    /// v3.0 tokens store it. Returns <see langword="null"/> unless the value is one of the two and the key is
+    /// <paramref name="keyLength"/> bytes long.
+    /// </summary>
+    /// <remarks>
+    /// Unambiguous: the OCTET STRING of a key is two bytes longer than the key, so a value of the key's
+    /// length is the raw key, and any other value must be exactly one OCTET STRING around it.
+    /// </remarks>
+    internal static byte[]? TryUnwrapRawKey(byte[] ecPoint, int keyLength)
+    {
+        ArgumentNullException.ThrowIfNull(ecPoint);
+
+        if (ecPoint.Length == keyLength)
+            return ecPoint;
+        return TryReadOctetString(ecPoint, out byte[]? key) && key.Length == keyLength ? key : null;
+    }
+
     private static int PointCoordinateLength(ReadOnlySpan<byte> point) => point switch
     {
         [0x04, ..] when point.Length >= 3 && point.Length % 2 == 1 => (point.Length - 1) / 2,
