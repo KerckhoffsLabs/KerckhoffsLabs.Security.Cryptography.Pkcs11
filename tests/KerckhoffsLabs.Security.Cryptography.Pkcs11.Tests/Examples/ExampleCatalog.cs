@@ -190,7 +190,7 @@ internal static class ExampleCatalog
         // Post-quantum (docs/examples/post-quantum.md)
         new(Pqc(nameof(PqcExamples.MlKemReceiveAesKey)), [typeof(MLKemPkcs11)],
             [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
-            AssertMlKemReceiveAesKey),
+            AssertMlKemReceiveAesKey, Unsupported: ExampleGates.ClassicAesGcm),
         new(Pqc(nameof(PqcExamples.MlDsaSign)), [typeof(MLDsaPkcs11)], [CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_ML_DSA],
             ExampleBackend.Kryoptic,
             b => WithSession(b, s =>
