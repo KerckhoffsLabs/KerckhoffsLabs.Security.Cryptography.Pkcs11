@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
@@ -29,6 +30,7 @@ public static class RsaExamples
         #endregion
     }
 
+    [SuppressMessage("Security", "S5542:Use secure mode and padding scheme", Justification = "RSASSA-PKCS1-v1_5 *signatures* with SHA-256 are FIPS 186-5-approved and allowed by the default policy; the rule targets PKCS#1 v1.5 encryption, which docs/examples/rsa.md does not show.")]
     public static (byte[] Signature, RSAParameters PublicKey) SignPkcs1v15(Pkcs11Session session, byte[] data)
     {
         #region SignPkcs1v15
