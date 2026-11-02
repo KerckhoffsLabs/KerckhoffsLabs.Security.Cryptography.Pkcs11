@@ -1,5 +1,7 @@
 - name: Home
   href: index.md
+- name: Security model
+  href: security-model.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies

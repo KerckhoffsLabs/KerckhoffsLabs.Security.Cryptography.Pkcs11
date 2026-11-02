@@ -9,6 +9,9 @@ full surface: the high-level façade (`Pkcs11Library`, `Pkcs11Slot`, `Pkcs11Sess
 algorithm adapters (`RSAPkcs11`, `ECDsaPkcs11`, `AesGcmPkcs11`, `MLKemPkcs11`, `MLDsaPkcs11`,
 `SlhDsaPkcs11`, …), the object/attribute model, and the low-level interop types.
 
+Start with the [**security model**](security-model.md): what the library protects, from whom, and where
+its protection ends.
+
 ## Highlights
 
 - Secure-by-default: weak mechanisms (MD5, SHA-1, DES/3DES/RC2, RSA PKCS#1 v1.5, DSA) are
