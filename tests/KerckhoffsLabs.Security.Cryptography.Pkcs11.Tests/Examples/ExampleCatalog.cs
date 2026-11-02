@@ -24,13 +24,27 @@ internal enum ExampleBackend
 /// <param name="Run">Calls the example and asserts its outcome.</param>
 /// <param name="NeedsUserLogin">The example logs in with the user PIN itself, so it cannot run on a
 /// token that refuses <c>C_Login</c> (NSS's login-less crypto token).</param>
+/// <param name="Unsupported">Why this backend cannot run the example although it advertises the
+/// mechanisms (a known capability gap of that module or version), or <see langword="null"/> when it can.
+/// Judged by the same skip-or-fail rule as <paramref name="Requires"/>.</param>
 internal sealed record ExampleCase(
     string Name,
     Type[] Covers,
     CKM[] Requires,
     ExampleBackend MustRunOn,
     Action<IPkcs11Backend> Run,
-    bool NeedsUserLogin = false);
+    bool NeedsUserLogin = false,
+    Func<IPkcs11Backend, string?>? Unsupported = null);
+
+/// <summary>Known capability gaps the catalogue's <see cref="ExampleCase.Unsupported"/> gates reuse.</summary>
+internal static class ExampleGates
+{
+    /// <summary>NSS before 3.52 cannot run classic AES-GCM (see <see cref="NssBackendFixture.RequireClassicAesGcm"/>).</summary>
+    public static string? ClassicAesGcm(IPkcs11Backend backend) =>
+        backend is NssBackendFixture nss && !nss.Library.LowLevelLibrary!.IsBoundThroughV3Interface
+            ? "NSS before 3.52 reads CK_GCM_PARAMS without ulIvBits, so classic AES-GCM fails on it"
+            : null;
+}
 
 /// <summary>Every documentation example, with the assertions that prove it does what its page says.</summary>
 internal static class ExampleCatalog
@@ -52,7 +66,8 @@ internal static class ExampleCatalog
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM],
             ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             AssertEncryptAndDecryptWithTokenKey,
-            NeedsUserLogin: true),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.ClassicAesGcm),
     ];
 
     /// <summary>The example names, as theory data (a name serializes; a delegate does not).</summary>

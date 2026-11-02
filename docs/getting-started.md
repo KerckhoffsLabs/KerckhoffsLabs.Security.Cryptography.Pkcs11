@@ -38,7 +38,8 @@ What each step does:
 
 1. **`Pkcs11Library.Load`** maps the module and initializes it. Dispose it last: the library calls
    `C_Finalize` when it is disposed, if it was the one that initialized the module.
-2. **`OpenSessionWithPin`** finds the token by label, opens a session and logs in. The session enforces
+2. **`OpenSessionWithPin`** finds the token by label, opens a session and logs in. (A token that takes
+   no login, such as a software crypto token, is opened with `OpenSessionWithoutLogin` instead.) The session enforces
    the default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
    `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it as
    the last argument; see [Using crypto policies](crypto-policies.md).
@@ -48,8 +49,8 @@ What each step does:
    disappears when the session closes. Pass `persistOnToken: true` to keep it, and find it again later
    with `session.OpenKey(label)`.
 4. **`AesGcmPkcs11`** gives the key the shape of `System.Security.Cryptography.AesGcm`: the same
-   `Encrypt` and `Decrypt`, but the key is a `Pkcs11Key`, not bytes, and the tag size is fixed when you
-   create it. The token does the work.
+   constructor arguments (with a `Pkcs11Key` instead of key bytes) and the same `Encrypt` and `Decrypt`.
+   The token does the work.
 5. **Disposal** releases everything in reverse order. Dispose sessions and keys deterministically
    (`using`), rather than leaving them to the garbage collector.
 

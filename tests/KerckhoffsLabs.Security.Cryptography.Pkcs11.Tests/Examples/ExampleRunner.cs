@@ -24,15 +24,25 @@ internal static class ExampleRunner
         string? reason =
             missing.Length > 0 ? $"{which} does not advertise {string.Join(", ", missing)}"
             : example.NeedsUserLogin && !backend.RequiresUserLogin ? $"{which}'s token takes no user login"
-            : null;
+            : example.Unsupported?.Invoke(backend);
 
+        bool required = coverageRequired && example.MustRunOn.HasFlag(which);
         if (reason is not null)
         {
-            if (coverageRequired && example.MustRunOn.HasFlag(which))
+            if (required)
                 throw new XunitException($"Example {example.Name} must run on {which}, but {reason}.");
             Assert.Skip($"{reason}.");
         }
 
-        example.Run(backend);
+        try
+        {
+            example.Run(backend);
+        }
+        catch (SkipException skip) when (required)
+        {
+            // A skip from inside the example (a platform that lacks the BCL side, say) is still a skip on
+            // a backend the example must run on: on the full CI leg it fails like any other.
+            throw new XunitException($"Example {example.Name} must run on {which}, but it skipped: {skip.Message}");
+        }
     }
 }
