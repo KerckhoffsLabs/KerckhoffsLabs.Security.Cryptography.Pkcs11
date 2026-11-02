@@ -305,9 +305,177 @@ public sealed class Pkcs11KeyAsymmetricTests
         Assert.Equal(bcl.ExportSubjectPublicKeyInfo(), key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
     }
 
+    // === Export: Ed25519, Ed448, X25519, X448 (RFC 8410, over a fake token) =====
+
+    // The public keys of RFC 8032 §7.1 test 1 (Ed25519) and §7.4 "Blank" (Ed448), and Alice's of RFC 7748
+    // §6.1 (X25519) and §6.2 (X448). The SPKI prefixes are SEQUENCE { SEQUENCE { OID }, BIT STRING, 0 unused
+    // bits } as OpenSSL writes them (RFC 8410 §4), written out rather than read from the library's table.
+    private const string Ed25519Key = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+    private const string Ed448Key = "5fd7449b59b461fd2ce787ec616ad46a1da1342485a70e1f8a0ea75d80e96778edf124769b46c7061bd6783df1e50f6cd1fa1abeafe8256180";
+    private const string X25519Key = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a";
+    private const string X448Key = "9b08f7cc31b7e3e67d22d5aea121074a273bd2b83de09c63faa73d2c22c5d9bbc836647241d953d40c5b12da88120d53177f80e532c41fa0";
+
+    // CKA_EC_PARAMS as the RFC 8410 OID (06 03 2B 65 xx) or as the PKCS#11 v3.0 curve name (PrintableString).
+    private const string Ed25519Oid = "06032b6570";
+    private const string Ed448Oid = "06032b6571";
+    private const string X25519Oid = "06032b656e";
+    private const string X448Oid = "06032b656f";
+    private const string Edwards25519Name = "130c656477617264733235353139";
+    private const string Edwards448Name = "130a65647761726473343438";
+    private const string Curve25519Name = "130a63757276653235353139";
+    private const string Curve448Name = "13086375727665343438";
+
+    private static FakeKey Rfc8410Key(CKK keyType, string ecParams, byte[] ecPoint, bool publicOnly = true)
+        => FakeKeys.Create(keyType, ca => ca switch
+        {
+            CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Convert.FromHexString(ecParams)),
+            CKA.CKA_EC_POINT => (CKR.CKR_OK, ecPoint),
+            _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+        }, publicOnly: publicOnly);
+
+    private static byte[] OctetString(byte[] content)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteOctetString(content);
+        return writer.Encode();
+    }
+
+    [Theory]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed25519Oid, Ed25519Key, "302a300506032b6570032100", false)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed25519Oid, Ed25519Key, "302a300506032b6570032100", true)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Edwards25519Name, Ed25519Key, "302a300506032b6570032100", false)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Edwards25519Name, Ed25519Key, "302a300506032b6570032100", true)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed448Oid, Ed448Key, "3043300506032b6571033a00", false)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed448Oid, Ed448Key, "3043300506032b6571033a00", true)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Edwards448Name, Ed448Key, "3043300506032b6571033a00", false)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Edwards448Name, Ed448Key, "3043300506032b6571033a00", true)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X25519Oid, X25519Key, "302a300506032b656e032100", false)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X25519Oid, X25519Key, "302a300506032b656e032100", true)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, Curve25519Name, X25519Key, "302a300506032b656e032100", false)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, Curve25519Name, X25519Key, "302a300506032b656e032100", true)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X448Oid, X448Key, "3042300506032b656f033900", false)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X448Oid, X448Key, "3042300506032b656f033900", true)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, Curve448Name, X448Key, "3042300506032b656f033900", false)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, Curve448Name, X448Key, "3042300506032b656f033900", true)]
+    public void Export_Rfc8410_IsTheRawKeyAndItsSpki(CKK keyType, string ecParams, string publicKey, string spkiPrefix, bool octetString)
+    {
+        byte[] raw = Convert.FromHexString(publicKey);
+        using var key = Rfc8410Key(keyType, ecParams, octetString ? OctetString(raw) : raw);
+
+        Assert.Equal(raw, key.Key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+        Assert.Equal(Convert.FromHexString(spkiPrefix + publicKey), key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+    }
+
+    // RFC 8410 §10.1's example X25519 public key, byte for byte.
+    [Fact]
+    public void Export_X25519_SubjectPublicKeyInfo_IsTheRfc8410Example()
+    {
+        byte[] expected = Convert.FromBase64String("MCowBQYDK2VuAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=");
+        using var key = Rfc8410Key(CKK.CKK_EC_MONTGOMERY, X25519Oid, expected[^32..]);
+
+        Assert.Equal(expected, key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+    }
+
+    // A point of another length, raw or wrapped, is refused rather than exported as some other curve's key.
+    [Theory]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed25519Oid, 31, false)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed25519Oid, 33, true)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed448Oid, 56, false)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed448Oid, 32, true)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X25519Oid, 56, false)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X25519Oid, 31, true)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X448Oid, 57, false)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X448Oid, 32, true)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X25519Oid, 0, false)]
+    public void Export_Rfc8410_WrongLength_Throws(CKK keyType, string ecParams, int length, bool octetString)
+    {
+        byte[] point = new byte[length];
+        using var key = Rfc8410Key(keyType, ecParams, octetString ? OctetString(point) : point);
+
+        foreach (Pkcs11KeyBlobFormat format in new[] { Pkcs11KeyBlobFormat.RawPublicKey, Pkcs11KeyBlobFormat.SubjectPublicKeyInfo })
+        {
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Key.Export(format));
+            Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, ex.ReturnValue);
+        }
+    }
+
+    // Not a primitive DER OCTET STRING around the key: a constructed one, trailing bytes, a wrapper twice.
+    [Theory]
+    [InlineData("24220420" + Ed25519Key)]
+    [InlineData("0420" + Ed25519Key + "00")]
+    [InlineData("0422" + "0420" + Ed25519Key)]
+    public void Export_Rfc8410_MalformedPoint_Throws(string ecPoint)
+    {
+        using var key = Rfc8410Key(CKK.CKK_EC_EDWARDS, Ed25519Oid, Convert.FromHexString(ecPoint));
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+        Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, ex.ReturnValue);
+    }
+
+    // CKA_EC_PARAMS naming no RFC 8410 curve of the key's own family: a Weierstrass curve, the other
+    // family's OID or name, an unknown name, explicit parameters, trailing bytes, not DER at all.
+    [Theory]
+    [InlineData(CKK.CKK_EC_EDWARDS, "06082a8648ce3d030107")]
+    [InlineData(CKK.CKK_EC_EDWARDS, X25519Oid)]
+    [InlineData(CKK.CKK_EC_EDWARDS, Curve25519Name)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, Ed25519Oid)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, Edwards25519Name)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, "1309637572766532353531")]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, "3000")]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X25519Oid + "00")]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, "ff")]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, "")]
+    public void Export_Rfc8410_UnknownCurve_Throws(CKK keyType, string ecParams)
+    {
+        using var key = Rfc8410Key(keyType, ecParams, Convert.FromHexString(X25519Key));
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+        Assert.Equal(CKR.CKR_ATTRIBUTE_VALUE_INVALID, ex.ReturnValue);
+    }
+
+    [Theory]
+    [InlineData(CKA.CKA_EC_PARAMS)]
+    [InlineData(CKA.CKA_EC_POINT)]
+    public void Export_Rfc8410_UnreadableAttribute_Throws(CKA unreadable)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_EC_MONTGOMERY, ca => ca == unreadable
+            ? (CKR.CKR_ATTRIBUTE_SENSITIVE, null)
+            : ca switch
+            {
+                CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Convert.FromHexString(X25519Oid)),
+                CKA.CKA_EC_POINT => (CKR.CKR_OK, Convert.FromHexString(X25519Key)),
+                _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+            }, publicOnly: true);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+        Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+    }
+
+    // A pair reads the point from its public half; tokens leave it off the private one.
+    [Theory]
+    [InlineData(CKK.CKK_EC_EDWARDS, Ed25519Oid, Ed25519Key)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY, X448Oid, X448Key)]
+    public void Export_Rfc8410_KeyPair_ReadsThePublicHalf(CKK keyType, string ecParams, string publicKey)
+    {
+        byte[] raw = Convert.FromHexString(publicKey);
+        using var key = FakeKeys.Create(keyType, _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+            respondFor: (handle, ca) => ca switch
+            {
+                CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Convert.FromHexString(ecParams)),
+                CKA.CKA_EC_POINT when handle == 2 => (CKR.CKR_OK, OctetString(raw)),
+                _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+            });
+
+        Assert.Equal(raw, key.Key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+    }
+
     [Fact]
     public void Export_SecretKey_IsNotSupported() => WithAesKey(key =>
-        Assert.Throws<NotSupportedException>(() => key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo)));
+    {
+        var ex = Assert.Throws<NotSupportedException>(() => key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+        Assert.Contains("CKK_EC_EDWARDS", ex.Message);
+        Assert.Contains("CKK_EC_MONTGOMERY", ex.Message);
+    });
 
     [Fact]
     public void Export_UndefinedFormat_Throws() => WithAesKey(key =>

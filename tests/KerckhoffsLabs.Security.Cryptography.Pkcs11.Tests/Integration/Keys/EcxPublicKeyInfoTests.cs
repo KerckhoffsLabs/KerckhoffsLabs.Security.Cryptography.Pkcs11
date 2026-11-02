@@ -32,9 +32,14 @@ public enum EcxCurve
 /// expected encoding.
 /// </para>
 /// <para>
-/// A case skips when the token does not provide <c>CKA_PUBLIC_KEY_INFO</c> on either half (PKCS#11 lets it
-/// leave the attribute empty), when it lacks the curve's key-pair generation mechanism, and when it refuses
-/// the curve itself.
+/// The other cases check the library against the same encoding: that a <see cref="Pkcs11Key"/> pair reads
+/// <c>CKA_EC_POINT</c> from its public half, and that <see cref="Pkcs11Key.Export"/> writes the RFC 8410 key
+/// and SubjectPublicKeyInfo, for a generated pair and for an imported RFC 8032 Ed25519 public key.
+/// </para>
+/// <para>
+/// A case skips when the token lacks the curve's key-pair generation mechanism or refuses the curve itself;
+/// the <c>CKA_PUBLIC_KEY_INFO</c> case also when the token does not provide that attribute on either half
+/// (PKCS#11 lets it leave the attribute empty), which the other cases then do not compare against.
 /// </para>
 /// </remarks>
 internal static class EcxPublicKeyInfoTestCases
@@ -89,6 +94,60 @@ internal static class EcxPublicKeyInfoTestCases
         using var session = backend.OpenSession();
         // As above: generation is the setup, not what a policy should decide.
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using Pkcs11Key pair = GeneratePair(session, generate, keyType, oid, usage, curve);
+        using var attrs = pair.GetAttributeValue(CKA.CKA_CLASS, CKA.CKA_EC_POINT);
+        Assert.False(attrs[0].CannotBeRead, $"{curve} pair CKA_CLASS cannot be read.");
+        Assert.Equal(CKO.CKO_PUBLIC_KEY, (CKO)attrs[0].GetValueAsUlong());
+        Assert.False(attrs[1].CannotBeRead, $"{curve} pair CKA_EC_POINT cannot be read.");
+        byte[] fromPair = RawKey(attrs[1].GetValueAsByteArray(), keyLength);
+
+        Assert.Equal(RawPublicKey(session.Core, pair.PublicHandle, keyLength, curve), fromPair);
+
+        byte[]? info = PublicKeyInfo(session.Core, pair.PublicHandle) ?? PublicKeyInfo(session.Core, pair.PrivateHandle);
+        if (info is not null)
+            Assert.Equal(Spki(oid, fromPair), info);
+    }
+
+    // Pkcs11Key.Export of a generated pair: the raw key is the public-key object's CKA_EC_POINT (unwrapped),
+    // the SubjectPublicKeyInfo is RFC 8410's around it, and equals the token's own CKA_PUBLIC_KEY_INFO where
+    // the token provides one.
+    internal static void Assert_Export_IsRfc8410(IPkcs11Backend backend, EcxCurve curve)
+    {
+        (CKM generate, CKK keyType, string oid, int keyLength, CKA usage) = Describe(curve);
+        backend.RequireMechanisms(generate);
+
+        using var session = backend.OpenSession();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using Pkcs11Key pair = GeneratePair(session, generate, keyType, oid, usage, curve);
+
+        byte[] raw = RawPublicKey(session.Core, pair.PublicHandle, keyLength, curve);
+        Assert.Equal(raw, pair.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+        byte[] spki = pair.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo);
+        Assert.Equal(Spki(oid, raw), spki);
+
+        byte[]? info = PublicKeyInfo(session.Core, pair.PublicHandle) ?? PublicKeyInfo(session.Core, pair.PrivateHandle);
+        if (info is not null)
+            Assert.Equal(info, spki);
+    }
+
+    // Pkcs11Key.Export of an imported Ed25519 public key, RFC 8032 §7.1 test 1, in the CKA_EC_POINT form the
+    // backend stores.
+    internal static void Assert_Export_Ed25519KnownAnswer(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
+        byte[] publicKey = Convert.FromHexString("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
+
+        using var session = backend.OpenSession();
+        ObjectHandle handle = TestKeys.CreateEd25519PublicKey(session.Core, publicKey, backend.EcxPointIsDerEncoded);
+        using Pkcs11Key key = session.HydrateExistingHandleAsKey(handle);
+
+        Assert.Equal(publicKey, key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+        Assert.Equal(Convert.FromHexString("302a300506032b6570032100" + Convert.ToHexString(publicKey)),
+            key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+    }
+
+    private static Pkcs11Key GeneratePair(Pkcs11Session session, CKM generate, CKK keyType, string oid, CKA usage, EcxCurve curve)
+    {
         var ecParams = new AsnWriter(AsnEncodingRules.DER);
         ecParams.WriteObjectIdentifier(oid);
         // NSS refuses an Edwards public key without CKA_VERIFY (CKR_KEY_TYPE_INCONSISTENT); the builder
@@ -96,31 +155,15 @@ internal static class EcxPublicKeyInfoTestCases
         using var publicTemplate = ObjectTemplate.ForPublicKey(keyType).OnToken(false).EcParams(ecParams.Encode())
             .Verify(keyType == CKK.CKK_EC_EDWARDS).Build();
         using var privateTemplate = ObjectTemplate.ForPrivateKey(keyType).OnToken(false).Attribute(usage, true).Build();
-        Pkcs11Key pair;
         try
         {
-            pair = session.GenerateKeyPair(new Mechanism(generate), publicTemplate, privateTemplate);
+            return session.GenerateKeyPair(new Mechanism(generate), publicTemplate, privateTemplate);
         }
         catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_CURVE_NOT_SUPPORTED
                                          or CKR.CKR_DOMAIN_PARAMS_INVALID or CKR.CKR_ATTRIBUTE_VALUE_INVALID)
         {
             Assert.Skip($"The token does not generate {curve} keys ({ex.ReturnValue}).");
             throw; // unreachable: Assert.Skip throws
-        }
-
-        using (pair)
-        {
-            using var attrs = pair.GetAttributeValue(CKA.CKA_CLASS, CKA.CKA_EC_POINT);
-            Assert.False(attrs[0].CannotBeRead, $"{curve} pair CKA_CLASS cannot be read.");
-            Assert.Equal(CKO.CKO_PUBLIC_KEY, (CKO)attrs[0].GetValueAsUlong());
-            Assert.False(attrs[1].CannotBeRead, $"{curve} pair CKA_EC_POINT cannot be read.");
-            byte[] fromPair = RawKey(attrs[1].GetValueAsByteArray(), keyLength);
-
-            Assert.Equal(RawPublicKey(session.Core, pair.PublicHandle, keyLength, curve), fromPair);
-
-            byte[]? info = PublicKeyInfo(session.Core, pair.PublicHandle) ?? PublicKeyInfo(session.Core, pair.PrivateHandle);
-            if (info is not null)
-                Assert.Equal(Spki(oid, fromPair), info);
         }
     }
 
