@@ -8,6 +8,8 @@ needs.
 
 What each built-in policy allows, for which operations and why, is listed on its reference page:
 [Recommended](policies/recommended.md) and [NistApproved](policies/nist-approved.md).
+Why the policies exist, what they protect against and where their protection ends is explained in the
+[security model](security-model.md#crypto-policies).
 
 The examples use the namespaces `KerckhoffsLabs.Security.Cryptography.Pkcs11` and its `.Common`,
 `.MechanismParams`, `.Policy` and `.Exceptions` sub-namespaces.
