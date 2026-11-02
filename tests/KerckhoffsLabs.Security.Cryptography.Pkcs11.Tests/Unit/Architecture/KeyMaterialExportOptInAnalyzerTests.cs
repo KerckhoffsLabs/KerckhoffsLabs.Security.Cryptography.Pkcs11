@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
-/// KLPKCS11012 marks every <see cref="KeyMaterialExportRule.Allow"/> call site, so an opt-in to reading
+/// KLPKCS11012 marks every <see cref="KeyMaterialExportRule.Allow(IEnumerable{KeyMaterialExportKind}, string)"/> call site, so an opt-in to reading
 /// secrets off the token shows up in review and must be suppressed with a reason. The tests' own build
 /// proves it fires (the suppressions there would otherwise be unused); these compile in-memory source
 /// against the library to pin what it reports, where, and what it leaves alone.

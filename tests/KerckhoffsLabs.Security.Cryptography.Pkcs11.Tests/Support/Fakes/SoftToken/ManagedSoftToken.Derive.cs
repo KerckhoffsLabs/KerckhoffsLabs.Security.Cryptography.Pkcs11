@@ -56,6 +56,7 @@ internal sealed partial class ManagedSoftToken
         if (!DeriveWithholdsValue)
             attrs[(ulong)CKA.CKA_VALUE] = derived;
         attrs.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
+        RecordProtectionHistory(attrs, generated: true, _objects.GetValueOrDefault((ulong)baseKey) ?? []);
         key = (NativeCULong)Store(attrs);
         return CKR.CKR_OK;
     }

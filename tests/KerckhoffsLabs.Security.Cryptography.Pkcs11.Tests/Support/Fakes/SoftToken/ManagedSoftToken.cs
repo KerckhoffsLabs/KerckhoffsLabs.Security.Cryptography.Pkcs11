@@ -148,6 +148,8 @@ internal sealed partial class ManagedSoftToken : FakeModule
             return CKR.CKR_ATTRIBUTE_VALUE_INVALID;
 
         attrs[(ulong)CKA.CKA_VALUE] = RandomNumberGenerator.GetBytes(len);
+        attrs.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
+        RecordProtectionHistory(attrs, generated: true);
         key = (NativeCULong)Store(attrs);
         return CKR.CKR_OK;
     }
@@ -162,6 +164,7 @@ internal sealed partial class ManagedSoftToken : FakeModule
             && !(attrs.TryGetValue((ulong)CKA.CKA_KEY_TYPE, out var type) && (CKK)ToUlong(type) is CKK.CKK_DES or CKK.CKK_DES2 or CKK.CKK_DES3)
             && attrs.TryGetValue((ulong)CKA.CKA_VALUE, out var value) && !attrs.ContainsKey((ulong)CKA.CKA_VALUE_LEN))
             attrs[(ulong)CKA.CKA_VALUE_LEN] = UlongAttr((ulong)value.Length);
+        RecordProtectionHistory(attrs, generated: false);
         ulong handle = Store(attrs);
         RegisterImportedAsymKey(handle, attrs); // reconstructs a live BCL DSA for CKK_DSA imports
         objectId = (NativeCULong)handle;
@@ -254,6 +257,21 @@ internal sealed partial class ManagedSoftToken : FakeModule
     // (Symmetric encrypt/decrypt — block ciphers + AEAD — lives in ManagedSoftToken.Symmetric.cs.)
 
     // === Helpers =========================================================
+
+    // CKA_ALWAYS_SENSITIVE / CKA_NEVER_EXTRACTABLE as PKCS#11 has the token keep them on a secret or private
+    // key: false for a key it was handed the value of (C_CreateObject); from the key's own CKA_SENSITIVE /
+    // CKA_EXTRACTABLE when it generated it; and, when it derived it, only while the base key's are still true.
+    private static void RecordProtectionHistory(Dictionary<ulong, byte[]> attrs, bool generated, Dictionary<ulong, byte[]>? baseKey = null)
+    {
+        if (!(attrs.TryGetValue((ulong)CKA.CKA_CLASS, out var cls) && (CKO)ToUlong(cls) is CKO.CKO_SECRET_KEY or CKO.CKO_PRIVATE_KEY))
+            return;
+        static bool Bool(Dictionary<ulong, byte[]>? a, CKA type) => a is not null && a.TryGetValue((ulong)type, out var v) && v.Length > 0 && v[0] != 0;
+        bool sensitive = Bool(attrs, CKA.CKA_SENSITIVE), extractable = Bool(attrs, CKA.CKA_EXTRACTABLE);
+        bool alwaysSensitive = generated && sensitive && (baseKey is null || Bool(baseKey, CKA.CKA_ALWAYS_SENSITIVE));
+        bool neverExtractable = generated && !extractable && (baseKey is null || Bool(baseKey, CKA.CKA_NEVER_EXTRACTABLE));
+        attrs[(ulong)CKA.CKA_ALWAYS_SENSITIVE] = [alwaysSensitive ? (byte)1 : (byte)0];
+        attrs[(ulong)CKA.CKA_NEVER_EXTRACTABLE] = [neverExtractable ? (byte)1 : (byte)0];
+    }
 
     private ulong Store(Dictionary<ulong, byte[]> attrs)
     {

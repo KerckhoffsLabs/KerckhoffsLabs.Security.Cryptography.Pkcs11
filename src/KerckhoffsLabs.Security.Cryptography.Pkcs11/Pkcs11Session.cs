@@ -62,7 +62,14 @@ public sealed partial class Pkcs11Session : IDisposable
     /// </summary>
     /// <exception cref="CryptoPolicyViolationException">The policy refuses the export.</exception>
     /// <exception cref="InvalidOperationException">Another thread is using the session, or a read-back is already open on it.</exception>
-    internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind) => new(_core.BeginReadBack(kind));
+    /// <param name="kind">The kind of secret to read.</param>
+    /// <param name="kdfBaseKey">
+    /// For <see cref="KeyMaterialExportKind.KdfOutput"/>, the KDF's base key, whose attributes the policy's base-key scope
+    /// judges (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>); <see langword="null"/> otherwise, and for a KDF with no
+    /// base key (PBKDF2).
+    /// </param>
+    internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind, Pkcs11Key? kdfBaseKey = null)
+        => new(_core.BeginReadBack(kind, kdfBaseKey is null ? null : kdfBaseKey.ReadKdfBaseKeyInfo));
 
     /// <summary>Evaluates <paramref name="request"/> without throwing or logging.</summary>
     internal bool IsPermitted(PolicyRequest request) => _core.IsPermitted(request);
