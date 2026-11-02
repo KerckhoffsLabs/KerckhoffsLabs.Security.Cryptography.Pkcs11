@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.PropertyBase
 /// </summary>
 internal static class CsInputs
 {
-    private static readonly Gen<byte> Byte = Gen.Frequency((7, Gen.Byte), (1, Gen.OneOfConst<byte>(0x00, 0xFF)));
+    private static readonly Gen<byte> Byte = Gen.Frequency((7, Gen.Byte), (1, Gen.OneOf<byte>(0x00, 0xFF)));
 
     /// <summary>Checks <paramref name="property"/> on <see cref="PropertyRuns.Iterations"/> cases.</summary>
     internal static void Check<T>(Gen<T> inputs, Action<T> property) =>
@@ -19,7 +19,7 @@ internal static class CsInputs
 
     /// <summary>An integer in [<paramref name="min"/>, <paramref name="max"/>], both inclusive.</summary>
     internal static Gen<int> Int(int min, int max) =>
-        Gen.Frequency((3, Gen.Int[min, max]), (1, Gen.OneOfConst(PropertyRuns.Edges(min, max))));
+        Gen.Frequency((3, Gen.Int[min, max]), (1, Gen.OneOf(PropertyRuns.Edges(min, max))));
 
     /// <summary>Random bytes, exactly <paramref name="length"/> of them.</summary>
     internal static Gen<byte[]> Bytes(int length) => Byte.Array[length];
