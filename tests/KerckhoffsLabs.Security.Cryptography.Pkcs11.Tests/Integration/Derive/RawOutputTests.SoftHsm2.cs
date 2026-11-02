@@ -31,4 +31,7 @@ public sealed class RawOutputTests_SoftHsm(SoftHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void DeriveBytes_Sp800108Feedback_MatchesReference() => RawOutputTestCases.Assert_DeriveBytes_Sp800108Feedback_MatchesReference(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void DeriveBytes_OverAnAgreedSecret_DefaultScope() => RawOutputTestCases.Assert_DeriveBytes_OverAnAgreedSecret_DefaultScope(_backend);
 }

@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// <see cref="Pkcs11Key.DeriveRawSecret"/> on X25519 / X448 (<see cref="CKK.CKK_EC_MONTGOMERY"/>) keys, and
 /// <see cref="Pkcs11Key.DeriveBytes"/>; and <see cref="Pkcs11Key.DeriveSecretAgreement"/> on the same keys,
 /// which keeps the secret on the token and needs no opt-in. Each case runs under <c>Recommended</c> with
-/// <see cref="KeyMaterialExportRule.Allow"/> for its kind only, so it also shows that the opt-in is all such
+/// <see cref="KeyMaterialExportRule.Allow(IEnumerable{KeyMaterialExportKind}, string)"/> for its kind only, so it also shows that the opt-in is all such
 /// a read-back needs.
 /// </summary>
 /// <remarks>
@@ -228,6 +228,38 @@ internal static class RawOutputTestCases
         {
             using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 DestroyByLabel(session, label);
+        }
+    }
+
+    // The default KdfOutput scope refuses KDF output over the agreed secret Z of DeriveSecretAgreement: Z is derived
+    // from a generated, sensitive private key, so a token that keeps CKA_ALWAYS_SENSITIVE reports it always sensitive,
+    // and the output would reproduce every sensitive key derived from Z. A token that resets the attribute on derive
+    // reports Z as not always sensitive, which the default scope cannot tell from imported key material: pinned here,
+    // so the case changes the day the token does.
+    internal static void Assert_DeriveBytes_OverAnAgreedSecret_DefaultScope(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_HKDF_DERIVE);
+        using var session = backend.OpenSession();
+        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        var hkdf = new Mechanism(CKM.CKM_HKDF_DERIVE,
+            CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, HkdfSalt, HkdfInfo));
+
+        using (session.UsePolicy(OptIn(KeyMaterialExportKind.KdfOutput)))
+        {
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using Pkcs11Key z = alice.DeriveSecretAgreement(bob.ExportSubjectPublicKeyInfo());
+
+            KdfBaseKeyInfo info = z.ReadKdfBaseKeyInfo();
+            if (backend.KeepsAlwaysSensitiveOnDerive)
+            {
+                Assert.True(info.AlwaysSensitive);
+                var e = Assert.Throws<CryptoPolicyViolationException>(() => z.DeriveBytes(hkdf, 32));
+                Assert.True(Assert.IsType<KeyMaterialExportRequest>(e.Request).KdfBaseKey!.AlwaysSensitive);
+            }
+            else
+            {
+                Assert.False(info.AlwaysSensitive);
+            }
         }
     }
 

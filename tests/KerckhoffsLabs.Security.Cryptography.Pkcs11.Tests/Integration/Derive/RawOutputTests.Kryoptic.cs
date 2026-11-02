@@ -31,4 +31,7 @@ public sealed class RawOutputTests_Kryoptic(KryopticBackendFixture backend)
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void DeriveBytes_Sp800108Feedback_MatchesReference() => RawOutputTestCases.Assert_DeriveBytes_Sp800108Feedback_MatchesReference(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void DeriveBytes_OverAnAgreedSecret_DefaultScope() => RawOutputTestCases.Assert_DeriveBytes_OverAnAgreedSecret_DefaultScope(_backend);
 }
