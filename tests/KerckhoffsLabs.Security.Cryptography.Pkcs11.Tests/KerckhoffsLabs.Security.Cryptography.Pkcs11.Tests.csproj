@@ -19,7 +19,7 @@
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
-    <LangVersion>13.0</LangVersion>
+    <LangVersion>14.0</LangVersion>
     <!--
       GenerateDocumentationFile is on repo-wide (Directory.Build.props) only so IDE0005
       (unused usings) runs at build. Individual test methods are not XML-documented, so the
