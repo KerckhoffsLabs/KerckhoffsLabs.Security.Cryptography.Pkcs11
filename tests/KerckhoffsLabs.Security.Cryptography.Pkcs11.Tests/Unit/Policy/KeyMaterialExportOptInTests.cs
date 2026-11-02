@@ -511,6 +511,24 @@ public sealed class KeyMaterialExportOptInTests
         Assert.True(all.Evaluate(untagged with { ReadBackFor = KeyMaterialExportKind.EcdhSharedSecret }).IsAllowed);
     }
 
+    // An EcdhSharedSecret tag approves only the CKD_NULL derivation that returns Z. A tagged request naming any
+    // other KDF still goes through the KDF allow-list, so no read-back can route around the SHA-1 KDF refusal.
+    [Theory]
+    [InlineData(CKD.CKD_SHA1_KDF)]
+    [InlineData(CKD.CKD_SHA256_KDF)]
+    public void EcdhTaggedRequest_OtherThanCkdNull_IsJudgedByTheKdfRule(CKD kdf)
+    {
+        ICryptoPolicy all = OptIn(AllKinds);
+        var untagged = new KeyAgreementKdfRequest(CKM.CKM_ECDH1_DERIVE, kdf);
+
+        PolicyDecision tagged = all.Evaluate(untagged with { ReadBackFor = KeyMaterialExportKind.EcdhSharedSecret });
+
+        Assert.Equal(all.Evaluate(untagged).IsAllowed, tagged.IsAllowed);
+        Assert.Equal(all.Evaluate(untagged).Reason, tagged.Reason);
+        if (kdf == CKD.CKD_SHA1_KDF)
+            Assert.False(tagged.IsAllowed);
+    }
+
     // === DeriveRawSecret on a Montgomery (X25519 / X448) key =====================================
 
     // RFC 7748 §6.1 and §6.2: Bob's public key and the secret Alice shares with him.
@@ -922,9 +940,10 @@ public sealed class KeyMaterialExportOptInTests
 
     // === The read-back grant ======================================================================
 
-    // The tag is set only inside a grant: the same template from the caller, before or after, is untagged.
+    // The tag is set only while the grant creates its ephemeral key: the same derivation from the caller, before,
+    // inside the grant but outside that call, or after, is untagged.
     [Fact]
-    public void ReadBackGrant_TagsOnlyWhileOpen()
+    public void ReadBackGrant_TagsOnlyTheEphemeralKeysCreation()
     {
         var policy = new RecordingPolicy();
         WithSession(policy, session =>
@@ -933,17 +952,95 @@ public sealed class KeyMaterialExportOptInTests
             using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Extractable().Sensitive(false).Build();
             policy.Seen.Clear();
 
-            using (session.BeginReadBack(KeyMaterialExportKind.KdfOutput))
+            using (SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput))
             {
-                using Pkcs11Key inside = ikm.Derive(HkdfMechanism(), template);
+                using (Pkcs11Key insideGrant = ikm.Derive(HkdfMechanism(), template)) { }
+                byte[] value = readBack.Read(() => ikm.Derive(HkdfMechanism(), template), 32, ReadBackFailures.KdfOutput);
+                CryptographicOperations.ZeroMemory(value);
             }
             using Pkcs11Key after = ikm.Derive(HkdfMechanism(), template);
 
             KeyTemplateRequest[] templates = [.. policy.Seen.OfType<KeyTemplateRequest>()];
-            Assert.Equal(2, templates.Length);
-            Assert.Equal(KeyMaterialExportKind.KdfOutput, templates[0].ReadBackFor);
-            Assert.Null(templates[1].ReadBackFor);
+            Assert.Equal(3, templates.Length);
+            Assert.Null(templates[0].ReadBackFor);
+            Assert.Equal(KeyMaterialExportKind.KdfOutput, templates[1].ReadBackFor);
+            Assert.Null(templates[2].ReadBackFor);
         });
+    }
+
+    // A logger sink that calls back into the session while the library creates a read-back's ephemeral key
+    // (the lock is reentrant) is the caller, not the read-back: its non-sensitive template is refused.
+    [Fact]
+    public void ReentrantLoggerSink_DuringReadBack_IsNotTagged()
+    {
+        var sink = new ReentrantLogger();
+        using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(sink) });
+        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var ikm = ImportIkm(session);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Extractable().Sensitive(false).Build();
+
+        Exception? reentrant = null;
+        sink.OnDeriveTrace = () => reentrant = Record.Exception(() => ikm.Derive(HkdfMechanism(), template).Dispose());
+
+        byte[] okm = HkdfPkcs11.DeriveKey(Sha256, ikm, 32, Salt, Info);
+        CryptographicOperations.ZeroMemory(okm);
+
+        var e = Assert.IsType<CryptoPolicyViolationException>(reentrant);
+        Assert.Null(Assert.IsType<KeyTemplateRequest>(e.Request).ReadBackFor);
+    }
+
+    // Runs OnDeriveTrace once, from inside the session's DeriveKey trace.
+    private sealed class ReentrantLogger : Microsoft.Extensions.Logging.ILogger
+    {
+        public Action? OnDeriveTrace { get; set; }
+        IDisposable? Microsoft.Extensions.Logging.ILogger.BeginScope<TState>(TState state) => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (OnDeriveTrace is { } run && formatter(state, exception).EndsWith("::DeriveKey", StringComparison.Ordinal))
+            {
+                OnDeriveTrace = null;
+                run();
+            }
+        }
+    }
+
+    // A custom policy that calls back into the session while judging a read-back's own request is the caller
+    // too: what it submits is untagged, and judged by the opt-in policy it delegates to.
+    [Fact]
+    public void ReentrantPolicy_DuringReadBack_IsNotTagged()
+    {
+        var policy = new ReentrantPolicy(OptIn(KeyMaterialExportKind.KdfOutput));
+        WithSession(policy, session =>
+        {
+            using var ikm = ImportIkm(session);
+            using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Extractable().Sensitive(false).Build();
+            Exception? reentrant = null;
+            policy.OnTaggedRequest = () => reentrant = Record.Exception(() => ikm.Derive(HkdfMechanism(), template).Dispose());
+
+            byte[] okm = HkdfPkcs11.DeriveKey(Sha256, ikm, 32, Salt, Info);
+            CryptographicOperations.ZeroMemory(okm);
+
+            var e = Assert.IsType<CryptoPolicyViolationException>(reentrant);
+            Assert.Null(Assert.IsType<KeyTemplateRequest>(e.Request).ReadBackFor);
+        });
+    }
+
+    // Delegates to inner; runs OnTaggedRequest once, from inside the first tagged template's evaluation.
+    private sealed class ReentrantPolicy(ICryptoPolicy inner) : ICryptoPolicy
+    {
+        public Action? OnTaggedRequest { get; set; }
+        public string Name => inner.Name;
+        public bool AllowsOverride => inner.AllowsOverride;
+        public PolicyDecision Evaluate(PolicyRequest request)
+        {
+            if (request is KeyTemplateRequest { ReadBackFor: not null } && OnTaggedRequest is { } run)
+            {
+                OnTaggedRequest = null;
+                run();
+            }
+            return inner.Evaluate(request);
+        }
     }
 
     // A refused export opens no grant, and leaves the session usable.
@@ -958,6 +1055,34 @@ public sealed class KeyMaterialExportOptInTests
         thread.Start();
         thread.Join();
         Assert.Null(other);
+    });
+
+    // A refused export is reported as the policy refusal even while another thread holds the session: the
+    // policy is asked before the lock is taken.
+    [Fact]
+    public void ReadBackGrant_ExportRefused_WhileSessionBusy_ReportsThePolicy() => WithSession(CryptoPolicy.Recommended, session =>
+    {
+        using var held = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var holder = new Thread(() =>
+        {
+            using (session.Core.AcquireExclusive())
+            {
+                held.Set();
+                release.Wait();
+            }
+        });
+        holder.Start();
+        held.Wait();
+        try
+        {
+            Assert.Throws<CryptoPolicyViolationException>(() => session.BeginReadBack(KeyMaterialExportKind.KdfOutput));
+        }
+        finally
+        {
+            release.Set();
+            holder.Join();
+        }
     });
 
     // Another thread cannot use the session, so it can never be judged under the grant's tag.
