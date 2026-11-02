@@ -50,7 +50,7 @@ public sealed class Pkcs11KeyAsymmetricTests
     }
 
     private static void WithEcKey(string oid, Action<Pkcs11Key> body, bool allowExtraction = false)
-        => WithKey(s => s.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(oid)), body, allowExtraction);
+        => WithKey(s => s.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.CreateFromValue(oid)), body, allowExtraction);
 
     private static void WithAesKey(Action<Pkcs11Key> body) => WithKey(s => s.GenerateAesKey(256), body);
 
@@ -289,7 +289,7 @@ public sealed class Pkcs11KeyAsymmetricTests
         using var library = token.Load();
         using var session = ManagedToken.OpenSession(library);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(P256));
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.CreateFromValue(P256));
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
         var ex = Assert.Throws<CryptographicException>(() => alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
@@ -376,7 +376,7 @@ public sealed class Pkcs11KeyAsymmetricTests
     {
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library, policy == "NistApproved" ? CryptoPolicy.NistApproved : CryptoPolicy.Recommended);
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
         using Pkcs11Key z = alice.DeriveSecretAgreement(bob.ExportSubjectPublicKeyInfo());

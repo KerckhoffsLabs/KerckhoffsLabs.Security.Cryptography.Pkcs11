@@ -188,9 +188,15 @@ public sealed partial class Pkcs11Session
     }
 
     /// <summary>
-    /// Generates an EC key pair on a NIST prime curve. The private key is sensitive,
-    /// non-extractable, and usable for signing and ECDH derivation.
+    /// Generates an EC signing key pair (ECDSA). The private key is sensitive, non-extractable, and
+    /// usable only for signing; the public key only for verification. The returned key carries both
+    /// handles.
     /// </summary>
+    /// <remarks>
+    /// Deliberately excludes <c>CKA_DERIVE</c> — see <see cref="GenerateEcKeyAgreementKeyPair"/> for a
+    /// dedicated ECDH pair. Using one key for both ECDSA and ECDH breaks the one-purpose-per-key rule
+    /// (NIST SP 800-57 Part 1 §5.2): the two schemes' security arguments assume independent keys.
+    /// </remarks>
     /// <param name="curve">Named curve from <see cref="Pkcs11ECCurve.NamedCurves"/> (or <see cref="Pkcs11ECCurve.CreateFromValue(string, string?, int?)"/>).
     /// Defaults to <see cref="Pkcs11ECCurve.NamedCurves.NistP256"/> when omitted. The token must support the curve.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
@@ -202,7 +208,37 @@ public sealed partial class Pkcs11Session
     /// the curve (under the default policy: any curve not on its allow-list, including every curve below
     /// 128-bit security).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
-    public Pkcs11Key GenerateEcKeyPair(Pkcs11ECCurve? curve = null, string? label = null, bool persistOnToken = false)
+    public Pkcs11Key GenerateEcSigningKeyPair(Pkcs11ECCurve? curve = null, string? label = null, bool persistOnToken = false)
+        => GenerateEcKeyPair(curve, label, persistOnToken, pub => pub.Verify(), priv => priv.Sign());
+
+    /// <summary>
+    /// Generates an EC key-agreement key pair (ECDH). The private key is sensitive, non-extractable,
+    /// and usable only to derive (<c>CKM_ECDH1_DERIVE</c>, as used by
+    /// <see cref="Pkcs11Key.DeriveSecretAgreement(ReadOnlySpan{byte})"/> and <c>ECDiffieHellmanPkcs11</c>);
+    /// the public key is granted no role, since ECDH does not use it on the token. The returned key
+    /// carries both handles.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately excludes <c>CKA_SIGN</c>/<c>CKA_VERIFY</c> — see <see cref="GenerateEcSigningKeyPair"/>
+    /// for the signing counterpart, and for why one EC key should not serve both roles.
+    /// </remarks>
+    /// <param name="curve">Named curve from <see cref="Pkcs11ECCurve.NamedCurves"/> (or <see cref="Pkcs11ECCurve.CreateFromValue(string, string?, int?)"/>).
+    /// Defaults to <see cref="Pkcs11ECCurve.NamedCurves.NistP256"/> when omitted. The token must support the curve.</param>
+    /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
+    /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
+    /// <returns>The generated EC key pair.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="curve"/> is the default (uninitialized) <see cref="Pkcs11ECCurve"/>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's <see cref="Policy"/> does not allow
+    /// the curve (under the default policy: any curve not on its allow-list, including every curve below
+    /// 128-bit security).</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
+    public Pkcs11Key GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve? curve = null, string? label = null, bool persistOnToken = false)
+        => GenerateEcKeyPair(curve, label, persistOnToken, pub => pub, priv => priv.Derive());
+
+    private Pkcs11Key GenerateEcKeyPair(Pkcs11ECCurve? curve, string? label, bool persistOnToken,
+        Func<PublicKeyTemplateBuilder, PublicKeyTemplateBuilder> publicRole,
+        Func<PrivateKeyTemplateBuilder, PrivateKeyTemplateBuilder> privateRole)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -212,14 +248,12 @@ public sealed partial class Pkcs11Session
         // The curve allow-list is enforced by the session's GenerateKeyPair, which every EC key-pair
         // generation reaches, so there is no separate check here.
 
-        var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
-            .EcParams(resolved.GetEcParams())
-            .Verify()
+        var pub = publicRole(ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .EcParams(resolved.GetEcParams()))
             .OnToken(persistOnToken)
             .Attribute(CKA.CKA_MODIFIABLE, false);
-        var priv = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
-            .Sensitive().NonExtractable()
-            .Sign().Derive()
+        var priv = privateRole(ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
+            .Sensitive().NonExtractable())
             .OnToken(persistOnToken)
             .Attribute(CKA.CKA_MODIFIABLE, false);
         if (label is not null)

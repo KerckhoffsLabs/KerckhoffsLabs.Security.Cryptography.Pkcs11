@@ -97,7 +97,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
         using IDisposable? insecure = allowExtraction ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
-        using var key = session.GenerateEcKeyPair(Curves(curve).token);
+        using var key = session.GenerateEcKeyAgreementKeyPair(Curves(curve).token);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         body(ecdh);
     }
@@ -228,7 +228,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { CurveCatalog = Prime239v1Catalog });
         using var session = ManagedToken.OpenSession(library);
         using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var key = session.GenerateEcKeyPair(Curves("prime239v1").token);
+        using var key = session.GenerateEcKeyAgreementKeyPair(Curves("prime239v1").token);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         body(ecdh);
     }
@@ -317,8 +317,8 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         using var session = ManagedToken.OpenSession(library);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // reads Z back on both sides
 
-        using var aliceKey = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
-        using var bobKey = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var aliceKey = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bobKey = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var alice = new ECDiffieHellmanPkcs11(aliceKey);
         using var bob = new ECDiffieHellmanPkcs11(bobKey);
 
@@ -514,7 +514,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
         using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(oid));
+        using var key = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.CreateFromValue(oid));
         using var alice = new ECDiffieHellmanPkcs11(key);
         using var bob = ECDiffieHellman.Create(BclECCurve.CreateFromValue(oid));
 
@@ -631,7 +631,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
         ECParameters explicitPeer = bob.ExportParameters(includePrivateParameters: false);
         explicitPeer.Curve = ExplicitNistP256;

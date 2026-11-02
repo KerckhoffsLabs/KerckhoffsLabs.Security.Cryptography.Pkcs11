@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// The EC curve is judged on every key-pair generation, not only through
-/// <see cref="Pkcs11Session.GenerateEcKeyPair"/>: the generic <c>GenerateKeyPair(mechanism, public, private)</c>
+/// the <see cref="Pkcs11Session.GenerateEcSigningKeyPair"/> and <see cref="Pkcs11Session.GenerateEcKeyAgreementKeyPair"/> helpers: the generic <c>GenerateKeyPair(mechanism, public, private)</c>
 /// path reaches the same session call and must meet the same curve allow-list.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]

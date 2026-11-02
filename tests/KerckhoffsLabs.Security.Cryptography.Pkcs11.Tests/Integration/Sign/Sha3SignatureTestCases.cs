@@ -21,7 +21,7 @@ internal static class Sha3SignatureTestCases
         RequireBclSha3();
         backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA3_256);
         using var session = backend.OpenSession();
-        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         try
         {
             byte[] signature = key.Sign(new Mechanism(CKM.CKM_ECDSA_SHA3_256), Message);

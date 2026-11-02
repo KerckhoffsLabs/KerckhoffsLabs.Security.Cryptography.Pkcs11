@@ -195,6 +195,10 @@ of PKCS#11*, CHES 2003).
 - `GenerateRsaSigningKeyPair` → sign/verify only. `GenerateRsaKeyTransportKeyPair` → encrypt/decrypt
   only (RSA-OAEP key transport). Neither grants `CKA_WRAP`/`CKA_UNWRAP`; a caller who specifically
   needs RSA `C_WrapKey`/`C_UnwrapKey` should build that template explicitly.
+- `GenerateEcSigningKeyPair` → sign/verify only (ECDSA). `GenerateEcKeyAgreementKeyPair` → derive only
+  (ECDH); its public key is granted no role, since ECDH does not use it on the token. Using one EC key
+  for both signatures and key agreement breaks the one-purpose-per-key rule of NIST SP 800-57 Part 1
+  §5.2: the two schemes' security arguments assume independent keys.
 
 There is no single "do everything" key-generation helper — pick the one that names the role the key
 will actually play.

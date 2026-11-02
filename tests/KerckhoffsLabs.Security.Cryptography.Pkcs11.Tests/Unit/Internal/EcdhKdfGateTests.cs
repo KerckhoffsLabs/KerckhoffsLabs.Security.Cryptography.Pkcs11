@@ -178,8 +178,8 @@ public sealed class EcdhKdfGateTests
     {
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
-        using Pkcs11Key ours = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
-        using Pkcs11Key theirs = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using Pkcs11Key ours = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using Pkcs11Key theirs = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         byte[] peerPoint = theirs.GetAttributeValue(CKA.CKA_EC_POINT)[0].GetValueAsByteArray();
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
 

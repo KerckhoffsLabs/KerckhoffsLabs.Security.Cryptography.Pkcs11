@@ -8,7 +8,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// Backend-agnostic assertions for <c>Pkcs11Session.GenerateEcKeyPair</c>. The per-backend test
+/// Backend-agnostic assertions for <c>Pkcs11Session.GenerateEcSigningKeyPair</c> and
+/// <c>Pkcs11Session.GenerateEcKeyAgreementKeyPair</c>. The per-backend test
 /// classes live in <c>GenerateEcKeyPairTests.Pkcs11Mock.cs</c> and <c>GenerateEcKeyPairTests.SoftHsm2.cs</c>.
 /// (The sub-128-bit-curve insecure gate is covered separately in <c>GenerateEcKeyPairInsecureGateTests</c>.)
 /// <c>EcKeyGen_CurveOidNotACurve_IsRefused</c> goes through the raw dispatch, with <c>CKA_EC_PARAMS</c> the library
@@ -22,17 +23,65 @@ internal static class GenerateEcKeyPairTestCases
     internal static void Assert_GeneratesP256KeyPair(IPkcs11Backend backend)
     {
         using var session = OpenSession(backend);
-        using var key = session.GenerateEcKeyPair(curve: Pkcs11ECCurve.NamedCurves.NistP256);
+        using var key = session.GenerateEcSigningKeyPair(curve: Pkcs11ECCurve.NamedCurves.NistP256);
 
         Assert.False(key.PrivateHandle.IsInvalid);
         Assert.False(key.PublicHandle.IsInvalid);
+    }
+
+    /// <summary>
+    /// A signing pair carries <c>CKA_SIGN</c>/<c>CKA_VERIFY</c> and nothing else: no <c>CKA_DERIVE</c>, so the
+    /// signing key cannot also be used for ECDH, and no encrypt, decrypt, wrap or unwrap.
+    /// </summary>
+    internal static void Assert_SigningKeyPair_SignVerifyOnly(IPkcs11Backend backend)
+    {
+        using var session = OpenSession(backend);
+        using var key = session.GenerateEcSigningKeyPair(curve: Pkcs11ECCurve.NamedCurves.NistP256);
+
+        AssertCapabilities(session, key.PrivateHandle, granted: [CKA.CKA_SIGN],
+            refused: [CKA.CKA_DERIVE, CKA.CKA_DECRYPT, CKA.CKA_UNWRAP]);
+        AssertCapabilities(session, key.PublicHandle, granted: [CKA.CKA_VERIFY],
+            refused: [CKA.CKA_DERIVE, CKA.CKA_ENCRYPT, CKA.CKA_WRAP]);
+    }
+
+    /// <summary>
+    /// A key-agreement pair's private key carries <c>CKA_DERIVE</c> only (ECDH, <c>CKM_ECDH1_DERIVE</c>): it cannot
+    /// sign, decrypt or unwrap. Its public key, which ECDH does not use on the token, is granted no role.
+    /// </summary>
+    internal static void Assert_KeyAgreementKeyPair_DeriveOnly(IPkcs11Backend backend)
+    {
+        using var session = OpenSession(backend);
+        using var key = session.GenerateEcKeyAgreementKeyPair(curve: Pkcs11ECCurve.NamedCurves.NistP256);
+
+        Assert.False(key.PrivateHandle.IsInvalid);
+        Assert.False(key.PublicHandle.IsInvalid);
+        AssertCapabilities(session, key.PrivateHandle, granted: [CKA.CKA_DERIVE],
+            refused: [CKA.CKA_SIGN, CKA.CKA_DECRYPT, CKA.CKA_UNWRAP]);
+        AssertCapabilities(session, key.PublicHandle, granted: [],
+            refused: [CKA.CKA_VERIFY, CKA.CKA_DERIVE, CKA.CKA_ENCRYPT, CKA.CKA_WRAP]);
+    }
+
+    internal static void Assert_KeyAgreementKeyPair_RejectsUnspecifiedCurve(IPkcs11Backend backend)
+    {
+        using var session = OpenSession(backend);
+        Assert.Throws<ArgumentException>(() => session.GenerateEcKeyAgreementKeyPair(curve: default(Pkcs11ECCurve)));
+    }
+
+    // Each attribute in granted reads back CK_TRUE and each in refused CK_FALSE.
+    private static void AssertCapabilities(Pkcs11Session session, ObjectHandle handle, CKA[] granted, CKA[] refused)
+    {
+        CKA[] all = [.. granted, .. refused];
+        using var attrs = session.Core.GetAttributeValue(handle, all);
+        for (int i = 0; i < all.Length; i++)
+            Assert.True(attrs[i].GetValueAsBool() == i < granted.Length,
+                $"{all[i]} is {attrs[i].GetValueAsBool()}, expected {i < granted.Length}.");
     }
 
     internal static void Assert_RejectsUnspecifiedCurve(IPkcs11Backend backend)
     {
         using var session = OpenSession(backend);
         // The uninitialized default(Pkcs11ECCurve) carries no OID and must be rejected.
-        Assert.Throws<ArgumentException>(() => session.GenerateEcKeyPair(curve: default(Pkcs11ECCurve)));
+        Assert.Throws<ArgumentException>(() => session.GenerateEcSigningKeyPair(curve: default(Pkcs11ECCurve)));
     }
 
     public static TheoryData<string> CurveOidsNotACurve => ["P-256 with an extra arc", "P-256 without its last arc"];
