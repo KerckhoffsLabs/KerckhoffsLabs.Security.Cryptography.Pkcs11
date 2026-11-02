@@ -137,7 +137,10 @@ internal static class ExampleCatalog
             })),
         new(Rsa(nameof(RsaExamples.OaepEncryptDecrypt)), [typeof(RSAPkcs11)], [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP],
             ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(Message, RsaExamples.OaepEncryptDecrypt(s, Message)))),
+            b => WithSession(b, s => Assert.Equal(Message, RsaExamples.OaepEncryptDecrypt(s, Message))),
+            Unsupported: b => b is SoftHsmBackendFixture && SoftHsmBackendFixture.IsV240Leg
+                ? "SoftHSM 2.5 implements RSA-OAEP with SHA-1 only"
+                : null),
         new(Rsa(nameof(RsaExamples.BclOaepEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(Message, RsaExamples.BclOaepEncryptDecrypt(Message))),
     ];
