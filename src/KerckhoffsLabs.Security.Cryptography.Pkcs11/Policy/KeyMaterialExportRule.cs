@@ -75,10 +75,18 @@ public sealed class KeyMaterialExportRule
 
         string scoped = kdfOutput ? $" (KdfOutput over {kdfBaseKeys.Description})" : "";
         return new(
-            r => !allowed.Contains(r.Kind) ? PolicyDecision.Deny(RefuseDenial(r.Kind))
-                : r.Kind == KeyMaterialExportKind.KdfOutput && !kdfBaseKeys.Admits(r.KdfBaseKey) ? PolicyDecision.Deny(OutOfScopeDenial(r.KdfBaseKey!, kdfBaseKeys))
-                : PolicyDecision.Allow,
+            r => Decide(r, allowed, kdfBaseKeys),
             $"Reads of {string.Join(", ", copy)} are allowed{scoped}: {rationale.Trim()}");
+    }
+
+    private static PolicyDecision Decide(
+        KeyMaterialExportRequest request, HashSet<KeyMaterialExportKind> allowed, KdfBaseKeyScope kdfBaseKeys)
+    {
+        if (!allowed.Contains(request.Kind))
+            return PolicyDecision.Deny(RefuseDenial(request.Kind));
+        if (request.Kind == KeyMaterialExportKind.KdfOutput && !kdfBaseKeys.Admits(request.KdfBaseKey))
+            return PolicyDecision.Deny(OutOfScopeDenial(request.KdfBaseKey!, kdfBaseKeys));
+        return PolicyDecision.Allow;
     }
 
     private static string OutOfScopeDenial(KdfBaseKeyInfo baseKey, KdfBaseKeyScope scope) =>
