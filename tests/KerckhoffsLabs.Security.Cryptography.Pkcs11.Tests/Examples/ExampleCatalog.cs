@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -50,6 +52,7 @@ internal static class ExampleGates
 internal static class ExampleCatalog
 {
     private static readonly byte[] Message = Encoding.UTF8.GetBytes("Pay 100 EUR to account 42.");
+    private static readonly byte[] Header = Encoding.UTF8.GetBytes("message-id: 7");
 
     public static IReadOnlyList<ExampleCase> All { get; } =
     [
@@ -68,7 +71,45 @@ internal static class ExampleCatalog
             AssertEncryptAndDecryptWithTokenKey,
             NeedsUserLogin: true,
             Unsupported: ExampleGates.ClassicAesGcm),
+
+        // AEAD (docs/examples/aead.md)
+        new(Name(nameof(AeadExamples.AesGcmEncryptDecrypt)), [typeof(AesGcmPkcs11)], [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM],
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s => Assert.Equal(Message, AeadExamples.AesGcmEncryptDecrypt(s, Message, Header)))),
+        new(Name(nameof(AeadExamples.BclAesGcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
+            _ => Assert.Equal(Message, AeadExamples.BclAesGcmEncryptDecrypt(Message, Header))),
+        new(Name(nameof(AeadExamples.AesGcmDetectsTampering)), [typeof(AesGcmPkcs11)], [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM],
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s => Assert.True(AeadExamples.AesGcmDetectsTampering(s, Message)))),
+        new(Name(nameof(AeadExamples.AesCcmEncryptDecrypt)), [typeof(AesCcmPkcs11)], [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CCM],
+            ExampleBackend.Kryoptic,
+            b => WithSession(b, s => Assert.Equal(Message, AeadExamples.AesCcmEncryptDecrypt(s, Message, Header)))),
+        new(Name(nameof(AeadExamples.BclAesCcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                if (!AesCcm.IsSupported) Assert.Skip("AES-CCM is not supported on this platform.");
+                Assert.Equal(Message, AeadExamples.BclAesCcmEncryptDecrypt(Message, Header));
+            }),
+        new(Name(nameof(AeadExamples.ChaCha20Poly1305EncryptDecrypt)), [typeof(ChaCha20Poly1305Pkcs11)],
+            [CKM.CKM_CHACHA20_KEY_GEN, CKM.CKM_CHACHA20_POLY1305],
+            ExampleBackend.Kryoptic,
+            b => WithSession(b, s => Assert.Equal(Message, AeadExamples.ChaCha20Poly1305EncryptDecrypt(s, Message, Header)))),
+        new(Name(nameof(AeadExamples.BclChaCha20Poly1305EncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                if (!ChaCha20Poly1305.IsSupported) Assert.Skip("ChaCha20-Poly1305 is not supported on this platform.");
+                Assert.Equal(Message, AeadExamples.BclChaCha20Poly1305EncryptDecrypt(Message, Header));
+            }),
     ];
+
+    private static string Name(string aeadMethod) => $"{nameof(AeadExamples)}.{aeadMethod}";
+
+    // Opens a session the backend's way (login or not) and runs an example in it.
+    private static void WithSession(IPkcs11Backend backend, Action<Pkcs11Session> body)
+    {
+        using Pkcs11Session session = backend.OpenSession();
+        body(session);
+    }
 
     /// <summary>The example names, as theory data (a name serializes; a delegate does not).</summary>
     public static TheoryData<string> Names => [.. All.Select(c => c.Name)];

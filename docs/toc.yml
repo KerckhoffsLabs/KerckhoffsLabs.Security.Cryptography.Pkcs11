@@ -4,6 +4,10 @@
   href: getting-started.md
 - name: Security model
   href: security-model.md
+- name: Examples
+  items:
+    - name: Authenticated encryption
+      href: examples/aead.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies
