@@ -16,9 +16,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// <b>Two surfaces.</b> The <c>DeriveKey</c> / <c>Extract</c> / <c>Expand</c> overloads that return or
 /// fill bytes mirror <see cref="HKDF"/> and produce the same output for the same inputs. Reading that
-/// output means taking key material off the token, so under the default policy they throw
-/// <see cref="CryptoPolicyViolationException"/> unless the caller opens a scoped
-/// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>. The additions —
+/// output means taking key material off the token
+/// (<see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind.KdfOutput"/>), so under every built-in policy they throw
+/// <see cref="CryptoPolicyViolationException"/> unless the caller opts in with
+/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "reason"))</c>
+/// (reported as KLPKCS11012). A scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also
+/// allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. The additions —
 /// <see cref="DeriveKey(HashAlgorithmName, Pkcs11Key, ObjectTemplate, ReadOnlySpan{byte}, ReadOnlySpan{byte})"/>,
 /// <see cref="ExtractKey"/> and <see cref="ExpandKey"/> — keep the result on the token as a
 /// <see cref="Pkcs11Key"/> and need no override: prefer them whenever the derived material only has to

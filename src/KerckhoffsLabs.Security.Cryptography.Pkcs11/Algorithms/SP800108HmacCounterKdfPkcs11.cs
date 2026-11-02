@@ -34,12 +34,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// Does not take ownership of the base key — disposing this provider does not dispose it.
 /// </para>
 /// <para>
-/// <b>Requires a policy that permits reading key material off the token, e.g.
-/// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
+/// <b>Requires a policy that allows
+/// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind.KdfOutput"/>.</b> Every method here returns
 /// <c>byte[]</c>, so the derived value must be read off the token — this adapter cannot be
-/// implemented without extracting key material. The refusal comes from the library's single
-/// secure-defaults gate, which declines to create the extractable, non-sensitive key the
-/// read-back needs. Scope the policy override to one operation, or stay on the on-token
+/// implemented without extracting key material. Every built-in policy refuses it; opt in with
+/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "reason"))</c>
+/// (reported as KLPKCS11012). A scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also
+/// allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. Or stay on the on-token
 /// <c>Pkcs11Key.Derive</c> path if the derived key never needs to leave the HSM.
 /// </para>
 /// </remarks>
