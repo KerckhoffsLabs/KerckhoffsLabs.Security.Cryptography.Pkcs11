@@ -17,4 +17,11 @@ public sealed class EcxPublicKeyInfoTests_Kryoptic(KryopticBackendFixture backen
     [InlineData(EcxCurve.X25519)]
     [InlineData(EcxCurve.X448)]
     public void PublicKeyInfo_IsRfc8410(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_PublicKeyInfo_IsRfc8410(_backend, curve);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData(EcxCurve.Ed25519)]
+    [InlineData(EcxCurve.Ed448)]
+    [InlineData(EcxCurve.X25519)]
+    [InlineData(EcxCurve.X448)]
+    public void KeyPair_ReadsThePublicPoint(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_KeyPair_ReadsThePublicPoint(_backend, curve);
 }

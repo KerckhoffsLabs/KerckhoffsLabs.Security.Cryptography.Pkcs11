@@ -77,6 +77,53 @@ internal static class EcxPublicKeyInfoTestCases
         }
     }
 
+    // A Pkcs11Key pair reads its attributes from the public half, where CKA_EC_POINT is: the point it
+    // returns is the public-key object's, and the key in the BIT STRING of the token's
+    // CKA_PUBLIC_KEY_INFO where the token provides one. Before CKK_EC_MONTGOMERY was routed like the other
+    // pair types, an X25519/X448 pair read the private-key object, which tokens leave without the point.
+    internal static void Assert_KeyPair_ReadsThePublicPoint(IPkcs11Backend backend, EcxCurve curve)
+    {
+        (CKM generate, CKK keyType, string oid, int keyLength, CKA usage) = Describe(curve);
+        backend.RequireMechanisms(generate);
+
+        using var session = backend.OpenSession();
+        // As above: generation is the setup, not what a policy should decide.
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var ecParams = new AsnWriter(AsnEncodingRules.DER);
+        ecParams.WriteObjectIdentifier(oid);
+        // NSS refuses an Edwards public key without CKA_VERIFY (CKR_KEY_TYPE_INCONSISTENT); the builder
+        // defaults every usage to false.
+        using var publicTemplate = ObjectTemplate.ForPublicKey(keyType).OnToken(false).EcParams(ecParams.Encode())
+            .Verify(keyType == CKK.CKK_EC_EDWARDS).Build();
+        using var privateTemplate = ObjectTemplate.ForPrivateKey(keyType).OnToken(false).Attribute(usage, true).Build();
+        Pkcs11Key pair;
+        try
+        {
+            pair = session.GenerateKeyPair(new Mechanism(generate), publicTemplate, privateTemplate);
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_CURVE_NOT_SUPPORTED
+                                         or CKR.CKR_DOMAIN_PARAMS_INVALID or CKR.CKR_ATTRIBUTE_VALUE_INVALID)
+        {
+            Assert.Skip($"The token does not generate {curve} keys ({ex.ReturnValue}).");
+            throw; // unreachable: Assert.Skip throws
+        }
+
+        using (pair)
+        {
+            using var attrs = pair.GetAttributeValue(CKA.CKA_CLASS, CKA.CKA_EC_POINT);
+            Assert.False(attrs[0].CannotBeRead, $"{curve} pair CKA_CLASS cannot be read.");
+            Assert.Equal(CKO.CKO_PUBLIC_KEY, (CKO)attrs[0].GetValueAsUlong());
+            Assert.False(attrs[1].CannotBeRead, $"{curve} pair CKA_EC_POINT cannot be read.");
+            byte[] fromPair = RawKey(attrs[1].GetValueAsByteArray(), keyLength);
+
+            Assert.Equal(RawPublicKey(session.Core, pair.PublicHandle, keyLength, curve), fromPair);
+
+            byte[]? info = PublicKeyInfo(session.Core, pair.PublicHandle) ?? PublicKeyInfo(session.Core, pair.PrivateHandle);
+            if (info is not null)
+                Assert.Equal(Spki(oid, fromPair), info);
+        }
+    }
+
     // RFC 8410 §3: id-X25519 1.3.101.110, id-X448 1.3.101.111, id-Ed25519 1.3.101.112, id-Ed448 1.3.101.113.
     private static (CKM Generate, CKK KeyType, string Oid, int KeyLength, CKA Usage) Describe(EcxCurve curve) => curve switch
     {
@@ -122,7 +169,11 @@ internal static class EcxPublicKeyInfoTestCases
     {
         using var attrs = session.GetAttributeValue(pub, [CKA.CKA_EC_POINT]);
         Assert.False(attrs[0].CannotBeRead, $"{curve} CKA_EC_POINT cannot be read.");
-        byte[] point = attrs[0].GetValueAsByteArray();
+        return RawKey(attrs[0].GetValueAsByteArray(), keyLength);
+    }
+
+    private static byte[] RawKey(byte[] point, int keyLength)
+    {
         if (point.Length == keyLength)
             return point;
 
