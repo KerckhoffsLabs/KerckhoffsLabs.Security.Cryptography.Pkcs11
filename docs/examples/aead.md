@@ -3,8 +3,8 @@
 AES-GCM, AES-CCM and ChaCha20-Poly1305 encrypt **and** authenticate: a ciphertext, tag or associated
 data that was changed in transit fails to decrypt, instead of decrypting to something else. Use one of
 them for any new encryption. The adapters have the same `Encrypt` and `Decrypt` as their
-`System.Security.Cryptography` counterparts; the differences are that the key is a token key, not bytes,
-and that the AES adapters fix the tag size when they are created.
+`System.Security.Cryptography` counterparts; the main difference is that the key is a token key, not
+bytes. `AesCcmPkcs11` also fixes the tag size when it is created, where `AesCcm` takes it from each call.
 
 Each example below shows the PKCS#11 code and the BCL code for the same task. Both are compiled and run
 in CI.
@@ -28,14 +28,17 @@ in CI.
 - Generate nonces with `session.GenerateRandom` (the token's generator) or `RandomNumberGenerator`; both
   are fine. What matters is that a nonce is **never reused** with the same key: AES-GCM's
   confidentiality and authenticity both fail on a repeated nonce.
-- `tagSizeInBytes` is fixed for the instance, as `AesGcm` requires since SYSLIB0053, and `Decrypt`
-  refuses a tag of any other length. The default `Recommended` policy requires at least 12 bytes
+- `tagSizeInBytes` is fixed for the instance, as for `AesGcm(key, tagSizeInBytes)` (the constructor
+  without it is obsolete, SYSLIB0053, and has no counterpart here), and `Decrypt` refuses a tag of any
+  other length. The default `Recommended` policy requires at least 12 bytes
   (96 bits), `NistApproved` 12 to 16 bytes. Use 16.
 - The nonce is 12 bytes, as for `AesGcm`.
 
 ### Detecting tampering
 
-A failed authentication throws `AuthenticationTagMismatchException`, as the BCL does:
+A failed authentication usually throws `AuthenticationTagMismatchException`, as the BCL does. Some tokens
+report a bad tag with a generic error code, which the library cannot tell apart from a real fault, so it
+surfaces as a `Pkcs11Exception`. Both are `CryptographicException`s; catch that:
 
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/AeadExamples.cs#AesGcmDetectsTampering)]
 

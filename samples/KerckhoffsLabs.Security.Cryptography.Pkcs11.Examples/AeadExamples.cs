@@ -59,10 +59,11 @@ public static class AeadExamples
             aesGcm.Decrypt(nonce, ciphertext, tag, decrypted);
             return false;
         }
-        catch (AuthenticationTagMismatchException)
+        catch (CryptographicException)
         {
-            // The same exception as the BCL's AesGcm. `decrypted` has been cleared: never use
-            // any of it. The token's own error is the InnerException, for logging.
+            // Usually AuthenticationTagMismatchException, as from the BCL's AesGcm; a token that reports
+            // a bad tag with a generic code surfaces as a Pkcs11Exception instead. Both derive from
+            // CryptographicException: reject the message either way, and never use `decrypted`.
             return true;
         }
         #endregion
