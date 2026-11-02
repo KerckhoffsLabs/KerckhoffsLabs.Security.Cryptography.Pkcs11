@@ -820,11 +820,12 @@ public sealed class KeyMaterialExportOptInTests
     [MemberData(nameof(WrongCurvePeers))]
     public void X25519_DeriveSecretAgreement_WrongCurvePeer_ThrowsPkcs11ArgumentException(string peer)
     {
+        using var p256 = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
         byte[] spki = peer switch
         {
             "X448 peer" => MontgomerySpki("1.3.101.111", X448BobPublic),
             "Ed25519 peer" => MontgomerySpki("1.3.101.112", X25519BobPublic),
-            _ => ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256).ExportSubjectPublicKeyInfo(),
+            _ => p256.ExportSubjectPublicKeyInfo(),
         };
         WithMontgomeryKey(X25519Oid, X25519Shared, CryptoPolicy.Recommended, (key, module) =>
         {
