@@ -19,8 +19,8 @@ Two details matter:
 - **Use `X509SignatureGenerator`, not `CreateSelfSigned`.** `CertificateRequest.CreateSelfSigned` returns
   a certificate with the private key attached, which means exporting it, and a token key cannot be
   exported. `request.Create(...)` with `X509SignatureGenerator.CreateForECDsa` (or `CreateForRSA`) only
-  asks the key to sign. The same applies to a certificate signing request (`CreateSigningRequest`) for a
-  certificate authority to sign.
+  asks the key to sign. To have a certificate authority issue the certificate instead,
+  `request.CreateSigningRequest()` works as it is: it only asks the key to sign the request.
 
 ## Signing with a certificate's key — `Pkcs11CertificateExtensions`
 
