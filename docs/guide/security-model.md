@@ -176,7 +176,10 @@ using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy ar
 
 The same builder allows a hash, curve or key-agreement KDF (`AllowHash`, `AllowCurve`,
 `AllowKeyAgreementKdf`), tightens a copy (`RemoveMechanism`, `WithRsaKeyGenerationRule`), or starts a policy
-from scratch (`new CryptoPolicyBuilder(name)`); see [Using crypto policies](crypto-policies.md). The
+from scratch (`new CryptoPolicyBuilder(name)`); see [Using crypto policies](crypto-policies.md). Reading a
+shared secret or KDF output off the token is an explicit, per-kind opt-in with a reason
+(`WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, reason))`): the first export of each kind under a
+policy logs a warning (later ones log at Debug), and each `Allow` call site is reported as `KLPKCS11012`. The
 generated [Recommended](policies/recommended.md) and [NistApproved](policies/nist-approved.md) pages list
 exactly what each policy allows, for which operations, and why.
 
