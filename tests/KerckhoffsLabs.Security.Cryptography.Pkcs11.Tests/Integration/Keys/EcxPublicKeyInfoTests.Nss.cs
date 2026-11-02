@@ -24,4 +24,14 @@ public sealed class EcxPublicKeyInfoTests_Nss(NssBackendFixture backend)
     [InlineData(EcxCurve.X25519)]
     [InlineData(EcxCurve.X448)]
     public void KeyPair_ReadsThePublicPoint(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_KeyPair_ReadsThePublicPoint(_backend, curve);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [InlineData(EcxCurve.Ed25519)]
+    [InlineData(EcxCurve.Ed448)]
+    [InlineData(EcxCurve.X25519)]
+    [InlineData(EcxCurve.X448)]
+    public void Export_IsRfc8410(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_Export_IsRfc8410(_backend, curve);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void Export_Ed25519KnownAnswer() => EcxPublicKeyInfoTestCases.Assert_Export_Ed25519KnownAnswer(_backend);
 }

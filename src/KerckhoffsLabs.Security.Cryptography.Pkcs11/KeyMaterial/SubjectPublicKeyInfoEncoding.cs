@@ -20,6 +20,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 /// the public value <c>INTEGER y</c> as the BIT STRING.</item>
 /// <item>ML-DSA, SLH-DSA, ML-KEM: the parameter set's OID with absent parameters, and the FIPS-encoded
 /// public key as the BIT STRING (see <see cref="PostQuantumParameterSets"/>).</item>
+/// <item>Ed25519, Ed448, X25519, X448 (RFC 8410): the curve's OID with absent parameters, and the RFC 8032 /
+/// RFC 7748 public key as the BIT STRING (see <see cref="Rfc8410Curves"/>).</item>
 /// </list>
 /// Writes and reads DER only: a peer key is caller input, so nothing outside the canonical encoding is
 /// accepted.
@@ -53,7 +55,7 @@ internal static class SubjectPublicKeyInfoEncoding
         return writer.Encode();
     }
 
-    /// <summary>Encodes a public key whose algorithm takes no parameters (ML-DSA, SLH-DSA, ML-KEM).</summary>
+    /// <summary>Encodes a public key whose algorithm takes no parameters (ML-DSA, SLH-DSA, ML-KEM, RFC 8410 curves).</summary>
     internal static byte[] EncodeWithoutParameters(string algorithmOid, ReadOnlySpan<byte> publicKey)
         => Encode(algorithmOid, null, publicKey);
 

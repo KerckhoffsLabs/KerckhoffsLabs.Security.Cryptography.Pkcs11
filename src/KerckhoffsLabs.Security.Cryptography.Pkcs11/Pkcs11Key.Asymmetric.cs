@@ -25,6 +25,7 @@ public sealed partial class Pkcs11Key
     /// <item><term><see cref="CKK.CKK_EC"/> (named curve)</term><description>The uncompressed point <c>0x04 ‖ X ‖ Y</c>.</description></item>
     /// <item><term><see cref="CKK.CKK_RSA"/></term><description>PKCS#1 <c>RSAPublicKey</c>, as <see cref="RSA.ExportRSAPublicKey"/> writes it.</description></item>
     /// <item><term><see cref="CKK.CKK_DSA"/></term><description>The public value as <c>INTEGER y</c> (RFC 3279); the domain parameters are only in the <c>SubjectPublicKeyInfo</c>.</description></item>
+    /// <item><term><see cref="CKK.CKK_EC_EDWARDS"/>, <see cref="CKK.CKK_EC_MONTGOMERY"/></term><description>The Ed25519 / Ed448 (RFC 8032) or X25519 / X448 (RFC 7748) public key; the <c>SubjectPublicKeyInfo</c> is RFC 8410's, the curve's OID with no parameters. The curve is read from <c>CKA_EC_PARAMS</c>, as the RFC 8410 OID or the PKCS#11 curve name; <c>CKA_EC_POINT</c> may hold the key raw or in an OCTET STRING.</description></item>
     /// <item><term><see cref="CKK.CKK_ML_DSA"/>, <see cref="CKK.CKK_SLH_DSA"/>, <see cref="CKK.CKK_ML_KEM"/></term><description>The FIPS 204 / 205 / 203 public-key encoding; the <c>SubjectPublicKeyInfo</c> names the parameter set by OID.</description></item>
     /// </list>
     /// <para>
@@ -40,7 +41,8 @@ public sealed partial class Pkcs11Key
     /// <exception cref="Pkcs11Exception">
     /// Thrown when the public attributes are sensitive, cannot be read from any available handle, or
     /// cannot be parsed; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when an RSA or DSA integer the token
-    /// returned is empty or zero; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.
+    /// returned is empty or zero, or an Edwards or Montgomery key's <c>CKA_EC_PARAMS</c> names none of its
+    /// curves or its <c>CKA_EC_POINT</c> is not a key of that curve's length; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.
     /// </exception>
     public byte[] Export(Pkcs11KeyBlobFormat format)
     {
@@ -54,9 +56,10 @@ public sealed partial class Pkcs11Key
             CKK.CKK_EC => ExportEc(spki),
             CKK.CKK_RSA => ExportRsa(spki),
             CKK.CKK_DSA => ExportDsa(spki),
+            CKK.CKK_EC_EDWARDS or CKK.CKK_EC_MONTGOMERY => ExportRfc8410(spki),
             CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA or CKK.CKK_ML_KEM => ExportPostQuantum(spki),
             _ => throw new NotSupportedException(
-                $"Pkcs11Key.Export supports CKK_EC, CKK_RSA, CKK_DSA, CKK_ML_DSA, CKK_SLH_DSA and CKK_ML_KEM keys; this key is {_keyType}."),
+                $"Pkcs11Key.Export supports CKK_EC, CKK_RSA, CKK_DSA, CKK_EC_EDWARDS, CKK_EC_MONTGOMERY, CKK_ML_DSA, CKK_SLH_DSA and CKK_ML_KEM keys; this key is {_keyType}."),
         };
     }
 
@@ -96,6 +99,22 @@ public sealed partial class Pkcs11Key
             PublicKeySynthesis.RequirePublicInteger(domain[1].GetValueAsByteArray(), CKA.CKA_SUBPRIME, ExportOperation),
             PublicKeySynthesis.RequirePublicInteger(domain[2].GetValueAsByteArray(), CKA.CKA_BASE, ExportOperation),
             y);
+    }
+
+    // RFC 8410: the curve from CKA_EC_PARAMS, the key from CKA_EC_POINT, both public on either half.
+    private byte[] ExportRfc8410(bool spki)
+    {
+        using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS, CKA.CKA_EC_POINT);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "Pkcs11Key.Export (CKA_EC_PARAMS / CKA_EC_POINT not readable from any available handle)");
+        Rfc8410Curve curve = Rfc8410Curves.Describe(_keyType, attrs[0].GetValueAsByteArray())
+            ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
+                $"Pkcs11Key.Export (CKA_EC_PARAMS names no {_keyType} curve: Ed25519, Ed448, X25519 or X448)");
+        byte[] key = EcPointEncoding.TryUnwrapRawKey(attrs[1].GetValueAsByteArray(), curve.KeyLength)
+            ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
+                $"Pkcs11Key.Export (CKA_EC_POINT is not a {curve.KeyLength}-byte {curve.Name} key, raw or in an OCTET STRING)");
+        return spki ? SubjectPublicKeyInfoEncoding.EncodeWithoutParameters(curve.Oid, key) : key;
     }
 
     private byte[] ExportPostQuantum(bool spki)

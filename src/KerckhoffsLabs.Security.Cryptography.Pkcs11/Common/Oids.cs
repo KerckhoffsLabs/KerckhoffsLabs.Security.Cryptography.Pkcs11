@@ -1,5 +1,7 @@
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
+// Sonar S1313 reads dotted OIDs with four arcs (such as 1.3.101.110) as IPv4 addresses; every literal here is an object identifier.
+#pragma warning disable S1313
 /// <summary>
 /// Every object identifier the library uses, in one place, each with the standard that assigns it. No
 /// other source file spells out an OID (<c>OidLiteralTests</c> enforces it); tests that check these
@@ -23,6 +25,18 @@ internal static class Oids
 
         /// <summary><c>id-dsa</c> (RFC 3279 §2.3.2).</summary>
         internal const string Dsa = "1.2.840.10040.4.1";
+
+        /// <summary><c>id-X25519</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an X25519 key.</summary>
+        internal const string X25519 = "1.3.101.110";
+
+        /// <summary><c>id-X448</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an X448 key.</summary>
+        internal const string X448 = "1.3.101.111";
+
+        /// <summary><c>id-Ed25519</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an Ed25519 key.</summary>
+        internal const string Ed25519 = "1.3.101.112";
+
+        /// <summary><c>id-Ed448</c> (RFC 8410 §3); also the <c>CKA_EC_PARAMS</c> of an Ed448 key.</summary>
+        internal const string Ed448 = "1.3.101.113";
     }
 
     /// <summary>X.509 certificate extension OIDs (<c>extnID</c>).</summary>
@@ -122,3 +136,4 @@ internal static class Oids
         internal const string MlKem1024 = "2.16.840.1.101.3.4.4.3";
     }
 }
+#pragma warning restore S1313

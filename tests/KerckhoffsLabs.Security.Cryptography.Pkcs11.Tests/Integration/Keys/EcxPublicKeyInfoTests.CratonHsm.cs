@@ -24,4 +24,14 @@ public sealed class EcxPublicKeyInfoTests_CratonHsm(CratonHsmBackendFixture back
     [InlineData(EcxCurve.X25519)]
     [InlineData(EcxCurve.X448)]
     public void KeyPair_ReadsThePublicPoint(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_KeyPair_ReadsThePublicPoint(_backend, curve);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [InlineData(EcxCurve.Ed25519)]
+    [InlineData(EcxCurve.Ed448)]
+    [InlineData(EcxCurve.X25519)]
+    [InlineData(EcxCurve.X448)]
+    public void Export_IsRfc8410(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_Export_IsRfc8410(_backend, curve);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void Export_Ed25519KnownAnswer() => EcxPublicKeyInfoTestCases.Assert_Export_Ed25519KnownAnswer(_backend);
 }
