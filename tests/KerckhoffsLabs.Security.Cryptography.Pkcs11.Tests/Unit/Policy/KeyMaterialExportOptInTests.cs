@@ -89,7 +89,7 @@ public sealed class KeyMaterialExportOptInTests
     [Fact]
     public void EcdhAllowed_DeriveRawSecret_Succeeds() => WithSession(OptIn(KeyMaterialExportKind.EcdhSharedSecret), session =>
     {
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
         using var alicePublic = ECDiffieHellman.Create();
         alicePublic.ImportSubjectPublicKeyInfo(alice.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo), out _);
@@ -115,7 +115,7 @@ public sealed class KeyMaterialExportOptInTests
     [Fact]
     public void OnlyKdfOutputAllowed_DeriveRawSecret_Throws() => WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
     {
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
 
         var e = Assert.Throws<CryptoPolicyViolationException>(() => alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
@@ -157,7 +157,7 @@ public sealed class KeyMaterialExportOptInTests
     [MemberData(nameof(ReadBackShapedTemplate))]
     public void ExportAllowed_CallerCkdNullDerive_StillRefused(bool readBackShaped) => WithSession(OptIn(AllKinds), session =>
     {
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, PeerPoint()));
         using var template = readBackShaped
             ? ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Extractable().Sensitive(false).Build()
@@ -221,7 +221,7 @@ public sealed class KeyMaterialExportOptInTests
         var policy = new RecordingPolicy();
         WithSession(policy, session =>
         {
-            using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
             using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
             policy.Seen.Clear();
 
@@ -367,7 +367,7 @@ public sealed class KeyMaterialExportOptInTests
         var policy = new RecordingPolicy();
         WithSession(policy, session =>
         {
-            using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
             var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, PeerPoint()));
             policy.Seen.Clear();
 
@@ -380,7 +380,7 @@ public sealed class KeyMaterialExportOptInTests
         // And under the KdfOutput opt-in, the policy that would otherwise let a KdfOutput read-back through.
         WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
         {
-            using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
             var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, PeerPoint()));
 
             Assert.Throws<ArgumentException>(() => alice.DeriveBytes(mechanism, 32));
@@ -848,7 +848,7 @@ public sealed class KeyMaterialExportOptInTests
     public void KdfOutputOptIn_DeriveBytesOverAnAgreedSecret_ReproducesTheSensitiveKeyDerivedFromIt() =>
         WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
         {
-            using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
             using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
             using Pkcs11Key z = alice.DeriveSecretAgreement(bob.ExportSubjectPublicKeyInfo());
 
