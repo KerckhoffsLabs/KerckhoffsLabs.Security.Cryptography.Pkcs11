@@ -65,6 +65,9 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// skip via <see cref="TokenObjectsAvailable"/>.</summary>
     public bool SupportsTokenObjects => false;
 
+    /// <summary>Softoken resets <c>CKA_ALWAYS_SENSITIVE</c> to false on every derived secret key.</summary>
+    public bool KeepsAlwaysSensitiveOnDerive => false;
+
     /// <summary>Gate for cases that specifically need a writable token (persistent keys / token
     /// objects). Always false: NSS's generic token never persists token objects.</summary>
     public static bool TokenObjectsAvailable => false;

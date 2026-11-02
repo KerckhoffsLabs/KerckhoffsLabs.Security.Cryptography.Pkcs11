@@ -49,6 +49,12 @@ public interface IPkcs11Backend
     /// run unchanged against both auth models.</summary>
     bool RequiresUserLogin => true;
 
+    /// <summary>True when the token keeps <c>CKA_ALWAYS_SENSITIVE</c> on a derived key as PKCS#11 specifies
+    /// (true while the base key's is true and the derived key is sensitive). A token that resets it to
+    /// <see langword="false"/> on every derived key overrides this, and the export-scope cases assert what
+    /// that means for <see cref="Policy.KdfBaseKeyScope.NeverProtected"/> instead.</summary>
+    bool KeepsAlwaysSensitiveOnDerive => true;
+
     /// <summary>Opens a session over the fixture's token using the backend's authentication model:
     /// a normal-user login when <see cref="RequiresUserLogin"/> is set, otherwise no login. Shared,
     /// backend-agnostic test cases call this instead of hard-coding the login path.</summary>
