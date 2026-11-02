@@ -143,6 +143,48 @@ internal static class ExampleCatalog
                 : null),
         new(Rsa(nameof(RsaExamples.BclOaepEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(Message, RsaExamples.BclOaepEncryptDecrypt(Message))),
+
+        // Elliptic curves (docs/examples/elliptic-curves.md)
+        new($"{nameof(EcExamples)}.{nameof(EcExamples.SignP256)}", [typeof(ECDsaPkcs11)], [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA],
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                (byte[] signature, ECParameters publicKey) = EcExamples.SignP256(s, Message);
+                Assert.True(EcExamples.VerifyWithBcl(Message, signature, publicKey));
+                Assert.False(EcExamples.VerifyWithBcl([.. Message, 0], signature, publicKey));
+            })),
+        new($"{nameof(EcExamples)}.{nameof(EcExamples.VerifyWithBcl)}", [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                using ECDsa bcl = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+                byte[] signature = bcl.SignData(Message, HashAlgorithmName.SHA256);
+                Assert.True(EcExamples.VerifyWithBcl(Message, signature, bcl.ExportParameters(false)));
+            }),
+        new($"{nameof(EcExamples)}.{nameof(EcExamples.AgreeAesKeyWithBclPeer)}", [typeof(ECDiffieHellmanPkcs11)],
+            [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_HKDF_DERIVE, CKM.CKM_AES_GCM],
+            ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                (Pkcs11Key tokenKey, byte[] peerKey) = EcExamples.AgreeAesKeyWithBclPeer(s);
+                using (tokenKey)
+                {
+                    // The two keys are the same: what the token encrypts, the peer decrypts.
+                    using var onToken = new AesGcmPkcs11(tokenKey, 16);
+                    byte[] nonce = RandomNumberGenerator.GetBytes(12), ciphertext = new byte[Message.Length], tag = new byte[16];
+                    onToken.Encrypt(nonce, Message, ciphertext, tag);
+                    using var atPeer = new AesGcm(peerKey, 16);
+                    byte[] decrypted = new byte[ciphertext.Length];
+                    atPeer.Decrypt(nonce, ciphertext, tag, decrypted);
+                    Assert.Equal(Message, decrypted);
+                }
+
+                // The BCL-shaped DeriveKey* methods return the shared secret into the process, which
+                // the default policy refuses.
+                using Pkcs11Key ec = s.GenerateEcKeyAgreementKeyPair();
+                using var ecdh = new ECDiffieHellmanPkcs11(ec);
+                using ECDiffieHellman other = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+                Assert.Throws<CryptoPolicyViolationException>(() => ecdh.DeriveKeyFromHash(other.PublicKey, HashAlgorithmName.SHA256));
+            })),
     ];
 
     private static string Rsa(string method) => $"{nameof(RsaExamples)}.{method}";
