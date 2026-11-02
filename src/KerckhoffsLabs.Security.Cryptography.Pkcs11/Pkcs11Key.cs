@@ -481,12 +481,22 @@ public sealed partial class Pkcs11Key : IDisposable
     /// public handle when present, and falls back to managed verification via the synthesized
     /// RSA/EC public parameters when no real handle exists.
     /// </summary>
+    /// <remarks>
+    /// The managed fallback verifies only what the BCL's <see cref="System.Security.Cryptography.RSA"/> and
+    /// <see cref="System.Security.Cryptography.ECDsa"/> support. For a <c>CKM_SHA*_RSA_PKCS_PSS</c> mechanism
+    /// that is one profile: <see cref="CkmRsaPkcsPssParams"/> naming the mechanism's own hash, MGF1 with that
+    /// hash, and a salt of the hash's output length (what <c>Pkcs11MechanismMap.RsaPssSign(hash, -1)</c>
+    /// builds). Any other parameters, or none, are refused with <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/>
+    /// rather than verified under parameters the caller did not ask for. SHA-224 and SHA3-224 mechanisms,
+    /// and raw <c>CKM_RSA_PKCS</c> / <c>CKM_RSA_PKCS_PSS</c>, have no managed mapping. To verify those, keep a
+    /// <c>CKO_PUBLIC_KEY</c> companion on the token so the native path is taken.
+    /// </remarks>
     /// <returns><see langword="true"/> if the signature is valid, <see langword="false"/> if not.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
-    /// <exception cref="NotSupportedException">Thrown when the managed verification fallback is taken (no public handle on the token) and <paramref name="mechanism"/> has no managed RSA/ECDSA equivalent.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when the token's RSA modulus or public exponent, read for managed verification, is empty or zero; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
+    /// <exception cref="NotSupportedException">Thrown when the managed verification fallback is taken (no public handle on the token) and <paramref name="mechanism"/> has no managed RSA/ECDSA equivalent (for example SHA-224, SHA3-224, or raw <c>CKM_RSA_PKCS</c>).</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/> when the managed fallback is taken for a <c>CKM_SHA*_RSA_PKCS_PSS</c> mechanism whose parameters are not the profile the BCL verifies (see remarks); <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when the token's RSA modulus or public exponent, read for managed verification, is empty or zero; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public bool Verify(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -929,10 +939,11 @@ public sealed partial class Pkcs11Key : IDisposable
         ReadOnlySpan<byte> data,
         ReadOnlySpan<byte> signature)
     {
+        // Map (and check the PSS parameters) before any RSA work.
+        var (hashName, padding) = MapRsaSignMechanism(mechanism);
+
         using var rsa = System.Security.Cryptography.RSA.Create();
         rsa.ImportParameters(rsaParams);
-
-        var (hashName, padding) = MapRsaSignMechanism(mechanism);
         return rsa.VerifyData(data, signature, hashName, padding);
     }
 
@@ -955,7 +966,15 @@ public sealed partial class Pkcs11Key : IDisposable
     }
 
     private static (System.Security.Cryptography.HashAlgorithmName, System.Security.Cryptography.RSASignaturePadding)
-        MapRsaSignMechanism(Mechanism mechanism) => mechanism.Type switch
+        MapRsaSignMechanism(Mechanism mechanism)
+    {
+        if (BclPssProfile(mechanism.Type) is { } pss)
+        {
+            RequireBclPssParameters(mechanism, pss.HashAlg, pss.Mgf, pss.SaltLength);
+            return (pss.Hash, System.Security.Cryptography.RSASignaturePadding.Pss);
+        }
+
+        return mechanism.Type switch
         {
             CKM.CKM_SHA1_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
@@ -964,21 +983,44 @@ public sealed partial class Pkcs11Key : IDisposable
             CKM.CKM_SHA3_256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA3_256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA3_384_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA3_384, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA3_512_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA3_512, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
-            // PSS: RSASignaturePadding.Pss uses a digest-length salt, matching the salt the
-            // RSA-PSS sign path (Pkcs11MechanismMap.RsaPssSign) defaults to.
-            CKM.CKM_SHA1_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA3_256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_256, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA3_384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_384, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA3_512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_512, System.Security.Cryptography.RSASignaturePadding.Pss),
-            // Raw CKM_RSA_PKCS / CKM_RSA_X_509 carry the hash inside a DigestInfo, so there is no
-            // mechanism-level hash to map to a managed VerifyData call. Use a CKO_PUBLIC_KEY companion.
+            // Raw CKM_RSA_PKCS / CKM_RSA_X_509 / CKM_RSA_PKCS_PSS carry no mechanism-level message hash to
+            // map to a managed VerifyData call, and the BCL has no SHA-224 / SHA3-224.
             _ => throw new NotSupportedException(
-                $"Managed RSA verify is not implemented for mechanism {mechanism.Type}. " +
+                $"Managed RSA verify is not implemented for mechanism {mechanism.Type}: it has no managed RSA equivalent. " +
                 "Provide a CKO_PUBLIC_KEY companion on the token to use the native verify path."),
         };
+    }
+
+    // The one PSS profile the BCL's RSASignaturePadding.Pss verifies, per hash-bound PSS mechanism:
+    // MGF1 with the message hash and a salt of the hash's output length.
+    private static (System.Security.Cryptography.HashAlgorithmName Hash, CKM HashAlg, CKG Mgf, int SaltLength)?
+        BclPssProfile(CKM type) => type switch
+        {
+            CKM.CKM_SHA1_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA1, CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1, 20),
+            CKM.CKM_SHA256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA256, CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32),
+            CKM.CKM_SHA384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA384, CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, 48),
+            CKM.CKM_SHA512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA512, CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, 64),
+            CKM.CKM_SHA3_256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_256, CKM.CKM_SHA3_256, CKG.CKG_MGF1_SHA3_256, 32),
+            CKM.CKM_SHA3_384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_384, CKM.CKM_SHA3_384, CKG.CKG_MGF1_SHA3_384, 48),
+            CKM.CKM_SHA3_512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA3_512, CKM.CKM_SHA3_512, CKG.CKG_MGF1_SHA3_512, 64),
+            _ => null,
+        };
+
+    // A CKM_SHAx_RSA_PKCS_PSS mechanism requires CK_RSA_PKCS_PSS_PARAMS, and the token verifies under
+    // exactly the parameters given. The BCL verifies only its own profile, so any other parameters (none,
+    // an unreadable raw block, another parameter type, or other values) are refused as the token refuses
+    // parameters it cannot use: answering under the BCL's profile instead would report a valid signature
+    // as invalid, or accept one made under parameters the caller did not ask for.
+    private static void RequireBclPssParameters(Mechanism mechanism, CKM hashAlg, CKG mgf, int saltLength)
+    {
+        if (mechanism.Parameters is CkmRsaPkcsPssParams p
+            && p.HashAlg == hashAlg && p.Mgf == mgf && p.SaltLength == saltLength)
+            return;
+
+        throw Pkcs11Exception.Create(CKR.CKR_MECHANISM_PARAM_INVALID,
+            $"Pkcs11Key.Verify (managed verify of {mechanism.Type} requires CkmRsaPkcsPssParams({hashAlg}, {mgf}, {saltLength}); " +
+            "provide a CKO_PUBLIC_KEY companion on the token to verify under other parameters)");
+    }
 
     private static System.Security.Cryptography.HashAlgorithmName MapEcdsaMechanism(Mechanism mechanism)
         => mechanism.Type switch
