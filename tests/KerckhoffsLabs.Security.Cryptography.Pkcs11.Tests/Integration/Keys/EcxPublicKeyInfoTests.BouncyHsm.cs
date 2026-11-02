@@ -17,4 +17,11 @@ public sealed class EcxPublicKeyInfoTests_BouncyHsm(BouncyHsmBackendFixture back
     [InlineData(EcxCurve.X25519)]
     [InlineData(EcxCurve.X448)]
     public void PublicKeyInfo_IsRfc8410(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_PublicKeyInfo_IsRfc8410(_backend, curve);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [InlineData(EcxCurve.Ed25519)]
+    [InlineData(EcxCurve.Ed448)]
+    [InlineData(EcxCurve.X25519)]
+    [InlineData(EcxCurve.X448)]
+    public void KeyPair_ReadsThePublicPoint(EcxCurve curve) => EcxPublicKeyInfoTestCases.Assert_KeyPair_ReadsThePublicPoint(_backend, curve);
 }

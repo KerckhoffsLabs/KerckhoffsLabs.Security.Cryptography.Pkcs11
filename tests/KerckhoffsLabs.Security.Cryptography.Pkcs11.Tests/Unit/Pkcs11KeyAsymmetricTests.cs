@@ -76,6 +76,57 @@ public sealed class Pkcs11KeyAsymmetricTests
         Assert.Throws<ObjectDisposedException>(() => key.KeySize);
     });
 
+    // === GetAttributeValue: which half =========================================
+
+    // Over a fake token whose private-key object is handle 1 and public-key object handle 2, each
+    // answering CKA_CLASS with its own class.
+    private static FakeKey PairOf(CKK keyType) => FakeKeys.Create(keyType,
+        _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+        respondFor: (handle, ca) => ca == CKA.CKA_CLASS
+            ? (CKR.CKR_OK, UlongAttr((ulong)(handle == 2 ? CKO.CKO_PUBLIC_KEY : CKO.CKO_PRIVATE_KEY)))
+            : (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null));
+
+    private static CKO ClassReadFrom(Pkcs11Key key)
+    {
+        using var attrs = key.GetAttributeValue(CKA.CKA_CLASS);
+        return (CKO)attrs[0].GetValueAsUlong();
+    }
+
+    // Public attributes such as CKA_EC_POINT are defined on the public-key object only, and tokens keep
+    // them off the private one, so a key pair is read through its public half. The key-agreement types
+    // (X25519/X448, DH) are pairs like the others.
+    [Theory]
+    [InlineData(CKK.CKK_RSA)]
+    [InlineData(CKK.CKK_DSA)]
+    [InlineData(CKK.CKK_EC)]
+    [InlineData(CKK.CKK_EC_EDWARDS)]
+    [InlineData(CKK.CKK_EC_MONTGOMERY)]
+    [InlineData(CKK.CKK_DH)]
+    [InlineData(CKK.CKK_X9_42_DH)]
+    [InlineData(CKK.CKK_ML_KEM)]
+    [InlineData(CKK.CKK_ML_DSA)]
+    [InlineData(CKK.CKK_SLH_DSA)]
+    public void GetAttributeValue_KeyPair_ReadsThePublicHalf(CKK keyType)
+    {
+        using var pair = PairOf(keyType);
+
+        Assert.Equal(CKO.CKO_PUBLIC_KEY, ClassReadFrom(pair));
+    }
+
+    // Without a public-key object the private one is all there is.
+    [Theory]
+    [InlineData(CKK.CKK_EC_MONTGOMERY)]
+    [InlineData(CKK.CKK_DH)]
+    [InlineData(CKK.CKK_X9_42_DH)]
+    public void GetAttributeValue_PrivateKeyOnly_ReadsThePrivateKey(CKK keyType)
+    {
+        using var key = FakeKeys.Create(keyType, ca => ca == CKA.CKA_CLASS
+            ? (CKR.CKR_OK, UlongAttr((ulong)CKO.CKO_PRIVATE_KEY))
+            : (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null));
+
+        Assert.Equal(CKO.CKO_PRIVATE_KEY, ClassReadFrom(key));
+    }
+
     // === Export ===============================================================
 
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
