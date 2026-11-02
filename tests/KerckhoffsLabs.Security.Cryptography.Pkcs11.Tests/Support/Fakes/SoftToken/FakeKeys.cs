@@ -24,9 +24,10 @@ internal static class FakeKeys
         ICryptoPolicy? policy = null,
         bool publicOnly = false,
         Func<byte[], byte[]>? decrypt = null,
-        Func<ulong, CKA, (CKR Rv, byte[]? Value)>? respondFor = null)
+        Func<ulong, CKA, (CKR Rv, byte[]? Value)>? respondFor = null,
+        bool allowDestroy = false)
     {
-        var library = new AttributeResponseModule(respond, decrypt, respondFor).Load();
+        var library = new AttributeResponseModule(respond, decrypt, respondFor, allowDestroy).Load();
         var lowLevel = library.LowLevelLibrary!;
         var slot = new Pkcs11Slot(lowLevel, slotId: 1);
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1, policy: policy);
