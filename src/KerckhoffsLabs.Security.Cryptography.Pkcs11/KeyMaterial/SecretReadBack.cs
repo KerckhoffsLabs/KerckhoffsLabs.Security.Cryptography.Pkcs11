@@ -140,16 +140,16 @@ internal sealed class SecretReadBack(IReadBackGrant grant) : IDisposable
         }
     }
 
-    // A throw from here would replace the exception the read-back is already unwinding with, whatever its type:
-    // a token error, a disposed key or session, a lease error.
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Best-effort cleanup while a primary exception propagates; any failure here would mask it, and the session object is collected at C_CloseSession.")]
+    // A throw from here would replace the exception the read-back is already unwinding with. Destroy fails with a
+    // token error (Pkcs11Exception), a disposed key or session (ObjectDisposedException), or a session-lease error
+    // (InvalidOperationException); the session object is collected at C_CloseSession regardless.
     private static void DestroyAfterFailure(Pkcs11Key ephemeral)
     {
         try
         {
             ephemeral.Destroy();
         }
-        catch
+        catch (Exception ex) when (ex is Pkcs11Exception or InvalidOperationException)
         {
             // Deliberately swallowed: see Read's remarks. The primary exception is the useful one.
         }

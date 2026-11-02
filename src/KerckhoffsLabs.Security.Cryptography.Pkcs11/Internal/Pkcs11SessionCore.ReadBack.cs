@@ -202,6 +202,9 @@ internal sealed partial class Pkcs11SessionCore
             return default;
         }
 
-        public void Dispose() => t_depth--;
+        public void Dispose() => Exit();
+
+        // Static, like Enter: the depth is per thread, not per scope value.
+        private static void Exit() => t_depth--;
     }
 }
