@@ -80,9 +80,9 @@ public sealed class LibraryHelpersUnderRecommendedTests
     });
 
     [Fact]
-    public void GenerateEcKeyPair_EcdsaSha256SignVerify() => WithSession(session =>
+    public void GenerateEcSigningKeyPair_EcdsaSha256SignVerify() => WithSession(session =>
     {
-        using var key = session.GenerateEcKeyPair();
+        using var key = session.GenerateEcSigningKeyPair();
         using var ecdsa = new ECDsaPkcs11(key);
 
         byte[] signature = ecdsa.SignData(Message, HashAlgorithmName.SHA256);
@@ -95,8 +95,8 @@ public sealed class LibraryHelpersUnderRecommendedTests
     [Fact]
     public void DeriveSharedSecretEcdh_DefaultKdf_TwoPartiesAgree() => WithSession(session =>
     {
-        using var alice = session.GenerateEcKeyPair();
-        using var bob = session.GenerateEcKeyPair();
+        using var alice = session.GenerateEcKeyAgreementKeyPair();
+        using var bob = session.GenerateEcKeyAgreementKeyPair();
         byte[] alicePoint = ReadEcPoint(session, alice);
         byte[] bobPoint = ReadEcPoint(session, bob);
 

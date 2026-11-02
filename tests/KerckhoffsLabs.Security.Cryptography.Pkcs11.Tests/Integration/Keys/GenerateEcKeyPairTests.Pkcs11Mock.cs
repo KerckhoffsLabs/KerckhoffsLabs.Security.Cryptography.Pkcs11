@@ -9,4 +9,7 @@ public sealed class GenerateEcKeyPairTests_Mock(MockBackendFixture f)
 
     [Fact]
     public void RejectsUnspecifiedCurve() => GenerateEcKeyPairTestCases.Assert_RejectsUnspecifiedCurve(_backend);
+
+    [Fact]
+    public void KeyAgreementKeyPair_RejectsUnspecifiedCurve() => GenerateEcKeyPairTestCases.Assert_KeyAgreementKeyPair_RejectsUnspecifiedCurve(_backend);
 }

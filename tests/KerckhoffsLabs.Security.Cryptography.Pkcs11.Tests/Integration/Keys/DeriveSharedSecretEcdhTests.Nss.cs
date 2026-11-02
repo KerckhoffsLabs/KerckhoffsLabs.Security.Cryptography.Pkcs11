@@ -30,8 +30,8 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
         _backend.RequireClassicAesGcm();
         using var session = OpenSession();
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKD_NULL is gated by default — it's what's under test here
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
-        using var bob = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 
         byte[] alicePoint = ReadEcPoint(session, alice.PublicHandle);
         byte[] bobPoint = ReadEcPoint(session, bob.PublicHandle);
@@ -52,7 +52,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
     public void RejectsWrongAesBitLength()
     {
         using var session = OpenSession();
-        using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         byte[] point = ReadEcPoint(session, alice.PublicHandle);
 
         Assert.Throws<ArgumentOutOfRangeException>(

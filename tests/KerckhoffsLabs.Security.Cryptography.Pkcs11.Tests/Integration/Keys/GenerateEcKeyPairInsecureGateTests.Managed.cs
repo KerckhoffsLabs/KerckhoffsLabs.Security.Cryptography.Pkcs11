@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
-// GenerateEcKeyPair refuses sub-128-bit curves unless the AllowInsecure policy is used, mirroring the
+// GenerateEcSigningKeyPair (like GenerateEcKeyAgreementKeyPair, which shares its path) refuses sub-128-bit curves unless the AllowInsecure policy is used, mirroring the
 // SHA-1/DES secure-defaults gate. Runs on the in-process managed token (real keygen). P-224 is the
 // weak curve used here; the throws-path needs no keygen, but actually generating it needs BCL P-224
 // support — macOS's SecurityFramework lacks it, so the generate case is gated on a probe.
@@ -36,7 +36,7 @@ public sealed class GenerateEcKeyPairInsecureGateTests
 
 #pragma warning disable KLPKCS11007 // exercising the gate with an intentionally-obsolete weak curve
         Assert.Throws<CryptoPolicyViolationException>(
-            () => session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224));
+            () => session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP224));
 #pragma warning restore KLPKCS11007
     }
 
@@ -49,7 +49,7 @@ public sealed class GenerateEcKeyPairInsecureGateTests
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
 #pragma warning disable KLPKCS11007
-            using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224);
+            using var key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP224);
 #pragma warning restore KLPKCS11007
             Assert.False(key.PrivateHandle.IsInvalid);
             Assert.False(key.PublicHandle.IsInvalid);
@@ -62,7 +62,7 @@ public sealed class GenerateEcKeyPairInsecureGateTests
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
 
-        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         Assert.False(key.PrivateHandle.IsInvalid);
         Assert.False(key.PublicHandle.IsInvalid);
     }

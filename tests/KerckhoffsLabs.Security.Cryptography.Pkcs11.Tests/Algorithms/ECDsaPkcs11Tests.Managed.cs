@@ -58,7 +58,7 @@ public sealed class ECDsaPkcs11Tests_Managed
         var (eccurve, _, _) = Spec(curve);
         using var library = (token ?? new ManagedSoftToken()).Load();
         using var session = ManagedToken.OpenSession(library);
-        using var key = session.GenerateEcKeyPair(eccurve);
+        using var key = session.GenerateEcSigningKeyPair(eccurve);
         using var ec = new ECDsaPkcs11(key);
         body(session, ec);
     }
@@ -217,7 +217,7 @@ public sealed class ECDsaPkcs11Tests_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library, CryptoPolicy.NistApproved);
-        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ec = new ECDsaPkcs11(key);
         body(ec);
     }
@@ -615,7 +615,7 @@ public sealed class ECDsaPkcs11Tests_Managed
         using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { CurveCatalog = catalog });
         using var session = ManagedToken.OpenSession(library);
         using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.CreateFromValue(Prime239v1Oid));
+        using var key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.CreateFromValue(Prime239v1Oid));
         using var ec = new ECDsaPkcs11(key);
         body(ec);
     }

@@ -680,7 +680,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     {
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
-        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 
         // CKM_SHA256 is on the managed token's mechanism list: the positive control that the probe works.
         Assert.True(key.SupportsMechanism(CKM.CKM_SHA256));

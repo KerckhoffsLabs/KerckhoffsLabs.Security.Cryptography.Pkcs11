@@ -74,7 +74,7 @@ public sealed class DerivedKeyMaterialLeakTests
         using var library = ManagedToken.NewLibrary();
         using var session = ManagedToken.OpenSession(library);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // DeriveRawSecretAgreement hands Z to the caller and is gated
-        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var key = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         using var peer = ECDiffieHellman.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
 
