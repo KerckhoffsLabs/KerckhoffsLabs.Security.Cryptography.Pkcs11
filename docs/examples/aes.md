@@ -24,8 +24,9 @@ which the example records in a policy of its own.
 **Why a derived policy rather than `AllowInsecure`:** `CryptoPolicy.Recommended.ToBuilder(name)` copies
 every `Recommended` rule and adds exactly the mechanism you reviewed, for the operations you name, with
 your reason attached. Everything else stays refused: the session cannot slip into ECB, a broken hash or a
-weak key because CBC was allowed. `UsePolicy(CryptoPolicy.AllowInsecure)` lifts every check; keep it for
-a one-off operation on legacy data. See [Using crypto policies](../crypto-policies.md).
+weak key because CBC was allowed. `UsePolicy(CryptoPolicy.AllowInsecure)` lifts every check, for the whole
+session (every thread using it) until the lease is disposed; keep it for a one-off operation on legacy
+data, on a session of its own. See [Using crypto policies](../crypto-policies.md).
 
 **What differs from `Aes.Create()`:**
 
