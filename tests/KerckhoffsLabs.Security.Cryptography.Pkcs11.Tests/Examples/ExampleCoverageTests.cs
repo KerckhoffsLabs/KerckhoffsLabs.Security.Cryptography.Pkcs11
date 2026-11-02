@@ -11,7 +11,6 @@ public sealed class ExampleCoverageTests
     // the legacy adapters are [Obsolete] and SlhDsaPkcs11 is [Experimental]). Each family's change removes its own; the list ends empty.
     internal static readonly HashSet<string> NotYetDocumented = new(StringComparer.Ordinal)
     {
-        nameof(Pkcs11CertificateExtensions),
         "DESPkcs11", "TripleDESPkcs11", "RC2Pkcs11", "DSAPkcs11", "MD5Pkcs11", "SHA1Pkcs11",
     };
 

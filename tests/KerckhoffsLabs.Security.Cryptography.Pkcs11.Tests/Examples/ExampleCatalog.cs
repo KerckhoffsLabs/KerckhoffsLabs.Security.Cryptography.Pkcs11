@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -303,7 +304,31 @@ internal static class ExampleCatalog
             Unsupported: ExampleGates.ClassicAesGcm),
         new(Kdf(nameof(KdfExamples.BclSp800108)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(32, KdfExamples.BclSp800108(new byte[32], [1], [2]).Length)),
+
+        // Certificates (docs/examples/certificates.md)
+        new(Cert(nameof(CertificateExamples.IssueSelfSignedCertificate)), [typeof(Pkcs11CertificateExtensions)],
+            [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                string label = $"example-{Guid.NewGuid():N}";
+                using Pkcs11Certificate stored = CertificateExamples.IssueSelfSignedCertificate(s, label);
+                Assert.Equal("CN=Example Signing", stored.Certificate.Subject);
+                Assert.False(stored.Certificate.HasPrivateKey);
+            })),
+        new(Cert(nameof(CertificateExamples.SignWithCertificateKey)), [typeof(Pkcs11CertificateExtensions)],
+            [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                string label = $"example-{Guid.NewGuid():N}";
+                using (CertificateExamples.IssueSelfSignedCertificate(s, label)) { }
+                (byte[] signature, X509Certificate2 certificate) = CertificateExamples.SignWithCertificateKey(s, label, Message);
+                using (certificate)
+                using (ECDsa verifier = certificate.GetECDsaPublicKey()!)
+                    Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
+            })),
     ];
+
+    private static string Cert(string method) => $"{nameof(CertificateExamples)}.{method}";
 
     private static string Kdf(string method) => $"{nameof(KdfExamples)}.{method}";
 
