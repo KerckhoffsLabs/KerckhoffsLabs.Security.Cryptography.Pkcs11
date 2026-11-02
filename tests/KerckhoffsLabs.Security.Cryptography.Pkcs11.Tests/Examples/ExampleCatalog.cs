@@ -184,7 +184,8 @@ internal static class ExampleCatalog
                 using var ecdh = new ECDiffieHellmanPkcs11(ec);
                 using ECDiffieHellman other = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
                 Assert.Throws<CryptoPolicyViolationException>(() => ecdh.DeriveKeyFromHash(other.PublicKey, HashAlgorithmName.SHA256));
-            })),
+            }),
+            Unsupported: ExampleGates.ClassicAesGcm),
     ];
 
     private static string Rsa(string method) => $"{nameof(RsaExamples)}.{method}";

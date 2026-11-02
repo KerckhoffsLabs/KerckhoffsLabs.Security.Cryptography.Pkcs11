@@ -44,7 +44,7 @@ What each step does:
    `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it as
    the last argument; see [Using crypto policies](crypto-policies.md).
 3. **`GenerateAesKey`** creates the key on the token, sensitive and non-extractable, and allowed only to
-   encrypt and decrypt. Each key-generation helper grants one purpose; see
+   encrypt and decrypt. Each key-generation helper grants exactly one role; see
    [Key role separation](security-model.md#key-role-separation). The key is a **session object** and
    disappears when the session closes. Pass `persistOnToken: true` to keep it, and find it again later
    with `session.OpenKey(label)`.
