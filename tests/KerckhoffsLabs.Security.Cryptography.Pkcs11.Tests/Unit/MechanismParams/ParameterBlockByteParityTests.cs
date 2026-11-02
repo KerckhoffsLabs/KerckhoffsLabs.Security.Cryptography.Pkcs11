@@ -20,6 +20,7 @@ public sealed unsafe class ParameterBlockByteParityTests
 {
     private static readonly Dictionary<string, ParameterCase> Cases = new(StringComparer.Ordinal)
     {
+        [nameof(CkmAesCtrParams)] = Case<CK_AES_CTR_PARAMS>(_ => new CkmAesCtrParams(counterBits: 96, [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])),
         [nameof(CkmAesCcmParams)] = Case<CK_CCM_PARAMS>(_ => new CkmAesCcmParams(dataLen: 64, [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77], [0xAA, 0xBB, 0xCC], macLen: 16)),
         [nameof(CkmAesGcmParams)] = Case<CK_GCM_PARAMS>(_ => new CkmAesGcmParams([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [0xA0, 0xA1], tagBits: 128)),
         [nameof(CkmCcmMessageParams)] = Case<CK_CCM_MESSAGE_PARAMS>(_ => CkmCcmMessageParams.ForDecrypt(dataLen: 48, [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99], new byte[12])),
