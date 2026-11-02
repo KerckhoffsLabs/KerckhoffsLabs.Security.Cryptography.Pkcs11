@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Examples;
@@ -220,7 +221,51 @@ internal static class ExampleCatalog
                 Assert.True(verifier.VerifyData(Message, signature));
             })),
 #pragma warning restore SYSLIB5006
+
+        // Hashes and HMAC (docs/examples/hashes.md)
+        new(Hash(nameof(HashExamples.Sha2OnToken)), [typeof(SHA256Pkcs11), typeof(SHA384Pkcs11), typeof(SHA512Pkcs11)],
+            [CKM.CKM_SHA256, CKM.CKM_SHA384, CKM.CKM_SHA512], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s => Assert.Equal(
+                [SHA256.HashData(Message), SHA384.HashData(Message), SHA512.HashData(Message)],
+                HashExamples.Sha2OnToken(s, Message)))),
+        new(Hash(nameof(HashExamples.Sha3OnToken)), [typeof(SHA3_256Pkcs11), typeof(SHA3_384Pkcs11), typeof(SHA3_512Pkcs11)],
+            [CKM.CKM_SHA3_256, CKM.CKM_SHA3_384, CKM.CKM_SHA3_512], ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                byte[][] onToken = HashExamples.Sha3OnToken(s, Message);
+                if (!SHA3_256.IsSupported) Assert.Skip("SHA-3 is not supported by this platform's BCL; the token side ran.");
+                Assert.Equal([SHA3_256.HashData(Message), SHA3_384.HashData(Message), SHA3_512.HashData(Message)], onToken);
+            })),
+        new(Hash(nameof(HashExamples.BclSha256)), [], [], ExampleBackend.SoftHsm2,
+            _ => Assert.Equal(SHA256.HashData(Message), HashExamples.BclSha256(Message))),
+        new(Hash(nameof(HashExamples.GenerateHmacKey)), [typeof(HMACPkcs11)], [CKM.CKM_GENERIC_SECRET_KEY_GEN, CKM.CKM_SHA256_HMAC],
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                using Pkcs11Key key = HashExamples.GenerateHmacKey(s);
+                byte[] tag = HashExamples.HmacSha256(key, Message);
+                Assert.Equal(32, tag.Length);
+                Assert.Equal(tag, HashExamples.HmacSha256(key, Message));
+            })),
+        new(Hash(nameof(HashExamples.HmacSha256)), [typeof(HMACPkcs11)], [CKM.CKM_SHA256_HMAC],
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                // A known key, imported, so the token's HMAC can be compared with the BCL's.
+                byte[] raw = RandomNumberGenerator.GetBytes(32);
+                using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(raw).Sign().Verify().Build();
+                using Pkcs11Key key = s.ImportKey(template);
+                Assert.Equal(HashExamples.BclHmacSha256(raw, Message), HashExamples.HmacSha256(key, Message));
+            })),
+        new(Hash(nameof(HashExamples.BclHmacSha256)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                byte[] raw = RandomNumberGenerator.GetBytes(32);
+                Assert.Equal(HMACSHA256.HashData(raw, Message), HashExamples.BclHmacSha256(raw, Message));
+            }),
     ];
+
+    private static string Hash(string method) => $"{nameof(HashExamples)}.{method}";
 
     private static string Pqc(string method) => $"{nameof(PqcExamples)}.{method}";
 
