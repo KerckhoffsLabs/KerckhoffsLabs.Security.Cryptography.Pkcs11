@@ -43,7 +43,7 @@ formats. PKCS#1 v1.5 *encryption* is a different matter; see below.
 
 RSA encrypts only a short message (with a 3072-bit key and OAEP-SHA-256, at most 318 bytes). To encrypt
 data, encrypt a random AES key with RSA-OAEP and the data with [AES-GCM](aead.md) under that key, or
-use ML-KEM as the key-establishment step.
+use [ML-KEM](post-quantum.md) as the key-establishment step.
 
 ## What differs from `RSA`
 

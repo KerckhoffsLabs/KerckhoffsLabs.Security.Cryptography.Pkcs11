@@ -186,7 +186,62 @@ internal static class ExampleCatalog
                 Assert.Throws<CryptoPolicyViolationException>(() => ecdh.DeriveKeyFromHash(other.PublicKey, HashAlgorithmName.SHA256));
             }),
             Unsupported: ExampleGates.ClassicAesGcm),
+
+        // Post-quantum (docs/examples/post-quantum.md)
+        new(Pqc(nameof(PqcExamples.MlKemReceiveAesKey)), [typeof(MLKemPkcs11)],
+            [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
+            AssertMlKemReceiveAesKey),
+        new(Pqc(nameof(PqcExamples.MlDsaSign)), [typeof(MLDsaPkcs11)], [CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_ML_DSA],
+            ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                if (!b.SupportsMlDsa) Assert.Skip("The backend cannot operate ML-DSA.");
+                (byte[] signature, byte[] publicKey) = PqcExamples.MlDsaSign(s, Message);
+                if (!MLDsa.IsSupported) Assert.Skip("ML-DSA is not supported by this platform's BCL; the token side ran.");
+                Assert.True(PqcExamples.MlDsaVerifyWithBcl(Message, signature, publicKey));
+                Assert.False(PqcExamples.MlDsaVerifyWithBcl([.. Message, 0], signature, publicKey));
+            })),
+        new(Pqc(nameof(PqcExamples.MlDsaVerifyWithBcl)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                if (!MLDsa.IsSupported) Assert.Skip("ML-DSA is not supported by this platform's BCL.");
+                using MLDsa bcl = MLDsa.GenerateKey(MLDsaAlgorithm.MLDsa65);
+                Assert.True(PqcExamples.MlDsaVerifyWithBcl(Message, bcl.SignData(Message), bcl.ExportMLDsaPublicKey()));
+            }),
+#pragma warning disable SYSLIB5006 // SlhDsa and SlhDsaPkcs11 are [Experimental] in .NET 10
+        new(Pqc(nameof(PqcExamples.SlhDsaSign)), [typeof(SlhDsaPkcs11)], [CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA],
+            ExampleBackend.BouncyHsm,
+            b => WithSession(b, s =>
+            {
+                if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
+                (byte[] signature, byte[] publicKey) = PqcExamples.SlhDsaSign(s, Message);
+                if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL; the token side ran.");
+                using SlhDsa verifier = SlhDsa.ImportSlhDsaPublicKey(SlhDsaAlgorithm.SlhDsaSha2_128s, publicKey);
+                Assert.True(verifier.VerifyData(Message, signature));
+            })),
+#pragma warning restore SYSLIB5006
     ];
+
+    private static string Pqc(string method) => $"{nameof(PqcExamples)}.{method}";
+
+    private static void AssertMlKemReceiveAesKey(IPkcs11Backend backend)
+    {
+        if (!backend.SupportsMlKem) Assert.Skip("The backend cannot operate ML-KEM.");
+        if (!MLKem.IsSupported) Assert.Skip("ML-KEM is not supported by this platform's BCL (the sender side).");
+        using Pkcs11Session session = backend.OpenSession();
+        (Pkcs11Key tokenKey, byte[] senderKey) = PqcExamples.MlKemReceiveAesKey(session);
+        using (tokenKey)
+        {
+            // The sender encrypts with its copy of the shared secret; the token decrypts with its own.
+            using var atSender = new AesGcm(senderKey, 16);
+            byte[] nonce = RandomNumberGenerator.GetBytes(12), ciphertext = new byte[Message.Length], tag = new byte[16];
+            atSender.Encrypt(nonce, Message, ciphertext, tag);
+            using var onToken = new AesGcmPkcs11(tokenKey, 16);
+            byte[] decrypted = new byte[ciphertext.Length];
+            onToken.Decrypt(nonce, ciphertext, tag, decrypted);
+            Assert.Equal(Message, decrypted);
+        }
+    }
 
     private static string Rsa(string method) => $"{nameof(RsaExamples)}.{method}";
 
