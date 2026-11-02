@@ -333,7 +333,95 @@ internal static class ExampleCatalog
                     Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
             }),
             Unsupported: ExampleGates.NoCertificateObjects),
+
+        // Legacy algorithms (docs/examples/legacy.md)
+#pragma warning disable KLPKCS11001, KLPKCS11002, KLPKCS11003, KLPKCS11004, KLPKCS11005, KLPKCS11006 // the legacy adapters, named for coverage
+        new(Legacy(nameof(LegacyExamples.TripleDesDecryptLegacyArchive)), [typeof(TripleDESPkcs11)], [CKM.CKM_DES3_CBC_PAD],
+            ExampleBackend.SoftHsm2,
+            b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_DES3, 24, 8, TripleDES.Create, LegacyExamples.TripleDesDecryptLegacyArchive,
+                key => new TripleDESPkcs11(key)))),
+        new(Legacy(nameof(LegacyExamples.DesDecryptLegacyRecord)), [typeof(DESPkcs11)], [CKM.CKM_DES_CBC_PAD],
+            ExampleBackend.Nss,
+            b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_DES, 8, 8, DES.Create, LegacyExamples.DesDecryptLegacyRecord,
+                key => new DESPkcs11(key)))),
+        new(Legacy(nameof(LegacyExamples.Rc2DecryptLegacyRecord)), [typeof(RC2Pkcs11)], [CKM.CKM_RC2_CBC_PAD],
+            ExampleBackend.Nss,
+            b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_RC2, 16, 8, RC2.Create, LegacyExamples.Rc2DecryptLegacyRecord,
+                key => new RC2Pkcs11(key)))),
+        new(Legacy(nameof(LegacyExamples.DsaVerifyLegacySignature)), [typeof(DSAPkcs11)], [CKM.CKM_DSA_KEY_PAIR_GEN, CKM.CKM_DSA_SHA256],
+            ExampleBackend.SoftHsm2, b => WithSession(b, AssertDsaVerifyLegacySignature)),
+        new(Legacy(nameof(LegacyExamples.Md5ChecksumForLegacyProtocol)), [typeof(MD5Pkcs11)], [CKM.CKM_MD5],
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                Assert.Equal(MD5.HashData(Message), LegacyExamples.Md5ChecksumForLegacyProtocol(s, Message));
+                using var md5 = new MD5Pkcs11(s);
+                Assert.Throws<CryptoPolicyViolationException>(() => md5.ComputeHash(Message));
+            })),
+        new(Legacy(nameof(LegacyExamples.Sha1ForLegacyProtocol)), [typeof(SHA1Pkcs11)], [CKM.CKM_SHA_1],
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                Assert.Equal(SHA1.HashData(Message), LegacyExamples.Sha1ForLegacyProtocol(s, Message));
+                using var sha1 = new SHA1Pkcs11(s);
+                Assert.Throws<CryptoPolicyViolationException>(() => sha1.ComputeHash(Message));
+            })),
+#pragma warning restore KLPKCS11001, KLPKCS11002, KLPKCS11003, KLPKCS11004, KLPKCS11005, KLPKCS11006
     ];
+
+    private static string Legacy(string method) => $"{nameof(LegacyExamples)}.{method}";
+
+    // The legacy data is made by the BCL with a known key, which the test imports onto the token (under
+    // AllowInsecure: the default policy refuses a legacy key); the example must read it back, and the same
+    // decryption without the example's lease must be refused.
+    private static void AssertLegacyCbc(
+        Pkcs11Session session, CKK keyType, int keyBytes, int blockBytes, Func<SymmetricAlgorithm> bcl,
+        Func<Pkcs11Session, Pkcs11Key, byte[], byte[], byte[]> example, Func<Pkcs11Key, SymmetricAlgorithm> adapter)
+    {
+        byte[] raw = RandomNumberGenerator.GetBytes(keyBytes), iv = RandomNumberGenerator.GetBytes(blockBytes);
+        using SymmetricAlgorithm software = bcl();
+        software.Key = raw;
+        byte[] ciphertext = software.EncryptCbc(Message, iv, PaddingMode.PKCS7);
+
+        Pkcs11Key key;
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (ObjectTemplate template = ObjectTemplate.ForSecretKey(keyType).Value(raw).Decrypt().Build())
+            key = session.ImportKey(template);
+        using (key)
+        {
+            Assert.Equal(Message, example(session, key, iv, ciphertext));
+            using SymmetricAlgorithm unleased = adapter(key);
+            Assert.Throws<CryptoPolicyViolationException>(() => unleased.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7));
+        }
+    }
+
+    private static void AssertDsaVerifyLegacySignature(Pkcs11Session session)
+    {
+        // A legacy DSA-2048 key pair on the token (set-up, under AllowInsecure), and a signature it made.
+        DSAParameters domain;
+        using (DSA bclDsa = DSA.Create(2048))
+            domain = bclDsa.ExportParameters(false);
+        using ObjectTemplate publicTemplate = ObjectTemplate.ForPublicKey(CKK.CKK_DSA).Verify()
+            .Attribute(CKA.CKA_PRIME, domain.P!).Attribute(CKA.CKA_SUBPRIME, domain.Q!).Attribute(CKA.CKA_BASE, domain.G!).Build();
+        using ObjectTemplate privateTemplate = ObjectTemplate.ForPrivateKey(CKK.CKK_DSA).Sign().Build();
+        Pkcs11Key key;
+        byte[] signature;
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+        {
+#pragma warning disable KLPKCS11009, KLPKCS11006 // DSA key generation and signing are the set-up
+            key = session.GenerateKeyPair(new Mechanism(CKM.CKM_DSA_KEY_PAIR_GEN), publicTemplate, privateTemplate);
+            using var signer = new DSAPkcs11(key);
+            signature = signer.SignData(Message, HashAlgorithmName.SHA256);
+        }
+        using (key)
+        {
+            Assert.True(LegacyExamples.DsaVerifyLegacySignature(session, key, Message, signature));
+            Assert.False(LegacyExamples.DsaVerifyLegacySignature(session, key, [.. Message, 0], signature));
+            using var unleased = new DSAPkcs11(key);
+#pragma warning restore KLPKCS11009, KLPKCS11006
+            Assert.Throws<CryptoPolicyViolationException>(() => unleased.VerifyData(Message, signature, HashAlgorithmName.SHA256));
+        }
+    }
 
     private static string Cert(string method) => $"{nameof(CertificateExamples)}.{method}";
 

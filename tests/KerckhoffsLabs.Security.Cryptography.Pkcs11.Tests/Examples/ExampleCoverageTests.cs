@@ -7,13 +7,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Examples;
 /// <summary>Every adapter has a documentation example, and every example is catalogued and runs somewhere.</summary>
 public sealed class ExampleCoverageTests
 {
-    // Adapters whose example family has not been written yet, by type name (names, not typeof, because
-    // the legacy adapters are [Obsolete] and SlhDsaPkcs11 is [Experimental]). Each family's change removes its own; the list ends empty.
-    internal static readonly HashSet<string> NotYetDocumented = new(StringComparer.Ordinal)
-    {
-        "DESPkcs11", "TripleDESPkcs11", "RC2Pkcs11", "DSAPkcs11", "MD5Pkcs11", "SHA1Pkcs11",
-    };
-
     private static IEnumerable<Type> Adapters() =>
         typeof(RSAPkcs11).Assembly.GetExportedTypes()
             .Where(t => t.Namespace == typeof(RSAPkcs11).Namespace && t != typeof(Pkcs11MechanismMap));
@@ -22,26 +15,11 @@ public sealed class ExampleCoverageTests
         [.. ExampleCatalog.All.SelectMany(c => c.Covers).Select(t => t.Name)];
 
     [Fact]
-    public void EveryAdapter_HasAnExample_OrIsListedAsPending()
+    public void EveryAdapter_HasAnExample()
     {
         HashSet<string> documented = Documented();
-        string[] missing = [.. Adapters().Select(t => t.Name).Where(n => !documented.Contains(n) && !NotYetDocumented.Contains(n))];
+        string[] missing = [.. Adapters().Select(t => t.Name).Where(n => !documented.Contains(n))];
         Assert.True(missing.Length == 0, $"Adapters with no documentation example: {string.Join(", ", missing)}.");
-    }
-
-    [Fact]
-    public void PendingList_HasNoDocumentedAdapter()
-    {
-        string[] stale = [.. NotYetDocumented.Where(Documented().Contains)];
-        Assert.True(stale.Length == 0, $"Remove from NotYetDocumented, they now have examples: {string.Join(", ", stale)}.");
-    }
-
-    [Fact]
-    public void PendingList_NamesOnlyRealAdapters()
-    {
-        HashSet<string> adapters = [.. Adapters().Select(t => t.Name)];
-        string[] unknown = [.. NotYetDocumented.Where(n => !adapters.Contains(n))];
-        Assert.True(unknown.Length == 0, $"Not adapters: {string.Join(", ", unknown)}.");
     }
 
     [Fact]
