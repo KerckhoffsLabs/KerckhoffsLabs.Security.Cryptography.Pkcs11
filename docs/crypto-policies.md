@@ -128,7 +128,7 @@ ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
 |---|---|
 | `EcdhSharedSecret` | The raw shared secret Z of an ECDH agreement: `Pkcs11Key.DeriveRawSecret` for EC (`CKK_EC`) and X25519 / X448 (`CKK_EC_MONTGOMERY`) keys, and `ECDiffieHellmanPkcs11`'s derive methods |
 | `KemSharedSecret` | An ML-KEM shared secret: `MLKemPkcs11` encapsulate / decapsulate |
-| `KdfOutput` | KDF output over any derive-capable key the session can use: `Pkcs11Key.DeriveBytes`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11`. See the warning below |
+| `KdfOutput` | KDF output over a base key in the opt-in's `KdfBaseKeyScope` (by default, one the token has not always protected): `Pkcs11Key.DeriveBytes`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11`. See [the base-key scope](#kdfoutput-base-key-scope) below |
 
 `Allow` copies the kinds and throws on an empty list, an undefined kind or a blank reason. It refuses every
 kind it does not name exactly as `KeyMaterialExportRule.Refuse()` does. Its reason is shown in the policy
@@ -140,13 +140,45 @@ call site (and method-group reference) is reported at build time as
 [KLPKCS11012](diagnostics.md#KLPKCS11012), so the opt-in is visible in review; suppress it with a
 justification.
 
-> **`KdfOutput` is per kind, not per key.** It lets the session run an allowed KDF over *any* derive-capable
-> key it can use and read the output, including a derivation-only secret such as the agreed secret Z of
-> `DeriveSecretAgreement`. It never returns Z itself, but the bytes it returns for a mechanism are the value of
-> any key the token derives from the same base with the same mechanism, however sensitive:
-> `z.DeriveBytes(hkdf, 32)` is the AES key `z.Derive(hkdf, aes256Template)` made on the token. Allow
-> `KdfOutput` only in the sessions that need it, give them their own derive keys, and keep the base keys of
-> on-token key schedules (agreed secrets, master keys) in sessions whose policy does not allow it.
+<a id="kdfoutput-base-key-scope"></a>
+#### The `KdfOutput` base-key scope
+
+KDF output is the value of a key the token could derive from the same base with the same mechanism:
+`z.DeriveBytes(hkdf, 32)` over the agreed secret Z of `DeriveSecretAgreement` *is* the AES key
+`z.Derive(hkdf, aes256Template)` makes on the token. So a `KdfOutput` opt-in is scoped by base key: before it asks
+the policy, the library reads the KDF's base key (`KeyMaterialExportRequest.KdfBaseKey`: its type, `CKA_ID`,
+`CKA_LABEL`, `CKA_ALWAYS_SENSITIVE` and `CKA_NEVER_EXTRACTABLE`), and the rule checks it against a
+`KdfBaseKeyScope`:
+
+| Scope | Base keys it admits |
+|---|---|
+| `KdfBaseKeyScope.NeverProtected` (the default of `Allow(kinds, reason)`) | Keys that are not `CKA_ALWAYS_SENSITIVE`: key material the application imported (`C_CreateObject`), and keys the token derived from it, such as the PRK of `HkdfPkcs11.ExtractKey`. A generated sensitive key, and anything derived from one as sensitive (Z, a master key's children), is refused |
+| `KdfBaseKeyScope.Where(predicate, description)` | What the predicate decides from `KdfBaseKeyInfo`; it decides alone, so check `AlwaysSensitive` in it to keep the default's protection |
+| `KdfBaseKeyScope.Any` | Every base key the session can use. Name it only when reproducing derived keys is the point |
+
+```csharp
+#pragma warning disable KLPKCS11012 // HKDF over the session's own derive keys only, see <ticket>
+KeyMaterialExportRule rule = KeyMaterialExportRule.Allow(
+    [KeyMaterialExportKind.KdfOutput],
+    "HKDF output for <protocol>, over its own derive keys.",
+    KdfBaseKeyScope.Where(k => !k.AlwaysSensitive && k.Label == "<protocol>-ikm", "<protocol>'s IKM"));
+#pragma warning restore KLPKCS11012
+```
+
+An attribute the token does not report reads as protected, so an unknown key is never taken for an imported one.
+PBKDF2 has no base key (its input is a password the caller holds) and is in every scope.
+
+The default relies on the token keeping `CKA_ALWAYS_SENSITIVE` as PKCS#11 specifies, and it has two limits:
+
+- **Unwrapped keys.** PKCS#11 makes every unwrapped key not `CKA_ALWAYS_SENSITIVE`, whatever its history, and no
+  attribute tells a key provisioned under a KEK from one imported in the clear. `NeverProtected` admits both.
+- **Tokens that reset the attribute on derive.** Some tokens report every derived key as not
+  `CKA_ALWAYS_SENSITIVE`, Z included, and `NeverProtected` then admits it.
+
+On such tokens, or wherever on-token key schedules start from unwrapped keys, narrow the scope with
+`Where` (by `CKA_ID` or `CKA_LABEL`, on objects that are `CKA_MODIFIABLE=false`: anyone with a read/write
+session can change those attributes otherwise), or keep those base keys in sessions whose policy does not allow
+`KdfOutput`.
 
 `Pkcs11Key.DeriveBytes(mechanism, length)` returns the output of an on-token KDF and accepts only KDFs
 with their own parameters: `CKM_HKDF_DERIVE` with `CkmHkdfParams`, and `CKM_SP800_108_COUNTER_KDF`,
@@ -166,7 +198,8 @@ else about it (`CKA_TOKEN`, `CKA_VALUE_LEN`, …), as it judges every template y
 key-agreement KDF of a raw ECDH read-back is judged by the export rule, and only for `EcdhSharedSecret`: a
 `KdfOutput` or `KemSharedSecret` opt-in never approves a derivation that would return Z. A custom
 `ICryptoPolicy` sees these requests tagged with the kind (`KeyTemplateRequest.ReadBackFor`,
-`KeyAgreementKdfRequest.ReadBackFor`), after the matching `KeyMaterialExportRequest`.
+`KeyAgreementKdfRequest.ReadBackFor`), after the matching `KeyMaterialExportRequest`, whose `KdfBaseKey` it
+should judge too when it allows `KdfOutput`.
 
 ## Allowing less
 

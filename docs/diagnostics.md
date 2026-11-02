@@ -189,10 +189,9 @@ ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
 Suppressing the diagnostic changes nothing at run time: the policy still allows only the kinds named,
 and the exports it allows are logged once the secret has been read: a `KeyMaterialExportAllowed` warning
 for the first export of each kind under the policy on a session, then the same line at Debug for every later
-one (the kind and the policy name, never the secret). `KdfOutput` is the broadest kind: it reads a KDF's
-output over any derive-capable key the session can use, so it can reproduce the bytes of keys the token
-derives as sensitive from the same base; see the warning in
-[Reading secret key material off the token](crypto-policies.md#reading-secret-key-material-off-the-token).
+one (the kind and the policy name, never the secret). `KdfOutput` is the broadest kind: a KDF's output is the
+value of keys the token could derive from the same base, so it is scoped by base key, by default to keys the
+token has not always protected; see [the base-key scope](crypto-policies.md#kdfoutput-base-key-scope).
 
 ## Runtime-only gates
 

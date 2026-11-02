@@ -183,7 +183,10 @@ The same builder allows a hash, curve or key-agreement KDF (`AllowHash`, `AllowC
 from scratch (`new CryptoPolicyBuilder(name)`); see [Using crypto policies](crypto-policies.md). Reading a
 shared secret or KDF output off the token is an explicit, per-kind opt-in with a reason
 (`WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, reason))`): the first export of each kind under a
-policy logs a warning (later ones log at Debug), and each `Allow` call site is reported as `KLPKCS11012`. The
+policy logs a warning (later ones log at Debug), and each `Allow` call site is reported as `KLPKCS11012`.
+KDF output is further scoped by base key: by default only over keys the token has not always protected
+(`CKA_ALWAYS_SENSITIVE` false), so it cannot reproduce keys derived on the token from an agreed secret or a
+generated master key ([the base-key scope](crypto-policies.md#kdfoutput-base-key-scope), with its limits). The
 generated [Recommended](policies/recommended.md) and [NistApproved](policies/nist-approved.md) pages list
 exactly what each policy allows, for which operations, and why.
 
