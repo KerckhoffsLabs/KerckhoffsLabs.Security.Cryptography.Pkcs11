@@ -109,11 +109,12 @@ public sealed record KeyAgreementKdfRequest(CKM Mechanism, CKD Kdf) : PolicyRequ
     /// the caller.
     /// </summary>
     /// <remarks>
-    /// A built-in policy judges a request tagged <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> with
-    /// its key-material export rule for that kind instead of its KDF allow-list, so an explicit
-    /// <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> opt-in covers the <see cref="CKD.CKD_NULL"/>
-    /// derivation its read-back needs. A request tagged with any other kind is judged as if untagged: only
-    /// the ECDH shared-secret export may approve a derivation that returns Z. A caller's own
+    /// A built-in policy judges a <see cref="CKD.CKD_NULL"/> request tagged
+    /// <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> with its key-material export rule for that kind
+    /// instead of its KDF allow-list, so an explicit <see cref="KeyMaterialExportKind.EcdhSharedSecret"/>
+    /// opt-in covers the derivation its read-back needs. A tagged request naming any other KDF, or tagged
+    /// with any other kind, is judged as if untagged: only the ECDH shared-secret export may approve a
+    /// derivation that returns Z, and it approves nothing else. A caller's own
     /// <see cref="CKD.CKD_NULL"/> derivation is untagged and judged as before.
     /// </remarks>
     public KeyMaterialExportKind? ReadBackFor { get; internal init; }

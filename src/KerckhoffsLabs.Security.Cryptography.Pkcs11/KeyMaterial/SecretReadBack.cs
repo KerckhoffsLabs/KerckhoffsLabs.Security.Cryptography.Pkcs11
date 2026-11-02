@@ -29,16 +29,31 @@ internal sealed record ReadBackFailures(
 }
 
 /// <summary>
+/// The session's half of an open read-back (<c>Pkcs11SessionCore.ReadBackGrant</c>): the tag, the export report
+/// and the exclusive lease, released on dispose.
+/// </summary>
+internal interface IReadBackGrant : IDisposable
+{
+    /// <summary>
+    /// Runs <paramref name="createEphemeral"/> with the grant armed: the templates and key-agreement KDFs the
+    /// session judges during it, and only then, are tagged as this read-back.
+    /// </summary>
+    T Create<T>(Func<T> createEphemeral);
+
+    /// <summary>Logs the export; called once the value has been read, checked and its key destroyed.</summary>
+    void ReportExport();
+}
+
+/// <summary>
 /// An open read-back of one kind of secret, from <see cref="Pkcs11Session.BeginReadBack"/>: the only way the
 /// library reads secret key material off the token. The policy allowed the kind before this was created; while it
-/// is open the session is held exclusively, and the templates and key-agreement KDFs it judges are tagged as this
-/// read-back (<c>KeyTemplateRequest.ReadBackFor</c>). Dispose it when the read is done.
+/// is open the session is held exclusively, and the templates and key-agreement KDFs judged while the ephemeral key
+/// is created (and only then) are tagged as this read-back (<c>KeyTemplateRequest.ReadBackFor</c>). Dispose it when
+/// the read is done.
 /// </summary>
-/// <param name="reportExport">Logs the export; called once a value has been read, checked and its key destroyed.</param>
-/// <param name="session">The session's half of the read-back (the tag and the exclusive lease), released on dispose.</param>
-internal sealed class SecretReadBack(Action reportExport, IDisposable session) : IDisposable
+/// <param name="grant">The session's half of the read-back (the tag, the export report and the exclusive lease), released on dispose.</param>
+internal sealed class SecretReadBack(IReadBackGrant grant) : IDisposable
 {
-
     /// <summary>
     /// Creates the ephemeral, extractable key holding the secret, reads its <c>CKA_VALUE</c>, checks it and
     /// destroys the key: the single read-back flow behind every byte-returning path.
@@ -58,7 +73,8 @@ internal sealed class SecretReadBack(Action reportExport, IDisposable session) :
     /// </remarks>
     internal byte[] Read(Func<Pkcs11Key> createEphemeral, int expectedLength, ReadBackFailures failures, Action<byte[]>? check = null)
     {
-        Pkcs11Key ephemeral = createEphemeral();
+        // Armed only for this call: the read, the checks and the export report below run untagged.
+        Pkcs11Key ephemeral = grant.Create(createEphemeral);
         byte[] value;
         using (ephemeral)
         {
@@ -84,7 +100,7 @@ internal sealed class SecretReadBack(Action reportExport, IDisposable session) :
 
         try
         {
-            reportExport();
+            grant.ReportExport();
         }
         catch
         {
@@ -124,19 +140,21 @@ internal sealed class SecretReadBack(Action reportExport, IDisposable session) :
         }
     }
 
-    // A throw from here would replace the exception the read-back is already unwinding with.
+    // A throw from here would replace the exception the read-back is already unwinding with, whatever its type:
+    // a token error, a disposed key or session, a lease error.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Best-effort cleanup while a primary exception propagates; any failure here would mask it, and the session object is collected at C_CloseSession.")]
     private static void DestroyAfterFailure(Pkcs11Key ephemeral)
     {
         try
         {
             ephemeral.Destroy();
         }
-        catch (Pkcs11Exception)
+        catch
         {
             // Deliberately swallowed: see Read's remarks. The primary exception is the useful one.
         }
     }
 
     /// <summary>Closes the read-back and releases the session.</summary>
-    public void Dispose() => session.Dispose();
+    public void Dispose() => grant.Dispose();
 }

@@ -62,11 +62,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// </summary>
     /// <exception cref="CryptoPolicyViolationException">The policy refuses the export.</exception>
     /// <exception cref="InvalidOperationException">Another thread is using the session, or a read-back is already open on it.</exception>
-    internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind)
-    {
-        Pkcs11SessionCore.ReadBackGrant grant = _core.BeginReadBack(kind);
-        return new SecretReadBack(grant.ReportExport, grant);
-    }
+    internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind) => new(_core.BeginReadBack(kind));
 
     /// <summary>Evaluates <paramref name="request"/> without throwing or logging.</summary>
     internal bool IsPermitted(PolicyRequest request) => _core.IsPermitted(request);

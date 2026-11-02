@@ -224,7 +224,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     private ICryptoPolicy EnforceUnder(PolicyRequest request)
     {
         ICryptoPolicy policy = _effectivePolicy;
-        PolicyDecision decision = policy.Evaluate(request);
+        PolicyDecision decision;
+        using (CallOutScope.Enter())
+            decision = policy.Evaluate(request);
         if (decision.IsAllowed)
             return policy;
 
@@ -243,7 +245,8 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     internal bool IsPermitted(PolicyRequest request)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _effectivePolicy.Evaluate(request).IsAllowed;
+        using (CallOutScope.Enter())
+            return _effectivePolicy.Evaluate(request).IsAllowed;
     }
 
     private void Enforce(Mechanism mechanism, CryptoOperation operation, IReadOnlyList<Objects.ObjectAttribute>? resultTemplate = null)
@@ -495,7 +498,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
                 throw new ArgumentException("Invalid handle specified", nameof(sessionHandle));
 
             // Both run consumer code (the factory, the logger), which may throw.
-            _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11SessionCore>();
+            // Fenced: a sink runs inside session operations, read-backs included, and must not be able to
+            // call back into a session as if it were the library (see CallOutScope).
+            _logger = new CallOutFencedLogger((loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11SessionCore>());
             Log.SessionTrace(_logger, (ulong)sessionHandle.SessionId, "ctor");
 
             _basePolicy = policy ?? CryptoPolicy.Recommended;
