@@ -91,7 +91,10 @@ internal static class EcxPublicKeyInfoTestCases
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var ecParams = new AsnWriter(AsnEncodingRules.DER);
         ecParams.WriteObjectIdentifier(oid);
-        using var publicTemplate = ObjectTemplate.ForPublicKey(keyType).OnToken(false).EcParams(ecParams.Encode()).Build();
+        // NSS refuses an Edwards public key without CKA_VERIFY (CKR_KEY_TYPE_INCONSISTENT); the builder
+        // defaults every usage to false.
+        using var publicTemplate = ObjectTemplate.ForPublicKey(keyType).OnToken(false).EcParams(ecParams.Encode())
+            .Verify(keyType == CKK.CKK_EC_EDWARDS).Build();
         using var privateTemplate = ObjectTemplate.ForPrivateKey(keyType).OnToken(false).Attribute(usage, true).Build();
         Pkcs11Key pair;
         try
