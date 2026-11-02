@@ -20,8 +20,11 @@ takes two deliberate steps, both visible in the code:
    `#pragma warning disable KLPKCS11004` … `#pragma warning restore KLPKCS11004`. Never suppress it for
    the whole project. See [Diagnostics](../diagnostics.md).
 2. **Lift the policy for one scoped operation**, with `using (session.UsePolicy(CryptoPolicy.AllowInsecure))`.
-   The lease ends with the block; the session is back under its own policy afterwards. A session opened
-   under `NistApproved` refuses the lease altogether.
+   The lease ends with the block, and the session is back under its own policy afterwards. While it is
+   open it lifts every check **for the whole session**, on every thread using it, so do the legacy step
+   on a session of its own. A session opened under `NistApproved` refuses the lease altogether. Narrower
+   still: a policy derived from `Recommended` that allows only the one legacy mechanism for `Decrypt`, as
+   the [AES block modes](aes.md) page shows.
 
 ## Decrypting a Triple-DES archive — `TripleDESPkcs11`
 
@@ -45,6 +48,11 @@ retire the 3DES key.
 The cipher adapters are `SymmetricAlgorithm`s like [`AesPkcs11`](aes.md): one-shot `DecryptCbc`,
 `DecryptEcb` and the encrypting counterparts, no `ICryptoTransform`, no readable `Key`. Many tokens no
 longer implement single DES or RC2 at all.
+
+**RC2 has an effective key length** (RFC 2268) separate from the key size, and old data often used
+40 bits. Set `rc2.EffectiveKeySize` to the value the data was encrypted with before decrypting: it
+defaults to the key size, and a wrong value decrypts to garbage, or to a padding error, without saying
+why.
 
 ## Verifying an old DSA signature — `DSAPkcs11`
 

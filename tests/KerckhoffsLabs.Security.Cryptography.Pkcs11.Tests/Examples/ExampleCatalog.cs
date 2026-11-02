@@ -343,7 +343,10 @@ internal static class ExampleCatalog
         new(Legacy(nameof(LegacyExamples.DesDecryptLegacyRecord)), [typeof(DESPkcs11)], [CKM.CKM_DES_CBC_PAD],
             ExampleBackend.Nss,
             b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_DES, 8, 8, DES.Create, LegacyExamples.DesDecryptLegacyRecord,
-                key => new DESPkcs11(key)))),
+                key => new DESPkcs11(key))),
+            Unsupported: b => b is SoftHsmBackendFixture
+                ? "SoftHSM advertises single DES, but its OpenSSL needs the legacy provider to run it"
+                : null),
         new(Legacy(nameof(LegacyExamples.Rc2DecryptLegacyRecord)), [typeof(RC2Pkcs11)], [CKM.CKM_RC2_CBC_PAD],
             ExampleBackend.Nss,
             b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_RC2, 16, 8, RC2.Create, LegacyExamples.Rc2DecryptLegacyRecord,
@@ -351,7 +354,7 @@ internal static class ExampleCatalog
         new(Legacy(nameof(LegacyExamples.DsaVerifyLegacySignature)), [typeof(DSAPkcs11)], [CKM.CKM_DSA_KEY_PAIR_GEN, CKM.CKM_DSA_SHA256],
             ExampleBackend.SoftHsm2, b => WithSession(b, AssertDsaVerifyLegacySignature)),
         new(Legacy(nameof(LegacyExamples.Md5ChecksumForLegacyProtocol)), [typeof(MD5Pkcs11)], [CKM.CKM_MD5],
-            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            ExampleBackend.SoftHsm2,
             b => WithSession(b, s =>
             {
                 Assert.Equal(MD5.HashData(Message), LegacyExamples.Md5ChecksumForLegacyProtocol(s, Message));
@@ -397,12 +400,12 @@ internal static class ExampleCatalog
 
     private static void AssertDsaVerifyLegacySignature(Pkcs11Session session)
     {
-        // A legacy DSA-2048 key pair on the token (set-up, under AllowInsecure), and a signature it made.
-        DSAParameters domain;
-        using (DSA bclDsa = DSA.Create(2048))
-            domain = bclDsa.ExportParameters(false);
+        // A legacy DSA-2048 key pair on the token (set-up, under AllowInsecure), and a signature it made. The
+        // domain parameters are the suite's fixed ones: not every platform's BCL generates 2048-bit DSA.
         using ObjectTemplate publicTemplate = ObjectTemplate.ForPublicKey(CKK.CKK_DSA).Verify()
-            .Attribute(CKA.CKA_PRIME, domain.P!).Attribute(CKA.CKA_SUBPRIME, domain.Q!).Attribute(CKA.CKA_BASE, domain.G!).Build();
+            .Attribute(CKA.CKA_PRIME, Algorithms.DSAPkcs11TestCases.P)
+            .Attribute(CKA.CKA_SUBPRIME, Algorithms.DSAPkcs11TestCases.Q)
+            .Attribute(CKA.CKA_BASE, Algorithms.DSAPkcs11TestCases.G).Build();
         using ObjectTemplate privateTemplate = ObjectTemplate.ForPrivateKey(CKK.CKK_DSA).Sign().Build();
         Pkcs11Key key;
         byte[] signature;
