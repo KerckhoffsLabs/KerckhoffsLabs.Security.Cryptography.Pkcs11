@@ -273,7 +273,8 @@ internal static class ExampleCatalog
                 using Pkcs11Key ikmKey = ImportDeriveKey(s, ikm);
                 using Pkcs11Key derived = KdfExamples.HkdfDeriveAesKey(ikmKey, salt, info);
                 AssertSameAesKey(derived, KdfExamples.BclHkdf(ikm, salt, info));
-            })),
+            }),
+            Unsupported: ExampleGates.ClassicAesGcm),
         new(Kdf(nameof(KdfExamples.BclHkdf)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(32, KdfExamples.BclHkdf(new byte[32], new byte[16], []).Length)),
         new(Kdf(nameof(KdfExamples.Pbkdf2DeriveAesKey)), [typeof(Rfc2898DeriveBytesPkcs11)], [CKM.CKM_PKCS5_PBKD2, CKM.CKM_AES_GCM],
@@ -284,7 +285,8 @@ internal static class ExampleCatalog
                 using var password = new SecurePassword("correct horse battery staple".AsSpan());
                 using Pkcs11Key derived = KdfExamples.Pbkdf2DeriveAesKey(s, password, salt);
                 AssertSameAesKey(derived, KdfExamples.BclPbkdf2("correct horse battery staple"u8.ToArray(), salt));
-            })),
+            }),
+            Unsupported: ExampleGates.ClassicAesGcm),
         new(Kdf(nameof(KdfExamples.BclPbkdf2)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(
                 Rfc2898DeriveBytes.Pbkdf2("pw"u8, new byte[16], 600_000, HashAlgorithmName.SHA256, 32),
@@ -297,7 +299,8 @@ internal static class ExampleCatalog
                 using Pkcs11Key kdkKey = ImportDeriveKey(s, kdk);
                 using Pkcs11Key derived = KdfExamples.Sp800108DeriveAesKey(kdkKey, "orders"u8.ToArray(), "tenant-42"u8.ToArray());
                 AssertSameAesKey(derived, KdfExamples.BclSp800108(kdk, "orders"u8.ToArray(), "tenant-42"u8.ToArray()));
-            })),
+            }),
+            Unsupported: ExampleGates.ClassicAesGcm),
         new(Kdf(nameof(KdfExamples.BclSp800108)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(32, KdfExamples.BclSp800108(new byte[32], [1], [2]).Length)),
     ];
