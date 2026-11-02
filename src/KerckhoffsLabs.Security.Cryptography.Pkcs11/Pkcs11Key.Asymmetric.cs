@@ -332,9 +332,9 @@ public sealed partial class Pkcs11Key
     // The curve of this CKK_EC_MONTGOMERY key, read from CKA_EC_PARAMS on first use. CKA_EC_PARAMS cannot
     // change once the object exists, and the value is one of two immutable singletons, so a race between
     // two first uses only reads the attribute twice; a failed read is not cached.
-    private MontgomeryCurve? _montgomeryCurve;
+    private Rfc8410Curve? _montgomeryCurve;
 
-    internal MontgomeryCurve ResolveMontgomeryCurve(string operationName)
+    internal Rfc8410Curve ResolveMontgomeryCurve(string operationName)
         => _montgomeryCurve ??= MontgomeryPeerValidator.ReadLocalCurve(this, operationName);
 
     private ValidatedEcdhPeer ValidateEcPeer(ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string operationName)
