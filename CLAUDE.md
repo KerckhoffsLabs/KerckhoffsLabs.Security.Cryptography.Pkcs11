@@ -23,7 +23,7 @@ Your primary goals:
 
 ## C# and interop style
 
-- **Language level:** Use modern C# and .NET. Production projects target `net10.0` with `<LangVersion>latest</LangVersion>` — modern C# features (collection expressions, primary constructors, `System.Security.Cryptography.MLKem`/`MLDsa`/`SlhDsa`, etc.) are fair game.
+- **Language level:** Use modern C# and .NET. Production projects target `net10.0` with `<LangVersion>14.0</LangVersion>` (pinned, so the language version does not float with the SDK) — modern C# features (collection expressions, primary constructors, `System.Security.Cryptography.MLKem`/`MLDsa`/`SlhDsa`, etc.) are fair game.
 - **Interop:**
   - Prefer **safe wrappers** around P/Invoke rather than exposing raw `IntPtr` and unmanaged buffers.
   - Use `SafeHandle`-like patterns for sessions, objects, and other PKCS#11 handles.

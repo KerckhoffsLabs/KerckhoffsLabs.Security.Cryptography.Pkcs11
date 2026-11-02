@@ -17,7 +17,7 @@
          (or any AOT-publish consumer) is built. -->
     <PublishAot>false</PublishAot>
     <IsAotCompatible>false</IsAotCompatible>
-    <LangVersion>13.0</LangVersion>
+    <LangVersion>14.0</LangVersion>
     <Nullable>enable</Nullable>
     <IsRoslynComponent>true</IsRoslynComponent>
     <!-- The authoring rules from Microsoft.CodeAnalysis.Analyzers below, notably RS1035: no file,
