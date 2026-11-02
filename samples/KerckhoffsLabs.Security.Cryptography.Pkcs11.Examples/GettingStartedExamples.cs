@@ -44,7 +44,8 @@ public static class GettingStartedExamples
         aesGcm.Decrypt(nonce, ciphertext, tag, decrypted);
         return decrypted;
         // 5. The using declarations dispose the adapter, key handle, session and library in reverse
-        //    order: the session logs out and closes, the library finalizes the module.
+        //    order: the session closes, and the library calls C_Finalize if it was the one that
+        //    initialized the module.
         #endregion
     }
 }
