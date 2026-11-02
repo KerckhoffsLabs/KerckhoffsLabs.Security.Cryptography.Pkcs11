@@ -97,7 +97,7 @@ internal static partial class BclDifferentialTestCases
 
     // === AES ===============================================================================
 
-    private static readonly Gen<byte[]> AesKey = Gen.OneOfConst(16, 24, 32).SelectMany(CsInputs.Bytes);
+    private static readonly Gen<byte[]> AesKey = Gen.OneOf(16, 24, 32).SelectMany(CsInputs.Bytes);
 
     // CBC with and without PKCS#7 padding: the token's ciphertext is the BCL's, and the token decrypts
     // the BCL's ciphertext back to the plaintext. Without padding the plaintext is whole blocks. The
@@ -223,8 +223,8 @@ internal static partial class BclDifferentialTestCases
         RequireHost(tags.Length > 0, "Host BCL's AES-GCM takes none of the token's tag sizes.");
 
         using var session = backend.OpenSession();
-        Gen<byte[]> key = keySizes is null ? AesKey : Gen.OneOfConst(keySizes).SelectMany(CsInputs.Bytes);
-        CsInputs.Check(AeadCases(key, Gen.OneOfConst(12), Gen.OneOfConst(tags)), input =>
+        Gen<byte[]> key = keySizes is null ? AesKey : Gen.OneOf(keySizes).SelectMany(CsInputs.Bytes);
+        CsInputs.Check(AeadCases(key, Gen.OneOf(12), Gen.OneOf(tags)), input =>
         {
             var (ciphertext, tag) = Seal(input, (c, t) =>
             {
@@ -248,7 +248,7 @@ internal static partial class BclDifferentialTestCases
         RequireHost(AesCcm.IsSupported, "Host BCL has no AES-CCM.");
 
         using var session = backend.OpenSession();
-        var tagSize = Gen.OneOfConst(8, 10, 12, 14, 16);
+        var tagSize = Gen.OneOf(8, 10, 12, 14, 16);
         CsInputs.Check(AeadCases(AesKey, CsInputs.Int(7, 13), tagSize), input =>
         {
             var (ciphertext, tag) = Seal(input, (c, t) =>
@@ -271,7 +271,7 @@ internal static partial class BclDifferentialTestCases
         RequireHost(ChaCha20Poly1305.IsSupported, "Host BCL has no ChaCha20-Poly1305.");
 
         using var session = backend.OpenSession();
-        CsInputs.Check(AeadCases(CsInputs.Bytes(32), Gen.OneOfConst(12), Gen.OneOfConst(16)), input =>
+        CsInputs.Check(AeadCases(CsInputs.Bytes(32), Gen.OneOf(12), Gen.OneOf(16)), input =>
         {
             var (ciphertext, tag) = Seal(input, (c, t) =>
             {

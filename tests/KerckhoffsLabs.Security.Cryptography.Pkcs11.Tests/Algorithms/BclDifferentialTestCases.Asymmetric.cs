@@ -101,7 +101,7 @@ internal static partial class BclDifferentialTestCases
         backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE);
         var (bclCurve, _) = EcSpec(curve);
         var inputs =
-            from hash in Gen.OneOfConst("SHA256", "SHA384", "SHA512")
+            from hash in Gen.OneOf("SHA256", "SHA384", "SHA512")
             from prepend in CsInputs.Bytes(0, 32)
             from append in CsInputs.Bytes(0, 32)
             from hmacKey in CsInputs.Bytes(0, 64)
