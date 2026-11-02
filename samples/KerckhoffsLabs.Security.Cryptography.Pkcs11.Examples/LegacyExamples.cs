@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
@@ -11,6 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 /// </summary>
 public static class LegacyExamples
 {
+    [SuppressMessage("Security", "S5547:Use a strong cipher algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/legacy.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
     public static byte[] TripleDesDecryptLegacyArchive(Pkcs11Session session, Pkcs11Key legacyKey, byte[] iv, byte[] ciphertext)
     {
         #region TripleDesDecryptLegacyArchive
@@ -26,6 +28,7 @@ public static class LegacyExamples
         #endregion
     }
 
+    [SuppressMessage("Security", "S5547:Use a strong cipher algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/legacy.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
     public static byte[] DesDecryptLegacyRecord(Pkcs11Session session, Pkcs11Key legacyKey, byte[] iv, byte[] ciphertext)
     {
         #region DesDecryptLegacyRecord
@@ -39,6 +42,7 @@ public static class LegacyExamples
         #endregion
     }
 
+    [SuppressMessage("Security", "S5547:Use a strong cipher algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/legacy.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
     public static byte[] Rc2DecryptLegacyRecord(Pkcs11Session session, Pkcs11Key legacyKey, byte[] iv, byte[] ciphertext)
     {
         #region Rc2DecryptLegacyRecord
@@ -52,6 +56,7 @@ public static class LegacyExamples
         #endregion
     }
 
+    [SuppressMessage("Security", "S4790:Use a stronger hashing algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/legacy.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
     public static bool DsaVerifyLegacySignature(Pkcs11Session session, Pkcs11Key legacyKey, byte[] data, byte[] signature)
     {
         #region DsaVerifyLegacySignature
@@ -67,6 +72,7 @@ public static class LegacyExamples
         #endregion
     }
 
+    [SuppressMessage("Security", "S4790:Use a stronger hashing algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/legacy.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
     public static byte[] Md5ChecksumForLegacyProtocol(Pkcs11Session session, byte[] data)
     {
         #region Md5ChecksumForLegacyProtocol
@@ -82,6 +88,7 @@ public static class LegacyExamples
         #endregion
     }
 
+    [SuppressMessage("Security", "S4790:Use a stronger hashing algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/legacy.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
     public static byte[] Sha1ForLegacyProtocol(Pkcs11Session session, byte[] data)
     {
         #region Sha1ForLegacyProtocol
