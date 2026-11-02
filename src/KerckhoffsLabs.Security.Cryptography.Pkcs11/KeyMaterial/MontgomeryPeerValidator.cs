@@ -1,4 +1,3 @@
-using System.Formats.Asn1;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
@@ -10,17 +9,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 /// <param name="U">The peer's u-coordinate as RFC 7748 encodes it (little-endian), the <c>CKM_ECDH1_DERIVE</c> public data for a <see cref="CKK.CKK_EC_MONTGOMERY"/> key.</param>
 /// <param name="SecretLength">The length of the curve's shared secret, and of <see cref="U"/>: 32 bytes for X25519, 56 for X448.</param>
 internal readonly record struct ValidatedMontgomeryPeer(byte[] U, int SecretLength);
-
-/// <summary>A Montgomery curve this library can agree on: X25519 or X448.</summary>
-/// <param name="Oid">The RFC 8410 algorithm OID, which an RFC 8410 peer <c>SubjectPublicKeyInfo</c> names.</param>
-/// <param name="Name">The curve's name, for messages.</param>
-/// <param name="Length">The length of a u-coordinate and of the shared secret: 32 bytes for X25519, 56 for X448.</param>
-internal sealed record MontgomeryCurve(string Oid, string Name, int Length)
-{
-    internal static MontgomeryCurve X25519 { get; } = new(Oids.KeyAlgorithms.X25519, "X25519", 32);
-
-    internal static MontgomeryCurve X448 { get; } = new(Oids.KeyAlgorithms.X448, "X448", 56);
-}
 
 /// <summary>
 /// Validates a peer's X25519 / X448 public key against a local <see cref="CKK.CKK_EC_MONTGOMERY"/> key
@@ -84,27 +72,29 @@ internal static class MontgomeryPeerValidator
     internal static ValidatedMontgomeryPeer Validate(
         Pkcs11Key localKey, ReadOnlySpan<byte> peerSubjectPublicKeyInfo, string peerParamName, string operationName)
     {
-        string algorithm = SubjectPublicKeyInfoEncoding.TryReadAlgorithm(peerSubjectPublicKeyInfo)
-            ?? throw new ArgumentException("Peer public key is not a DER SubjectPublicKeyInfo.", peerParamName);
+        // One decode: the algorithm is checked before the parameters, so a key of another algorithm is
+        // reported as a mismatch whatever its parameters.
+        if (!SubjectPublicKeyInfoEncoding.TryDecode(peerSubjectPublicKeyInfo, out string? algorithm, out bool hasParameters, out byte[]? u))
+            throw new ArgumentException("Peer public key is not a DER SubjectPublicKeyInfo.", peerParamName);
 
-        MontgomeryCurve curve = localKey.ResolveMontgomeryCurve(operationName);
+        Rfc8410Curve curve = localKey.ResolveMontgomeryCurve(operationName);
         if (!string.Equals(algorithm, curve.Oid, StringComparison.Ordinal))
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
                 $"{operationName} (peer public key algorithm is {algorithm}, expected {curve.Name} {curve.Oid})");
 
-        if (!SubjectPublicKeyInfoEncoding.TryDecodeWithoutParameters(peerSubjectPublicKeyInfo, out _, out byte[]? u))
+        if (hasParameters)
             throw new ArgumentException(
                 $"Peer {curve.Name} public key must have no algorithm parameters (RFC 8410 §3).", peerParamName);
 
-        if (u.Length != curve.Length)
+        if (u.Length != curve.KeyLength)
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
-                $"{operationName} (peer public key is {u.Length} bytes; {curve.Name} takes {curve.Length})");
+                $"{operationName} (peer public key is {u.Length} bytes; {curve.Name} takes {curve.KeyLength})");
 
         if (IsLowOrder(u, curve))
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
                 $"{operationName} (peer public key is a low-order point: the shared secret would be all zero)");
 
-        return new ValidatedMontgomeryPeer(u, curve.Length);
+        return new ValidatedMontgomeryPeer(u, curve.KeyLength);
     }
 
     /// <summary>
@@ -121,9 +111,9 @@ internal static class MontgomeryPeerValidator
 
     // Whether u is one of the curve's low-order points. The peer key is public, but the comparison is
     // constant-time anyway, so the check never depends on where a mismatch falls.
-    private static bool IsLowOrder(byte[] u, MontgomeryCurve curve)
+    private static bool IsLowOrder(byte[] u, Rfc8410Curve curve)
     {
-        bool x25519 = ReferenceEquals(curve, MontgomeryCurve.X25519);
+        bool x25519 = ReferenceEquals(curve, Rfc8410Curves.X25519);
         byte[][] lowOrder = x25519 ? X25519LowOrder : X448LowOrder;
         bool found = false;
         foreach (byte[] point in lowOrder)
@@ -136,54 +126,17 @@ internal static class MontgomeryPeerValidator
         return found;
     }
 
-    /// <summary>The local key's curve, from its <c>CKA_EC_PARAMS</c>. Cached by <c>Pkcs11Key.ResolveMontgomeryCurve</c>.</summary>
+    /// <summary>The local key's curve, from its <c>CKA_EC_PARAMS</c> (<see cref="Rfc8410Curves.Describe"/>). Cached by <c>Pkcs11Key.ResolveMontgomeryCurve</c>.</summary>
     /// <exception cref="Pkcs11Exception">The attribute is unreadable or names neither X25519 nor X448.</exception>
-    internal static MontgomeryCurve ReadLocalCurve(Pkcs11Key key, string operationName)
+    internal static Rfc8410Curve ReadLocalCurve(Pkcs11Key key, string operationName)
     {
         using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
         if (attrs.Count == 0 || attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 $"{operationName} (local CKA_EC_PARAMS not readable — cannot tell X25519 from X448)");
 
-        return CurveOf(attrs[0].GetValueAsByteArray()) switch
-        {
-            Oids.KeyAlgorithms.X25519 => MontgomeryCurve.X25519,
-            Oids.KeyAlgorithms.X448 => MontgomeryCurve.X448,
-            _ => throw Pkcs11Exception.Create(CKR.CKR_CURVE_NOT_SUPPORTED,
-                $"{operationName} (local CKK_EC_MONTGOMERY key's CKA_EC_PARAMS names neither X25519 nor X448)"),
-        };
-    }
-
-    // The RFC 8410 OID a CKA_EC_PARAMS value names, either as that OID or as the PKCS#11 v3.0 curve name;
-    // null for anything else.
-    private static string? CurveOf(byte[] ecParams)
-    {
-        try
-        {
-            Asn1Tag tag = Asn1Tag.Decode(ecParams, out _);
-            if (tag.HasSameClassAndValue(Asn1Tag.ObjectIdentifier))
-            {
-                string oid = AsnDecoder.ReadObjectIdentifier(ecParams, AsnEncodingRules.DER, out int consumed);
-                return consumed == ecParams.Length ? oid : null;
-            }
-            if (tag.HasSameClassAndValue(new Asn1Tag(UniversalTagNumber.PrintableString)))
-            {
-                string name = AsnDecoder.ReadCharacterString(ecParams, AsnEncodingRules.DER, UniversalTagNumber.PrintableString, out int consumed);
-                if (consumed != ecParams.Length)
-                    return null;
-                return name switch
-                {
-                    "curve25519" => Oids.KeyAlgorithms.X25519,
-                    "curve448" => Oids.KeyAlgorithms.X448,
-                    _ => null,
-                };
-            }
-        }
-        catch (AsnContentException)
-        {
-            // Not DER, or truncated: an unparseable CKA_EC_PARAMS names no curve, the same as an unknown one.
-            return null;
-        }
-        return null;
+        return Rfc8410Curves.Describe(CKK.CKK_EC_MONTGOMERY, attrs[0].GetValueAsByteArray())
+            ?? throw Pkcs11Exception.Create(CKR.CKR_CURVE_NOT_SUPPORTED,
+                $"{operationName} (local CKK_EC_MONTGOMERY key's CKA_EC_PARAMS names neither X25519 nor X448)");
     }
 }
