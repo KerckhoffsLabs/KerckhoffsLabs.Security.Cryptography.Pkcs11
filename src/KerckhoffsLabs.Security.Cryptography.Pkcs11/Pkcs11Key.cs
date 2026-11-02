@@ -926,9 +926,12 @@ public sealed partial class Pkcs11Key : IDisposable
         return _session.HydrateExistingHandleAsKey(resulting);
     }
 
+    // The key types that come as a public/private pair. The key-agreement types (DH, X9.42 DH, X25519/X448)
+    // are pairs too: their public value (CKA_VALUE, CKA_EC_POINT) is on the public-key object only.
     private static bool IsAsymmetricKeyType(CKK keyType) => keyType switch
     {
-        CKK.CKK_RSA or CKK.CKK_DSA or CKK.CKK_EC or CKK.CKK_EC_EDWARDS
+        CKK.CKK_RSA or CKK.CKK_DSA or CKK.CKK_DH or CKK.CKK_X9_42_DH
+            or CKK.CKK_EC or CKK.CKK_EC_EDWARDS or CKK.CKK_EC_MONTGOMERY
             or CKK.CKK_ML_KEM or CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA => true,
         _ => false,
     };
