@@ -50,7 +50,8 @@ internal sealed class SecretReadBack(Action reportExport, IDisposable session) :
     /// <returns>The value, owned by the caller, who should zero it once done.</returns>
     /// <remarks>
     /// The value is zeroed on every failure, including a failed destroy after a good read: a secret is never
-    /// left behind in managed memory alongside an exception. A destroy failure is swallowed only while an
+    /// left behind in managed memory alongside an exception, whatever its type (a failed destroy, or an export
+    /// report that throws). A destroy failure is swallowed only while an
     /// earlier failure is propagating, which it would otherwise replace; the key is a session object, which
     /// the token collects at <c>C_CloseSession</c> either way. The export is logged only once the value is
     /// in hand and the ephemeral key gone.
@@ -73,9 +74,25 @@ internal sealed class SecretReadBack(Action reportExport, IDisposable session) :
                     throw wrap(ex);
                 throw;
             }
+            catch
+            {
+                // Any other failure (a disposed key, a session-lease error) must not leave the value behind either.
+                CryptographicOperations.ZeroMemory(value);
+                throw;
+            }
         }
 
-        reportExport();
+        try
+        {
+            reportExport();
+        }
+        catch
+        {
+            // The log sink is the caller's code: if it throws, the value never reaches the caller, so zero it.
+            CryptographicOperations.ZeroMemory(value);
+            throw;
+        }
+
         return value;
     }
 
