@@ -20,6 +20,8 @@
       href: examples/hashes.md
     - name: Key derivation
       href: examples/key-derivation.md
+    - name: Certificates
+      href: examples/certificates.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies

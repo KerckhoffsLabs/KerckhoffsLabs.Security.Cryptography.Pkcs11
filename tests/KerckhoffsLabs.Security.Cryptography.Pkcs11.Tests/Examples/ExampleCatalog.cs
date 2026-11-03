@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -44,6 +45,11 @@ internal sealed record ExampleCase(
 internal static class ExampleGates
 {
     /// <summary>NSS before 3.52 cannot run classic AES-GCM (see <see cref="NssBackendFixture.RequireClassicAesGcm"/>).</summary>
+    /// <summary>NSS's crypto token does not store certificate objects: <c>C_CreateObject</c> returns
+    /// <c>CKR_TEMPLATE_INCOMPLETE</c> (the certificate suite has no NSS wrapper either).</summary>
+    public static string? NoCertificateObjects(IPkcs11Backend backend) =>
+        backend is NssBackendFixture ? "NSS's crypto token does not store certificate objects" : null;
+
     public static string? ClassicAesGcm(IPkcs11Backend backend) =>
         backend is NssBackendFixture nss && !nss.Library.LowLevelLibrary!.IsBoundThroughV3Interface
             ? "NSS before 3.52 reads CK_GCM_PARAMS without ulIvBits, so classic AES-GCM fails on it"
@@ -303,7 +309,33 @@ internal static class ExampleCatalog
             Unsupported: ExampleGates.ClassicAesGcm),
         new(Kdf(nameof(KdfExamples.BclSp800108)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(32, KdfExamples.BclSp800108(new byte[32], [1], [2]).Length)),
+
+        // Certificates (docs/examples/certificates.md)
+        new(Cert(nameof(CertificateExamples.IssueSelfSignedCertificate)), [typeof(Pkcs11CertificateExtensions)],
+            [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                string label = $"example-{Guid.NewGuid():N}";
+                using Pkcs11Certificate stored = CertificateExamples.IssueSelfSignedCertificate(s, label);
+                Assert.Equal("CN=Example Signing", stored.Certificate.Subject);
+                Assert.False(stored.Certificate.HasPrivateKey);
+            }),
+            Unsupported: ExampleGates.NoCertificateObjects),
+        new(Cert(nameof(CertificateExamples.SignWithCertificateKey)), [typeof(Pkcs11CertificateExtensions)],
+            [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                string label = $"example-{Guid.NewGuid():N}";
+                using (CertificateExamples.IssueSelfSignedCertificate(s, label)) { }
+                (byte[] signature, X509Certificate2 certificate) = CertificateExamples.SignWithCertificateKey(s, label, Message);
+                using (certificate)
+                using (ECDsa verifier = certificate.GetECDsaPublicKey()!)
+                    Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
+            }),
+            Unsupported: ExampleGates.NoCertificateObjects),
     ];
+
+    private static string Cert(string method) => $"{nameof(CertificateExamples)}.{method}";
 
     private static string Kdf(string method) => $"{nameof(KdfExamples)}.{method}";
 
