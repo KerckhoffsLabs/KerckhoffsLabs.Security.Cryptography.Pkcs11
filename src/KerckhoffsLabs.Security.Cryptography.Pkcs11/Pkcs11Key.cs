@@ -1246,6 +1246,14 @@ public sealed partial class Pkcs11Key : IDisposable
         Mechanism mechanism,
         ObjectTemplate sharedSecretTemplate,
         int expectedCiphertextLen = 0)
+        => EncapsulateKey(mechanism, sharedSecretTemplate, expectedCiphertextLen, readBack: null);
+
+    /// <summary><see cref="EncapsulateKey(Mechanism, ObjectTemplate, int)"/> for the ephemeral key of an open secret read-back.</summary>
+    internal EncapsulationResult EncapsulateKey(
+        Mechanism mechanism,
+        ObjectTemplate sharedSecretTemplate,
+        int expectedCiphertextLen,
+        KeyMaterial.IReadBackGrant? readBack)
     {
         using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -1256,7 +1264,7 @@ public sealed partial class Pkcs11Key : IDisposable
                 "Pkcs11Key.EncapsulateKey (no public handle)");
 
         var (ct, sharedHandle) = _session.Core.EncapsulateKey(
-            mechanism, PublicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
+            mechanism, PublicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen, readBack);
         return new EncapsulationResult(ct, _session.HydrateExistingHandleAsKey(sharedHandle));
     }
 
@@ -1274,6 +1282,14 @@ public sealed partial class Pkcs11Key : IDisposable
         Mechanism mechanism,
         ReadOnlySpan<byte> ciphertext,
         ObjectTemplate sharedSecretTemplate)
+        => DecapsulateKey(mechanism, ciphertext, sharedSecretTemplate, readBack: null);
+
+    /// <summary><see cref="DecapsulateKey(Mechanism, ReadOnlySpan{byte}, ObjectTemplate)"/> for the ephemeral key of an open secret read-back.</summary>
+    internal Pkcs11Key DecapsulateKey(
+        Mechanism mechanism,
+        ReadOnlySpan<byte> ciphertext,
+        ObjectTemplate sharedSecretTemplate,
+        KeyMaterial.IReadBackGrant? readBack)
     {
         using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -1284,7 +1300,7 @@ public sealed partial class Pkcs11Key : IDisposable
                 "Pkcs11Key.DecapsulateKey (no private handle)");
 
         ObjectHandle sharedHandle = _session.Core.DecapsulateKey(
-            mechanism, PrivateHandle, ciphertext, [.. sharedSecretTemplate.Attributes]);
+            mechanism, PrivateHandle, ciphertext, [.. sharedSecretTemplate.Attributes], readBack);
         return _session.HydrateExistingHandleAsKey(sharedHandle);
     }
 
@@ -1375,7 +1391,7 @@ public sealed partial class Pkcs11Key : IDisposable
         // key derived from it (KdfBaseKeyScope).
         using SecretReadBack readBack = _session.BeginReadBack(KeyMaterialExportKind.KdfOutput, this);
         using var template = SecretReadBack.ExtractableSecretTemplate(length);
-        return readBack.Read(() => DeriveCore(mechanism, template), length, ReadBackFailures.KdfOutput);
+        return readBack.Read(grant => DeriveCore(mechanism, template, grant), length, ReadBackFailures.KdfOutput);
     }
 
     // DeriveBytes' allow-list. The parameters must be the KDF's own: the session raises a key-agreement KDF
@@ -1401,7 +1417,11 @@ public sealed partial class Pkcs11Key : IDisposable
                 nameof(mechanism));
     }
 
-    private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template)
+    /// <summary><see cref="Derive(Mechanism, ObjectTemplate)"/> for the ephemeral key of an open secret read-back.</summary>
+    internal Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template, KeyMaterial.IReadBackGrant readBack)
+        => DeriveCore(mechanism, template, readBack);
+
+    private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template, KeyMaterial.IReadBackGrant? readBack = null)
     {
         using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -1412,7 +1432,7 @@ public sealed partial class Pkcs11Key : IDisposable
                 "Pkcs11Key.Derive (no private handle)");
 
         ObjectHandle resulting = _session.Core.DeriveKey(
-            mechanism, PrivateHandle, [.. template.Attributes]);
+            mechanism, PrivateHandle, [.. template.Attributes], readBack);
 
         // SP800-108 sibling keys: the params object absorbed their raw handles during the call
         // above; turn them into usable Pkcs11Key instances now, while the session is at hand.

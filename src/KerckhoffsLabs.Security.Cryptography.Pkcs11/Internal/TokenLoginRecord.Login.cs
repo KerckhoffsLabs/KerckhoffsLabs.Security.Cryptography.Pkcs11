@@ -115,7 +115,7 @@ internal sealed partial class TokenLoginRecord
         // Both made before anything changes: they run the caller's logger factory, and a throw then leaves nothing
         // half done.
         ILoggerFactory? loggerFactory = owner.LoggerFactory;
-        ILogger logger = new CallOutFencedLogger((loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<TokenLoginRecord>());
+        ILogger logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<TokenLoginRecord>();
 
         // The operations a first login waits for: those in flight when it first found it had to log in (null when none
         // was, or once they ended).
