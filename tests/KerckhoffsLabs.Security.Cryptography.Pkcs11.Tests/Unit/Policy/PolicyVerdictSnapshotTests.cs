@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 /// <summary>
 /// Pins every verdict and reason of the built-in policies against a committed snapshot
 /// (<c>Unit/Policy/Snapshots/*.verdicts.tsv</c>), so a change that widens, narrows or rewords
-/// <c>Recommended</c> or <c>NistApproved</c> shows up as a reviewed diff rather than silently.
+/// <c>Recommended</c>, <c>NistApproved</c> or <c>Cnsa20</c> shows up as a reviewed diff rather than silently.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,13 +36,20 @@ public sealed class PolicyVerdictSnapshotTests
     {
         { "Recommended", "tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Policy/Snapshots/recommended.verdicts.tsv" },
         { "NistApproved", "tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Policy/Snapshots/nist-approved.verdicts.tsv" },
+        { "Cnsa20", "tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Policy/Snapshots/cnsa20.verdicts.tsv" },
     };
 
     [Theory]
     [MemberData(nameof(Snapshots))]
     public void Verdicts_MatchTheCommittedSnapshot(string policyName, string relativePath)
     {
-        ComposedCryptoPolicy policy = policyName == "Recommended" ? CryptoPolicy.Recommended : CryptoPolicy.NistApproved;
+        ComposedCryptoPolicy policy = policyName switch
+        {
+            "Recommended" => CryptoPolicy.Recommended,
+            "NistApproved" => CryptoPolicy.NistApproved,
+            "Cnsa20" => CryptoPolicy.Cnsa20,
+            _ => throw new ArgumentOutOfRangeException(nameof(policyName)),
+        };
         string path = Path.Join(RepositoryRoot.Find(), relativePath.Replace('/', Path.DirectorySeparatorChar));
         string rendered = Render(policy);
         var utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);

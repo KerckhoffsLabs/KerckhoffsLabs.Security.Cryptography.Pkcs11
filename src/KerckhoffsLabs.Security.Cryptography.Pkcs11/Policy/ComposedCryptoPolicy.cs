@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 /// A policy assembled from reusable rules by <see cref="CryptoPolicyBuilder"/>: deny by default, an allow-list of
 /// mechanisms (each with an optional <see cref="MechanismCheck"/>), hashes, curves and key-agreement KDFs and
 /// key types, plus <see cref="RsaKeyGenerationRule"/>, <see cref="KeyTemplateRule"/> and <see cref="KeyMaterialExportRule"/>.
-/// <see cref="CryptoPolicy.Recommended"/> and <see cref="CryptoPolicy.NistApproved"/> are built this way.
+/// <see cref="CryptoPolicy.Recommended"/>, <see cref="CryptoPolicy.NistApproved"/> and <see cref="CryptoPolicy.Cnsa20"/> are built this way.
 /// </summary>
 public sealed class ComposedCryptoPolicy : ICryptoPolicy
 {
@@ -43,7 +43,7 @@ public sealed class ComposedCryptoPolicy : ICryptoPolicy
     /// Starts a new policy named <paramref name="name"/> holding a copy of every rule of this one, including
     /// <see cref="AllowsOverride"/>. This policy is not modified.
     /// </summary>
-    /// <param name="name">The new policy's name; not <c>"Recommended"</c> or <c>"NistApproved"</c>.</param>
+    /// <param name="name">The new policy's name; not <c>"Recommended"</c>, <c>"NistApproved"</c> or <c>"Cnsa20"</c>.</param>
     /// <exception cref="ArgumentException"><paramref name="name"/> is blank or reserved.</exception>
     public CryptoPolicyBuilder ToBuilder(string name) => CryptoPolicyBuilder.CopyOf(this, name);
 

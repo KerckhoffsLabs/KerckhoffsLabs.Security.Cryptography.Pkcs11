@@ -8,9 +8,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 
 /// <summary>
 /// Renders a <see cref="PolicyCatalogue"/> to the Markdown catalogue documentation:
-/// <c>docs/guide/policies/recommended.md</c> and <c>docs/guide/policies/nist-approved.md</c> are the
-/// committed output of <see cref="Render"/> against <c>CryptoPolicy.Recommended.Catalogue</c> and
-/// <c>CryptoPolicy.NistApproved.Catalogue</c>, kept in sync by <c>PolicyDocsAreCurrentTests</c>.
+/// <c>docs/guide/policies/recommended.md</c>, <c>docs/guide/policies/nist-approved.md</c> and
+/// <c>docs/guide/policies/cnsa-2.0.md</c> are the committed output of <see cref="Render"/> against
+/// <c>CryptoPolicy.Recommended.Catalogue</c>, <c>CryptoPolicy.NistApproved.Catalogue</c> and
+/// <c>CryptoPolicy.Cnsa20.Catalogue</c>, kept in sync by <c>PolicyDocsAreCurrentTests</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -43,17 +44,21 @@ internal static class PolicyCatalogueMarkdown
     private const string ThreeColumnSeparator = "|---|---|---|";
 
     /// <summary>
-    /// Known limits applicable to every restrictive policy. The policy-specific limits
-    /// (<see cref="RecommendedKnownLimits"/>, <see cref="FipsKnownLimits"/>) are appended after them.
+    /// Rendered for a policy whose key-strength rule does not inspect keys.
     /// </summary>
-    private static readonly string[] SharedKnownLimits =
-    [
+    private const string KeysNotInspectedLimit =
         "The size and curve of keys already on the token are not inspected: using an existing key that would "
             + "not pass generation (a short RSA modulus, a weak curve, …) is not refused. Only an ECDH key's type "
-            + "is checked.",
+            + "is checked.";
+
+    /// <summary>
+    /// Rendered for a policy that allows at least one of <see cref="RawDigestMechanisms"/>.
+    /// </summary>
+    private const string RawDigestLimit =
         "Raw `CKM_ECDSA`, `CKM_RSA_PKCS` and `CKM_RSA_PKCS_PSS` sign a caller-computed digest; the hash that "
-            + "produced it is not visible to the policy.",
-    ];
+            + "produced it is not visible to the policy.";
+
+    private static readonly CKM[] RawDigestMechanisms = [CKM.CKM_ECDSA, CKM.CKM_RSA_PKCS, CKM.CKM_RSA_PKCS_PSS];
 
     /// <summary>
     /// Known limits of the Recommended family alone: NistApproved refuses <c>CKM_AES_KEY_WRAP_PAD</c> outright.
@@ -74,13 +79,35 @@ internal static class PolicyCatalogueMarkdown
             + "validated cryptographic module operating in its approved mode.",
     ];
 
+    /// <summary>
+    /// Known limits of Cnsa20 alone.
+    /// </summary>
+    private static readonly string[] Cnsa20KnownLimits =
+    [
+        "Cnsa20 restricts what this library sends to the token; it is not a CNSA 2.0 certification or validation "
+            + "of the application or the token.",
+        "LMS (`CKM_HSS`) and XMSS (`CKM_XMSS`) are allowed for any signing. CNSA 2.0 intends them for software and "
+            + "firmware signing; the policy cannot see what is being signed, so restricting them to that use is the "
+            + "application's job.",
+        "XMSS parameter sets are not checked.",
+        "It fails closed: a key whose type, length, parameter set or HSS levels the token does not report (absent, "
+            + "sensitive or unavailable) is refused, so a token that hides these attributes cannot use a compliant key.",
+        "Each keyed operation costs one or two extra `C_GetAttributeValue` calls, because the key is read again on "
+            + "every use rather than cached.",
+        "`C_SetOperationState` restores a saved operation whose own mechanism and key are not inspected; only the key "
+            + "handles passed to it are.",
+        "Keys returned through TLS/SSL3 key-and-MAC parameters are not judged after creation. Cnsa20 refuses those "
+            + "mechanisms, but a policy derived from it that allows them again would not judge those keys.",
+    ];
+
     /// <summary>Renders <paramref name="catalogue"/> as the full Markdown catalogue page for the policy named <paramref name="policyName"/>.</summary>
     /// <param name="catalogue">The allow-list, rules and documented deny list to render.</param>
     /// <param name="policyName">
-    /// <c>"Recommended"</c> or <c>"NistApproved"</c> — selects the policy-specific sections: the
-    /// <c>ToBuilder</c> extension-point paragraph for the Recommended family (a name starting
-    /// with <c>"Recommended"</c>), or the FIPS 140-3 disclaimer, NIST baseline, and extra known limit for
-    /// <c>"NistApproved"</c>.
+    /// The policy's name, for the page title. The policy-specific sections follow
+    /// <see cref="PolicyCatalogue.Documentation"/>: the <c>ToBuilder</c> extension-point paragraph for
+    /// Recommended, the FIPS 140-3 disclaimer, NIST baseline and extra known limit for NistApproved, or the
+    /// not-a-certification disclaimer, CNSA 2.0 baseline and known limits for Cnsa20. A key-strength rule
+    /// that inspects keys adds its row to the rules table.
     /// </param>
     public static string Render(PolicyCatalogue catalogue, string policyName)
     {
@@ -89,6 +116,7 @@ internal static class PolicyCatalogueMarkdown
 
         bool isRecommendedFamily = catalogue.Documentation == PolicyDocumentation.Recommended;
         bool isNistApproved = catalogue.Documentation == PolicyDocumentation.NistApproved;
+        bool isCnsa20 = catalogue.Documentation == PolicyDocumentation.Cnsa20;
 
         var sb = new StringBuilder();
         void Line(string text = "") => sb.Append(text).Append('\n');
@@ -104,6 +132,14 @@ internal static class PolicyCatalogueMarkdown
                 "An allow-list of reviewed, modern mechanisms, hashes, curves, key-agreement KDFs and KDF PRFs. "
                 + "Anything not on the list below — including every vendor-defined mechanism — is denied by "
                 + "default, whether or not it also appears in the documented deny list further down this page.");
+        }
+        else if (isCnsa20)
+        {
+            Line(
+                "An allow-list of the NSA CNSA 2.0 algorithms at their CNSA 2.0 sizes (see the baseline below), with "
+                + "the size of every key checked when it is created and each time it is used. Anything not on the "
+                + "list below — including every vendor-defined mechanism — is denied by default, whether or not it "
+                + "also appears in the documented deny list further down this page.");
         }
         else
         {
@@ -122,6 +158,15 @@ internal static class PolicyCatalogueMarkdown
                  "approved mode.");
             Line(">");
             Line($"> Baseline: {Escape(NistApprovedDefinition.Baseline)}");
+            Line();
+        }
+
+        if (isCnsa20)
+        {
+            Line("> **`Cnsa20` is not a certification.** It restricts what this library sends to the token; it does " +
+                 "not certify or validate the application or the token for CNSA 2.0.");
+            Line(">");
+            Line($"> Baseline: {Escape(Cnsa20Definition.Baseline)}");
             Line();
         }
 
@@ -151,8 +196,10 @@ internal static class PolicyCatalogueMarkdown
 
         Line("## Known limits");
         Line();
-        foreach (string limit in SharedKnownLimits)
-            Line($"- {Escape(limit)}");
+        if (!catalogue.KeyStrength.InspectsKeys)
+            Line($"- {Escape(KeysNotInspectedLimit)}");
+        if (RawDigestMechanisms.Any(catalogue.AllowedMechanisms.ContainsKey))
+            Line($"- {Escape(RawDigestLimit)}");
         if (isRecommendedFamily)
         {
             foreach (string limit in RecommendedKnownLimits)
@@ -161,6 +208,11 @@ internal static class PolicyCatalogueMarkdown
         if (isNistApproved)
         {
             foreach (string limit in FipsKnownLimits)
+                Line($"- {Escape(limit)}");
+        }
+        if (isCnsa20)
+        {
+            foreach (string limit in Cnsa20KnownLimits)
                 Line($"- {Escape(limit)}");
         }
         Line();
@@ -295,18 +347,33 @@ internal static class PolicyCatalogueMarkdown
     {
         void Line(string text = "") => sb.Append(text).Append('\n');
 
+        bool inspectsKeys = catalogue.KeyStrength.InspectsKeys;
+
         Line("## Rules");
         Line();
-        Line(
-            "Beyond the allow-lists above, three rules apply: the modulus rule to RSA key-pair generation "
-            + "requests, the template rule to key templates the library creates keys from, and the export rule to "
-            + "every read of secret key material off the token.");
+        if (inspectsKeys)
+        {
+            Line(
+                "Beyond the allow-lists above, four rules apply: the modulus rule to RSA key-pair generation "
+                + "requests, the template rule to key templates the library creates keys from, the export rule to "
+                + "every read of secret key material off the token, and the key-strength rule to every key template, "
+                + "every key the token creates (a key that fails is destroyed) and every use of an existing key.");
+        }
+        else
+        {
+            Line(
+                "Beyond the allow-lists above, three rules apply: the modulus rule to RSA key-pair generation "
+                + "requests, the template rule to key templates the library creates keys from, and the export rule to "
+                + "every read of secret key material off the token.");
+        }
         Line();
         Line("| Rule | Rationale |");
         Line(TwoColumnSeparator);
         Line($"| RSA key-pair generation modulus | {Escape(catalogue.RsaKeyGeneration.Rationale)} |");
         Line($"| Key template (`CKA_SENSITIVE`) | {Escape(catalogue.KeyTemplate.Rationale)} |");
         Line($"| Key-material export | {Escape(catalogue.KeyMaterialExport.Rationale)} |");
+        if (inspectsKeys)
+            Line($"| Key strength | {Escape(catalogue.KeyStrength.Rationale)} |");
         Line();
     }
 
@@ -410,11 +477,12 @@ internal static class PolicyCatalogueMarkdown
     /// </summary>
     private static readonly (Func<string, bool> Matches, string Family)[] FamilyRules =
     [
-        (n => Has(n, "ML_KEM") || Has(n, "ML_DSA") || Has(n, "SLH_DSA"), "Post-quantum"),
+        (n => Has(n, "ML_KEM") || Has(n, "ML_DSA") || Has(n, "SLH_DSA") || Has(n, "CKM_HSS") || Has(n, "CKM_XMSS"), "Post-quantum"),
         (n => Has(n, "SP800_108") || Has(n, "HKDF") || Has(n, "PBKD2"), "KDF"),
         (n => Has(n, "KEY_DERIVATION") || Has(n, "KEY_DERIVE") || Has(n, "CONCATENATE") || Has(n, "XOR_BASE")
             || Has(n, "EXTRACT_KEY_FROM_KEY") || Has(n, "IKE"), "Key derivation"),
         (n => Has(n, "ECDSA") || Has(n, "EDDSA") || Has(n, "EC_KEY_PAIR_GEN") || Has(n, "EC_EDWARDS") || Has(n, "EC_MONTGOMERY") || Has(n, "ECDH"), "EC"),
+        (n => Has(n, "CKM_DH_"), "DH"),
         (n => Has(n, "DSA"), "DSA"),
         (n => Has(n, "RSA") && Has(n, "KEY_PAIR_GEN"), "RSA key generation"),
         (n => Has(n, "RSA") && Has(n, "OAEP"), "RSA encryption"),
