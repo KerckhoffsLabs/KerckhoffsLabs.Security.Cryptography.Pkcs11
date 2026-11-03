@@ -7,11 +7,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 internal sealed partial class Pkcs11SessionCore
 {
     /// <summary>
-    /// Whether the effective policy asks to see the keys it judges. Only a <see cref="ComposedCryptoPolicy"/>
-    /// with an inspecting key-strength rule does; under any other policy the session reads nothing from the
-    /// token to describe a key.
+    /// Whether the effective policy asks to see the keys it judges (<see cref="ICryptoPolicy.InspectsKeys"/>).
+    /// A policy that leaves it at its default does not; the session then reads nothing from the token to
+    /// describe a key.
     /// </summary>
-    private bool InspectsKeys => _effectivePolicy is ComposedCryptoPolicy { InspectsKeys: true };
+    private bool InspectsKeys => _effectivePolicy.InspectsKeys;
 
     /// <summary>
     /// Submits the strength of the key <paramref name="key"/> points at to the policy, before the token is
@@ -34,8 +34,9 @@ internal sealed partial class Pkcs11SessionCore
     /// <summary>
     /// Describes <paramref name="key"/> from the token: its <c>CKA_KEY_TYPE</c>, then the one attribute that
     /// gives the size of a key of that type. A value the token will not report becomes
-    /// <see langword="null"/>, which an inspecting policy refuses: the read never throws, so an unreadable
-    /// key fails closed at the policy rather than being left to the token.
+    /// <see langword="null"/>, which an inspecting policy refuses, so an unreadable key fails closed at the
+    /// policy rather than being left to the token. A device or session error propagates (see
+    /// <see cref="ReadUlongOrNull"/>), which stops the operation too.
     /// </summary>
     private KeyStrengthRequest ReadKeyStrength(ObjectHandle key, KeyStrengthSource source)
     {
@@ -114,13 +115,28 @@ internal sealed partial class Pkcs11SessionCore
 
     /// <summary>
     /// Whether a <c>C_CreateObject</c> <paramref name="template"/> makes a key. Its <c>CKA_CLASS</c> says so; a
-    /// certificate, data object or profile has no strength to judge and is neither pre- nor post-checked. A
-    /// template with no readable class is treated as a key, so the token's answer decides.
+    /// certificate, data object or profile has no strength to judge and is neither pre- nor post-checked. Every
+    /// <c>CKA_CLASS</c> entry counts, so a <c>CKO_DATA</c> listed before a key class cannot hide the key. A
+    /// template with no class, or with a class that is not a readable <c>CK_ULONG</c>, is treated as a key, so
+    /// the token's answer decides.
     /// </summary>
     private static bool CreatesKey(IReadOnlyList<ObjectAttribute>? template)
-        => template is null
-            || FirstUlongOf(template, CKA.CKA_CLASS) is not { } objectClass
-            || (CKO)objectClass is CKO.CKO_SECRET_KEY or CKO.CKO_PRIVATE_KEY or CKO.CKO_PUBLIC_KEY;
+    {
+        if (template is null)
+            return true;
+
+        bool statesAClass = false;
+        foreach (ObjectAttribute attribute in template)
+        {
+            if (attribute.Type != CKA.CKA_CLASS)
+                continue;
+            statesAClass = true;
+            if (UlongOrNull(attribute) is not { } objectClass
+                || (CKO)objectClass is CKO.CKO_SECRET_KEY or CKO.CKO_PRIVATE_KEY or CKO.CKO_PUBLIC_KEY)
+                return true;
+        }
+        return !statesAClass;
+    }
 
     private static ulong? FirstUlongOf(IReadOnlyList<ObjectAttribute> template, CKA type)
     {
@@ -230,14 +246,22 @@ internal sealed partial class Pkcs11SessionCore
         return failures;
     }
 
-    // A CKA_VALUE_LEN beyond int is no key's length: reported as unknown, which a strict policy refuses.
-    private static int? LengthOf(ulong? valueLen) => valueLen is { } len && len <= int.MaxValue ? (int)len : null;
+    // A CKA_VALUE_LEN of 0 or beyond int is no key's length: reported as unknown, which a strict policy refuses.
+    // SoftHSM2 reports 0 on unwrapped secret keys, so the refusal says the length was not reported rather than
+    // judging a real key as zero bytes long.
+    private static int? LengthOf(ulong? valueLen) => valueLen is { } len and > 0 and <= int.MaxValue ? (int)len : null;
 
     /// <summary>
     /// One <c>CK_ULONG</c> attribute of <paramref name="key"/>, or <see langword="null"/> when the token does
     /// not report it: unreadable (sensitive, unknown to the object, <c>CK_UNAVAILABLE_INFORMATION</c>), a
-    /// value of <c>CK_UNAVAILABLE_INFORMATION</c>, the wrong length, or a failed call.
+    /// value of <c>CK_UNAVAILABLE_INFORMATION</c>, the wrong length, or a handle the token does not know.
     /// </summary>
+    /// <remarks>
+    /// Only those answers say "this value is not available", which an inspecting policy refuses as unreported.
+    /// Any other failure of the read (a device, session or library error) is the token's error, not the key's:
+    /// it propagates unchanged, still before the operation the read guards reaches the token.
+    /// </remarks>
+    /// <exception cref="Pkcs11Exception">The read failed for a reason other than the value being unavailable.</exception>
     private ulong? ReadUlongOrNull(ObjectHandle key, CKA attribute)
     {
         try
@@ -248,7 +272,12 @@ internal sealed partial class Pkcs11SessionCore
             ulong value = attrs[0].GetValueAsUlong();
             return CK.IsCkInformationUnavailable(value) ? null : value;
         }
-        catch (Exception ex) when (ex is Pkcs11Exception or Pkcs11AttributeException)
+        catch (Pkcs11AttributeException)
+        {
+            return null;
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_ATTRIBUTE_SENSITIVE or CKR.CKR_ATTRIBUTE_TYPE_INVALID
+                                             or CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID)
         {
             return null;
         }

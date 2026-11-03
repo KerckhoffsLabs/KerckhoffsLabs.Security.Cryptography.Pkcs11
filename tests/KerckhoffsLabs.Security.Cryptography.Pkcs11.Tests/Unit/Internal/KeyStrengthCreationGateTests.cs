@@ -70,6 +70,9 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         /// </summary>
         public ulong[] SiblingHandles { get; set; } = [];
 
+        /// <summary>Handles whose <c>C_GetAttributeValue</c> fails with the given return value.</summary>
+        public Dictionary<ulong, CKR> ReadFailures { get; } = [];
+
         /// <summary>What <c>C_DestroyObject</c> answers.</summary>
         public CKR DestroyResult { get; set; } = CKR.CKR_OK;
 
@@ -82,6 +85,8 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
             GetAttributeValueCalls++;
+            if (ReadFailures.TryGetValue((ulong)objectHandle, out CKR failure))
+                return failure;
             return Keys.TryGetValue((ulong)objectHandle, out var values)
                 ? KeyStrengthAttributes.Answer(template, values)
                 : CKR.CKR_OBJECT_HANDLE_INVALID;
@@ -638,6 +643,93 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         Assert.Equal(Created, created.ObjectId);
         Assert.Equal(0, fake.GetAttributeValueCalls);
         Assert.Empty(fake.Destroyed);
+    }
+
+    // Any key class among the template's CKA_CLASS entries makes it a key: a CKO_DATA first cannot hide it (F5).
+    [Fact]
+    public void CreateObject_DataClassThenSecretKeyClass_IsJudgedAsAKey()
+    {
+        using var fake = new CreationFake();
+        using var session = fake.CreateSession(policy: StrongKeysOnly());
+        using var dataClass = new ObjectAttribute(CKA.CKA_CLASS, (ulong)CKO.CKO_DATA);
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, (ulong)CKO.CKO_SECRET_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, (ulong)CKK.CKK_AES);
+        using var value = new ObjectAttribute(CKA.CKA_VALUE, new byte[16]);
+
+        KeyStrengthRequest request = RefusedRequest(() => session.CreateObject([dataClass, keyClass, keyType, value]));
+
+        Assert.Equal(KeyStrengthSource.Template, request.Source);
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal(0, fake.CreateObjectCalls);
+    }
+
+    // The SoftHSM2 case: the unwrapped key reports CKA_VALUE_LEN = 0. It is refused as unreported, not as
+    // "AES-0", and destroyed (F3).
+    [Fact]
+    public void Unwrap_CreatedKeyWithZeroLength_IsRefusedAsUnreported_AndDestroyed()
+    {
+        using var fake = new CreationFake();
+        fake.SetAes(StrongAes.ObjectId, 32);
+        fake.SetAes(Created, 0);
+        using var session = fake.CreateSession(policy: CryptoPolicy.Cnsa20);
+
+        CryptoPolicyViolationException ex = Refusal(() => Unwrap(session));
+
+        KeyStrengthRequest request = Assert.IsType<KeyStrengthRequest>(ex.Request);
+        Assert.Equal(KeyStrengthSource.CreatedKey, request.Source);
+        Assert.Null(request.ValueLengthBytes);
+        Assert.Contains("did not report", ex.Reason, StringComparison.Ordinal);
+        Assert.Contains("so CNSA 2.0 compliance can't be verified", ex.Reason, StringComparison.Ordinal);
+        Assert.Equal([Created], fake.Destroyed);
+    }
+
+    // A template stating CKA_VALUE_LEN = 0 names no length either: refused before the token, as unreported (F3).
+    [Fact]
+    public void GenerateAes_TemplateWithZeroLength_IsRefusedAsUnreported_BeforeTheToken()
+    {
+        using var fake = new CreationFake();
+        using var session = fake.CreateSession(policy: CryptoPolicy.Cnsa20);
+
+        CryptoPolicyViolationException ex = Refusal(() => GenerateAes(session, 0));
+
+        Assert.Null(Assert.IsType<KeyStrengthRequest>(ex.Request).ValueLengthBytes);
+        Assert.Contains("did not report", ex.Reason, StringComparison.Ordinal);
+        Assert.Equal(0, fake.GenerateKeyCalls);
+    }
+
+    // A device error while reading back a created key is the token's error, and the key is still destroyed (F6).
+    [Fact]
+    public void CreatedKeyReadFails_WithDeviceError_Propagates_AndDestroysTheKey()
+    {
+        using var fake = new CreationFake();
+        fake.SetAes(Created, 32);
+        fake.ReadFailures[Created] = CKR.CKR_DEVICE_ERROR;
+        using var session = fake.CreateSession(policy: StrongKeysOnly());
+
+        Pkcs11Exception ex = Assert.ThrowsAny<Pkcs11Exception>(() => GenerateAes(session));
+
+        Assert.Equal(CKR.CKR_DEVICE_ERROR, ex.ReturnValue);
+        Assert.Equal(1, fake.GenerateKeyCalls);
+        Assert.Equal([Created], fake.Destroyed);
+    }
+
+    // The same for both halves of a pair: the read of one fails, both are destroyed.
+    [Fact]
+    public void KeyPairReadFails_WithDeviceError_Propagates_AndDestroysBothHalves()
+    {
+        using var fake = new CreationFake();
+        fake.SetPq(CreatedPublic, CKK.CKK_ML_KEM, (ulong)CkpMlKem.CKP_ML_KEM_1024);
+        fake.SetPq(CreatedPrivate, CKK.CKK_ML_KEM, (ulong)CkpMlKem.CKP_ML_KEM_1024);
+        fake.ReadFailures[CreatedPrivate] = CKR.CKR_DEVICE_ERROR;
+        using var session = fake.CreateSession(policy: StrongKeysOnly());
+        using var pub = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM).Build();
+        using var priv = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM).Build();
+
+        Pkcs11Exception ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.GenerateKeyPair(
+            new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), [.. pub.Attributes], [.. priv.Attributes], out _, out _));
+
+        Assert.Equal(CKR.CKR_DEVICE_ERROR, ex.ReturnValue);
+        Assert.Equal([CreatedPublic, CreatedPrivate], fake.Destroyed);
     }
 
     [Fact]

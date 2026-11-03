@@ -44,7 +44,7 @@ internal static class Cnsa20Wording
             StringComparer.Ordinal),
         Prf("HKDF",
             "requires CkmHkdfParams naming SHA-384 or SHA-512 (hash or _HMAC form)",
-            $"{Cnsa}: CKM_HKDF_DERIVE / CKM_HKDF_DATA require CkmHkdfParams naming SHA-384 or SHA-512 (hash or _HMAC form).",
+            $"{Cnsa}: CKM_HKDF_DERIVE requires CkmHkdfParams naming SHA-384 or SHA-512 (hash or _HMAC form).",
             "SHA-384 or SHA-512 (CKM_SHA384, CKM_SHA512, CKM_SHA384_HMAC or CKM_SHA512_HMAC)"));
 
     // --- Key strength (KeyStrengthRequest) ---

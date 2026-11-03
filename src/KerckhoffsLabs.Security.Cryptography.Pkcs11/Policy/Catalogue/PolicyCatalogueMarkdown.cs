@@ -98,6 +98,9 @@ internal static class PolicyCatalogueMarkdown
             + "handles passed to it are.",
         "Keys returned through TLS/SSL3 key-and-MAC parameters are not judged after creation. Cnsa20 refuses those "
             + "mechanisms, but a policy derived from it that allows them again would not judge those keys.",
+        "Some tokens (SoftHSM2) do not report `CKA_VALUE_LEN` on unwrapped secret keys; under Cnsa20 those unwraps are "
+            + "refused.",
+        "A custom policy that wraps Cnsa20 must forward `InspectsKeys`, or key sizes are no longer checked.",
     ];
 
     /// <summary>Renders <paramref name="catalogue"/> as the full Markdown catalogue page for the policy named <paramref name="policyName"/>.</summary>

@@ -189,8 +189,8 @@ internal static class Cnsa20PolicyTestCases
             .Sensitive().NonExtractable().Encrypt().Decrypt().OnToken(true).Build();
 
     // tokenReportsNoValueLenOnUnwrap pins SoftHSM2, which creates the unwrapped key with no usable CKA_VALUE_LEN
-    // (the post-check reads 0 bytes). The policy fails closed, so the unwrap is refused and the case asserts that
-    // instead; the pin can go once SoftHSM2 reports the length.
+    // (it reads as 0, which the session treats as unreported). The policy fails closed, so the unwrap is refused
+    // with "did not report" and the case asserts that instead; the pin can go once SoftHSM2 reports the length.
     internal static void Assert_AesKw_UnwrapsAes256(IPkcs11Backend backend, bool tokenReportsNoValueLenOnUnwrap = false)
     {
         backend.RequireMechanisms(CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_KEY_WRAP);
@@ -209,6 +209,9 @@ internal static class Cnsa20PolicyTestCases
                 var refusal = Assert.Throws<CryptoPolicyViolationException>(
                     () => kek.Unwrap(new Mechanism(CKM.CKM_AES_KEY_WRAP), wrapped, template));
                 AssertKeyStrengthRefusal(refusal, KeyStrengthSource.CreatedKey);
+                Assert.Null(Assert.IsType<KeyStrengthRequest>(refusal.Request).ValueLengthBytes);
+                Assert.Contains("did not report", refusal.Reason, StringComparison.Ordinal);
+                Assert.Contains("so CNSA 2.0 compliance can't be verified", refusal.Reason, StringComparison.Ordinal);
                 Assert.Equal(0, CountByLabel(session, unwrapLabel));
                 return;
             }
