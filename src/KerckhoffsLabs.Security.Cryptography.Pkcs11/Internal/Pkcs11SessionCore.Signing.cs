@@ -29,6 +29,7 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(mechanism);
         Enforce(mechanism, CryptoOperation.Sign);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
         return SignAfterPolicyCheck(mechanism, keyHandle, data, context);
     }
 
@@ -47,6 +48,7 @@ internal sealed partial class Pkcs11SessionCore
 
         (CKM scheme, byte[] digestInfo) = Pkcs1DigestInfo.Encode(hash, digest);
         Enforce(new Mechanism(scheme), CryptoOperation.Sign);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
         return SignAfterPolicyCheck(RawRsaPkcs1(), keyHandle, digestInfo, context);
     }
 
@@ -107,6 +109,7 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(mechanism);
         Enforce(mechanism, CryptoOperation.Verify);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
         return VerifyAfterPolicyCheck(mechanism, keyHandle, data, signature);
     }
 
@@ -141,6 +144,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Verify);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify2");
 
@@ -168,6 +172,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Verify);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify3");
 
@@ -216,6 +221,7 @@ internal sealed partial class Pkcs11SessionCore
 
         (CKM scheme, byte[] digestInfo) = Pkcs1DigestInfo.Encode(hash, digest);
         Enforce(new Mechanism(scheme), CryptoOperation.Verify);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
         return VerifyAfterPolicyCheck(RawRsaPkcs1(), keyHandle, digestInfo, signature);
     }
 
@@ -254,6 +260,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Verify);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifyRecover");
 
@@ -310,6 +317,8 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(verificationMechanism, CryptoOperation.Verify);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(verificationKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(decryptionKeyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify1");
 
@@ -354,6 +363,8 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(verificationMechanism, CryptoOperation.Verify);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(verificationKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(decryptionKeyHandle, KeyStrengthSource.ExistingKey);
 
         ThrowIfOneDescriptorDrivesBothHalves(verificationMechanism, decryptionMechanism, nameof(decryptionMechanism));
 
@@ -394,6 +405,8 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(verificationMechanism, CryptoOperation.Verify);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(verificationKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(decryptionKeyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify3");
 
