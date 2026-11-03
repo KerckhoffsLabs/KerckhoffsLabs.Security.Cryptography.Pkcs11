@@ -7,9 +7,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// Hermetic coverage for Pkcs11Library.WaitForSlotEvent — untouched by every other suite, since
-/// nothing else in this project's test matrix generates a real slot event. Pins the
-/// CKF_DONT_BLOCK flag encoding, the CKR_NO_EVENT non-blocking no-op, the event-occurred path,
-/// error propagation, and the disposed guard.
+/// nothing else in this project's test matrix generates a real slot event. Pins, for the blocking
+/// WaitForSlotEvent and the polling TryGetSlotEvent, the CKF_DONT_BLOCK flag encoding, the event-occurred
+/// path, what CKR_NO_EVENT means to each, error propagation, and the disposed guard.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
 public sealed class WaitForSlotEventTests
@@ -30,58 +30,87 @@ public sealed class WaitForSlotEventTests
     }
 
     [Fact]
-    public void EventOccurred_ReportsSlot()
+    public void Wait_EventOccurred_ReturnsSlot()
     {
         using var fake = new SlotEventFake { Rv = CKR.CKR_OK, SlotIdToReport = 5 };
         using var library = fake.Load();
 
-        Pkcs11Slot? slot = library.WaitForSlotEvent(nonBlocking: false);
+        Pkcs11Slot slot = library.WaitForSlotEvent();
 
-        Assert.NotNull(slot);
         Assert.Equal(new SlotId(5), slot.SlotId);
         Assert.Equal((NativeCULong)0, fake.CapturedFlags); // blocking call: no CKF_DONT_BLOCK
     }
 
     [Fact]
-    public void NonBlocking_SetsDontBlockFlag()
+    public void Wait_NoEventFromBlockingCall_Throws()
     {
-        using var fake = new SlotEventFake();
-        using var library = fake.Load();
-
-        library.WaitForSlotEvent(nonBlocking: true);
-
-        Assert.Equal((NativeCULong)CKF.CKF_DONT_BLOCK, fake.CapturedFlags);
-    }
-
-    [Fact]
-    public void NonBlocking_NoEventPending_ReturnsNullWithoutThrowing()
-    {
+        // A blocking call has no "nothing happened" result: a module returning CKR_NO_EVENT is an error.
         using var fake = new SlotEventFake { Rv = CKR.CKR_NO_EVENT };
         using var library = fake.Load();
 
-        Pkcs11Slot? slot = library.WaitForSlotEvent(nonBlocking: true);
-
-        Assert.Null(slot);
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => library.WaitForSlotEvent());
+        Assert.Equal(CKR.CKR_NO_EVENT, ex.ReturnValue);
     }
 
     [Fact]
-    public void ErrorCode_Throws()
+    public void Wait_ErrorCode_Throws()
     {
         using var fake = new SlotEventFake { Rv = CKR.CKR_GENERAL_ERROR };
         using var library = fake.Load();
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(
-            () => library.WaitForSlotEvent(nonBlocking: false));
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => library.WaitForSlotEvent());
         Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
     }
 
     [Fact]
-    public void AfterDispose_Throws()
+    public void Wait_AfterDispose_Throws()
     {
         using var fake = new SlotEventFake();
         var library = fake.Load();
         library.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => library.WaitForSlotEvent(nonBlocking: false));
+        Assert.Throws<ObjectDisposedException>(() => library.WaitForSlotEvent());
+    }
+
+    [Fact]
+    public void TryGet_EventPending_ReturnsSlotAndSetsDontBlock()
+    {
+        using var fake = new SlotEventFake { Rv = CKR.CKR_OK, SlotIdToReport = 7 };
+        using var library = fake.Load();
+
+        Assert.True(library.TryGetSlotEvent(out Pkcs11Slot? slot));
+
+        Assert.Equal(new SlotId(7), slot.SlotId);
+        Assert.Equal((NativeCULong)CKF.CKF_DONT_BLOCK, fake.CapturedFlags);
+    }
+
+    [Fact]
+    public void TryGet_NoEventPending_ReturnsFalseWithoutThrowing()
+    {
+        using var fake = new SlotEventFake { Rv = CKR.CKR_NO_EVENT };
+        using var library = fake.Load();
+
+        Assert.False(library.TryGetSlotEvent(out Pkcs11Slot? slot));
+        Assert.Null(slot);
+    }
+
+    [Fact]
+    public void TryGet_ErrorCode_Throws()
+    {
+        using var fake = new SlotEventFake { Rv = CKR.CKR_FUNCTION_NOT_SUPPORTED };
+        using var library = fake.Load();
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => library.TryGetSlotEvent(out _));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
+    }
+
+    [Fact]
+    public void TryGet_AfterDispose_Throws()
+    {
+        using var fake = new SlotEventFake();
+        var library = fake.Load();
+        library.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => library.TryGetSlotEvent(out _));
     }
 }
