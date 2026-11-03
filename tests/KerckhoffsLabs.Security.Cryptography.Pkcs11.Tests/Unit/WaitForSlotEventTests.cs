@@ -45,7 +45,7 @@ public sealed class WaitForSlotEventTests
         using var fake = new SlotEventFake { Rv = CKR.CKR_OK, SlotIdToReport = 5 };
         using var library = fake.Load();
 
-        Pkcs11Slot slot = library.WaitForSlotEvent();
+        Pkcs11Slot slot = library.WaitForSlotEvent(TestContext.Current.CancellationToken);
 
         Assert.Equal(new SlotId(5), slot.SlotId);
         Assert.Equal((NativeCULong)0, fake.CapturedFlags); // blocking call: no CKF_DONT_BLOCK
@@ -58,7 +58,7 @@ public sealed class WaitForSlotEventTests
         using var fake = new SlotEventFake { Rv = CKR.CKR_NO_EVENT };
         using var library = fake.Load();
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => library.WaitForSlotEvent());
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => library.WaitForSlotEvent(TestContext.Current.CancellationToken));
         Assert.Equal(CKR.CKR_NO_EVENT, ex.ReturnValue);
     }
 
@@ -68,7 +68,7 @@ public sealed class WaitForSlotEventTests
         using var fake = new SlotEventFake { Rv = CKR.CKR_GENERAL_ERROR };
         using var library = fake.Load();
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => library.WaitForSlotEvent());
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => library.WaitForSlotEvent(TestContext.Current.CancellationToken));
         Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
     }
 
@@ -79,7 +79,7 @@ public sealed class WaitForSlotEventTests
         var library = fake.Load();
         library.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => library.WaitForSlotEvent());
+        Assert.Throws<ObjectDisposedException>(() => library.WaitForSlotEvent(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class WaitForSlotEventTests
         using var library = fake.Load();
         IReadOnlyList<Pkcs11Slot> listed = library.GetSlotList(tokenPresent: false);
 
-        Pkcs11Slot slot = library.WaitForSlotEvent();
+        Pkcs11Slot slot = library.WaitForSlotEvent(TestContext.Current.CancellationToken);
 
         Assert.Contains(slot, listed);
         Assert.Equal(listed[1], slot);
@@ -150,6 +150,6 @@ public sealed class WaitForSlotEventTests
         using var a = fake.Load();
         using var b = fake.Load();
 
-        Assert.NotEqual(a.WaitForSlotEvent(), b.WaitForSlotEvent());
+        Assert.NotEqual(a.WaitForSlotEvent(TestContext.Current.CancellationToken), b.WaitForSlotEvent(TestContext.Current.CancellationToken));
     }
 }

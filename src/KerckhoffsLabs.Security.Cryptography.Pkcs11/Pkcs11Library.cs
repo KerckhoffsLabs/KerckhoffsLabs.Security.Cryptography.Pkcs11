@@ -42,6 +42,9 @@ public sealed class Pkcs11Library : IDisposable
 
     private LowLevelPkcs11Library? _pkcs11Library;
 
+    // This library's share of its module's slot events; ended first thing in Dispose.
+    private SlotEventSubscription? _slotEvents;
+
     /// <summary>
     /// The loaded low-level library. Set during construction and released on
     /// <see cref="Dispose()"/>; accessing it afterwards throws.
@@ -207,6 +210,9 @@ public sealed class Pkcs11Library : IDisposable
                 _ => null,
             };
             Initialize(options);
+
+            // After C_Initialize, so it joins the event stream of the module as now initialized.
+            _slotEvents = _pkcs11Library.Module.SlotEvents.Subscribe(_pkcs11Library);
         }
         catch
         {
@@ -488,7 +494,7 @@ public sealed class Pkcs11Library : IDisposable
     /// threading mode cannot be known.
     /// </para>
     /// <para>
-    /// A blocking <see cref="WaitForSlotEvent"/> is refused when this is <see langword="false"/>;
+    /// <see cref="WaitForSlotEvent"/> and <see cref="WaitForSlotEventAsync"/> are refused when this is <see langword="false"/>;
     /// <see cref="TryGetSlotEvent"/> still works.
     /// </para>
     /// </remarks>
@@ -505,6 +511,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>
     /// Blocks until a slot event, such as token insertion or token removal, occurs.
     /// </summary>
+    /// <param name="cancellationToken">Ends the wait without an event.</param>
     /// <returns>
     /// The slot the event occurred in. It equals the slot with the same id in <see cref="GetSlotList"/>.
     /// Call <see cref="Pkcs11Slot.GetTokenInfo"/> or <see cref="Pkcs11Slot.GetSlotInfo"/> on it to learn
@@ -518,18 +525,48 @@ public sealed class Pkcs11Library : IDisposable
     /// using a slot it has not reported.
     /// </para>
     /// <para>
-    /// The wait needs a module that may be called concurrently (<see cref="SupportsConcurrentAccess"/>):
-    /// otherwise it would hold the module's only lock until an event came, keeping out every other call.
-    /// Poll with <see cref="TryGetSlotEvent"/> there instead. Many modules do not implement a blocking wait
-    /// and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll <see cref="GetSlotList"/> on those.
+    /// Every <see cref="Pkcs11Library"/> loaded from a module sees every slot event of that module, however
+    /// many of them wait or poll: the module is waited on once, on a background thread, and each event goes
+    /// to each library. Within one library, an event is taken once: by the longest-waiting
+    /// <see cref="WaitForSlotEvent"/> or <see cref="WaitForSlotEventAsync"/>, or else by the next one, or by
+    /// <see cref="TryGetSlotEvent"/>. Events in one slot that have not been taken yet merge into one.
+    /// </para>
+    /// <para>
+    /// The wait ends without an event when <paramref name="cancellationToken"/> is cancelled
+    /// (<see cref="OperationCanceledException"/>) or this library is disposed
+    /// (<see cref="ObjectDisposedException"/>). It needs a module that may be called concurrently
+    /// (<see cref="SupportsConcurrentAccess"/>): otherwise the wait would hold the module's only lock until
+    /// an event came, keeping out every other call. Poll with <see cref="TryGetSlotEvent"/> there instead.
+    /// Many modules do not implement a blocking wait and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll
+    /// <see cref="GetSlotList"/> on those.
     /// </para>
     /// </remarks>
-    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed, before or during
+    /// the wait.</exception>
+    /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is
+    /// cancelled.</exception>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="SupportsConcurrentAccess"/> is
     /// <see langword="false"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call,
-    /// including <c>CKR_NO_EVENT</c>, which a blocking call must not return.</exception>
-    public Pkcs11Slot WaitForSlotEvent()
+    /// including <c>CKR_NO_EVENT</c>, which a blocking call must not return. Every wait on the module at
+    /// the time receives it.</exception>
+    public Pkcs11Slot WaitForSlotEvent(CancellationToken cancellationToken = default)
+        => WaitForSlotEventAsync(cancellationToken).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Waits asynchronously for a slot event, such as token insertion or token removal. See
+    /// <see cref="WaitForSlotEvent"/>, which this is the asynchronous form of.
+    /// </summary>
+    /// <param name="cancellationToken">Ends the wait without an event.</param>
+    /// <returns>The slot the event occurred in.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed, before or during
+    /// the wait.</exception>
+    /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is
+    /// cancelled.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if <see cref="SupportsConcurrentAccess"/> is
+    /// <see langword="false"/>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
+    public Task<Pkcs11Slot> WaitForSlotEventAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!SupportsConcurrentAccess)
@@ -538,14 +575,15 @@ public sealed class Pkcs11Library : IDisposable
                 "(see SupportsConcurrentAccess). Poll with TryGetSlotEvent instead.");
 
         Log.LibraryTrace(_logger, _libraryPath, "WaitForSlotEvent");
-        (CKR rv, ulong slotId) = CallWaitForSlotEvent(flags: 0);
-        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpWaitForSlotEvent);
-        return new Pkcs11Slot(LowLevel, slotId, _loggerFactory);
+        LowLevelPkcs11Library lowLevel = LowLevel;
+        return Core(SlotEvents.WaitAsync(cancellationToken));
+
+        async Task<Pkcs11Slot> Core(Task<ulong> wait)
+            => new(lowLevel, await wait.ConfigureAwait(false), _loggerFactory);
     }
 
     /// <summary>
-    /// Reports a pending slot event, such as token insertion or token removal, without waiting for one
-    /// (<c>CKF_DONT_BLOCK</c>).
+    /// Reports a pending slot event, such as token insertion or token removal, without waiting for one.
     /// </summary>
     /// <param name="slot">
     /// The slot the event occurred in, when one was pending; otherwise <see langword="null"/>. It equals the
@@ -556,11 +594,18 @@ public sealed class Pkcs11Library : IDisposable
     /// </param>
     /// <returns><see langword="true"/> if an event was pending; <see langword="false"/> if none was.</returns>
     /// <remarks>
+    /// <para>
+    /// While a <see cref="WaitForSlotEvent"/> runs on any library loaded from the module, this only takes
+    /// what that wait has already received for this library. Otherwise it asks the module, with
+    /// <c>CKF_DONT_BLOCK</c>; polls from several threads and libraries take turns.
+    /// </para>
+    /// <para>
     /// Works on a module that may not be called concurrently, provided the module honors
     /// <c>CKF_DONT_BLOCK</c>. Some do not, and block anyway: on such a module, when it may not be called
     /// concurrently, the poll holds the module's only lock until an event comes, and keeps every other call
     /// out until then. Many modules do not implement <c>C_WaitForSlotEvent</c> at all and throw
     /// <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll <see cref="GetSlotList"/> on those.
+    /// </para>
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
@@ -569,23 +614,17 @@ public sealed class Pkcs11Library : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.LibraryTrace(_logger, _libraryPath, "TryGetSlotEvent");
-        (CKR rv, ulong slotId) = CallWaitForSlotEvent(CKF.CKF_DONT_BLOCK);
-        if (rv == CKR.CKR_NO_EVENT)
+        LowLevelPkcs11Library lowLevel = LowLevel;
+        if (!SlotEvents.TryTake(out ulong slotId))
         {
             slot = null;
             return false;
         }
-        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpWaitForSlotEvent);
-        slot = new Pkcs11Slot(LowLevel, slotId, _loggerFactory);
+        slot = new Pkcs11Slot(lowLevel, slotId, _loggerFactory);
         return true;
     }
 
-    /// <summary>Calls <c>C_WaitForSlotEvent</c> and returns what it returned; the callers interpret it.</summary>
-    private (CKR ReturnValue, ulong SlotId) CallWaitForSlotEvent(ulong flags)
-    {
-        CKR rv = LowLevel.C_WaitForSlotEvent((NativeCULong)flags, out NativeCULong slotId, IntPtr.Zero);
-        return (rv, (ulong)slotId);
-    }
+    private SlotEventSubscription SlotEvents => _slotEvents ?? throw new ObjectDisposedException(nameof(Pkcs11Library));
 
     /// <summary>
     /// Opens an authenticated session against the slot whose token label matches
@@ -699,18 +738,23 @@ public sealed class Pkcs11Library : IDisposable
     /// Releases the library: closes any sessions still tracked against it, and releases the module.
     /// <c>C_Finalize</c> (only if this instance drove <c>C_Initialize</c>) and the unmap run when the
     /// last use of the module goes: at once, or when a call still in flight on another thread returns.
-    /// A thread blocked in <see cref="WaitForSlotEvent"/> does not delay <c>C_Finalize</c>; it is woken
-    /// with <c>CKR_CRYPTOKI_NOT_INITIALIZED</c>, as PKCS#11 specifies. While another load of the same
-    /// module is still live, <c>C_Finalize</c> waits for that one too, since they share the module's
-    /// state. It therefore runs on whichever thread releases the last use. Dispose logs what it can know
-    /// of it: a failure when it ran at once, or that it was deferred or left to another load. There is no finalizer — the native module is released by
-    /// <c>Pkcs11ModuleHandle</c>'s critical-finalizer <see cref="SafeHandle"/>
-    /// if a caller forgets to dispose.
+    /// A thread waiting in <see cref="WaitForSlotEvent"/> or <see cref="WaitForSlotEventAsync"/> on this
+    /// library gets <see cref="ObjectDisposedException"/> at once. While another load of the same module
+    /// still needs it, <c>C_Finalize</c> waits for that one too, since they share the module's state; a
+    /// blocking <c>C_WaitForSlotEvent</c> still inside the module does not delay it, and is woken by it, as
+    /// PKCS#11 specifies. It therefore runs on whichever thread releases the last use. Dispose logs what it
+    /// can know of it: a failure when it ran at once, or that it was deferred or left to another load.
+    /// There is no finalizer — the native module is released by <c>Pkcs11ModuleHandle</c>'s
+    /// critical-finalizer <see cref="SafeHandle"/> if a caller forgets to dispose.
     /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
         Log.LibraryTrace(_logger, _libraryPath, "Dispose");
+
+        // First: ends this library's slot-event waits at once, whatever else still uses the module.
+        _slotEvents?.Dispose();
+        _slotEvents = null;
 
         if (_pkcs11Library != null)
         {

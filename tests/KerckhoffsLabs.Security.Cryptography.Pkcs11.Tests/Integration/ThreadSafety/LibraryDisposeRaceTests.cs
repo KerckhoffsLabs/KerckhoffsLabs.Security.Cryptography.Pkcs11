@@ -1,6 +1,5 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -92,22 +91,21 @@ public sealed class LibraryDisposeRaceTests
         Assert.Equal(1, module.CallCount("C_Finalize"));
     }
 
-    // The one call C_Finalize is meant to interrupt: PKCS#11 has it wake a blocking C_WaitForSlotEvent
-    // with CKR_CRYPTOKI_NOT_INITIALIZED. Disposing must do that, not wait for an event that may never come.
+    // Disposing must end a blocking wait, not leave it waiting for an event that may never come: the
+    // caller gets ObjectDisposedException at once, and the C_Finalize that follows wakes the native
+    // C_WaitForSlotEvent (PKCS#11 has it return CKR_CRYPTOKI_NOT_INITIALIZED) so it leaves the module.
     [Fact]
     public async Task Dispose_WakesABlockingWaitForSlotEvent()
     {
         using var module = new WaitingModule();
         Pkcs11Library library = module.Load();
 
-        Task<Exception?> wait = Task.Run(() => Record.Exception(() => library.WaitForSlotEvent()), Token);
+        Task<Exception?> wait = Task.Run(() => Record.Exception(() => library.WaitForSlotEvent(TestContext.Current.CancellationToken)), Token);
         Assert.True(module.Waiting.Wait(Generous, Token), "the wait never reached the module");
 
         library.Dispose();
 
-        Exception? outcome = await wait.WaitAsync(Generous, Token);
-        var e = Assert.IsType<Pkcs11Exception>(outcome, exactMatch: false);
-        Assert.Equal(CKR.CKR_CRYPTOKI_NOT_INITIALIZED, e.ReturnValue);
+        Assert.IsType<ObjectDisposedException>(await wait.WaitAsync(Generous, Token));
         Assert.Equal(1, module.CallCount("C_Finalize"));
     }
 

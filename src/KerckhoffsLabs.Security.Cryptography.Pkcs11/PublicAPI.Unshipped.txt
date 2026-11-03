@@ -1514,7 +1514,8 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.OpenSessionWithPinpad(
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsConcurrentAccess.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsCryptokiVersion(System.Version! version) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.TryGetSlotEvent(out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot? slot) -> bool
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.WaitForSlotEvent() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.WaitForSlotEvent(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.WaitForSlotEventAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!>!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object.Destroy() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object.Dispose() -> void
