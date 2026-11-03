@@ -10,30 +10,18 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=KerckhoffsLabs_KerckhoffsLabs.Security.Cryptography.Pkcs11&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=KerckhoffsLabs_KerckhoffsLabs.Security.Cryptography.Pkcs11)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/badge)](https://scorecard.dev/viewer/?uri=github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11)
 
-## Overview
+PKCS#11 is the standard C API for HSMs, smart cards and software tokens. This library wraps a native
+PKCS#11 module in an idiomatic .NET API that is hard to hold wrong: keys stay on the token, weak
+algorithms are refused, and the adapters drop into code written against `System.Security.Cryptography`.
 
-PKCS#11 (Cryptoki) is the standard C API for talking to HSMs, smart cards, and software tokens. Using
-it from .NET means marshalling handles, mechanism structs, and fixed-width `CK_ULONG` values across
-the managed/unmanaged boundary — where a wrong struct layout is silent memory corruption and a wrong
-default is a production vulnerability nobody sees until it is exploited.
-
-This library wraps a native PKCS#11 module in an idiomatic .NET surface that is hard to hold wrong.
-
-- **Secure by default** — insecure mechanisms (unauthenticated cipher modes, broken hashes, PKCS#1
-  v1.5 encryption, sub-128-bit curves) are rejected before any call reaches the token, and must be
-  opted into explicitly. Compile-time analyzers warn about them where a runtime gate cannot.
-- **PKCS#11 v3.2, backward-compatible** — a single managed API over v2.40, v3.0, v3.1, and v3.2
-  modules; the right calling convention is negotiated for you, and v3.2-only calls degrade cleanly on
-  older tokens.
-- **Post-quantum ready** — ML-KEM (FIPS 203), ML-DSA (FIPS 204), and SLH-DSA (FIPS 205), alongside
-  RSA, ECDSA, EdDSA, and the AEAD suites.
-- **BCL-shaped adapters** — `RSAPkcs11 : RSA`, `ECDsaPkcs11 : ECDsa`, `AesGcmPkcs11`, `MLKemPkcs11`,
-  and friends drop into code already written against `System.Security.Cryptography`.
-- **Token-resident keys** — private keys stay non-extractable and operations run on the token by
-  default; you choose deliberately if you ever want otherwise.
-- **Safe at the boundary** — `SafeHandle`-backed sessions and objects, deterministic disposal,
-  zeroized secret buffers, and correct `CK_ULONG` width on every platform (4 bytes on 64-bit Windows,
-  8 bytes on 64-bit Unix). NativeAOT- and trim-compatible.
+- **Secure by default.** Unauthenticated cipher modes, broken hashes, PKCS#1 v1.5 encryption and
+  sub-128-bit curves are refused before any call reaches the token, and analyzers flag them at compile time.
+- **Post-quantum ready.** ML-KEM, ML-DSA and SLH-DSA, alongside RSA, ECDSA, EdDSA and the AEAD suites.
+- **BCL-shaped adapters.** `RSAPkcs11 : RSA`, `ECDsaPkcs11 : ECDsa`, `AesGcmPkcs11` and friends.
+- **Token-resident keys.** Generated keys are sensitive, non-extractable and granted one role each.
+- **PKCS#11 v3.2, backward-compatible.** One API over v2.40, v3.0, v3.1 and v3.2 modules.
+- **Safe at the boundary.** `SafeHandle`-backed sessions and objects, zeroized secret buffers, the
+  correct `CK_ULONG` width on every platform. NativeAOT- and trim-compatible.
 
 ## Installation
 
@@ -41,109 +29,53 @@ This library wraps a native PKCS#11 module in an idiomatic .NET surface that is 
 dotnet add package KerckhoffsLabs.Security.Cryptography.Pkcs11
 ```
 
-Requires .NET 10.0 or later, and a PKCS#11 v2.40+ module for your token (e.g. your HSM vendor's
-library, or [SoftHSM2](https://github.com/opendnssec/SoftHSMv2) for development).
+Requires .NET 10 or later, and a PKCS#11 v2.40+ module for your token: your HSM vendor's library, or
+[SoftHSM2](https://github.com/opendnssec/SoftHSMv2) for development.
 
 ## Quick start
 
-Load a module, log into a token, generate a key pair, and sign — end to end:
+Load the module, log in, generate a non-extractable AES-256 key on the token, and use it through an
+`AesGcm`-shaped adapter:
 
 ```csharp
-using System.Security.Cryptography;
-using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using var pin = new SecurePin(Environment.GetEnvironmentVariable("TOKEN_PIN")!); // from your secret store
 
-// 1. Load the native module (initialization and finalization are tied to the object's lifetime).
-using var library = Pkcs11Library.Load("/usr/lib/softhsm/libsofthsm2.so");
+using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+using Pkcs11Key key = session.GenerateAesKey(bitLength: 256, label: "getting-started");
 
-// 2. Open a logged-in session on a token, selected by label. SecurePin keeps the PIN in a pinned
-//    buffer that is zeroed on dispose. Read it from a secret manager, not source — and if you can
-//    get it as a char[] rather than a string, pass that: new SecurePin(chars) never makes a string.
-using var pin = new SecurePin(Environment.GetEnvironmentVariable("TOKEN_PIN")!);
-using var session = library.OpenSessionWithPin(slotLabel: "my-token", CKU.CKU_USER, pin);
-
-// 3. Generate a token-resident RSA signing key pair. The private key is non-extractable by default.
-using var key = session.GenerateRsaSigningKeyPair(modulusBits: 3072, label: "signing-key");
-
-// 4. Sign and verify through the familiar System.Security.Cryptography shape (RSA-PSS by default).
-using var rsa = new RSAPkcs11(key);
-byte[] message = Encoding.UTF8.GetBytes("hello, token");
-byte[] signature = rsa.SignData(message, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
-bool ok = rsa.VerifyData(message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+using var aesGcm = new AesGcmPkcs11(key, tagSizeInBytes: 16);
+byte[] nonce = session.GenerateRandom(12);
+byte[] ciphertext = new byte[plaintext.Length];
+byte[] tag = new byte[16];
+aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
 ```
 
-Reach for an existing key by label instead of generating one with `session.OpenKey("signing-key")`,
-and see the [documentation](#documentation) for encryption, wrapping, key derivation, and the
-post-quantum mechanisms.
-
-### Error handling
-
-Every exception this library raises derives from `System.Security.Cryptography.CryptographicException`,
-so code written against the BCL shapes above — including generic wrappers that have never heard of
-PKCS#11 — catches token failures where it already catches everything else:
-
-```csharp
-try { rsa.SignData(message, HashAlgorithmName.SHA256, RSASignaturePadding.Pss); }
-catch (Pkcs11Exception ex) { logger.LogError("{Method} returned {Ckr}", ex.Method, ex.ReturnValue); }
-catch (CryptographicException ex) { /* everything else, including a plain BCL failure */ }
-```
-
-Narrow to `Pkcs11Exception` when you want the raw `CKR` and the failing PKCS#11 method, or to one of
-its typed subclasses (`Pkcs11AuthenticationException`, `Pkcs11SessionException`, …) to catch by
-category.
-
-## Security model
-
-The high-level API is **secure by default**. Every session enforces a crypto policy, and a request it
-refuses throws `CryptoPolicyViolationException` before any call reaches the token:
-
-- **`CryptoPolicy.Recommended`** (the default) refuses broken algorithms, unauthenticated cipher modes,
-  PKCS#1 v1.5 encryption, weak keys and curves, and plaintext key export.
-- **`CryptoPolicy.NistApproved`** allows only NIST-approved functions and refuses any override for the
-  session's lifetime. It restricts what the library sends; it is not FIPS certification.
-- **`CryptoPolicy.AllowInsecure`** lifts the checks, for one scoped legacy operation:
-  `using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { ... }`.
-
-Keys the library generates are sensitive, non-extractable and granted one role each. Policies judge
-requests, not keys already on the token, and the library relies on the token to enforce
-`CKA_SENSITIVE`, `CKA_EXTRACTABLE` and `CKA_PRIVATE`.
-
-The [**security model**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/security-model.html) explains all of this in full, with the threat
-model, the known limits, key role separation and wrap hardening. See also
-[Using crypto policies](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/crypto-policies.html), the generated
-[Recommended](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/policies/recommended.html) and [NistApproved](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/policies/nist-approved.html)
-allow-lists, and the [diagnostics](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html).
+[Getting started](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/getting-started.html) walks through this snippet step by step; it is
+compiled and run against real tokens in CI.
 
 ## Documentation
 
-- [**Getting started**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/getting-started.html) — from a module path to an operation on a token key, step by step.
-- [**Examples**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/examples/index.html) — every algorithm adapter next to its `System.Security.Cryptography` equivalent, compiled and run in CI.
-- [**Security model**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/security-model.html) — what the library protects, from whom, and where its protection ends.
-- [**Using crypto policies**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/crypto-policies.html) — choosing, adjusting and writing a policy.
-- [**API reference**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/api/) — the full generated surface.
-- [**Diagnostics**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html) — the obsoletion and analyzer diagnostic ids, and how to suppress one precisely.
+- **[Guide](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/getting-started.html)**: getting started, the security model, crypto policies and
+  the analyzer diagnostics.
+- **[Examples](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/examples/index.html)**: every algorithm next to its `System.Security.Cryptography`
+  equivalent, compiled and run in CI.
+- **[API reference](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/api/)**: every type and member.
 
 ## Building from source
 
-The repository vendors its test backends (`pkcs11-mock`, SoftHSMv2, opencryptoki, NSS, Kryoptic, BouncyHsm) as git submodules,
-so clone recursively:
+The test backends (`pkcs11-mock`, SoftHSMv2, opencryptoki, NSS, Kryoptic, BouncyHsm) are vendored as git
+submodules, so clone recursively (or run `git submodule update --init --recursive` in an existing clone):
 
 ```bash
 git clone --recurse-submodules https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11.git
 cd KerckhoffsLabs.Security.Cryptography.Pkcs11
 dotnet build KerckhoffsLabs.sln
-```
-
-If you already cloned without submodules, run `git submodule update --init --recursive` first.
-
-```bash
 dotnet test --solution KerckhoffsLabs.sln
 ```
 
-Tests build `pkcs11-mock` from the vendored submodule automatically via an MSBuild target — this
-needs `make` and `gcc` on Linux/macOS, or `pwsh` and the MSVC build tools on Windows.
+The tests build `pkcs11-mock` from its submodule automatically, which needs `make` and `gcc` on Linux and
+macOS, or `pwsh` and the MSVC build tools on Windows.
 
 ## License
 
@@ -154,7 +86,4 @@ A [human-friendly license summary](https://www.tldrlegal.com/license/mit-license
 
 Bug reports and feature requests belong in
 [GitHub issues](https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/issues).
-
-## About
-
 Built and maintained by [KerckhoffsLabs](https://github.com/KerckhoffsLabs) and contributors.

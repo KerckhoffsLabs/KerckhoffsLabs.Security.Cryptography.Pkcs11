@@ -54,6 +54,20 @@ What each step does:
 5. **Disposal** releases everything in reverse order. Dispose sessions and keys deterministically
    (`using`), rather than leaving them to the garbage collector.
 
+## Handling errors
+
+Every exception the library throws derives from `System.Security.Cryptography.CryptographicException`, so
+code written against the BCL shapes, including generic code that has never heard of PKCS#11, catches token
+failures where it already catches everything else. Catch something narrower when you need more:
+
+- **`Pkcs11Exception`** is a failed PKCS#11 call. `ReturnValue` is the raw `CKR` code, and `Method` names
+  the function that returned it. Its subclasses group the codes by cause, such as
+  `Pkcs11AuthenticationException`, `Pkcs11SessionException` and `Pkcs11MechanismException`.
+- **`CryptoPolicyViolationException`** is a request the session's crypto policy refused, before any call
+  reached the token.
+
+The exception types are in the `KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions` namespace.
+
 ## Next steps
 
 - The example pages show every algorithm the library offers, each next to its
