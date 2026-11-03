@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -63,6 +64,12 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         /// <summary>The handle <c>C_DeriveKey</c> returns.</summary>
         public ulong DerivedHandle { get; set; } = Created;
 
+        /// <summary>
+        /// The handles <c>C_DeriveKey</c> writes into an SP800-108 derivation's additional derived-key slots,
+        /// one per slot, at the platform's CK_ULONG width.
+        /// </summary>
+        public ulong[] SiblingHandles { get; set; } = [];
+
         /// <summary>What <c>C_DestroyObject</c> answers.</summary>
         public CKR DestroyResult { get; set; } = CKR.CKR_OK;
 
@@ -113,7 +120,27 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         {
             DeriveCalls++;
             key = (NativeCULong)DerivedHandle;
+            if (SiblingHandles.Length > 0)
+            {
+                var kdf = UnmanagedMemory.Read<CK_SP800_108_KDF_PARAMS>(mechanism.Parameter);
+                int size = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
+                for (int j = 0; j < (int)(ulong)kdf.AdditionalDerivedKeys; j++)
+                {
+                    var slot = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(kdf.AdditionalDerivedKeysPtr, j * size));
+                    WriteHandle(slot.Key, SiblingHandles[j]);
+                }
+            }
             return CKR.CKR_OK;
+        }
+
+        private static void WriteHandle(IntPtr slot, ulong handle)
+        {
+            Span<byte> bytes = stackalloc byte[8];
+            if (UnmanagedMemory.NativeULongSize == 4)
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(bytes, checked((uint)handle));
+            else
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(bytes, handle);
+            UnmanagedMemory.Write(slot, bytes[..UnmanagedMemory.NativeULongSize]);
         }
 
         protected override CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong key)
@@ -454,6 +481,118 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
 
         Assert.Equal(KeyStrengthSource.Template, request.Source);
         Assert.Equal(0, fake.DeriveCalls);
+    }
+
+    private const ulong SiblingA = 50;
+    private const ulong SiblingB = 51;
+
+    /// <summary>Recommended, but inspecting keys and allowing any key of 32 bytes (the base key is a generic secret).</summary>
+    private static ComposedCryptoPolicy Only32Bytes() =>
+        CryptoPolicy.Recommended.ToBuilder("T")
+            .WithKeyStrengthRule(KeyStrengthRule.FromDelegate(
+                r => r.ValueLengthBytes == 32 ? PolicyDecision.Allow : PolicyDecision.Deny("Too weak."), "32 bytes"))
+            .Build();
+
+    /// <summary>A counter-mode SP800-108 derivation with one additional derived key per template.</summary>
+    private static CkmSp800108KdfParams Sp800108(params List<ObjectAttribute>[] siblings)
+    {
+        var builder = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+            .IterationCounter(widthInBits: 32, littleEndian: false)
+            .ByteArray([0x01])
+            .DkmLength(Sp800108DkmLengthMethod.SumOfKeys, widthInBits: 32, littleEndian: false);
+        foreach (List<ObjectAttribute> sibling in siblings)
+            builder.AddDerivedKey(sibling);
+        return builder.Build();
+    }
+
+    private CreationFake Sp800108Fake(ulong? siblingBLength)
+    {
+        var fake = new CreationFake { SiblingHandles = [SiblingA, SiblingB] };
+        fake.Keys[StrongAes.ObjectId] = new() { [CKA.CKA_KEY_TYPE] = (ulong)CKK.CKK_GENERIC_SECRET, [CKA.CKA_VALUE_LEN] = 32 };
+        fake.SetAes(Created, 32);
+        fake.SetAes(SiblingA, 32);
+        fake.SetAes(SiblingB, siblingBLength);
+        return fake;
+    }
+
+    // A sibling key is a created key too: one refused sibling takes the main key and every other sibling with it.
+    [Fact]
+    public void Sp800108_RefusedSibling_DestroysTheMainKeyAndEverySibling()
+    {
+        using CreationFake fake = Sp800108Fake(siblingBLength: 16);
+        using var session = fake.CreateSession(policy: Only32Bytes());
+        CkmSp800108KdfParams kdf = Sp800108(AesTemplate(), AesTemplate());
+
+        KeyStrengthRequest request = RefusedRequest(
+            () => session.DeriveKey(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdf), StrongAes, AesTemplate()));
+
+        Assert.Equal(KeyStrengthSource.CreatedKey, request.Source);
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal(1, fake.DeriveCalls);
+        Assert.Equal([Created, SiblingA, SiblingB], fake.Destroyed);
+        // The destroyed siblings' handles are gone from the parameters: Pkcs11Key.Derive cannot wrap them.
+        Assert.Empty(kdf.RawAdditionalDerivedKeyHandles);
+    }
+
+    [Fact]
+    public void Sp800108_AllowedSiblings_AreKept()
+    {
+        using CreationFake fake = Sp800108Fake(siblingBLength: 32);
+        using var session = fake.CreateSession(policy: Only32Bytes());
+        CkmSp800108KdfParams kdf = Sp800108(AesTemplate(), AesTemplate());
+
+        ObjectHandle key = session.DeriveKey(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdf), StrongAes, AesTemplate());
+
+        Assert.Equal(Created, key.ObjectId);
+        Assert.Empty(fake.Destroyed);
+        Assert.Equal([SiblingA, SiblingB], kdf.RawAdditionalDerivedKeyHandles);
+        // The base key, the main key and both siblings: two reads (four calls) each.
+        Assert.Equal(16, fake.GetAttributeValueCalls);
+    }
+
+    // A slot the token left at CK_INVALID_HANDLE is no key: skipped, while the others are still judged.
+    [Fact]
+    public void Sp800108_UnwrittenSiblingSlot_IsSkipped()
+    {
+        using CreationFake fake = Sp800108Fake(siblingBLength: 32);
+        fake.SiblingHandles = [CK.CK_INVALID_HANDLE, SiblingB];
+        using var session = fake.CreateSession(policy: Only32Bytes());
+        CkmSp800108KdfParams kdf = Sp800108(AesTemplate(), AesTemplate());
+
+        session.DeriveKey(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdf), StrongAes, AesTemplate());
+
+        Assert.Empty(fake.Destroyed);
+        Assert.Equal(12, fake.GetAttributeValueCalls);
+    }
+
+    [Fact]
+    public void Sp800108_SiblingTemplateWith16Bytes_IsRefused_BeforeTheToken()
+    {
+        using CreationFake fake = Sp800108Fake(siblingBLength: 32);
+        using var session = fake.CreateSession(policy: Only32Bytes());
+        CkmSp800108KdfParams kdf = Sp800108(AesTemplate(32), AesTemplate(16));
+
+        KeyStrengthRequest request = RefusedRequest(
+            () => session.DeriveKey(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdf), StrongAes, AesTemplate()));
+
+        Assert.Equal(KeyStrengthSource.Template, request.Source);
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal(0, fake.DeriveCalls);
+        Assert.Empty(fake.Destroyed);
+    }
+
+    [Fact]
+    public void Sp800108_UnderRecommended_ReadsNothing()
+    {
+        using CreationFake fake = Sp800108Fake(siblingBLength: 16);
+        using var session = fake.CreateSession();
+        CkmSp800108KdfParams kdf = Sp800108(AesTemplate(), AesTemplate());
+
+        session.DeriveKey(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdf), StrongAes, AesTemplate());
+
+        Assert.Equal(0, fake.GetAttributeValueCalls);
+        Assert.Empty(fake.Destroyed);
+        Assert.Equal([SiblingA, SiblingB], kdf.RawAdditionalDerivedKeyHandles);
     }
 
     [Fact]

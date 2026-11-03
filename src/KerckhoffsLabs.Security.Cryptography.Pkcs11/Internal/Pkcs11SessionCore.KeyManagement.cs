@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -408,6 +409,14 @@ internal sealed partial class Pkcs11SessionCore
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
         EnforceKeyStrength(baseKeyHandle, KeyStrengthSource.ExistingKey);
         EnforceTemplateKeyStrength(null, attributes);
+        // An SP800-108 derivation also makes one key per additional derived-key template: each is a created
+        // key, judged like the main one.
+        var sp800108 = mechanism.Parameters as CkmSp800108KdfParams;
+        if (sp800108 is not null)
+        {
+            foreach (IReadOnlyList<ObjectAttribute> siblingTemplate in sp800108.DerivedKeyTemplates)
+                EnforceTemplateKeyStrength(null, siblingTemplate);
+        }
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
@@ -432,7 +441,25 @@ internal sealed partial class Pkcs11SessionCore
         mechanism.AbsorbOutput(mechParams);
 
         var key = new ObjectHandle((ulong)derivedKey);
-        EnforceCreatedKeyStrength(key);
+        if (sp800108 is null)
+        {
+            EnforceCreatedKeyStrength(key);
+            return key;
+        }
+
+        // The main key and every sibling are judged together: if any fails, all are destroyed, and the
+        // destroyed siblings' handles are dropped from the parameters so Pkcs11Key.Derive cannot wrap them.
+        // A sibling slot the token left at CK_INVALID_HANDLE is skipped by the post-check.
+        ObjectHandle[] created = [key, .. sp800108.RawAdditionalDerivedKeyHandles.Select(h => new ObjectHandle(h))];
+        try
+        {
+            EnforceCreatedKeyStrength(created);
+        }
+        catch
+        {
+            sp800108.ForgetAbsorbedHandles();
+            throw;
+        }
         return key;
     }
 }
