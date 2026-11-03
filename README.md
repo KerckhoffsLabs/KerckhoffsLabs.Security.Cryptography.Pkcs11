@@ -110,18 +110,18 @@ Keys the library generates are sensitive, non-extractable and granted one role e
 requests, not keys already on the token, and the library relies on the token to enforce
 `CKA_SENSITIVE`, `CKA_EXTRACTABLE` and `CKA_PRIVATE`.
 
-The [**security model**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/security-model.html) explains all of this in full, with the threat
+The [**security model**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/security-model.html) explains all of this in full, with the threat
 model, the known limits, key role separation and wrap hardening. See also
-[Using crypto policies](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/crypto-policies.html), the generated
-[Recommended](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/policies/recommended.html) and [NistApproved](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/policies/nist-approved.html)
+[Using crypto policies](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/crypto-policies.html), the generated
+[Recommended](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/policies/recommended.html) and [NistApproved](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/policies/nist-approved.html)
 allow-lists, and the [diagnostics](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html).
 
 ## Documentation
 
-- [**Getting started**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/getting-started.html) — from a module path to an operation on a token key, step by step.
-- [**Examples**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/examples/aead.html) — every algorithm adapter next to its `System.Security.Cryptography` equivalent, compiled and run in CI.
-- [**Security model**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/security-model.html) — what the library protects, from whom, and where its protection ends.
-- [**Using crypto policies**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/crypto-policies.html) — choosing, adjusting and writing a policy.
+- [**Getting started**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/getting-started.html) — from a module path to an operation on a token key, step by step.
+- [**Examples**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/examples/index.html) — every algorithm adapter next to its `System.Security.Cryptography` equivalent, compiled and run in CI.
+- [**Security model**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/security-model.html) — what the library protects, from whom, and where its protection ends.
+- [**Using crypto policies**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/guide/crypto-policies.html) — choosing, adjusting and writing a policy.
 - [**API reference**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/api/) — the full generated surface.
 - [**Diagnostics**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html) — the obsoletion and analyzer diagnostic ids, and how to suppress one precisely.
 

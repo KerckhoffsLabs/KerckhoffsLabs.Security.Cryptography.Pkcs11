@@ -1,0 +1,20 @@
+- name: Getting started
+  href: getting-started.md
+- name: Concepts
+  expanded: true
+  items:
+    - name: Security model
+      href: security-model.md
+    - name: Crypto policies
+      href: crypto-policies.md
+      items:
+        - name: Recommended
+          href: policies/recommended.md
+        - name: NistApproved
+          href: policies/nist-approved.md
+- name: Reference
+  expanded: true
+  items:
+    # diagnostics.html stays at the site root: the analyzers and [Obsolete] attributes link to it.
+    - name: Analyzer diagnostics
+      href: ../diagnostics.md

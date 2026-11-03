@@ -22,4 +22,4 @@
   protocol (IEEE 802.15.4, Bluetooth LE, some IoT stacks) requires CCM.
 
 API reference: <xref:KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.AesCcmPkcs11>. See also
-[Algorithm notes](../security-model.md#algorithm-notes).
+[Algorithm notes](../guide/security-model.md#algorithm-notes).

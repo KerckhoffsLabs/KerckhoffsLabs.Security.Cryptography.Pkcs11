@@ -1,21 +1,479 @@
-/* ---- KerckhoffsLabs DocFX theme overrides ---- */
+/* ---- KerckhoffsLabs DocFX theme ----
+   Layered over DocFX's `modern` template (Bootstrap 5.3). The palette comes from the logo: an indigo
+   (#34488a), a slate (#637388) and an ink (#182430). Every colour is a token below, redefined for dark
+   mode, so the components never hard-code one. */
 
-/* Navbar emblem: constrain the square logo to the navbar height and align it with
-   the "PKCS11.NET" wordmark. Neutralize the modern template's SVG dark-mode filter
-   (our logo is a coloured raster, not a monochrome SVG). */
+:root,
+[data-bs-theme=light] {
+  --kl-brand: #34488a;
+  --kl-brand-rgb: 52, 72, 138;
+  --kl-brand-strong: #26366b;
+  --kl-brand-soft: #eef1fa;
+  --kl-slate: #637388;
+  --kl-ink: #182430;
+  --kl-surface: #f7f8fb;
+  --kl-border: #e3e6ee;
+  --kl-code-fg: #2f4182;
+  --kl-code-bg: #eef1f8;
+  --kl-hero-glow: rgba(52, 72, 138, .10);
+
+  --bs-body-color: #1f2a37;
+  --bs-body-color-rgb: 31, 42, 55;
+  --bs-emphasis-color: var(--kl-ink);
+  --bs-primary: var(--kl-brand);
+  --bs-primary-rgb: var(--kl-brand-rgb);
+  --bs-link-color: var(--kl-brand);
+  --bs-link-color-rgb: var(--kl-brand-rgb);
+  --bs-link-hover-color: var(--kl-brand-strong);
+  --bs-link-hover-color-rgb: 38, 54, 107;
+  --bs-code-color: var(--kl-code-fg);
+  --bs-border-color: var(--kl-border);
+}
+
+[data-bs-theme=dark] {
+  --kl-brand: #9db0f0;
+  --kl-brand-rgb: 157, 176, 240;
+  --kl-brand-strong: #c3cff7;
+  --kl-brand-soft: #1e2640;
+  --kl-slate: #9aa7b8;
+  --kl-ink: #e9edf3;
+  --kl-surface: #161b24;
+  --kl-border: #2a3140;
+  --kl-code-fg: #b7c5f5;
+  --kl-code-bg: #1e2433;
+  --kl-hero-glow: rgba(157, 176, 240, .10);
+
+  --bs-body-bg: #10141b;
+  --bs-body-bg-rgb: 16, 20, 27;
+  --bs-body-color: #d5dbe4;
+  --bs-body-color-rgb: 213, 219, 228;
+  --bs-emphasis-color: var(--kl-ink);
+  --bs-primary: var(--kl-brand);
+  --bs-primary-rgb: var(--kl-brand-rgb);
+  --bs-link-color: var(--kl-brand);
+  --bs-link-color-rgb: var(--kl-brand-rgb);
+  --bs-link-hover-color: var(--kl-brand-strong);
+  --bs-link-hover-color-rgb: 195, 207, 247;
+  --bs-code-color: var(--kl-code-fg);
+  --bs-border-color: var(--kl-border);
+  --bs-tertiary-bg: #161b24;
+  --bs-secondary-bg: #1b212c;
+}
+
+/* ---- Typography ---- */
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, kbd, pre, samp {
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+article h1 {
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--bs-emphasis-color);
+  margin-bottom: 1rem;
+}
+
+article h2 {
+  font-weight: 650;
+  letter-spacing: -.01em;
+  margin-top: 2.5rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--kl-border);
+}
+
+article h3 {
+  font-weight: 600;
+  margin-top: 2rem;
+}
+
+article h1 code,
+article h2 code,
+article h3 code {
+  font-size: .85em;
+  background: none;
+  padding: 0;
+}
+
+/* Inline code: brand-tinted chips instead of Bootstrap's pink. */
+:not(pre) > code {
+  background: var(--kl-code-bg);
+  border-radius: 4px;
+  padding: .1em .35em;
+  font-size: .86em;
+}
+
+a :not(pre) > code,
+a > code {
+  color: inherit;
+}
+
+/* Code blocks and tabbed code. */
+article pre {
+  border: 1px solid var(--kl-border);
+  border-radius: 8px;
+}
+
+article .tabGroup > section {
+  border-color: var(--kl-border);
+  border-radius: 0 8px 8px 8px;
+}
+
+article .tabGroup > ul[role=tablist] a[aria-selected=true] {
+  color: var(--kl-brand);
+  font-weight: 600;
+}
+
+/* Code inside a tab panel: the panel is the frame, so the block needs no border of its own. */
+article .tabGroup > section[role=tabpanel] pre {
+  border: 0;
+  margin-bottom: 0;
+}
+
+/* Tables: horizontal rules only, a tinted header, and a horizontal scroll instead of overflowing the
+   page on a narrow screen. */
+article table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: .95em;
+  margin-bottom: 1.25rem;
+}
+
+article table th,
+article table td {
+  padding: .55rem .9rem;
+  border: 0;
+  border-bottom: 1px solid var(--kl-border);
+  vertical-align: top;
+}
+
+article table thead th {
+  background: var(--kl-surface);
+  font-weight: 600;
+  vertical-align: bottom;
+  border-bottom: 2px solid var(--kl-border);
+}
+
+/* Callouts ([!NOTE], [!WARNING], ...). */
+article .alert {
+  border-radius: 8px;
+  border-left-width: 4px;
+}
+
+/* ---- Navbar ---- */
+
+body > header {
+  backdrop-filter: saturate(160%) blur(8px);
+  box-shadow: 0 1px 0 var(--kl-border);
+}
+
+.navbar-brand {
+  font-weight: 650;
+  letter-spacing: -.01em;
+  color: var(--bs-emphasis-color);
+}
+
+/* The emblem is a coloured raster, not a monochrome SVG: no dark-mode inversion. */
 #logo {
   height: 30px;
   width: auto;
-  margin-right: .5rem;
+  margin-right: .6rem;
 }
+
 #logo.svg {
   filter: none;
 }
 
-/* Homepage hero lockup: centered, responsive, never oversized. */
-.hero-logo {
-  display: block;
-  margin: 1.75rem auto 2rem;
-  width: min(300px, 70%);
+.navbar .nav-link {
+  font-weight: 500;
+  color: var(--bs-secondary-color);
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  color: var(--bs-emphasis-color);
+}
+
+.navbar .nav-link.active {
+  color: var(--kl-brand);
+  font-weight: 600;
+}
+
+/* ---- Sidebar ---- */
+
+.toc {
+  font-size: 14.5px;
+}
+
+.toc li.active > a,
+.toc li.active > span > a {
+  color: var(--kl-brand);
+  font-weight: 600;
+}
+
+/* Section headings (TOC entries without a page). */
+.toc .name-only {
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kl-slate) !important;
+}
+
+/* ---- Breadcrumb, "in this article", next/previous ---- */
+
+.breadcrumb a {
+  color: var(--kl-slate);
+}
+
+.affix h5 {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: var(--kl-slate);
+}
+
+.affix a {
+  color: var(--bs-secondary-color);
+}
+
+.affix a:hover {
+  color: var(--kl-brand);
+}
+
+.next-article a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ---- Footer ---- */
+
+body > footer {
   height: auto;
+  min-height: 60px;
+  background: var(--kl-surface);
+}
+
+body > footer a {
+  color: var(--bs-secondary-color);
+  text-decoration: none;
+}
+
+body > footer a:hover {
+  color: var(--kl-brand);
+}
+
+.kl-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem 1.25rem;
+  align-items: center;
+}
+
+.kl-footer .kl-sep {
+  opacity: .4;
+}
+
+/* ---- Buttons ---- */
+
+.btn-primary {
+  --bs-btn-bg: var(--kl-brand);
+  --bs-btn-border-color: var(--kl-brand);
+  --bs-btn-hover-bg: var(--kl-brand-strong);
+  --bs-btn-hover-border-color: var(--kl-brand-strong);
+  --bs-btn-active-bg: var(--kl-brand-strong);
+  --bs-btn-active-border-color: var(--kl-brand-strong);
+  --bs-btn-color: #fff;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-color: #fff;
+}
+
+[data-bs-theme=dark] .btn-primary {
+  --bs-btn-color: #10141b;
+  --bs-btn-hover-color: #10141b;
+  --bs-btn-active-color: #10141b;
+}
+
+/* ---- Landing page (index.md, _layout: landing) ---- */
+
+body[data-layout=landing] > main > .content > article {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 1.25rem 3rem;
+}
+
+.kl-hero {
+  text-align: center;
+  padding: 4.5rem 0 3.5rem;
+  background: radial-gradient(60% 70% at 50% 0%, var(--kl-hero-glow), transparent 70%);
+}
+
+.kl-hero-logo {
+  width: 88px;
+  height: auto;
+  margin-bottom: 1.5rem;
+}
+
+.kl-eyebrow {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--kl-brand);
+  background: var(--kl-brand-soft);
+  border-radius: 999px;
+  padding: .3rem .85rem;
+  margin-bottom: 1.25rem;
+}
+
+article .kl-hero h1 {
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  line-height: 1.1;
+  letter-spacing: -.03em;
+  max-width: 820px;
+  margin: 0 auto 1.25rem;
+  text-wrap: balance;
+}
+
+.kl-lead {
+  font-size: 1.2rem;
+  color: var(--bs-secondary-color);
+  max-width: 720px;
+  margin: 0 auto 2rem;
+  text-wrap: pretty;
+}
+
+.kl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .75rem;
+  margin-bottom: 1.75rem;
+}
+
+.kl-actions .btn {
+  padding: .65rem 1.4rem;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.kl-install {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--kl-border);
+  background: var(--kl-surface);
+  border-radius: 8px;
+  padding: .55rem 1rem;
+  font-size: .95rem;
+}
+
+.kl-install > code {
+  background: none;
+  padding: 0;
+  color: var(--bs-body-color);
+  white-space: nowrap;
+}
+
+.kl-install::before {
+  content: "$";
+  color: var(--kl-slate);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.kl-section {
+  padding: 3rem 0 1rem;
+}
+
+article .kl-section > h2 {
+  text-align: center;
+  border-bottom: 0;
+  margin: 0 0 .5rem;
+  font-size: 1.85rem;
+}
+
+.kl-section > .kl-sub {
+  text-align: center;
+  color: var(--bs-secondary-color);
+  max-width: 680px;
+  margin: 0 auto 2rem;
+}
+
+.kl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.kl-card {
+  border: 1px solid var(--kl-border);
+  border-radius: 12px;
+  padding: 1.35rem 1.4rem;
+  background: var(--bs-body-bg);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+a.kl-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.kl-card:hover {
+  border-color: rgba(var(--kl-brand-rgb), .55);
+  box-shadow: 0 6px 24px -12px rgba(var(--kl-brand-rgb), .45);
+  transform: translateY(-1px);
+}
+
+.kl-card .bi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  background: var(--kl-brand-soft);
+  color: var(--kl-brand);
+  font-size: 1.15rem;
+  margin-bottom: .85rem;
+}
+
+.kl-card h3 {
+  font-size: 1.05rem;
+  font-weight: 650;
+  margin: 0 0 .4rem;
+}
+
+.kl-card p {
+  margin: 0;
+  color: var(--bs-secondary-color);
+  font-size: .95rem;
+}
+
+.kl-card .kl-more {
+  display: inline-block;
+  margin-top: .75rem;
+  font-weight: 600;
+  font-size: .9rem;
+  color: var(--kl-brand);
+}
+
+.kl-code {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+@media (max-width: 767.98px) {
+  .kl-hero {
+    padding: 2.5rem 0 2rem;
+  }
 }

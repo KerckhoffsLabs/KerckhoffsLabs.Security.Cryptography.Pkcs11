@@ -29,8 +29,11 @@
         "files": [
           "*.md",
           "toc.yml",
-          "policies/*.md",
-          "examples/*.md"
+          "guide/**/*.md",
+          "guide/toc.yml",
+          "examples/*.md",
+          "examples/toc.yml",
+          "policies/*.md"
         ]
       }
     ],
@@ -48,13 +51,14 @@
       "templates/kl"
     ],
     "globalMetadata": {
-      "_appName": "KerckhoffsLabs.Security.Cryptography.Pkcs11",
-      "_appTitle": "KerckhoffsLabs.Security.Cryptography.Pkcs11",
+      "_appName": "KerckhoffsLabs PKCS#11",
+      "_appTitle": "KerckhoffsLabs PKCS#11",
       "_appLogoPath": "images/icon.png",
       "_appFaviconPath": "images/favicon.ico",
       "_description": "Modern, secure-by-default PKCS#11 v3.2 interop for .NET.",
       "_enableSearch": true,
-      "_disableContribution": true
+      "_disableContribution": true,
+      "_appFooter": "<div class=\"kl-footer\"><span>&copy; KerckhoffsLabs and contributors</span><span class=\"kl-sep\">&middot;</span><a href=\"https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/blob/main/LICENSE\">MIT License</a><span class=\"kl-sep\">&middot;</span><a href=\"https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11\">GitHub</a><span class=\"kl-sep\">&middot;</span><a href=\"https://www.nuget.org/packages/KerckhoffsLabs.Security.Cryptography.Pkcs11\">NuGet</a><span class=\"kl-sep\">&middot;</span><span>Built with <a href=\"https://dotnet.github.io/docfx\">DocFX</a></span></div>"
     }
   }
 }

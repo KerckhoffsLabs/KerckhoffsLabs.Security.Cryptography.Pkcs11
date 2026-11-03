@@ -26,7 +26,7 @@ every `Recommended` rule and adds exactly the mechanism you reviewed, for the op
 your reason attached. Everything else stays refused: the session cannot slip into ECB, a broken hash or a
 weak key because CBC was allowed. `UsePolicy(CryptoPolicy.AllowInsecure)` lifts every check, for the whole
 session (every thread using it) until the lease is disposed; keep it for a one-off operation on
-[legacy data](legacy.md), on a session of its own. See [Using crypto policies](../crypto-policies.md).
+[legacy data](legacy.md), on a session of its own. See [Using crypto policies](../guide/crypto-policies.md).
 
 **What differs from `Aes.Create()`:**
 
@@ -40,7 +40,7 @@ session (every thread using it) until the lease is disposed; keep it for a one-o
 - Under the default policy, the same `EncryptCbc` call throws `CryptoPolicyViolationException` before
   anything reaches the token.
 - `NistApproved` allows these modes for encrypting data, but not for wrapping keys; see
-  [NistApproved](../policies/nist-approved.md).
+  [NistApproved](../guide/policies/nist-approved.md).
 
 **If you decrypt CBC from an untrusted source,** authenticate the ciphertext first (a signature or a MAC
 over the ciphertext and IV), and reject it before decrypting if that check fails; never let a sender

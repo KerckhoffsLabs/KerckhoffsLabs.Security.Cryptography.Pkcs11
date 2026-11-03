@@ -119,7 +119,7 @@ not report which check failed, or the caller rebuilds a Manger oracle.
 Also an analyzer, for the same reason as KLPKCS11008: the legacy primitives have `[Obsolete]` façade
 types, but the *mechanisms* underneath are reachable as values — `new Mechanism(CKM.CKM_DES3_CBC)`,
 or `aes.Mode = CipherMode.CBC` — where there is no symbol to mark. Covers the mechanisms on
-`Recommended`'s documented deny list ([`recommended.md`](policies/recommended.md)) apart from the RSA pair
+`Recommended`'s documented deny list ([`recommended.md`](guide/policies/recommended.md)) apart from the RSA pair
 above. Mechanisms that are merely not on the allow-list — vendor-defined or not yet reviewed — are refused
 at run time too, but are not reported:
 
