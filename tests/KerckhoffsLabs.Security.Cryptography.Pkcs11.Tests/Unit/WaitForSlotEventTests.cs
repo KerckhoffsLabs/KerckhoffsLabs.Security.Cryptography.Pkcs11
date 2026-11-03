@@ -20,6 +20,16 @@ public sealed class WaitForSlotEventTests
         public CKR Rv = CKR.CKR_OK;
         public ulong SlotIdToReport = 3;
 
+        protected override CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count)
+        {
+            count = (NativeCULong)2;
+            if (slotList.IsNull) return CKR.CKR_OK;
+            if (slotList.Span.Length < 2) return CKR.CKR_BUFFER_TOO_SMALL;
+            slotList.Span[0] = (NativeCULong)3UL;
+            slotList.Span[1] = (NativeCULong)5UL;
+            return CKR.CKR_OK;
+        }
+
         protected override CKR C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot)
         {
             CapturedFlags = flags;
@@ -112,5 +122,34 @@ public sealed class WaitForSlotEventTests
         library.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => library.TryGetSlotEvent(out _));
+    }
+
+    // An event's slot must match the one GetSlotList reports for the same id, so callers can look it up
+    // in a list or key a dictionary on it.
+    [Fact]
+    public void EventSlot_EqualsTheListedSlotWithTheSameId()
+    {
+        using var fake = new SlotEventFake { Rv = CKR.CKR_OK, SlotIdToReport = 5 };
+        using var library = fake.Load();
+        IReadOnlyList<Pkcs11Slot> listed = library.GetSlotList(tokenPresent: false);
+
+        Pkcs11Slot slot = library.WaitForSlotEvent();
+
+        Assert.Contains(slot, listed);
+        Assert.Equal(listed[1], slot);
+        Assert.Equal(listed[1].GetHashCode(), slot.GetHashCode());
+        Assert.NotEqual(listed[0], slot);
+    }
+
+    // A slot belongs to the library that produced it (it calls through that library, and stops working
+    // when that library is disposed), so the same id from another library is another slot.
+    [Fact]
+    public void Slots_FromDifferentLibraries_AreNotEqual()
+    {
+        using var fake = new SlotEventFake { SlotIdToReport = 3 };
+        using var a = fake.Load();
+        using var b = fake.Load();
+
+        Assert.NotEqual(a.WaitForSlotEvent(), b.WaitForSlotEvent());
     }
 }

@@ -1523,6 +1523,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object.Id.get -> System.ReadOn
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object.Label.get -> string?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object.ObjectClass.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKO
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot? other) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.GetMechanismInfo(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKM mechanism) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismInfo!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.GetMechanismList() -> System.Collections.Generic.IReadOnlyList<KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKM>!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.GetSlotInfo() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.SlotInfo!
@@ -1880,6 +1881,8 @@ override KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectAttribute.ToS
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.Equals(object? obj) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.GetHashCode() -> int
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.ToString() -> string!
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.Equals(object? obj) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.GetHashCode() -> int
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.EcKeyGenerationRequest.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.EcKeyGenerationRequest!
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.EcKeyGenerationRequest.Equals(object? obj) -> bool
 override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.EcKeyGenerationRequest.GetHashCode() -> int

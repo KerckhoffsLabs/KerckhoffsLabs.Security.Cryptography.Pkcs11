@@ -506,28 +506,29 @@ public sealed class Pkcs11Library : IDisposable
     /// Blocks until a slot event, such as token insertion or token removal, occurs.
     /// </summary>
     /// <returns>
-    /// The slot the event occurred in. Call <see cref="Pkcs11Slot.GetTokenInfo"/> or
-    /// <see cref="Pkcs11Slot.GetSlotInfo"/> on it to learn whether a token was inserted or removed: the
-    /// event itself does not say which. The slot may be one <see cref="GetSlotList"/> has not reported
-    /// before, such as a reader plugged in after the module was loaded.
+    /// The slot the event occurred in. It equals the slot with the same id in <see cref="GetSlotList"/>.
+    /// Call <see cref="Pkcs11Slot.GetTokenInfo"/> or <see cref="Pkcs11Slot.GetSlotInfo"/> on it to learn
+    /// whether a token was inserted or removed: the event itself does not say which.
     /// </returns>
     /// <remarks>
     /// <para>
-    /// The wait needs a module that may be called concurrently (<see cref="SupportsConcurrentAccess"/>):
-    /// otherwise it would hold the module's only lock until an event came, keeping out every other call,
-    /// and <see cref="Dispose"/> could not wake it. Poll with <see cref="TryGetSlotEvent"/> there instead.
+    /// The slot may be one <see cref="GetSlotList"/> has not reported before, such as a reader plugged in
+    /// after the module was loaded. Many modules only add such a slot to their table when the slot list is
+    /// read again, and answer <c>CKR_SLOT_ID_INVALID</c> until then: call <see cref="GetSlotList"/> before
+    /// using a slot it has not reported.
     /// </para>
     /// <para>
-    /// The only way to end the wait without an event is <see cref="Dispose"/>, which finalizes the module
-    /// and so wakes it with a <see cref="Pkcs11Exception"/> (<c>CKR_CRYPTOKI_NOT_INITIALIZED</c>). Many
-    /// modules do not implement a blocking wait and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll
-    /// <see cref="GetSlotList"/> on those.
+    /// The wait needs a module that may be called concurrently (<see cref="SupportsConcurrentAccess"/>):
+    /// otherwise it would hold the module's only lock until an event came, keeping out every other call.
+    /// Poll with <see cref="TryGetSlotEvent"/> there instead. Many modules do not implement a blocking wait
+    /// and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll <see cref="GetSlotList"/> on those.
     /// </para>
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="SupportsConcurrentAccess"/> is
     /// <see langword="false"/>.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call,
+    /// including <c>CKR_NO_EVENT</c>, which a blocking call must not return.</exception>
     public Pkcs11Slot WaitForSlotEvent()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -536,9 +537,10 @@ public sealed class Pkcs11Library : IDisposable
                 "A blocking WaitForSlotEvent needs a module that may be called concurrently, and this one may not " +
                 "(see SupportsConcurrentAccess). Poll with TryGetSlotEvent instead.");
 
-        // A blocking call returns CKR_OK or an error, never CKR_NO_EVENT.
-        return CallWaitForSlotEvent(blocking: true)
-               ?? throw Pkcs11Exception.Create(CKR.CKR_NO_EVENT, Pkcs11Operations.OpWaitForSlotEvent);
+        Log.LibraryTrace(_logger, _libraryPath, "WaitForSlotEvent");
+        (CKR rv, ulong slotId) = CallWaitForSlotEvent(flags: 0);
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpWaitForSlotEvent);
+        return new Pkcs11Slot(LowLevel, slotId, _loggerFactory);
     }
 
     /// <summary>
@@ -546,37 +548,43 @@ public sealed class Pkcs11Library : IDisposable
     /// (<c>CKF_DONT_BLOCK</c>).
     /// </summary>
     /// <param name="slot">
-    /// The slot the event occurred in, when one was pending; otherwise <see langword="null"/>. Call
-    /// <see cref="Pkcs11Slot.GetTokenInfo"/> or <see cref="Pkcs11Slot.GetSlotInfo"/> on it to learn
-    /// whether a token was inserted or removed: the event itself does not say which.
+    /// The slot the event occurred in, when one was pending; otherwise <see langword="null"/>. It equals the
+    /// slot with the same id in <see cref="GetSlotList"/>. Call <see cref="Pkcs11Slot.GetTokenInfo"/> or
+    /// <see cref="Pkcs11Slot.GetSlotInfo"/> on it to learn whether a token was inserted or removed: the
+    /// event itself does not say which. As with <see cref="WaitForSlotEvent"/>, call
+    /// <see cref="GetSlotList"/> before using a slot it has not reported.
     /// </param>
     /// <returns><see langword="true"/> if an event was pending; <see langword="false"/> if none was.</returns>
     /// <remarks>
-    /// Works on every module that implements <c>C_WaitForSlotEvent</c>, including one that may not be
-    /// called concurrently. Many modules do not, and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll
-    /// <see cref="GetSlotList"/> on those.
+    /// Works on a module that may not be called concurrently, provided the module honors
+    /// <c>CKF_DONT_BLOCK</c>. Some do not, and block anyway: on such a module, when it may not be called
+    /// concurrently, the poll holds the module's only lock until an event comes, and keeps every other call
+    /// out until then. Many modules do not implement <c>C_WaitForSlotEvent</c> at all and throw
+    /// <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll <see cref="GetSlotList"/> on those.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
     public bool TryGetSlotEvent([NotNullWhen(true)] out Pkcs11Slot? slot)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        slot = CallWaitForSlotEvent(blocking: false);
-        return slot is not null;
+
+        Log.LibraryTrace(_logger, _libraryPath, "TryGetSlotEvent");
+        (CKR rv, ulong slotId) = CallWaitForSlotEvent(CKF.CKF_DONT_BLOCK);
+        if (rv == CKR.CKR_NO_EVENT)
+        {
+            slot = null;
+            return false;
+        }
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpWaitForSlotEvent);
+        slot = new Pkcs11Slot(LowLevel, slotId, _loggerFactory);
+        return true;
     }
 
-    /// <summary>Calls <c>C_WaitForSlotEvent</c>; <see langword="null"/> on <c>CKR_NO_EVENT</c> from a poll.</summary>
-    private Pkcs11Slot? CallWaitForSlotEvent(bool blocking)
+    /// <summary>Calls <c>C_WaitForSlotEvent</c> and returns what it returned; the callers interpret it.</summary>
+    private (CKR ReturnValue, ulong SlotId) CallWaitForSlotEvent(ulong flags)
     {
-        Log.LibraryTrace(_logger, _libraryPath, blocking ? "WaitForSlotEvent" : "TryGetSlotEvent");
-
-        NativeCULong flags = (NativeCULong)(blocking ? 0UL : CKF.CKF_DONT_BLOCK);
-        CKR rv = LowLevel.C_WaitForSlotEvent(flags, out NativeCULong slotIdOut, IntPtr.Zero);
-
-        if (rv == CKR.CKR_OK) return new Pkcs11Slot(LowLevel, (ulong)slotIdOut, _loggerFactory);
-        if (!blocking && rv == CKR.CKR_NO_EVENT) return null;
-
-        throw Pkcs11Exception.Create(rv, Pkcs11Operations.OpWaitForSlotEvent);
+        CKR rv = LowLevel.C_WaitForSlotEvent((NativeCULong)flags, out NativeCULong slotId, IntPtr.Zero);
+        return (rv, (ulong)slotId);
     }
 
     /// <summary>
