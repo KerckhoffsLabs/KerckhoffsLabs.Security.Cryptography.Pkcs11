@@ -47,7 +47,7 @@ public sealed class SecretReadBackTests
     }
 
     // Runs body over an opted-in session, an HKDF base key and the ephemeral key factory a read-back would use.
-    private static void WithReadBack(ILogger? logger, Action<Pkcs11Session, Func<Pkcs11Key>> body)
+    private static void WithReadBack(ILogger? logger, Action<Pkcs11Session, Func<IReadBackGrant, Pkcs11Key>> body)
     {
         using var library = new ManagedSoftToken().Load(
             logger is null ? null : new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(logger) });
@@ -57,7 +57,7 @@ public sealed class SecretReadBackTests
         using var template = Pkcs11.Algorithms.DerivedKeyMaterial.ExtractableSecretTemplate(Length);
         var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
             CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, [1, 2, 3], [4, 5]));
-        body(session, () => ikm.Derive(mechanism, template));
+        body(session, grant => ikm.Derive(mechanism, template, grant));
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class SecretReadBackTests
 
         // Disposing the key from the check makes the following Destroy throw ObjectDisposedException.
         Assert.Throws<ObjectDisposedException>(() => readBack.Read(
-            () => ephemeral = create(), Length, Failures, v => { probe.Capture(v); ephemeral!.Dispose(); }));
+            grant => ephemeral = create(grant), Length, Failures, v => { probe.Capture(v); ephemeral!.Dispose(); }));
 
         Assert.NotNull(probe.Seen);
         Assert.All(probe.Seen, b => Assert.Equal(0, b));
@@ -97,7 +97,7 @@ public sealed class SecretReadBackTests
         using SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
 
         var e = Assert.Throws<CryptographicException>(() => readBack.Read(
-            () => ephemeral = create(), Length, Failures, v =>
+            grant => ephemeral = create(grant), Length, Failures, v =>
             {
                 probe.Capture(v);
                 ephemeral!.Dispose(); // the cleanup Destroy now throws ObjectDisposedException

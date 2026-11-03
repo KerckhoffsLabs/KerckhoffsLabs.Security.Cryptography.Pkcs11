@@ -415,7 +415,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         using SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
         var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf));
         using var template = DerivedKeyMaterial.ExtractableSecretTemplate(length);
-        return readBack.Read(() => session.GenerateKey(mechanism, template), length, ReadBackFailures.KdfOutput);
+        return readBack.Read(grant => session.GenerateKey(mechanism, template, grant), length, ReadBackFailures.KdfOutput);
     }
 
     private static void DeriveInto(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, Span<byte> destination)
