@@ -57,7 +57,11 @@ What each step does:
 ## Next steps
 
 - The example pages show every algorithm the library offers, each next to its
-  `System.Security.Cryptography` equivalent.
+  `System.Security.Cryptography` equivalent: [authenticated encryption](examples/aead.md),
+  [AES block modes](examples/aes.md), [RSA](examples/rsa.md), [elliptic curves](examples/elliptic-curves.md),
+  [post-quantum](examples/post-quantum.md), [hashes and HMAC](examples/hashes.md),
+  [key derivation](examples/key-derivation.md), [certificates](examples/certificates.md) and
+  [legacy algorithms](examples/legacy.md).
 - The [security model](security-model.md) explains what the library protects, from whom, and where its
   protection ends.
 - The [API reference](api/index.md) documents every type and member.

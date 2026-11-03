@@ -22,6 +22,8 @@
       href: examples/key-derivation.md
     - name: Certificates
       href: examples/certificates.md
+    - name: Legacy algorithms
+      href: examples/legacy.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies

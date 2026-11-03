@@ -9,8 +9,10 @@ full surface: the high-level façade (`Pkcs11Library`, `Pkcs11Slot`, `Pkcs11Sess
 algorithm adapters (`RSAPkcs11`, `ECDsaPkcs11`, `AesGcmPkcs11`, `MLKemPkcs11`, `MLDsaPkcs11`,
 `SlhDsaPkcs11`, …), the object/attribute model, and the low-level interop types.
 
-Start with the [**security model**](security-model.md): what the library protects, from whom, and where
-its protection ends.
+New here? [**Getting started**](getting-started.md) takes you from a module path to an operation on a
+token key, and the [**examples**](examples/aead.md) show every algorithm next to its
+`System.Security.Cryptography` equivalent. The [**security model**](security-model.md) explains what the
+library protects, from whom, and where its protection ends.
 
 ## Highlights
 
