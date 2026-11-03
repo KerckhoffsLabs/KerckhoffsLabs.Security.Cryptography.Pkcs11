@@ -1,0 +1,77 @@
+- name: Overview
+  href: index.md
+- name: Encryption
+  expanded: true
+  items:
+    - name: Authenticated encryption
+      href: aead.md
+    - name: AES-GCM
+      href: aes-gcm.md
+    - name: AES-CCM
+      href: aes-ccm.md
+    - name: ChaCha20-Poly1305
+      href: chacha20-poly1305.md
+    - name: AES block modes
+      href: aes.md
+- name: Signatures and key agreement
+  expanded: true
+  items:
+    - name: RSA
+      href: rsa.md
+    - name: Elliptic curves
+      href: elliptic-curves.md
+    - name: ECDSA
+      href: ecdsa.md
+    - name: ECDH
+      href: ecdh.md
+- name: Post-quantum
+  expanded: true
+  items:
+    - name: Overview
+      href: post-quantum.md
+    - name: ML-KEM
+      href: ml-kem.md
+    - name: ML-DSA
+      href: ml-dsa.md
+    - name: SLH-DSA
+      href: slh-dsa.md
+- name: Hashing and MACs
+  expanded: true
+  items:
+    - name: Overview
+      href: hashes.md
+    - name: SHA-2
+      href: sha-2.md
+    - name: SHA-3
+      href: sha-3.md
+    - name: HMAC
+      href: hmac.md
+- name: Key derivation
+  expanded: true
+  items:
+    - name: Overview
+      href: key-derivation.md
+    - name: HKDF
+      href: hkdf.md
+    - name: PBKDF2
+      href: pbkdf2.md
+    - name: SP 800-108
+      href: sp800-108.md
+- name: Certificates
+  href: certificates.md
+- name: Legacy algorithms
+  items:
+    - name: Overview
+      href: legacy.md
+    - name: Triple-DES
+      href: triple-des.md
+    - name: DES
+      href: des.md
+    - name: RC2
+      href: rc2.md
+    - name: DSA
+      href: dsa.md
+    - name: MD5
+      href: md5.md
+    - name: SHA-1
+      href: sha-1.md

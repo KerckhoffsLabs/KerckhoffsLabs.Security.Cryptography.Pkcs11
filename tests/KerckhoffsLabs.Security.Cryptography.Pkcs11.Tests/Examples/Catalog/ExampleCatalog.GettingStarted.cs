@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Examples;
 
-// docs/getting-started.md
+// docs/guide/getting-started.md
 internal static partial class ExampleCatalog
 {
     private static ExampleCase[] GettingStartedCases() =>

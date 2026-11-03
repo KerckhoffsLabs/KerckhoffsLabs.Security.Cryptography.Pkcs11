@@ -4,8 +4,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
-/// Keeps the generated policy catalogue documentation — <c>docs/policies/recommended.md</c>
-/// and <c>docs/policies/nist-approved.md</c> — byte-for-byte in sync with what <see cref="PolicyCatalogueMarkdown"/>
+/// Keeps the generated policy catalogue documentation — <c>docs/guide/policies/recommended.md</c>
+/// and <c>docs/guide/policies/nist-approved.md</c> — byte-for-byte in sync with what <see cref="PolicyCatalogueMarkdown"/>
 /// renders from the real <c>Recommended</c>/<c>NistApproved</c> catalogues.
 /// </summary>
 /// <remarks>
@@ -20,8 +20,8 @@ public sealed class PolicyDocsAreCurrentTests
 
     public static TheoryData<string, string> Pages => new()
     {
-        { "Recommended", "docs/policies/recommended.md" },
-        { "NistApproved", "docs/policies/nist-approved.md" },
+        { "Recommended", "docs/guide/policies/recommended.md" },
+        { "NistApproved", "docs/guide/policies/nist-approved.md" },
     };
 
     private static PolicyCatalogue CatalogueFor(string policyName) => policyName switch

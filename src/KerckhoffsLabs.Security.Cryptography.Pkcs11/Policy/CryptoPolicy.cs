@@ -18,7 +18,7 @@ public static class CryptoPolicy
     /// </summary>
     /// <remarks>
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its rationale, the
-    /// documented deny list — is at <c>docs/policies/recommended.md</c> in the repository. To allow a reviewed
+    /// documented deny list — is at <c>docs/guide/policies/recommended.md</c> in the repository. To allow a reviewed
     /// mechanism, derive your own policy: <c>CryptoPolicy.Recommended.ToBuilder("MyApp").AllowMechanism(...).Build()</c>.
     /// </remarks>
     public static ComposedCryptoPolicy Recommended { get; } = RecommendedDefinition.Create();
@@ -43,7 +43,7 @@ public static class CryptoPolicy
     /// </para>
     /// <para>
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its NIST citation and
-    /// the documented deny list — is at <c>docs/policies/nist-approved.md</c> in the repository.
+    /// the documented deny list — is at <c>docs/guide/policies/nist-approved.md</c> in the repository.
     /// </para>
     /// <para>Known limits — the policy judges requests, not the token's contents:</para>
     /// <list type="bullet">

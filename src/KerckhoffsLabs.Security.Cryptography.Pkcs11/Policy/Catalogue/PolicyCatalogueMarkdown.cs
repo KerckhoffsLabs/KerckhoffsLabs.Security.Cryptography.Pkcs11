@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 
 /// <summary>
 /// Renders a <see cref="PolicyCatalogue"/> to the Markdown catalogue documentation:
-/// <c>docs/policies/recommended.md</c> and <c>docs/policies/nist-approved.md</c> are the
+/// <c>docs/guide/policies/recommended.md</c> and <c>docs/guide/policies/nist-approved.md</c> are the
 /// committed output of <see cref="Render"/> against <c>CryptoPolicy.Recommended.Catalogue</c> and
 /// <c>CryptoPolicy.NistApproved.Catalogue</c>, kept in sync by <c>PolicyDocsAreCurrentTests</c>.
 /// </summary>

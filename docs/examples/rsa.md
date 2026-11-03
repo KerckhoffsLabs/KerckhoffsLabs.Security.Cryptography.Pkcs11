@@ -6,7 +6,7 @@ key operations run on the token, and the private key never leaves it.
 
 Each RSA key pair has one role. `GenerateRsaSigningKeyPair` creates a pair that can only sign and verify;
 `GenerateRsaKeyTransportKeyPair` one that can only encrypt and decrypt. See
-[Key role separation](../security-model.md#key-role-separation).
+[Key role separation](../guide/security-model.md#key-role-separation).
 
 ## Signing with RSA-PSS
 
@@ -60,6 +60,6 @@ use [ML-KEM](ml-kem.md) as the key-establishment step.
 - **Ciphertexts are checked before they reach the token:** a ciphertext must be exactly the modulus's
   length, and its value below the modulus, as the BCL requires.
 - **Keys already on the token are not inspected.** A 1024-bit key imported long ago still works; the
-  policy judges requests, not existing keys. See [Known limits](../security-model.md#known-limits).
+  policy judges requests, not existing keys. See [Known limits](../guide/security-model.md#known-limits).
 
 API reference: <xref:KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.RSAPkcs11>.

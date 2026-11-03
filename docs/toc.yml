@@ -1,84 +1,10 @@
-- name: Home
-  href: index.md
-- name: Getting started
-  href: getting-started.md
-- name: Security model
-  href: security-model.md
+# The navbar. Each section has its own sidebar: guide/toc.yml, examples/toc.yml and the generated api/toc.yml.
+- name: Guide
+  href: guide/
+  topicHref: guide/getting-started.md
 - name: Examples
-  items:
-    - name: Authenticated encryption
-      href: examples/aead.md
-      items:
-        - name: AES-GCM
-          href: examples/aes-gcm.md
-        - name: AES-CCM
-          href: examples/aes-ccm.md
-        - name: ChaCha20-Poly1305
-          href: examples/chacha20-poly1305.md
-    - name: AES block modes
-      href: examples/aes.md
-    - name: RSA
-      href: examples/rsa.md
-    - name: Elliptic curves
-      href: examples/elliptic-curves.md
-      items:
-        - name: ECDSA
-          href: examples/ecdsa.md
-        - name: ECDH
-          href: examples/ecdh.md
-    - name: Post-quantum
-      href: examples/post-quantum.md
-      items:
-        - name: ML-KEM
-          href: examples/ml-kem.md
-        - name: ML-DSA
-          href: examples/ml-dsa.md
-        - name: SLH-DSA
-          href: examples/slh-dsa.md
-    - name: Hashes and HMAC
-      href: examples/hashes.md
-      items:
-        - name: SHA-2
-          href: examples/sha-2.md
-        - name: SHA-3
-          href: examples/sha-3.md
-        - name: HMAC
-          href: examples/hmac.md
-    - name: Key derivation
-      href: examples/key-derivation.md
-      items:
-        - name: HKDF
-          href: examples/hkdf.md
-        - name: PBKDF2
-          href: examples/pbkdf2.md
-        - name: SP 800-108
-          href: examples/sp800-108.md
-    - name: Certificates
-      href: examples/certificates.md
-    - name: Legacy algorithms
-      href: examples/legacy.md
-      items:
-        - name: Triple-DES
-          href: examples/triple-des.md
-        - name: DES
-          href: examples/des.md
-        - name: RC2
-          href: examples/rc2.md
-        - name: DSA
-          href: examples/dsa.md
-        - name: MD5
-          href: examples/md5.md
-        - name: SHA-1
-          href: examples/sha-1.md
-- name: Diagnostics
-  href: diagnostics.md
-- name: Crypto policies
-  items:
-    - name: Using crypto policies
-      href: crypto-policies.md
-    - name: Recommended
-      href: policies/recommended.md
-    - name: NistApproved
-      href: policies/nist-approved.md
-- name: API
+  href: examples/
+  topicHref: examples/index.md
+- name: API reference
   href: api/
+  topicHref: api/index.md
