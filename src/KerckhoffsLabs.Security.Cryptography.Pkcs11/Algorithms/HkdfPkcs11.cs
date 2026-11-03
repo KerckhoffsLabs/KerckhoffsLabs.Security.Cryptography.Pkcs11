@@ -19,9 +19,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// output means taking key material off the token
 /// (<see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind.KdfOutput"/>), so under every built-in policy they throw
 /// <see cref="CryptoPolicyViolationException"/> unless the caller opts in with
-/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "reason"))</c>
-/// (reported as KLPKCS11012). A scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also
-/// allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. The additions —
+/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "reason", kdfBaseKeys: KdfBaseKeyScope.NeverProtected))</c>
+/// (reported as KLPKCS11012; the scope says which keys the secret may come from, see
+/// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Allow"/>), applied as a scoped
+/// <c>Pkcs11Session.UsePolicy</c> lease around the call or on a session of its own, not as a session\'s base policy.
+/// A <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. The additions —
 /// <see cref="DeriveKey(HashAlgorithmName, Pkcs11Key, ObjectTemplate, ReadOnlySpan{byte}, ReadOnlySpan{byte})"/>,
 /// <see cref="ExtractKey"/> and <see cref="ExpandKey"/> — keep the result on the token as a
 /// <see cref="Pkcs11Key"/> and need no override: prefer them whenever the derived material only has to

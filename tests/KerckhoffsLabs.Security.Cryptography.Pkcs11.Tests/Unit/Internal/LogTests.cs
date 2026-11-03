@@ -254,7 +254,7 @@ public sealed class LogTests
             var log = new CapturingLogger();
 #pragma warning disable KLPKCS11012 // an allowed export is what the log line under test reports
             ICryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("Opt-in")
-                .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test")).Build();
+                .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test", KdfBaseKeyScope.NeverProtected)).Build();
 #pragma warning restore KLPKCS11012
             var (library, session) = OpenLogged(log, policy);
             using (library)
@@ -276,7 +276,9 @@ public sealed class LogTests
 #pragma warning disable KLPKCS11012 // an allowed export is what the log lines under test report
         private static ICryptoPolicy OptIn(string name, params KeyMaterialExportKind[] kinds) =>
             CryptoPolicy.Recommended.ToBuilder(name)
-                .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, "test")).Build();
+                .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, "test",
+                    kinds.Contains(KeyMaterialExportKind.KdfOutput) ? KdfBaseKeyScope.NeverProtected : null,
+                    kinds.Any(k => k != KeyMaterialExportKind.KdfOutput) ? PrivateKeyScope.Any : null)).Build();
 #pragma warning restore KLPKCS11012
 
         private static int Exports(CapturingLogger log, LogLevel level) =>

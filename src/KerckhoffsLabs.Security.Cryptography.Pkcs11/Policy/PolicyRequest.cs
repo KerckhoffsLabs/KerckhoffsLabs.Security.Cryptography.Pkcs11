@@ -76,6 +76,12 @@ public sealed record KeyTemplateRequest(CKO? ObjectClass, IReadOnlyList<ObjectAt
     /// </remarks>
     public KeyMaterialExportKind? ReadBackFor { get; internal init; }
 
+    /// <summary>
+    /// The export request the open read-back was allowed for (its <see cref="KeyMaterialExportRequest.Kind"/> is
+    /// <see cref="ReadBackFor"/>), key info included, so the built-in policies judge the tag against the same scope.
+    /// </summary>
+    internal KeyMaterialExportRequest? ReadBackExport { get; init; }
+
     internal override string Describe()
     {
         string described = ObjectClass is { } cls ? $"key template ({cls})" : "key template";
@@ -119,6 +125,12 @@ public sealed record KeyAgreementKdfRequest(CKM Mechanism, CKD Kdf) : PolicyRequ
     /// </remarks>
     public KeyMaterialExportKind? ReadBackFor { get; internal init; }
 
+    /// <summary>
+    /// The export request the open read-back was allowed for (its <see cref="KeyMaterialExportRequest.Kind"/> is
+    /// <see cref="ReadBackFor"/>), key info included, so the built-in policies judge the tag against the same scope.
+    /// </summary>
+    internal KeyMaterialExportRequest? ReadBackExport { get; init; }
+
     internal override string Describe()
     {
         string described = ResultIsDerivationOnlySecret
@@ -151,10 +163,24 @@ public sealed record KeyMaterialExportRequest(KeyMaterialExportKind Kind) : Poli
     /// policy that allows <see cref="KeyMaterialExportKind.KdfOutput"/> should judge it too: KDF output over a base key the
     /// token has always protected reproduces every key derived from that base.
     /// </remarks>
-    public KdfBaseKeyInfo? KdfBaseKey { get; internal init; }
+    public ExportKeyInfo? KdfBaseKey { get; internal init; }
+
+    /// <summary>
+    /// For <see cref="KeyMaterialExportKind.EcdhSharedSecret"/>, and for a <see cref="KeyMaterialExportKind.KemSharedSecret"/>
+    /// read by decapsulation, what the library read off the private key; otherwise, and for an encapsulation (which uses no
+    /// private key), <see langword="null"/>. Set by the library, never by the caller.
+    /// </summary>
+    /// <remarks>
+    /// A built-in policy's <see cref="KeyMaterialExportRule"/> checks it against its <see cref="PrivateKeyScope"/>. A custom
+    /// policy that allows either kind should judge it too: the secret over a long-lived private key reproduces what earlier
+    /// agreements and decapsulations with it kept on the token.
+    /// </remarks>
+    public ExportKeyInfo? PrivateKey { get; internal init; }
 
     internal override string Describe() =>
-        KdfBaseKey is { } baseKey ? $"export of {Kind} over a {baseKey.Describe()}" : $"export of {Kind}";
+        KdfBaseKey is { } baseKey ? $"export of {Kind} over a {baseKey.Describe("base key")}"
+        : PrivateKey is { } privateKey ? $"export of {Kind} over a {privateKey.Describe("private key")}"
+        : $"export of {Kind}";
 }
 
 /// <summary>The kind of secret a <see cref="KeyMaterialExportRequest"/> reads off the token.</summary>

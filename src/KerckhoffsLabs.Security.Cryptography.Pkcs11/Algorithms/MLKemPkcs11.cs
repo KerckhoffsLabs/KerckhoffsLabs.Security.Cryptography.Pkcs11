@@ -27,9 +27,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <see cref="CryptoPolicyViolationException"/> unless the owning session's
 /// <see cref="Pkcs11Session.Policy"/> allows reading the shared secret off the token
 /// (<see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind.KemSharedSecret"/>). Every built-in policy refuses it; opt in with
-/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KemSharedSecret], "reason"))</c>
-/// (reported as KLPKCS11012). A scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also
-/// allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions.
+/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KemSharedSecret], "reason", privateKeys: PrivateKeyScope.SessionObjects))</c>
+/// (reported as KLPKCS11012; the scope says which keys the secret may come from, see
+/// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Allow"/>), applied as a scoped
+/// <c>Pkcs11Session.UsePolicy</c> lease around the call or on a session of its own, not as a session\'s base policy.
+/// A <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions.
 /// The gate is mechanism-agnostic — it gates the extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>
 /// <para><b>Private-key export</b> (<c>ExportDecapsulationKey</c>, seed, PKCS#8) is always
 /// refused. Public-key (<i>encapsulation key</i>) export reads <c>CKA_VALUE</c> from the
@@ -54,9 +56,11 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     /// <exception cref="CryptoPolicyViolationException">
     /// Thrown unless the owning session's <see cref="Pkcs11Session.Policy"/> allows
     /// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind.KemSharedSecret"/>. Every built-in policy refuses it; opt in with
-    /// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KemSharedSecret], "reason"))</c>
-    /// (reported as KLPKCS11012). A scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also
-    /// allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. Or use
+    /// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KemSharedSecret], "reason", privateKeys: PrivateKeyScope.SessionObjects))</c>
+    /// (reported as KLPKCS11012; the scope says which keys the secret may come from, see
+    /// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Allow"/>), applied as a scoped
+    /// <c>Pkcs11Session.UsePolicy</c> lease around the call or on a session of its own, not as a session\'s base policy.
+    /// A <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. Or use
     /// <see cref="Pkcs11Key.EncapsulateKey(Mechanism, Objects.ObjectTemplate, int)"/> for the on-token-only path.
     /// </exception>
     protected override void EncapsulateCore(Span<byte> ciphertext, Span<byte> sharedSecret)
@@ -116,7 +120,9 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 
     private void DecapsulateAndRead(ReadOnlySpan<byte> ciphertext, Span<byte> sharedSecret)
     {
-        using SecretReadBack readBack = _key.Session.BeginReadBack(KeyMaterialExportKind.KemSharedSecret);
+        // The private key is judged: over a long-lived key, decapsulating a recorded ciphertext returns the secret
+        // DecapsulateKey kept on the token (PrivateKeyScope). Encapsulation uses no private key, so it passes none.
+        using SecretReadBack readBack = _key.Session.BeginReadBack(KeyMaterialExportKind.KemSharedSecret, _key);
 
         var mech = new Mechanism(CKM.CKM_ML_KEM);
 

@@ -262,7 +262,8 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             Enforce(new KeyAgreementKdfRequest(mechanism.Type, ecdh.Kdf)
             {
                 ResultIsDerivationOnlySecret = resultTemplate is not null && IsDerivationOnlySecret(resultTemplate),
-                ReadBackFor = ReadBackKind,
+                ReadBackFor = ReadBackRequest?.Kind,
+                ReadBackExport = ReadBackRequest,
             });
     }
 

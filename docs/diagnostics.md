@@ -159,7 +159,7 @@ continue one PBKDF2 byte stream across several output chunks.
 <a id="KLPKCS11012"></a>
 ### KLPKCS11012 — Secret key material export opted in
 
-Reported by an analyzer at every `KeyMaterialExportRule.Allow(kinds, rationale)` call site, and at every
+Reported by an analyzer at every `KeyMaterialExportRule.Allow(kinds, rationale, kdfBaseKeys, privateKeys)` call site, and at every
 method-group reference to it (`Func<…> allow = KeyMaterialExportRule.Allow;`). `Allow` is the
 one way to let a policy read secret key material off the token in the clear: a raw ECDH / X25519 / X448
 shared secret (`EcdhSharedSecret`), a KEM shared secret (`KemSharedSecret`), or KDF output
@@ -181,7 +181,8 @@ Suppress at the call site, with a reason:
 ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
     .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(
         [KeyMaterialExportKind.EcdhSharedSecret],
-        "X25519 shared secret for <protocol>'s managed key schedule."))
+        "X25519 shared secret of an ephemeral key, for <protocol>'s managed key schedule.",
+        privateKeys: PrivateKeyScope.SessionObjects))
     .Build();
 #pragma warning restore KLPKCS11012
 ```
@@ -189,9 +190,12 @@ ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
 Suppressing the diagnostic changes nothing at run time: the policy still allows only the kinds named,
 and the exports it allows are logged once the secret has been read: a `KeyMaterialExportAllowed` warning
 for the first export of each kind under the policy on a session, then the same line at Debug for every later
-one (the kind and the policy name, never the secret). `KdfOutput` is the broadest kind: a KDF's output is the
-value of keys the token could derive from the same base, so it is scoped by base key, by default to keys the
-token has not always protected; see [the base-key scope](crypto-policies.md#kdfoutput-base-key-scope).
+one (the kind and the policy name, never the secret). Every kind is scoped by the key the secret comes from, and
+the call must name the scope: `KdfOutput` by base key
+([the base-key scope](crypto-policies.md#kdfoutput-base-key-scope)), `EcdhSharedSecret` and `KemSharedSecret` by
+private key ([the private-key scope](crypto-policies.md#private-key-scope)). Apply the policy as a scoped
+`UsePolicy` lease or on a session of its own, not as the policy your sessions are opened with
+([where to apply it](crypto-policies.md#where-to-apply-an-export-opt-in)).
 
 ## Runtime-only gates
 

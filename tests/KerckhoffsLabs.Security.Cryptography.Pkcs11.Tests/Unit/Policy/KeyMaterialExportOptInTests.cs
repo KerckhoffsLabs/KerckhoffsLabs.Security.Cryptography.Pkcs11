@@ -18,7 +18,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
-/// An explicit, per-kind <see cref="KeyMaterialExportRule.Allow(IEnumerable{KeyMaterialExportKind}, string)"/> opt-in over <c>Recommended</c> must make
+/// An explicit, per-kind <see cref="KeyMaterialExportRule.Allow"/> opt-in over <c>Recommended</c> must make
 /// the library's own read-back paths work, and nothing else: the extractable, non-sensitive template (and,
 /// for ECDH, the <c>CKD_NULL</c> derivation) such a path creates is judged by the export rule for its kind,
 /// while the same template or derivation coming from a caller is still judged by the template and KDF rules.
@@ -35,14 +35,27 @@ public sealed class KeyMaterialExportOptInTests
     private static readonly KeyMaterialExportKind[] AllKinds =
         [KeyMaterialExportKind.KdfOutput, KeyMaterialExportKind.EcdhSharedSecret, KeyMaterialExportKind.KemSharedSecret];
 
+    // Every scoped kind must name its scope. The tests that are not about scopes use the widest private-key scope and
+    // the NeverProtected base-key scope, so only the kind decides.
+    private static KdfBaseKeyScope? KdfScopeFor(KeyMaterialExportKind[] kinds, KdfBaseKeyScope scope) =>
+        kinds.Contains(KeyMaterialExportKind.KdfOutput) ? scope : null;
+
+    private static PrivateKeyScope? PrivateScopeFor(KeyMaterialExportKind[] kinds, PrivateKeyScope scope) =>
+        kinds.Any(k => k is KeyMaterialExportKind.EcdhSharedSecret or KeyMaterialExportKind.KemSharedSecret) ? scope : null;
+
     private static ICryptoPolicy OptIn(params KeyMaterialExportKind[] kinds) =>
-        CryptoPolicy.Recommended.ToBuilder("Opt-in")
-            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, "test"))
-            .Build();
+        OptIn(KdfBaseKeyScope.NeverProtected, PrivateKeyScope.Any, kinds);
 
     private static ICryptoPolicy OptIn(KdfBaseKeyScope kdfBaseKeys, params KeyMaterialExportKind[] kinds) =>
+        OptIn(kdfBaseKeys, PrivateKeyScope.Any, kinds);
+
+    private static ICryptoPolicy OptIn(PrivateKeyScope privateKeys, params KeyMaterialExportKind[] kinds) =>
+        OptIn(KdfBaseKeyScope.NeverProtected, privateKeys, kinds);
+
+    private static ICryptoPolicy OptIn(KdfBaseKeyScope kdfBaseKeys, PrivateKeyScope privateKeys, KeyMaterialExportKind[] kinds) =>
         CryptoPolicy.Recommended.ToBuilder("Opt-in")
-            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, "test", kdfBaseKeys))
+            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(
+                kinds, "test", KdfScopeFor(kinds, kdfBaseKeys), PrivateScopeFor(kinds, privateKeys)))
             .Build();
 
     private static void WithSession(ICryptoPolicy policy, Action<Pkcs11Session> body)
@@ -58,13 +71,13 @@ public sealed class KeyMaterialExportOptInTests
         return session.ImportKey(tpl);
     }
 
-    private static Pkcs11Key GenerateMlKem(Pkcs11Session session)
+    private static Pkcs11Key GenerateMlKem(Pkcs11Session session, bool onToken = false)
     {
         using var pub = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
             .Attribute(CKA.CKA_ENCAPSULATE, true)
-            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768).Build();
+            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768).OnToken(onToken).Build();
         using var priv = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
-            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
+            .Attribute(CKA.CKA_DECAPSULATE, true).OnToken(onToken).Build();
         return session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pub, priv);
     }
 
@@ -866,9 +879,9 @@ public sealed class KeyMaterialExportOptInTests
 
     // KDF output over the agreed secret Z of DeriveSecretAgreement IS the value of every key the token derives from
     // Z with the same mechanism. Z is CKA_ALWAYS_SENSITIVE (derived from a generated, sensitive private key), so the
-    // default scope refuses the read, and the sensitive key derived from Z stays on the token.
+    // NeverProtected scope refuses the read, and the sensitive key derived from Z stays on the token.
     [Fact]
-    public void KdfOutputOptIn_DeriveBytesOverAnAgreedSecret_IsRefusedByTheDefaultScope() =>
+    public void KdfOutputOptIn_DeriveBytesOverAnAgreedSecret_IsRefusedByNeverProtected() =>
         WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
         {
             using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
@@ -877,7 +890,7 @@ public sealed class KeyMaterialExportOptInTests
 
             var e = Assert.Throws<CryptoPolicyViolationException>(() => z.DeriveBytes(HkdfMechanism(), 32));
 
-            KdfBaseKeyInfo baseKey = Assert.IsType<KeyMaterialExportRequest>(e.Request).KdfBaseKey!;
+            ExportKeyInfo baseKey = Assert.IsType<KeyMaterialExportRequest>(e.Request).KdfBaseKey!;
             Assert.True(baseKey.AlwaysSensitive);
             Assert.Equal(CKK.CKK_GENERIC_SECRET, baseKey.KeyType);
             Assert.Contains("KdfOutput scope", e.Message);
@@ -902,9 +915,9 @@ public sealed class KeyMaterialExportOptInTests
             Assert.Equal(tag, HMACSHA256.HashData(bytes, "probe"u8));
         });
 
-    // A generated, sensitive secret key is always sensitive: refused by default.
+    // A generated, sensitive secret key is always sensitive: refused by NeverProtected.
     [Fact]
-    public void KdfOutputOptIn_GeneratedSensitiveKey_IsRefusedByTheDefaultScope() =>
+    public void KdfOutputOptIn_GeneratedSensitiveKey_IsRefusedByNeverProtected() =>
         WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
         {
             using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Derive().Build();
@@ -913,10 +926,10 @@ public sealed class KeyMaterialExportOptInTests
             Assert.Throws<CryptoPolicyViolationException>(() => HkdfPkcs11.DeriveKey(Sha256, master, 32, Salt, Info));
         });
 
-    // Imported key material, and a PRK the token extracted from it, are not always sensitive: the default scope
+    // Imported key material, and a PRK the token extracted from it, are not always sensitive: NeverProtected
     // covers the BCL adapters' usual inputs, Expand over an on-token PRK included.
     [Fact]
-    public void KdfOutputOptIn_ImportedIkmAndItsPrk_AreInTheDefaultScope() =>
+    public void KdfOutputOptIn_ImportedIkmAndItsPrk_AreInNeverProtected() =>
         WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
         {
             using var ikm = ImportIkm(session);
@@ -959,7 +972,7 @@ public sealed class KeyMaterialExportOptInTests
 
             HkdfPkcs11.DeriveKey(Sha256, ikm, 32, Salt, Info);
 
-            KdfBaseKeyInfo baseKey = Assert.Single(policy.Seen.OfType<KeyMaterialExportRequest>()).KdfBaseKey!;
+            ExportKeyInfo baseKey = Assert.Single(policy.Seen.OfType<KeyMaterialExportRequest>()).KdfBaseKey!;
             Assert.Equal(CKK.CKK_GENERIC_SECRET, baseKey.KeyType);
             Assert.Equal([7], baseKey.Id.ToArray());
             Assert.Equal("ikm", baseKey.Label);
@@ -967,35 +980,227 @@ public sealed class KeyMaterialExportOptInTests
         });
     }
 
+    // === The EcdhSharedSecret / KemSharedSecret private-key scope ===================================
+
+    // Z over a long-lived token key, with a peer public key anyone may have recorded, is the Z an earlier
+    // DeriveSecretAgreement kept on the token. SessionObjects refuses it and names the key in the request.
+    [Fact]
+    public void EcdhOptIn_SessionObjectsScope_TokenPrivateKey_IsRefused() =>
+        WithSession(OptIn(PrivateKeyScope.SessionObjects, KeyMaterialExportKind.EcdhSharedSecret), session =>
+        {
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, "static", persistOnToken: true);
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+
+            var e = Assert.Throws<CryptoPolicyViolationException>(() => alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
+
+            ExportKeyInfo privateKey = Assert.IsType<KeyMaterialExportRequest>(e.Request).PrivateKey!;
+            Assert.True(privateKey.Token);
+            Assert.Equal(CKK.CKK_EC, privateKey.KeyType);
+            Assert.Equal("static", privateKey.Label);
+            Assert.Contains("private-key scope", e.Message);
+        });
+
+    // An ephemeral (session) key is in SessionObjects, and the read agrees with the BCL.
+    [Fact]
+    public void EcdhOptIn_SessionObjectsScope_SessionPrivateKey_Succeeds() =>
+        WithSession(OptIn(PrivateKeyScope.SessionObjects, KeyMaterialExportKind.EcdhSharedSecret), session =>
+        {
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            using var alicePublic = ECDiffieHellman.Create();
+            alicePublic.ImportSubjectPublicKeyInfo(alice.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo), out _);
+
+            byte[] z = alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo());
+
+            Assert.Equal(bob.DeriveRawSecretAgreement(alicePublic.PublicKey), z);
+        });
+
+    // Under an explicit Any the same read over the token key is allowed, and then reproduces the sensitive key an
+    // earlier agreement kept on the token: the reason Any must be named, and justified, to get there.
+    [Fact]
+    public void EcdhOptIn_AnyScope_TokenPrivateKey_ReproducesTheSensitiveKeyAnAgreementKept() =>
+        WithSession(OptIn(PrivateKeyScope.Any, KeyMaterialExportKind.EcdhSharedSecret), session =>
+        {
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, persistOnToken: true);
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            byte[] bobSpki = bob.ExportSubjectPublicKeyInfo();
+            using Pkcs11Key kept = alice.DeriveSecretAgreement(bobSpki);
+            using var macTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Sign().Build();
+            using Pkcs11Key macKey = kept.Derive(HkdfMechanism(), macTemplate);
+            byte[] tag = macKey.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), "probe"u8.ToArray());
+
+            byte[] z = alice.DeriveRawSecret(bobSpki);
+
+            byte[] okm = HKDF.DeriveKey(Sha256, z, 32, Salt, Info);
+            Assert.Equal(tag, HMACSHA256.HashData(okm, "probe"u8));
+        });
+
+    // A Where scope decides alone, from what the library read off the private key.
+    [Fact]
+    public void EcdhOptIn_WhereScope_JudgesThePrivateKeysAttributes()
+    {
+        var scope = PrivateKeyScope.Where(k => k.Label == "agreement", "the key labelled agreement");
+        WithSession(OptIn(scope, KeyMaterialExportKind.EcdhSharedSecret), session =>
+        {
+            using var inScope = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, "agreement");
+            using var other = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, "other");
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+
+            Assert.NotEmpty(inScope.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
+            Assert.Throws<CryptoPolicyViolationException>(() => other.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
+        });
+    }
+
+    // A decapsulation over a long-lived token key returns the secret DecapsulateKey kept on the token for any
+    // recorded ciphertext: SessionObjects refuses it.
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void KemOptIn_SessionObjectsScope_TokenKeyDecapsulate_IsRefused() =>
+        WithSession(OptIn(PrivateKeyScope.SessionObjects, KeyMaterialExportKind.KemSharedSecret), session =>
+        {
+            using var key = GenerateMlKem(session, onToken: true);
+            using var mlkem = new MLKemPkcs11(key);
+            using var sender = MLKem.ImportEncapsulationKey(MLKemAlgorithm.MLKem768, mlkem.ExportEncapsulationKey());
+            sender.Encapsulate(out byte[] ciphertext, out _);
+
+            var e = Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Decapsulate(ciphertext));
+
+            ExportKeyInfo privateKey = Assert.IsType<KeyMaterialExportRequest>(e.Request).PrivateKey!;
+            Assert.True(privateKey.Token);
+            Assert.Equal(CKK.CKK_ML_KEM, privateKey.KeyType);
+        });
+
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void KemOptIn_SessionObjectsScope_SessionKeyDecapsulate_Succeeds() =>
+        WithSession(OptIn(PrivateKeyScope.SessionObjects, KeyMaterialExportKind.KemSharedSecret), session =>
+        {
+            using var key = GenerateMlKem(session);
+            using var mlkem = new MLKemPkcs11(key);
+            using var sender = MLKem.ImportEncapsulationKey(MLKemAlgorithm.MLKem768, mlkem.ExportEncapsulationKey());
+            sender.Encapsulate(out byte[] ciphertext, out byte[] expected);
+
+            Assert.Equal(expected, mlkem.Decapsulate(ciphertext));
+        });
+
+    // An encapsulation uses no private key: its fresh secret is in every scope, None included. None refuses every
+    // decapsulation and agreement.
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void KemOptIn_NoneScope_AllowsEncapsulationOnly() =>
+        WithSession(OptIn(PrivateKeyScope.None, KeyMaterialExportKind.KemSharedSecret, KeyMaterialExportKind.EcdhSharedSecret), session =>
+        {
+            using var key = GenerateMlKem(session);
+            using var mlkem = new MLKemPkcs11(key);
+
+            mlkem.Encapsulate(out byte[] ciphertext, out byte[] sharedSecret);
+            Assert.Equal(32, sharedSecret.Length);
+
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Decapsulate(ciphertext));
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            Assert.Throws<CryptoPolicyViolationException>(() => alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
+        });
+
+    // What a custom policy sees: no private key for an encapsulation; the private key, read off the private object,
+    // for a decapsulation and an agreement.
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void SharedSecretRequest_CarriesThePrivateKey()
+    {
+        var policy = new RecordingPolicy();
+        WithSession(policy, session =>
+        {
+            using var key = GenerateMlKem(session, onToken: true);
+            using var mlkem = new MLKemPkcs11(key);
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, "alice");
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            policy.Seen.Clear();
+
+            mlkem.Encapsulate(out byte[] ciphertext, out _);
+            mlkem.Decapsulate(ciphertext);
+            alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo());
+
+            KeyMaterialExportRequest[] exports = [.. policy.Seen.OfType<KeyMaterialExportRequest>()];
+            Assert.Equal(3, exports.Length);
+            Assert.Null(exports[0].PrivateKey);
+            Assert.Equal(CKK.CKK_ML_KEM, exports[1].PrivateKey!.KeyType);
+            Assert.True(exports[1].PrivateKey!.Token);
+            Assert.Equal(CKK.CKK_EC, exports[2].PrivateKey!.KeyType);
+            Assert.False(exports[2].PrivateKey!.Token);
+            Assert.Equal("alice", exports[2].PrivateKey!.Label);
+            Assert.All(exports, e => Assert.Null(e.KdfBaseKey));
+        });
+    }
+
+    // A private key whose attributes the token does not report is judged persistent; a read with no private key is
+    // in every scope.
+    [Fact]
+    public void PrivateKeyScope_UnreadPrivateKey_IsPersistent()
+    {
+        Assert.False(PrivateKeyScope.SessionObjects.Admits(ExportKeyInfo.Unread));
+        Assert.False(PrivateKeyScope.None.Admits(ExportKeyInfo.Unread));
+        Assert.True(PrivateKeyScope.Any.Admits(ExportKeyInfo.Unread));
+        Assert.True(PrivateKeyScope.SessionObjects.Admits(null));
+        Assert.True(PrivateKeyScope.None.Admits(null));
+    }
+
     // A base key whose attributes the token does not report is judged as protected.
     [Fact]
     public void KdfBaseKeyScope_UnreadBaseKey_IsProtected()
     {
-        Assert.False(KdfBaseKeyScope.NeverProtected.Admits(KdfBaseKeyInfo.Unread));
-        Assert.True(KdfBaseKeyScope.Any.Admits(KdfBaseKeyInfo.Unread));
+        Assert.False(KdfBaseKeyScope.NeverProtected.Admits(ExportKeyInfo.Unread));
+        Assert.True(KdfBaseKeyScope.Any.Admits(ExportKeyInfo.Unread));
         Assert.True(KdfBaseKeyScope.NeverProtected.Admits(null));
     }
 
+    // There is no default scope: an opt-in to a scoped kind names its scope, and a scope names a kind it applies to.
     [Fact]
-    public void Allow_WithScope_RequiresKdfOutput()
+    public void Allow_KdfOutputWithoutScope_Throws()
     {
-        Assert.Throws<ArgumentException>(() =>
-            KeyMaterialExportRule.Allow([KeyMaterialExportKind.EcdhSharedSecret], "test", KdfBaseKeyScope.Any));
-        Assert.Throws<ArgumentNullException>(() =>
-            KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test", null!));
-        Assert.Throws<ArgumentException>(() => KdfBaseKeyScope.Where(_ => true, " "));
+        var e = Assert.Throws<ArgumentException>(() =>
+            KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test"));
+        Assert.Equal("kdfBaseKeys", e.ParamName);
+        e = Assert.Throws<ArgumentException>(() =>
+            KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput, KeyMaterialExportKind.KemSharedSecret], "test",
+                privateKeys: PrivateKeyScope.Any));
+        Assert.Equal("kdfBaseKeys", e.ParamName);
     }
 
-    // The catalogue names the scope.
+    [Theory]
+    [InlineData(KeyMaterialExportKind.EcdhSharedSecret)]
+    [InlineData(KeyMaterialExportKind.KemSharedSecret)]
+    public void Allow_SharedSecretWithoutPrivateKeyScope_Throws(KeyMaterialExportKind kind)
+    {
+        var e = Assert.Throws<ArgumentException>(() => KeyMaterialExportRule.Allow([kind], "test"));
+        Assert.Equal("privateKeys", e.ParamName);
+        e = Assert.Throws<ArgumentException>(() =>
+            KeyMaterialExportRule.Allow([kind, KeyMaterialExportKind.KdfOutput], "test", KdfBaseKeyScope.Any));
+        Assert.Equal("privateKeys", e.ParamName);
+    }
+
     [Fact]
-    public void Allow_Rationale_NamesTheKdfScope()
+    public void Allow_ScopeForAKindNotNamed_Throws()
+    {
+        var e = Assert.Throws<ArgumentException>(() =>
+            KeyMaterialExportRule.Allow([KeyMaterialExportKind.EcdhSharedSecret], "test", KdfBaseKeyScope.Any, PrivateKeyScope.Any));
+        Assert.Equal("kdfBaseKeys", e.ParamName);
+        e = Assert.Throws<ArgumentException>(() =>
+            KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test", KdfBaseKeyScope.Any, PrivateKeyScope.Any));
+        Assert.Equal("privateKeys", e.ParamName);
+        Assert.Throws<ArgumentException>(() => KdfBaseKeyScope.Where(_ => true, " "));
+        Assert.Throws<ArgumentException>(() => PrivateKeyScope.Where(_ => true, " "));
+        Assert.Throws<ArgumentNullException>(() => PrivateKeyScope.Where(null!, "d"));
+    }
+
+    // The catalogue names every scope.
+    [Fact]
+    public void Allow_Rationale_NamesTheScopes()
     {
         Assert.Contains("KdfOutput over base keys that are not CKA_ALWAYS_SENSITIVE",
-            KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test").Rationale);
+            KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test", KdfBaseKeyScope.NeverProtected).Rationale);
         Assert.Contains("KdfOutput over any base key",
             KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test", KdfBaseKeyScope.Any).Rationale);
-        Assert.DoesNotContain("KdfOutput over",
-            KeyMaterialExportRule.Allow([KeyMaterialExportKind.KemSharedSecret], "test").Rationale);
+        string kem = KeyMaterialExportRule.Allow([KeyMaterialExportKind.KemSharedSecret], "test",
+            privateKeys: PrivateKeyScope.SessionObjects).Rationale;
+        Assert.DoesNotContain("KdfOutput over", kem);
+        Assert.Contains("shared secrets over private keys that are session objects", kem);
     }
 
     // === A read-back template is still judged by the template rule, but for sensitivity ==========
@@ -1006,7 +1211,8 @@ public sealed class KeyMaterialExportOptInTests
     {
         var seen = new List<(KeyMaterialExportKind?, CKA[])>();
         ICryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("Capped opt-in")
-            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, "test"))
+            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, "test",
+                KdfScopeFor(kinds, KdfBaseKeyScope.NeverProtected), PrivateScopeFor(kinds, PrivateKeyScope.Any)))
             .WithKeyTemplateRule(KeyTemplateRule.FromDelegate(r =>
             {
                 seen.Add((r.ReadBackFor, [.. r.Attributes.Select(a => a.Type)]));

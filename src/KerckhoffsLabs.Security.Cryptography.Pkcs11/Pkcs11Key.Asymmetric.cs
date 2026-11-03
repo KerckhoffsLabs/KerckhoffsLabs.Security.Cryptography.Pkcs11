@@ -208,7 +208,9 @@ public sealed partial class Pkcs11Key
         // The export check comes before the peer is examined, and it is what a policy that allows extractable
         // templates but not a plaintext shared secret relies on. Inside the read-back, the derivation's
         // extractable template and CKD_NULL are judged as this read-back.
-        using SecretReadBack readBack = _session.BeginReadBack(Policy.KeyMaterialExportKind.EcdhSharedSecret);
+        // The private key is judged too: Z over a long-lived key reproduces what DeriveSecretAgreement kept on the
+        // token (PrivateKeyScope).
+        using SecretReadBack readBack = _session.BeginReadBack(Policy.KeyMaterialExportKind.EcdhSharedSecret, this);
 
         AgreementPeer peer = ValidateAgreementPeer(peerSubjectPublicKeyInfo, operation);
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.PublicData));

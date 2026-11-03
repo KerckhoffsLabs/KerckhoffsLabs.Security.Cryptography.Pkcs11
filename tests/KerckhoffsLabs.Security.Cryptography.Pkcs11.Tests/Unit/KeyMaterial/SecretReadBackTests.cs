@@ -25,7 +25,7 @@ public sealed class SecretReadBackTests
     private static ReadBackFailures Failures => ReadBackFailures.KdfOutput;
 
     private static readonly ICryptoPolicy KdfOptIn = CryptoPolicy.Recommended.ToBuilder("Opt-in")
-        .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test"))
+        .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "test", KdfBaseKeyScope.NeverProtected))
         .Build();
 
     private sealed class Probe

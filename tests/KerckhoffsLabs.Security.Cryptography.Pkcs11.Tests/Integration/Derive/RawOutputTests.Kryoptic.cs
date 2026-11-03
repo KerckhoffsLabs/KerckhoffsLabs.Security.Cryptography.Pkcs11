@@ -33,5 +33,8 @@ public sealed class RawOutputTests_Kryoptic(KryopticBackendFixture backend)
     public void DeriveBytes_Sp800108Feedback_MatchesReference() => RawOutputTestCases.Assert_DeriveBytes_Sp800108Feedback_MatchesReference(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void DeriveBytes_OverAnAgreedSecret_DefaultScope() => RawOutputTestCases.Assert_DeriveBytes_OverAnAgreedSecret_DefaultScope(_backend);
+    public void DeriveBytes_OverAnAgreedSecret_NeverProtectedScope() => RawOutputTestCases.Assert_DeriveBytes_OverAnAgreedSecret_NeverProtectedScope(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void DeriveRawSecret_SessionObjectsScope() => RawOutputTestCases.Assert_DeriveRawSecret_SessionObjectsScope(_backend);
 }

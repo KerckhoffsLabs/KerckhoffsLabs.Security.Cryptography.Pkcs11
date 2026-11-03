@@ -63,13 +63,14 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <exception cref="CryptoPolicyViolationException">The policy refuses the export.</exception>
     /// <exception cref="InvalidOperationException">Another thread is using the session, or a read-back is already open on it.</exception>
     /// <param name="kind">The kind of secret to read.</param>
-    /// <param name="kdfBaseKey">
-    /// For <see cref="KeyMaterialExportKind.KdfOutput"/>, the KDF's base key, whose attributes the policy's base-key scope
-    /// judges (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>); <see langword="null"/> otherwise, and for a KDF with no
-    /// base key (PBKDF2).
+    /// <param name="sourceKey">
+    /// The key the secret comes from, whose attributes the policy's scope for <paramref name="kind"/> judges: for
+    /// <see cref="KeyMaterialExportKind.KdfOutput"/> the KDF's base key (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>),
+    /// otherwise the agreement's or decapsulation's private key (<see cref="KeyMaterialExportRequest.PrivateKey"/>).
+    /// <see langword="null"/> for a KDF with no base key (PBKDF2) and for a KEM encapsulation.
     /// </param>
-    internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind, Pkcs11Key? kdfBaseKey = null)
-        => new(_core.BeginReadBack(kind, kdfBaseKey is null ? null : kdfBaseKey.ReadKdfBaseKeyInfo));
+    internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind, Pkcs11Key? sourceKey = null)
+        => new(_core.BeginReadBack(kind, sourceKey is null ? null : sourceKey.ReadExportKeyInfo));
 
     /// <summary>Evaluates <paramref name="request"/> without throwing or logging.</summary>
     internal bool IsPermitted(PolicyRequest request) => _core.IsPermitted(request);
