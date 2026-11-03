@@ -387,7 +387,7 @@ public sealed class RSAPkcs11 : RSA
     /// </summary>
     private static Mechanism SignMechanismFor(HashAlgorithmName hash, RSASignaturePadding padding)
     {
-        // Policy (see the session's crypto policy check and the README "Security model" section):
+        // Policy (see the session's crypto policy check and docs/guide/security-model.md):
         // strong-hash (SHA-2/SHA-3) RSASSA-PKCS1-v1_5 *signatures* are allowed by default. The
         // policy gate targets broken *hashes* (MD2/MD5/SHA-1/RIPEMD — rejected in every
         // context, RsaPkcs1Sign won't map them) and PKCS#1 v1.5 *encryption* / raw RSA, not v1.5
