@@ -53,6 +53,7 @@ internal sealed partial class Pkcs11SessionCore
         Enforce(mechanism, CryptoOperation.Encapsulate);
         EnforceKeyAgreementKey(mechanism, encapsulatingPublicKey);
         EnforceKeyStrength(encapsulatingPublicKey, KeyStrengthSource.ExistingKey);
+        EnforceTemplateKeyStrength(null, sharedKeyTemplate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
 
@@ -132,7 +133,10 @@ internal sealed partial class Pkcs11SessionCore
         // the template holds raw copies of their pValue pointers.
         GC.KeepAlive(sharedKeyTemplate);
         GC.KeepAlive(secureDefaults);
-        return (ct, new ObjectHandle((ulong)sharedHandle));
+
+        var sharedKey = new ObjectHandle((ulong)sharedHandle);
+        EnforceCreatedKeyStrength(sharedKey);
+        return (ct, sharedKey);
     }
 
     /// <summary>
@@ -155,6 +159,7 @@ internal sealed partial class Pkcs11SessionCore
         Enforce(mechanism, CryptoOperation.Decapsulate);
         EnforceKeyAgreementKey(mechanism, decapsulatingPrivateKey);
         EnforceKeyStrength(decapsulatingPrivateKey, KeyStrengthSource.ExistingKey);
+        EnforceTemplateKeyStrength(null, sharedKeyTemplate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
 
@@ -185,7 +190,9 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)sharedHandle);
+        var sharedKey = new ObjectHandle((ulong)sharedHandle);
+        EnforceCreatedKeyStrength(sharedKey);
+        return sharedKey;
     }
 
     // === Authenticated wrap ================================================
@@ -252,6 +259,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(unwrappedKeyTemplate);
         Enforce(mechanism, CryptoOperation.Unwrap);
         EnforceKeyStrength(unwrappingKey, KeyStrengthSource.ExistingKey);
+        EnforceTemplateKeyStrength(null, unwrappedKeyTemplate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
 
@@ -283,7 +291,9 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)newKey);
+        var key = new ObjectHandle((ulong)newKey);
+        EnforceCreatedKeyStrength(key);
+        return key;
     }
 
     // === Signature-only verify (init binds the signature, data feeds in) ====
