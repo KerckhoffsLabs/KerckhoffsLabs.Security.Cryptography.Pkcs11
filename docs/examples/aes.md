@@ -1,6 +1,6 @@
 # AES block modes
 
-**For new code, use authenticated encryption: [AES-GCM](aead.md).** CBC, ECB and CFB provide
+**For new code, use authenticated encryption: [AES-GCM](aes-gcm.md).** CBC, ECB and CFB provide
 confidentiality only. A ciphertext can be changed without the change being detected, and CBC with
 padding, decrypted where an attacker can see whether decryption failed, is a padding oracle that
 reveals the plaintext.
@@ -13,11 +13,11 @@ which the example records in a policy of its own.
 
 # [PKCS#11](#tab/pkcs11)
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/AesModeExamples.cs#CbcPadUnderReviewedPolicy)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/AesModes/AesModeExamples.cs#CbcPadUnderReviewedPolicy)]
 
 # [System.Security.Cryptography](#tab/bcl)
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/AesModeExamples.cs#BclCbcPad)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/AesModes/AesModeExamples.cs#BclCbcPad)]
 
 ---
 
