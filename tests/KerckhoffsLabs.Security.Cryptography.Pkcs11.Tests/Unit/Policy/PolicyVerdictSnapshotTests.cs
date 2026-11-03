@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 /// <summary>
 /// Pins every verdict and reason of the built-in policies against a committed snapshot
 /// (<c>Unit/Policy/Snapshots/*.verdicts.tsv</c>), so a change that widens, narrows or rewords
-/// <c>Recommended</c> or <c>NistApproved</c> shows up as a reviewed diff rather than silently.
+/// <c>Recommended</c>, <c>NistApproved</c> or <c>Cnsa20</c> shows up as a reviewed diff rather than silently.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,13 +36,20 @@ public sealed class PolicyVerdictSnapshotTests
     {
         { "Recommended", "tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Policy/Snapshots/recommended.verdicts.tsv" },
         { "NistApproved", "tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Policy/Snapshots/nist-approved.verdicts.tsv" },
+        { "Cnsa20", "tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Policy/Snapshots/cnsa20.verdicts.tsv" },
     };
 
     [Theory]
     [MemberData(nameof(Snapshots))]
     public void Verdicts_MatchTheCommittedSnapshot(string policyName, string relativePath)
     {
-        ComposedCryptoPolicy policy = policyName == "Recommended" ? CryptoPolicy.Recommended : CryptoPolicy.NistApproved;
+        ComposedCryptoPolicy policy = policyName switch
+        {
+            "Recommended" => CryptoPolicy.Recommended,
+            "NistApproved" => CryptoPolicy.NistApproved,
+            "Cnsa20" => CryptoPolicy.Cnsa20,
+            _ => throw new ArgumentOutOfRangeException(nameof(policyName)),
+        };
         string path = Path.Join(RepositoryRoot.Find(), relativePath.Replace('/', Path.DirectorySeparatorChar));
         string rendered = Render(policy);
         var utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
@@ -211,6 +218,25 @@ public sealed class PolicyVerdictSnapshotTests
         }
         foreach (KeyMaterialExportKind kind in Enum.GetValues<KeyMaterialExportKind>())
             Add("export", kind.ToString(), new KeyMaterialExportRequest(kind));
+
+        // Key strength: every policy is asked about each key type and size, against an existing key.
+        KeyStrengthRequest Strength(CKK? type) => new(type, KeyStrengthSource.ExistingKey);
+        foreach (int? bytes in new int?[] { 16, 24, 32, null })
+            Add("key-strength", $"CKK_AES {bytes?.ToString() ?? "null"} bytes", Strength(CKK.CKK_AES) with { ValueLengthBytes = bytes });
+        foreach (CKK type in new[] { CKK.CKK_GENERIC_SECRET, CKK.CKK_HKDF, CKK.CKK_SHA384_HMAC, CKK.CKK_SHA512_HMAC })
+            foreach (int? bytes in new int?[] { 16, 32, 64, null })
+                Add("key-strength", $"{KeyTypeNames.Of(type)} {bytes?.ToString() ?? "null"} bytes", Strength(type) with { ValueLengthBytes = bytes });
+        foreach (CkpMlKem set in Enum.GetValues<CkpMlKem>())
+            Add("key-strength", $"CKK_ML_KEM {set}", Strength(CKK.CKK_ML_KEM) with { ParameterSet = (ulong)set });
+        Add("key-strength", "CKK_ML_KEM null", Strength(CKK.CKK_ML_KEM));
+        foreach (CkpMlDsa set in Enum.GetValues<CkpMlDsa>())
+            Add("key-strength", $"CKK_ML_DSA {set}", Strength(CKK.CKK_ML_DSA) with { ParameterSet = (ulong)set });
+        Add("key-strength", "CKK_ML_DSA null", Strength(CKK.CKK_ML_DSA));
+        foreach (ulong? levels in new ulong?[] { 1, 2, null })
+            Add("key-strength", $"CKK_HSS levels {levels?.ToString() ?? "null"}", Strength(CKK.CKK_HSS) with { HssLevels = levels });
+        foreach (CKK type in new[] { CKK.CKK_XMSS, CKK.CKK_XMSSMT, CKK.CKK_RSA, CKK.CKK_EC })
+            Add("key-strength", KeyTypeNames.Of(type), Strength(type));
+        Add("key-strength", "unknown type", Strength(null));
 
         // A copy keeps every verdict; only the hints that name the policy change.
         ComposedCryptoPolicy copy = policy.ToBuilder("Derived").Build();

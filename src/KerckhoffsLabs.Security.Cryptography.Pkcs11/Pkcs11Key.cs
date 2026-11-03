@@ -514,6 +514,7 @@ public sealed partial class Pkcs11Key : IDisposable
         // path, so the session policy is consulted here — the same verdict the token path gets from
         // the session's own check.
         _session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
+        _session.Core.EnforceKeyStrength(PrivateHandle, KeyStrengthSource.ExistingKey);
 
         if (_keyType == CKK.CKK_RSA)
         {
@@ -562,6 +563,7 @@ public sealed partial class Pkcs11Key : IDisposable
         // No session call happens on this path, so the policy is asked here, as Verify asks it.
         (CKM scheme, _) = Pkcs1DigestInfo.Encode(hash, digest);
         _session.Enforce(new MechanismUseRequest(new Mechanism(scheme), CryptoOperation.Verify));
+        _session.Core.EnforceKeyStrength(PrivateHandle, KeyStrengthSource.ExistingKey);
 
         if (_keyType == CKK.CKK_RSA && GetSynthesizedRsaParameters() is { } rsaParams)
         {

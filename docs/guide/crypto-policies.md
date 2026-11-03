@@ -7,7 +7,8 @@ choose a policy, react to a refusal, and widen or tighten a policy for exactly w
 needs.
 
 What each built-in policy allows, for which operations and why, is listed on its reference page:
-[Recommended](policies/recommended.md) and [NistApproved](policies/nist-approved.md).
+[Recommended](policies/recommended.md), [NistApproved](policies/nist-approved.md) and
+[Cnsa20](policies/cnsa-2.0.md).
 Why the policies exist, what they protect against and where their protection ends is explained in the
 [security model](security-model.md#crypto-policies).
 
@@ -20,11 +21,12 @@ The examples use the namespaces `KerckhoffsLabs.Security.Cryptography.Pkcs11` an
 |---|---|---|
 | `CryptoPolicy.Recommended` (default) | You want the library's reviewed, modern allow-list. | Allowed |
 | `CryptoPolicy.NistApproved` | Only NIST-approved security functions may be used. | Refused |
+| `CryptoPolicy.Cnsa20` | Only CNSA 2.0 algorithms and sizes may be used. | Refused |
 | `CryptoPolicy.AllowInsecure` | One scoped legacy operation, as a last resort. | — |
 | A policy you derive or build | You need exactly one more thing, or less than a built-in allows. | You choose |
 
-`Recommended` and `NistApproved` can be revised between releases as guidance changes, usually by tightening;
-each release's verdicts are pinned by a committed snapshot in the repository. A policy derived with `ToBuilder`
+`Recommended`, `NistApproved` and `Cnsa20` can be revised between releases as guidance changes, usually by
+tightening; each release's verdicts are pinned by a committed snapshot in the repository. A policy derived with `ToBuilder`
 copies the built-in's rules from the library version it runs with, so it follows those revisions too. Check the
 release notes and test the operations your application depends on when you upgrade.
 
@@ -43,6 +45,42 @@ using var fips = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, Crypt
 
 > `NistApproved` restricts what this library sends to the token; it is not a FIPS 140-3 certification, which
 > also requires a validated module operating in its approved mode.
+
+### CNSA 2.0
+
+`CryptoPolicy.Cnsa20` allows only the NSA CNSA 2.0 suite: AES-256 in GCM (128-bit tag only) and KW/KWP,
+SHA-384/512 and HMAC over them, SP 800-108 and HKDF over SHA-384/512, ML-KEM-1024, ML-DSA-87, single-level
+LMS (HSS) and XMSS. RSA, elliptic curves, SLH-DSA, HashML-DSA, the other AES modes, SHA-256 and PBKDF2 are
+refused; the [catalogue](policies/cnsa-2.0.md) gives the CNSA 2.0 alternative for each.
+
+It is the only built-in that **inspects keys**. The session reads each key's `CKA_KEY_TYPE` and its
+`CKA_VALUE_LEN`, `CKA_PARAMETER_SET` or `CKA_HSS_LEVELS`: in the template before the token creates a key, from
+the key the token created (destroying it if it fails), and from an existing key each time it is used. A key
+generated as AES-128 or ML-DSA-65 under `Recommended` is refused when used under `Cnsa20`.
+
+```csharp
+using var cnsa = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, CryptoPolicy.Cnsa20);
+```
+
+- **It fails closed.** A key whose type, length, parameter set or HSS levels the token does not report (absent,
+  sensitive or unavailable) is refused: the reason says the token did not report it, so CNSA 2.0 compliance
+  can't be verified. On a token that hides these attributes, compliant keys cannot be used.
+- **LMS and XMSS are allowed for any signing.** CNSA 2.0 intends them for software and firmware signing; the
+  policy cannot see what is being signed, so restricting them to that use is the application's job. XMSS
+  parameter sets are not checked.
+- **It is not a certification.** It restricts what this library sends to the token; it does not certify or
+  validate the application or the token. Its CNSA 2.0 citations come from secondary sources and are pending
+  verification against the NSA documents.
+- **Each keyed operation costs one or two extra attribute reads** (`C_GetAttributeValue`); keys are read again on
+  every use, never cached.
+- `C_SetOperationState` restores a saved operation whose own mechanism and key are not inspected; only the key
+  handles passed to it are.
+- Keys returned through TLS/SSL3 key-and-MAC parameters are not judged after creation. `Cnsa20` refuses those
+  mechanisms, but a policy derived from it that allows them again would not judge those keys.
+- Some tokens (SoftHSM2) do not report `CKA_VALUE_LEN` on unwrapped secret keys; under `Cnsa20` those unwraps
+  are refused.
+- A custom policy that wraps `Cnsa20` must forward `InspectsKeys`, or key sizes are no longer checked (see
+  [Writing your own policy](#writing-your-own-policy)).
 
 ## Handling a refusal
 
@@ -151,12 +189,13 @@ The checks available are `OaepHash`, `RsaPss`, `PqcPreHash`, `GcmTagLength`, `Cc
 `Pbkdf2Prf`, `Sp800108Prf`, `HkdfPrf` and `Ecdh1DeriveParams`.
 
 `ToBuilder(name)` works on any `ComposedCryptoPolicy`, so a policy you built can be copied and adjusted in
-turn. The names `Recommended` and `NistApproved` are reserved for the built-ins. A copy of `NistApproved` keeps
-refusing overrides unless you call `AllowsOverride(true)`.
+turn. The names `Recommended`, `NistApproved` and `Cnsa20` are reserved for the built-ins. A copy of `NistApproved`
+or `Cnsa20` keeps refusing overrides unless you call `AllowsOverride(true)`, and a copy of `Cnsa20` keeps
+inspecting keys.
 
 ## Writing your own policy
 
-`ICryptoPolicy` is a single method over a closed set of request types. Delegate to a built-in for what you
+`ICryptoPolicy` is essentially a single method over a closed set of request types. Delegate to a built-in for what you
 do not decide, and deny what you do not recognise, so request kinds added in later versions fail closed:
 
 ```csharp
@@ -164,6 +203,7 @@ sealed class NoExportAfterHours(ICryptoPolicy inner, TimeProvider clock) : ICryp
 {
     public string Name => $"{inner.Name}+NoExportAfterHours";
     public bool AllowsOverride => false;
+    public bool InspectsKeys => inner.InspectsKeys;
 
     public PolicyDecision Evaluate(PolicyRequest request) => request switch
     {
@@ -173,6 +213,10 @@ sealed class NoExportAfterHours(ICryptoPolicy inner, TimeProvider clock) : ICryp
     };
 }
 ```
+
+Forward `InspectsKeys` as well: it defaults to `false`, and a session only reads a key's type and size from the
+token when its policy says it inspects keys, so a wrapper that leaves it out silently turns off `Cnsa20`'s
+key-size checks.
 
 Prefer deriving a `ComposedCryptoPolicy` when an allow-list change is all you need: it keeps the
 built-in's parameter checks and refusal wording, and its catalogue can be documented.

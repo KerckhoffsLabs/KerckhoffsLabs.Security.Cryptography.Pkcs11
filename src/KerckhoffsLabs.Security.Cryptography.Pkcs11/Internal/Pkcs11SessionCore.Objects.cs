@@ -23,7 +23,10 @@ internal sealed partial class Pkcs11SessionCore
 
         // Any object class may arrive here, so the refusal applies but key defaults do not.
         EnforceKeyTemplate(attributes, null);
-
+        // An imported key is judged like a generated one; any other object class has no strength to judge.
+        bool createsKey = InspectsKeys && CreatesKey(attributes);
+        if (createsKey)
+            EnforceTemplateKeyStrength(null, attributes);
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
@@ -33,7 +36,10 @@ internal sealed partial class Pkcs11SessionCore
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
 
-        return new ObjectHandle((ulong)objectId);
+        var created = new ObjectHandle((ulong)objectId);
+        if (createsKey)
+            EnforceCreatedKeyStrength(created);
+        return created;
     }
 
     /// <summary>

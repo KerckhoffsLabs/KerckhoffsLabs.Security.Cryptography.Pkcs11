@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -22,6 +23,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(mechanism);
 
         Enforce(mechanism, CryptoOperation.GenerateKey);
+        EnforceTemplateKeyStrength(KeyTypeGeneratedBy(mechanism.Type), attributes);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKey");
 
@@ -47,7 +49,9 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)keyId);
+        var key = new ObjectHandle((ulong)keyId);
+        EnforceCreatedKeyStrength(key);
+        return key;
     }
 
     /// <summary>
@@ -85,6 +89,12 @@ internal sealed partial class Pkcs11SessionCore
             if (ecParams is not null)
                 Enforce(new EcKeyGenerationRequest(CurveOf(ecParams)));
         }
+
+        // CKA_PARAMETER_SET belongs on the public template and CKA_HSS_LEVELS on the private one; a size
+        // stated on either half is judged.
+        CKK? pairType = KeyTypeGeneratedBy(mechanism.Type);
+        EnforceTemplateKeyStrength(pairType, publicKeyAttributes);
+        EnforceTemplateKeyStrength(pairType, privateKeyAttributes);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKeyPair");
 
@@ -127,8 +137,13 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
-        privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
+        // Both halves are judged together and, if either fails, both are destroyed before either is handed out.
+        var publicKey = new ObjectHandle((ulong)publicKeyId);
+        var privateKey = new ObjectHandle((ulong)privateKeyId);
+        EnforceCreatedKeyStrength(publicKey, privateKey);
+
+        publicKeyHandle = publicKey;
+        privateKeyHandle = privateKey;
     }
 
     /// <summary>
@@ -146,6 +161,8 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Wrap);
+        EnforceKeyStrength(wrappingKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
@@ -227,6 +244,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Unwrap);
+        EnforceKeyStrength(unwrappingKeyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
@@ -240,6 +258,10 @@ internal sealed partial class Pkcs11SessionCore
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
+        // Unwrap templates often omit CKA_VALUE_LEN (SoftHSM rejects it there): the size is then judged on
+        // the key the token unwrapped, below.
+        EnforceTemplateKeyStrength(null, attributes);
+
         // After every policy check, the template's included.
         checkInput?.Invoke(wrappedKey);
 
@@ -252,7 +274,9 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)unwrappedKey);
+        var key = new ObjectHandle((ulong)unwrappedKey);
+        EnforceCreatedKeyStrength(key);
+        return key;
     }
 
     /// <summary>
@@ -383,6 +407,16 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(mechanism, CryptoOperation.Derive, attributes);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
+        EnforceKeyStrength(baseKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceTemplateKeyStrength(null, attributes);
+        // An SP800-108 derivation also makes one key per additional derived-key template: each is a created
+        // key, judged like the main one.
+        var sp800108 = mechanism.Parameters as CkmSp800108KdfParams;
+        if (sp800108 is not null)
+        {
+            foreach (IReadOnlyList<ObjectAttribute> siblingTemplate in sp800108.DerivedKeyTemplates)
+                EnforceTemplateKeyStrength(null, siblingTemplate);
+        }
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
@@ -406,6 +440,26 @@ internal sealed partial class Pkcs11SessionCore
         // out before `scope` is disposed.
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)derivedKey);
+        var key = new ObjectHandle((ulong)derivedKey);
+        if (sp800108 is null)
+        {
+            EnforceCreatedKeyStrength(key);
+            return key;
+        }
+
+        // The main key and every sibling are judged together: if any fails, all are destroyed, and the
+        // destroyed siblings' handles are dropped from the parameters so Pkcs11Key.Derive cannot wrap them.
+        // A sibling slot the token left at CK_INVALID_HANDLE is skipped by the post-check.
+        ObjectHandle[] created = [key, .. sp800108.RawAdditionalDerivedKeyHandles.Select(h => new ObjectHandle(h))];
+        try
+        {
+            EnforceCreatedKeyStrength(created);
+        }
+        catch
+        {
+            sp800108.ForgetAbsorbedHandles();
+            throw;
+        }
+        return key;
     }
 }

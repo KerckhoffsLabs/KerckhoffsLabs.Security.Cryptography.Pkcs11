@@ -28,6 +28,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Encrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
 
@@ -121,6 +122,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Encrypt);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt2");
 
@@ -147,6 +149,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Encrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt3");
 
@@ -287,6 +290,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(messageParams);
 
         EnforceMessage(mechanism, messageParams, CryptoOperation.Encrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageEncrypt");
 
@@ -347,6 +351,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(mechanism);
 
         Enforce(mechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
         checkInput?.Invoke(encryptedData);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
@@ -424,6 +429,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(mechanism);
 
         Enforce(mechanism, CryptoOperation.Decrypt);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt2");
 
@@ -449,6 +455,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(mechanism);
 
         Enforce(mechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt3");
 
@@ -514,6 +521,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(messageParams);
 
         EnforceMessage(mechanism, messageParams, CryptoOperation.Decrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageDecrypt");
 

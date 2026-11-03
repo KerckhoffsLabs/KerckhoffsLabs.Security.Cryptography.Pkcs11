@@ -45,7 +45,7 @@ The high-level API is **secure by default**:
 1. **Application → library** (the public API). The library assumes the caller is the party authorised to
    use the session it opened, and protects the caller from *mistakes*, not from itself: a caller can
    always lift the policy with `UsePolicy(CryptoPolicy.AllowInsecure)` unless the session was opened under
-   a policy that forbids overrides (`CryptoPolicy.NistApproved`).
+   a policy that forbids overrides (`CryptoPolicy.NistApproved`, `CryptoPolicy.Cnsa20`).
 2. **Library → PKCS#11 module** (P/Invoke and native memory). Everything the module writes or reports is
    validated before use; everything the library hands it is marshalled with the layouts and `CK_ULONG`
    width of the platform, and released deterministically.
@@ -62,7 +62,7 @@ fact that the token did so. Choose a token whose enforcement you trust for the k
 
 | Control | Where it is enforced |
 |---|---|
-| Crypto policy check before every operation | `Pkcs11Session` (the policy chosen at open, or a scoped `Pkcs11Session.UsePolicy` lease); `CryptoPolicy.Recommended`, `CryptoPolicy.NistApproved` |
+| Crypto policy check before every operation | `Pkcs11Session` (the policy chosen at open, or a scoped `Pkcs11Session.UsePolicy` lease); `CryptoPolicy.Recommended`, `CryptoPolicy.NistApproved`, `CryptoPolicy.Cnsa20` |
 | Build-time warnings for insecure choices | `[Obsolete]` on legacy adapters, weak curves and the PBKDF2 constructors with weak defaults (`KLPKCS11001`–`KLPKCS11007`, `KLPKCS11011`); analyzers for insecure values (`KLPKCS11008`–`KLPKCS11010`) |
 | Sensitive, non-extractable keys by default | `Pkcs11Session.GenerateAesKey`, `GenerateRsaSigningKeyPair`, … ; `SecretKeyTemplateBuilder` and `PrivateKeyTemplateBuilder` defaults |
 | One role per generated key | the `Pkcs11Session` key-generation helpers ([Key role separation](#key-role-separation)) |
@@ -90,7 +90,7 @@ These are outside what the library can defend against, and outside the scope of
 
 - **Policies judge requests, not what is already on the token.** They check mechanisms, parameters and
   *requested* key sizes and curves; they do not inspect the size or curve of an existing key (for ECDH,
-  the existing key's *type* is checked).
+  the existing key's *type* is checked). `Cnsa20` is the exception: it inspects every key it uses.
 - **Raw-digest mechanisms** (`CKM_ECDSA`, `CKM_RSA_PKCS`, `CKM_RSA_PKCS_PSS`) sign a caller-computed
   digest; the policy cannot see which hash produced it.
 - **`CKM_AES_KEY_WRAP_PAD` is vendor-dependent**: wrapped keys may not move between tokens.
@@ -121,11 +121,23 @@ Refusals throw `CryptoPolicyViolationException` (a `CryptographicException`) nam
 reason. You can supply your own `ICryptoPolicy`; end any `switch` over `PolicyRequest` with a deny arm so
 request kinds added in later versions fail closed.
 
-Both restrictive policies are **allow-lists that deny by default**: every mechanism, hash, curve,
+The restrictive policies are **allow-lists that deny by default**: every mechanism, hash, curve,
 key-agreement KDF and KDF PRF they permit — with its rationale — plus the documented, non-enforcing deny
 list (reason and alternative), is generated straight from the policy source into
-[Recommended](policies/recommended.md) and [NistApproved](policies/nist-approved.md). Anything not listed
-on those pages is refused.
+[Recommended](policies/recommended.md), [NistApproved](policies/nist-approved.md) and
+[Cnsa20](policies/cnsa-2.0.md). Anything not listed on those pages is refused.
+
+**Key-strength checks.** A policy can also judge the keys themselves. `CryptoPolicy.Cnsa20` does; `Recommended`
+and `NistApproved` don't, and sessions under them read no key attributes for it. Under an inspecting policy the
+session reads the key's `CKA_KEY_TYPE` and its `CKA_VALUE_LEN`, `CKA_PARAMETER_SET` or `CKA_HSS_LEVELS` before
+every keyed operation (again on every use, with no cache, so a handle that now points at a weaker key is still
+caught). It also checks templates before the token creates a key, and reads back each key the token generates,
+unwraps, derives, encapsulates, decapsulates or imports: a created key that fails is destroyed before its handle
+is returned, and if that destroy fails the exception names the handle and an error is logged. A copy made with
+`CopyObject` is not judged when it is created; it is judged when it is used. An attribute the token does not
+report is refused, never assumed. Only the key type, its length, parameter-set name or HSS levels, and object
+handles appear in refusals and logs; key values never do. See [CNSA 2.0](crypto-policies.md#cnsa-20) for the
+policy's known limits.
 
 > **`NistApproved` is not FIPS certification.** It restricts what this library sends to the token. FIPS 140-3
 > compliance also requires a validated cryptographic module operating in its approved mode. Under
@@ -136,7 +148,7 @@ on those pages is refused.
 > `CKM_AES_KEY_WRAP_PAD` is refused: its padding is vendor-defined (RFC 5649 on some tokens, KW over
 > PKCS#7 — not an SP 800-38F method — on others), so its approval cannot be established.
 
-**Known limits.** Both restrictive policies judge requests, not what is already on the token:
+**Known limits.** `Recommended` and `NistApproved` judge requests, not what is already on the token:
 
 - They check mechanisms, parameters and *requested* key sizes/curves. They do not inspect the size or curve
   of existing keys — using an RSA-1024 or Brainpool key already on the token is not refused. (For ECDH, the

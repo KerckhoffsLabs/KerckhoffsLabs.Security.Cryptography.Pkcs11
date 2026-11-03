@@ -132,6 +132,16 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// </summary>
     internal IReadOnlyList<ulong> RawAdditionalDerivedKeyHandles => [.. _derivedHandles];
 
+    /// <summary>The caller's template for each additional derived key, in order, for policy evaluation.</summary>
+    internal IReadOnlyList<IReadOnlyList<ObjectAttribute>> DerivedKeyTemplates => _retainedTemplates;
+
+    /// <summary>
+    /// Drops the raw handles <see cref="AbsorbOutput"/> collected, so a later
+    /// <see cref="HydrateDerivedKeys"/> cannot wrap them. Called when the session refused the derivation's
+    /// keys after the token made them and has destroyed every one.
+    /// </summary>
+    internal void ForgetAbsorbedHandles() => _derivedHandles.Clear();
+
     /// <summary>The PRF underlying this derivation, for policy evaluation.</summary>
     internal CKM PrfType => _prfType;
 

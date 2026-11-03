@@ -1,0 +1,928 @@
+ccm	CkmAesCcmParams mac 112	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmAesCcmParams mac 128	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmAesCcmParams mac 32	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmAesCcmParams mac 48	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmAesCcmParams mac 64	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmAesCcmParams mac 80	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmAesCcmParams mac 96	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmCcmMessageParams mac 112	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmCcmMessageParams mac 128	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmCcmMessageParams mac 32	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmCcmMessageParams mac 48	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmCcmMessageParams mac 64	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmCcmMessageParams mac 80	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+ccm	CkmCcmMessageParams mac 96	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+curve	BrainpoolP160r1	deny	brainpoolP160r1 (1.3.36.3.3.2.8.1.1.1) is not on the Cnsa20 allow-list (not reviewed).
+curve	BrainpoolP160t1	deny	brainpoolP160t1 (1.3.36.3.3.2.8.1.1.2) is not on the Cnsa20 allow-list (not reviewed).
+curve	BrainpoolP192r1	deny	brainpoolP192r1 (1.3.36.3.3.2.8.1.1.3) is not on the Cnsa20 allow-list (not reviewed).
+curve	BrainpoolP192t1	deny	brainpoolP192t1 (1.3.36.3.3.2.8.1.1.4) is not on the Cnsa20 allow-list (not reviewed).
+curve	BrainpoolP224r1	deny	brainpoolP224r1 (1.3.36.3.3.2.8.1.1.5) is not on the Cnsa20 allow-list (not reviewed).
+curve	BrainpoolP224t1	deny	brainpoolP224t1 (1.3.36.3.3.2.8.1.1.6) is not on the Cnsa20 allow-list (not reviewed).
+curve	BrainpoolP256r1	deny	brainpoolP256r1 (1.3.36.3.3.2.8.1.1.7) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	BrainpoolP256t1	deny	brainpoolP256t1 (1.3.36.3.3.2.8.1.1.8) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	BrainpoolP320r1	deny	brainpoolP320r1 (1.3.36.3.3.2.8.1.1.9) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	BrainpoolP320t1	deny	brainpoolP320t1 (1.3.36.3.3.2.8.1.1.10) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	BrainpoolP384r1	deny	brainpoolP384r1 (1.3.36.3.3.2.8.1.1.11) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	BrainpoolP384t1	deny	brainpoolP384t1 (1.3.36.3.3.2.8.1.1.12) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	BrainpoolP512r1	deny	brainpoolP512r1 (1.3.36.3.3.2.8.1.1.13) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	BrainpoolP512t1	deny	brainpoolP512t1 (1.3.36.3.3.2.8.1.1.14) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	NistP192	deny	nistP192 (1.2.840.10045.3.1.1) is not on the Cnsa20 allow-list (not reviewed).
+curve	NistP224	deny	nistP224 (1.3.132.0.33) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	NistP256	deny	nistP256 (1.2.840.10045.3.1.7) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	NistP384	deny	nistP384 (1.3.132.0.34) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	NistP521	deny	nistP521 (1.3.132.0.35) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	Secp160k1	deny	secp160k1 (1.3.132.0.9) is not on the Cnsa20 allow-list (not reviewed).
+curve	Secp160r1	deny	secp160r1 (1.3.132.0.8) is not on the Cnsa20 allow-list (not reviewed).
+curve	Secp160r2	deny	secp160r2 (1.3.132.0.30) is not on the Cnsa20 allow-list (not reviewed).
+curve	Secp192k1	deny	secp192k1 (1.3.132.0.31) is not on the Cnsa20 allow-list (not reviewed).
+curve	Secp224k1	deny	secp224k1 (1.3.132.0.32) is not on the Cnsa20 allow-list (not reviewed).
+curve	Secp256k1	deny	secp256k1 (1.3.132.0.10) is not allowed: CNSA 2.0 has no elliptic-curve algorithms. Use ML-DSA-87 (CKM_ML_DSA_KEY_PAIR_GEN) to sign, ML-KEM-1024 (CKM_ML_KEM_KEY_PAIR_GEN) to establish keys.
+curve	Sm2	deny	sm2 (1.2.156.10197.1.301) is not on the Cnsa20 allow-list (not reviewed).
+derived-copy	CKM_DES3_CBC Decrypt	deny	CKM_DES3_CBC is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+derived-copy	export EcdhSharedSecret	deny	CNSA 2.0 (this policy): reading the EcdhSharedSecret off the token in plaintext is refused; wrap it with AES-256 KW/KWP or GCM instead.
+derived-copy	export KdfOutput	deny	CNSA 2.0 (this policy): reading the KdfOutput off the token in plaintext is refused; wrap it with AES-256 KW/KWP or GCM instead.
+derived-copy	export KemSharedSecret	deny	CNSA 2.0 (this policy): reading the KemSharedSecret off the token in plaintext is refused; wrap it with AES-256 KW/KWP or GCM instead.
+derived-copy	unlisted vendor mechanism	deny	vendor mechanism 0x80001234 is not on the Derived allow-list (not reviewed).
+ecdh-params	CKD_BLAKE2B_160_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_BLAKE2B_256_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_BLAKE2B_384_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_BLAKE2B_512_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_CPDIVERSIFY_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_NULL	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA1_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA1_KDF_ASN1	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA1_KDF_CONCATENATE	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA1_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA224_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA224_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA256_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA256_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA384_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA384_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_224_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_224_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_256_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_256_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_384_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_384_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_512_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA3_512_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA512_KDF	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+ecdh-params	CKD_SHA512_KDF_SP800	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+export	EcdhSharedSecret	deny	CNSA 2.0 (this policy): reading the EcdhSharedSecret off the token in plaintext is refused; wrap it with AES-256 KW/KWP or GCM instead.
+export	KdfOutput	deny	CNSA 2.0 (this policy): reading the KdfOutput off the token in plaintext is refused; wrap it with AES-256 KW/KWP or GCM instead.
+export	KemSharedSecret	deny	CNSA 2.0 (this policy): reading the KemSharedSecret off the token in plaintext is refused; wrap it with AES-256 KW/KWP or GCM instead.
+gcm	CkmAesGcmParams tag 104	deny	CNSA 2.0 (this policy): a 104-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmAesGcmParams tag 112	deny	CNSA 2.0 (this policy): a 112-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmAesGcmParams tag 120	deny	CNSA 2.0 (this policy): a 120-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmAesGcmParams tag 128	allow	
+gcm	CkmAesGcmParams tag 32	deny	CNSA 2.0 (this policy): a 32-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmAesGcmParams tag 64	deny	CNSA 2.0 (this policy): a 64-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmAesGcmParams tag 96	deny	CNSA 2.0 (this policy): a 96-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmGcmMessageParams tag 104	deny	CNSA 2.0 (this policy): a 104-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmGcmMessageParams tag 112	deny	CNSA 2.0 (this policy): a 112-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmGcmMessageParams tag 120	deny	CNSA 2.0 (this policy): a 120-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmGcmMessageParams tag 128	allow	
+gcm	CkmGcmMessageParams tag 32	deny	CNSA 2.0 (this policy): a 32-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmGcmMessageParams tag 64	deny	CNSA 2.0 (this policy): a 64-bit AES-GCM tag is refused; use a 128-bit tag.
+gcm	CkmGcmMessageParams tag 96	deny	CNSA 2.0 (this policy): a 96-bit AES-GCM tag is refused; use a 128-bit tag.
+hash	MD5 Digest	deny	MD5 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	MD5 Sign	deny	MD5 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	MD5 Verify	deny	MD5 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	RIPEMD160 Digest	deny	RIPEMD160 is not on the Cnsa20 allow-list (not reviewed).
+hash	RIPEMD160 Sign	deny	RIPEMD160 is not on the Cnsa20 allow-list (not reviewed).
+hash	RIPEMD160 Verify	deny	RIPEMD160 is not on the Cnsa20 allow-list (not reviewed).
+hash	SHA1 Digest	deny	SHA1 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA1 Sign	deny	SHA1 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA1 Verify	deny	SHA1 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA224 Digest	deny	SHA224 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA224 Sign	deny	SHA224 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA224 Verify	deny	SHA224 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA256 Digest	deny	SHA256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA256 Sign	deny	SHA256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA256 Verify	deny	SHA256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-256 Digest	deny	SHA3-256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-256 Sign	deny	SHA3-256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-256 Verify	deny	SHA3-256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-384 Digest	deny	SHA3-384 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-384 Sign	deny	SHA3-384 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-384 Verify	deny	SHA3-384 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-512 Digest	deny	SHA3-512 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-512 Sign	deny	SHA3-512 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA3-512 Verify	deny	SHA3-512 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use SHA384 or SHA512.
+hash	SHA384 Digest	allow	
+hash	SHA384 Sign	allow	
+hash	SHA384 Verify	allow	
+hash	SHA512 Digest	allow	
+hash	SHA512 Sign	allow	
+hash	SHA512 Verify	allow	
+hkdf	CKM_AES_CMAC	deny	CNSA 2.0: CKM_AES_CMAC is not allowed: CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	CKM_MD5_HMAC	deny	CNSA 2.0: CKM_MD5_HMAC is not an allowed HKDF PRF; use SHA-384 or SHA-512 (CKM_SHA384, CKM_SHA512, CKM_SHA384_HMAC or CKM_SHA512_HMAC).
+hkdf	CKM_SHA224_HMAC	deny	CNSA 2.0: CKM_SHA224_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	CKM_SHA256_HMAC	deny	CNSA 2.0: CKM_SHA256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	CKM_SHA384_HMAC	allow	
+hkdf	CKM_SHA3_256_HMAC	deny	CNSA 2.0: CKM_SHA3_256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	CKM_SHA512_HMAC	allow	
+hkdf	CKM_SHA_1_HMAC	deny	CNSA 2.0: CKM_SHA_1_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	expand only CKM_SHA256_HMAC	deny	CNSA 2.0: CKM_SHA256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	expand only CKM_SHA_1_HMAC	deny	CNSA 2.0: CKM_SHA_1_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	no salt CKM_SHA256_HMAC	deny	CNSA 2.0: CKM_SHA256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf	no salt CKM_SHA_1_HMAC	deny	CNSA 2.0: CKM_SHA_1_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+hkdf-data	CKM_AES_CMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+hkdf-data	CKM_MD5_HMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+hkdf-data	CKM_SHA224_HMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+hkdf-data	CKM_SHA256_HMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+hkdf-data	CKM_SHA384_HMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+hkdf-data	CKM_SHA3_256_HMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+hkdf-data	CKM_SHA512_HMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+hkdf-data	CKM_SHA_1_HMAC	deny	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+kdf	CKD_BLAKE2B_160_KDF	deny	CKD_BLAKE2B_160_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_BLAKE2B_160_KDF into a derivation-only secret	deny	CKD_BLAKE2B_160_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_BLAKE2B_256_KDF	deny	CKD_BLAKE2B_256_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_BLAKE2B_256_KDF into a derivation-only secret	deny	CKD_BLAKE2B_256_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_BLAKE2B_384_KDF	deny	CKD_BLAKE2B_384_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_BLAKE2B_384_KDF into a derivation-only secret	deny	CKD_BLAKE2B_384_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_BLAKE2B_512_KDF	deny	CKD_BLAKE2B_512_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_BLAKE2B_512_KDF into a derivation-only secret	deny	CKD_BLAKE2B_512_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_CPDIVERSIFY_KDF	deny	CKD_CPDIVERSIFY_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_CPDIVERSIFY_KDF into a derivation-only secret	deny	CKD_CPDIVERSIFY_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_NULL	deny	CKD_NULL is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_NULL into a derivation-only secret	allow	
+kdf	CKD_SHA1_KDF	deny	CKD_SHA1_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA1_KDF into a derivation-only secret	deny	CKD_SHA1_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_ASN1	deny	CKD_SHA1_KDF_ASN1 is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_ASN1 into a derivation-only secret	deny	CKD_SHA1_KDF_ASN1 is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_CONCATENATE	deny	CKD_SHA1_KDF_CONCATENATE is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_CONCATENATE into a derivation-only secret	deny	CKD_SHA1_KDF_CONCATENATE is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_SP800	deny	CKD_SHA1_KDF_SP800 is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_SP800 into a derivation-only secret	deny	CKD_SHA1_KDF_SP800 is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA224_KDF	deny	CKD_SHA224_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA224_KDF into a derivation-only secret	deny	CKD_SHA224_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA224_KDF_SP800	deny	CKD_SHA224_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA224_KDF_SP800 into a derivation-only secret	deny	CKD_SHA224_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA256_KDF	deny	CKD_SHA256_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA256_KDF into a derivation-only secret	deny	CKD_SHA256_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA256_KDF_SP800	deny	CKD_SHA256_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA256_KDF_SP800 into a derivation-only secret	deny	CKD_SHA256_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA384_KDF	deny	CKD_SHA384_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA384_KDF into a derivation-only secret	deny	CKD_SHA384_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA384_KDF_SP800	deny	CKD_SHA384_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA384_KDF_SP800 into a derivation-only secret	deny	CKD_SHA384_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_224_KDF	deny	CKD_SHA3_224_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA3_224_KDF into a derivation-only secret	deny	CKD_SHA3_224_KDF is not on the Cnsa20 allow-list (not reviewed).
+kdf	CKD_SHA3_224_KDF_SP800	deny	CKD_SHA3_224_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_224_KDF_SP800 into a derivation-only secret	deny	CKD_SHA3_224_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_256_KDF	deny	CKD_SHA3_256_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_256_KDF into a derivation-only secret	deny	CKD_SHA3_256_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_256_KDF_SP800	deny	CKD_SHA3_256_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_256_KDF_SP800 into a derivation-only secret	deny	CKD_SHA3_256_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_384_KDF	deny	CKD_SHA3_384_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_384_KDF into a derivation-only secret	deny	CKD_SHA3_384_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_384_KDF_SP800	deny	CKD_SHA3_384_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_384_KDF_SP800 into a derivation-only secret	deny	CKD_SHA3_384_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_512_KDF	deny	CKD_SHA3_512_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_512_KDF into a derivation-only secret	deny	CKD_SHA3_512_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_512_KDF_SP800	deny	CKD_SHA3_512_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA3_512_KDF_SP800 into a derivation-only secret	deny	CKD_SHA3_512_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA512_KDF	deny	CKD_SHA512_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA512_KDF into a derivation-only secret	deny	CKD_SHA512_KDF is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA512_KDF_SP800	deny	CKD_SHA512_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+kdf	CKD_SHA512_KDF_SP800 into a derivation-only secret	deny	CKD_SHA512_KDF_SP800 is not allowed: CNSA 2.0 has no elliptic-curve key agreement, so no ECDH KDF is used. Use CKM_ML_KEM (ML-KEM-1024), then CKM_HKDF_DERIVE or an SP 800-108 KDF over SHA-384 / SHA-512.
+key-agreement-key	CKK_ACTI	deny	Key agreement with a CKK_ACTI key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_AES	deny	Key agreement with a CKK_AES key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_AES_XTS	deny	Key agreement with a CKK_AES_XTS key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_ARIA	deny	Key agreement with a CKK_ARIA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_BATON	deny	Key agreement with a CKK_BATON key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_160_HMAC	deny	Key agreement with a CKK_BLAKE2B_160_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_256_HMAC	deny	Key agreement with a CKK_BLAKE2B_256_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_384_HMAC	deny	Key agreement with a CKK_BLAKE2B_384_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_512_HMAC	deny	Key agreement with a CKK_BLAKE2B_512_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_BLOWFISH	deny	Key agreement with a CKK_BLOWFISH key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_CAMELLIA	deny	Key agreement with a CKK_CAMELLIA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_CAST	deny	Key agreement with a CKK_CAST key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_CAST3	deny	Key agreement with a CKK_CAST3 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_CAST5	deny	Key agreement with a CKK_CAST128 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_CDMF	deny	Key agreement with a CKK_CDMF key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_CHACHA20	deny	Key agreement with a CKK_CHACHA20 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_DES	deny	Key agreement with a CKK_DES key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_DES2	deny	Key agreement with a CKK_DES2 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_DES3	deny	Key agreement with a CKK_DES3 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_DH	deny	Key agreement with a CKK_DH key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_DSA	deny	Key agreement with a CKK_DSA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_ECDSA	deny	Key agreement with a CKK_EC key is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM replaces ECDH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+key-agreement-key	CKK_EC_EDWARDS	deny	Key agreement with a CKK_EC_EDWARDS key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_EC_MONTGOMERY	deny	Key agreement with a CKK_EC_MONTGOMERY key is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM replaces ECDH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+key-agreement-key	CKK_GENERIC_SECRET	deny	Key agreement with a CKK_GENERIC_SECRET key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_GOST28147	deny	Key agreement with a CKK_GOST28147 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_GOSTR3410	deny	Key agreement with a CKK_GOSTR3410 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_GOSTR3411	deny	Key agreement with a CKK_GOSTR3411 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_HKDF	deny	Key agreement with a CKK_HKDF key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_HOTP	deny	Key agreement with a CKK_HOTP key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_HSS	deny	Key agreement with a CKK_HSS key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_IDEA	deny	Key agreement with a CKK_IDEA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_JUNIPER	deny	Key agreement with a CKK_JUNIPER key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_KEA	deny	Key agreement with a CKK_KEA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_MD5_HMAC	deny	Key agreement with a CKK_MD5_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_ML_DSA	deny	Key agreement with a CKK_ML_DSA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_ML_KEM	deny	Key agreement with a CKK_ML_KEM key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_POLY1305	deny	Key agreement with a CKK_POLY1305 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_RC2	deny	Key agreement with a CKK_RC2 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_RC4	deny	Key agreement with a CKK_RC4 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_RC5	deny	Key agreement with a CKK_RC5 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_RIPEMD128_HMAC	deny	Key agreement with a CKK_RIPEMD128_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_RIPEMD160_HMAC	deny	Key agreement with a CKK_RIPEMD160_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_RSA	deny	Key agreement with a CKK_RSA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SALSA20	deny	Key agreement with a CKK_SALSA20 key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SECURID	deny	Key agreement with a CKK_SECURID key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SEED	deny	Key agreement with a CKK_SEED key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA224_HMAC	deny	Key agreement with a CKK_SHA224_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA256_HMAC	deny	Key agreement with a CKK_SHA256_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA384_HMAC	deny	Key agreement with a CKK_SHA384_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_224_HMAC	deny	Key agreement with a CKK_SHA3_224_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_256_HMAC	deny	Key agreement with a CKK_SHA3_256_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_384_HMAC	deny	Key agreement with a CKK_SHA3_384_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_512_HMAC	deny	Key agreement with a CKK_SHA3_512_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_224_HMAC	deny	Key agreement with a CKK_SHA512_224_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_256_HMAC	deny	Key agreement with a CKK_SHA512_256_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_HMAC	deny	Key agreement with a CKK_SHA512_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_T_HMAC	deny	Key agreement with a CKK_SHA512_T_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SHA_1_HMAC	deny	Key agreement with a CKK_SHA_1_HMAC key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SKIPJACK	deny	Key agreement with a CKK_SKIPJACK key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_SLH_DSA	deny	Key agreement with a CKK_SLH_DSA key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_TWOFISH	deny	Key agreement with a CKK_TWOFISH key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_VENDOR_DEFINED	deny	Key agreement with a CKK_VENDOR_DEFINED key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_X2RATCHET	deny	Key agreement with a CKK_X2RATCHET key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_X9_42_DH	deny	Key agreement with a CKK_X9_42_DH key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_XMSS	deny	Key agreement with a CKK_XMSS key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_XMSSMT	deny	Key agreement with a CKK_XMSSMT key is not on the Cnsa20 allow-list (not reviewed).
+key-strength	CKK_AES 16 bytes	deny	CNSA 2.0 requires AES-256; this is AES-128.
+key-strength	CKK_AES 24 bytes	deny	CNSA 2.0 requires AES-256; this is AES-192.
+key-strength	CKK_AES 32 bytes	allow	
+key-strength	CKK_AES null bytes	deny	The token did not report the key's length, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_EC	deny	CKK_EC keys are not part of CNSA 2.0.
+key-strength	CKK_GENERIC_SECRET 16 bytes	deny	CNSA 2.0 requires a secret of at least 256 bits; this is 128 bits.
+key-strength	CKK_GENERIC_SECRET 32 bytes	allow	
+key-strength	CKK_GENERIC_SECRET 64 bytes	allow	
+key-strength	CKK_GENERIC_SECRET null bytes	deny	The token did not report the key's length, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_HKDF 16 bytes	deny	CNSA 2.0 requires a secret of at least 256 bits; this is 128 bits.
+key-strength	CKK_HKDF 32 bytes	allow	
+key-strength	CKK_HKDF 64 bytes	allow	
+key-strength	CKK_HKDF null bytes	deny	The token did not report the key's length, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_HSS levels 1	allow	
+key-strength	CKK_HSS levels 2	deny	CNSA 2.0 requires single-level LMS (HSS levels = 1); this is 2 levels.
+key-strength	CKK_HSS levels null	deny	The token did not report the key's HSS levels, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_ML_DSA CKP_ML_DSA_44	deny	CNSA 2.0 requires ML-DSA-87; this is CKP_ML_DSA_44.
+key-strength	CKK_ML_DSA CKP_ML_DSA_65	deny	CNSA 2.0 requires ML-DSA-87; this is CKP_ML_DSA_65.
+key-strength	CKK_ML_DSA CKP_ML_DSA_87	allow	
+key-strength	CKK_ML_DSA null	deny	The token did not report the key's parameter set, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_ML_KEM CKP_ML_KEM_1024	allow	
+key-strength	CKK_ML_KEM CKP_ML_KEM_512	deny	CNSA 2.0 requires ML-KEM-1024; this is CKP_ML_KEM_512.
+key-strength	CKK_ML_KEM CKP_ML_KEM_768	deny	CNSA 2.0 requires ML-KEM-1024; this is CKP_ML_KEM_768.
+key-strength	CKK_ML_KEM null	deny	The token did not report the key's parameter set, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_RSA	deny	CKK_RSA keys are not part of CNSA 2.0.
+key-strength	CKK_SHA384_HMAC 16 bytes	deny	CNSA 2.0 requires a secret of at least 256 bits; this is 128 bits.
+key-strength	CKK_SHA384_HMAC 32 bytes	allow	
+key-strength	CKK_SHA384_HMAC 64 bytes	allow	
+key-strength	CKK_SHA384_HMAC null bytes	deny	The token did not report the key's length, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_SHA512_HMAC 16 bytes	deny	CNSA 2.0 requires a secret of at least 256 bits; this is 128 bits.
+key-strength	CKK_SHA512_HMAC 32 bytes	allow	
+key-strength	CKK_SHA512_HMAC 64 bytes	allow	
+key-strength	CKK_SHA512_HMAC null bytes	deny	The token did not report the key's length, so CNSA 2.0 compliance can't be verified.
+key-strength	CKK_XMSS	allow	
+key-strength	CKK_XMSSMT	deny	CKK_XMSSMT keys are not part of CNSA 2.0.
+key-strength	unknown type	deny	The token did not report the key's type, so CNSA 2.0 compliance can't be verified.
+mechanism	CKM_ACTI	allow: -	CKM_ACTI is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ACTI_KEY_GEN	allow: -	CKM_ACTI_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_CBC	allow: -	CKM_AES_CBC is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CBC_ENCRYPT_DATA	allow: -	CKM_AES_CBC_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_CBC_PAD	allow: -	CKM_AES_CBC_PAD is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CCM	allow: -	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CFB1	allow: -	CKM_AES_CFB1 is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CFB128	allow: -	CKM_AES_CFB128 is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CFB64	allow: -	CKM_AES_CFB64 is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CFB8	allow: -	CKM_AES_CFB8 is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CMAC	allow: -	CKM_AES_CMAC is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CMAC_GENERAL	allow: -	CKM_AES_CMAC_GENERAL is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CTR	allow: -	CKM_AES_CTR is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_CTS	allow: -	CKM_AES_CTS is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_ECB	allow: -	CKM_AES_ECB is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_ECB_ENCRYPT_DATA	allow: -	CKM_AES_ECB_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_GCM	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_GCM is allowed under Cnsa20 only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. CNSA 2.0 AES-256 (FIPS 197) in GCM (SP 800-38D), 128-bit tag
+mechanism	CKM_AES_GMAC	allow: -	CKM_AES_GMAC is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_KEY_GEN	allow: GenerateKey	CKM_AES_KEY_GEN is allowed under Cnsa20 only for GenerateKey; {op} is not. CNSA 2.0 AES-256 (FIPS 197); CKA_VALUE_LEN must be 32
+mechanism	CKM_AES_KEY_WRAP	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_KEY_WRAP is allowed under Cnsa20 only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. CNSA 2.0 AES-256 (FIPS 197) key wrap (SP 800-38F)
+mechanism	CKM_AES_KEY_WRAP_KWP	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_KEY_WRAP_KWP is allowed under Cnsa20 only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. CNSA 2.0 AES-256 (FIPS 197) key wrap (SP 800-38F)
+mechanism	CKM_AES_KEY_WRAP_PAD	allow: -	CKM_AES_KEY_WRAP_PAD is not allowed: Its padding is vendor-defined (RFC 5649 on some tokens, KW over PKCS#7 on others), so it is not a known SP 800-38F method. Use CKM_AES_KEY_WRAP_KWP or CKM_AES_KEY_WRAP.
+mechanism	CKM_AES_KEY_WRAP_PKCS7	allow: -	CKM_AES_KEY_WRAP_PKCS7 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_MAC	allow: -	CKM_AES_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_MAC_GENERAL	allow: -	CKM_AES_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_OFB	allow: -	CKM_AES_OFB is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_XCBC_MAC	allow: -	CKM_AES_XCBC_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_XCBC_MAC_96	allow: -	CKM_AES_XCBC_MAC_96 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_AES_XTS	allow: -	CKM_AES_XTS is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_AES_XTS_KEY_GEN	allow: -	CKM_AES_XTS_KEY_GEN is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+mechanism	CKM_ARIA_CBC	allow: -	CKM_ARIA_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ARIA_CBC_ENCRYPT_DATA	allow: -	CKM_ARIA_CBC_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ARIA_CBC_PAD	allow: -	CKM_ARIA_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ARIA_ECB	allow: -	CKM_ARIA_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ARIA_ECB_ENCRYPT_DATA	allow: -	CKM_ARIA_ECB_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ARIA_KEY_GEN	allow: -	CKM_ARIA_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ARIA_MAC	allow: -	CKM_ARIA_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ARIA_MAC_GENERAL	allow: -	CKM_ARIA_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BATON_CBC128	allow: -	CKM_BATON_CBC128 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BATON_COUNTER	allow: -	CKM_BATON_COUNTER is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BATON_ECB128	allow: -	CKM_BATON_ECB128 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BATON_ECB96	allow: -	CKM_BATON_ECB96 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BATON_KEY_GEN	allow: -	CKM_BATON_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BATON_SHUFFLE	allow: -	CKM_BATON_SHUFFLE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BATON_WRAP	allow: -	CKM_BATON_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160	allow: -	CKM_BLAKE2B_160 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_HMAC	allow: -	CKM_BLAKE2B_160_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_HMAC_GENERAL	allow: -	CKM_BLAKE2B_160_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_KEY_DERIVE	allow: -	CKM_BLAKE2B_160_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_KEY_GEN	allow: -	CKM_BLAKE2B_160_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256	allow: -	CKM_BLAKE2B_256 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_HMAC	allow: -	CKM_BLAKE2B_256_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_HMAC_GENERAL	allow: -	CKM_BLAKE2B_256_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_KEY_DERIVE	allow: -	CKM_BLAKE2B_256_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_KEY_GEN	allow: -	CKM_BLAKE2B_256_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384	allow: -	CKM_BLAKE2B_384 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_HMAC	allow: -	CKM_BLAKE2B_384_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_HMAC_GENERAL	allow: -	CKM_BLAKE2B_384_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_KEY_DERIVE	allow: -	CKM_BLAKE2B_384_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_KEY_GEN	allow: -	CKM_BLAKE2B_384_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512	allow: -	CKM_BLAKE2B_512 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_HMAC	allow: -	CKM_BLAKE2B_512_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_HMAC_GENERAL	allow: -	CKM_BLAKE2B_512_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_KEY_DERIVE	allow: -	CKM_BLAKE2B_512_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_KEY_GEN	allow: -	CKM_BLAKE2B_512_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLOWFISH_CBC	allow: -	CKM_BLOWFISH_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLOWFISH_CBC_PAD	allow: -	CKM_BLOWFISH_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_BLOWFISH_KEY_GEN	allow: -	CKM_BLOWFISH_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_CBC	allow: -	CKM_CAMELLIA_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_CBC_ENCRYPT_DATA	allow: -	CKM_CAMELLIA_CBC_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_CBC_PAD	allow: -	CKM_CAMELLIA_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_CTR	allow: -	CKM_CAMELLIA_CTR is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_ECB	allow: -	CKM_CAMELLIA_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_ECB_ENCRYPT_DATA	allow: -	CKM_CAMELLIA_ECB_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_KEY_GEN	allow: -	CKM_CAMELLIA_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_MAC	allow: -	CKM_CAMELLIA_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_MAC_GENERAL	allow: -	CKM_CAMELLIA_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST128_CBC	allow: -	CKM_CAST128_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST128_CBC_PAD	allow: -	CKM_CAST128_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST128_ECB	allow: -	CKM_CAST128_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST128_KEY_GEN	allow: -	CKM_CAST128_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST128_MAC	allow: -	CKM_CAST128_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST128_MAC_GENERAL	allow: -	CKM_CAST128_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST3_CBC	allow: -	CKM_CAST3_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST3_CBC_PAD	allow: -	CKM_CAST3_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST3_ECB	allow: -	CKM_CAST3_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST3_KEY_GEN	allow: -	CKM_CAST3_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST3_MAC	allow: -	CKM_CAST3_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST3_MAC_GENERAL	allow: -	CKM_CAST3_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST_CBC	allow: -	CKM_CAST_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST_CBC_PAD	allow: -	CKM_CAST_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST_ECB	allow: -	CKM_CAST_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST_KEY_GEN	allow: -	CKM_CAST_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST_MAC	allow: -	CKM_CAST_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CAST_MAC_GENERAL	allow: -	CKM_CAST_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CDMF_CBC	allow: -	CKM_CDMF_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CDMF_CBC_PAD	allow: -	CKM_CDMF_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CDMF_ECB	allow: -	CKM_CDMF_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CDMF_KEY_GEN	allow: -	CKM_CDMF_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CDMF_MAC	allow: -	CKM_CDMF_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CDMF_MAC_GENERAL	allow: -	CKM_CDMF_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CHACHA20	allow: -	CKM_CHACHA20 is not allowed: ChaCha20 is not part of CNSA 2.0. Use CKM_AES_GCM with an AES-256 key.
+mechanism	CKM_CHACHA20_KEY_GEN	allow: -	CKM_CHACHA20_KEY_GEN is not allowed: ChaCha20 is not part of CNSA 2.0. Use CKM_AES_GCM with an AES-256 key.
+mechanism	CKM_CHACHA20_POLY1305	allow: -	CKM_CHACHA20_POLY1305 is not allowed: ChaCha20 is not part of CNSA 2.0. Use CKM_AES_GCM with an AES-256 key.
+mechanism	CKM_CMS_SIG	allow: -	CKM_CMS_SIG is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CONCATENATE_BASE_AND_DATA	allow: -	CKM_CONCATENATE_BASE_AND_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CONCATENATE_BASE_AND_KEY	allow: -	CKM_CONCATENATE_BASE_AND_KEY is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_CONCATENATE_DATA_AND_BASE	allow: -	CKM_CONCATENATE_DATA_AND_BASE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES2_KEY_GEN	allow: -	CKM_DES2_KEY_GEN is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES3_CBC	allow: -	CKM_DES3_CBC is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES3_CBC_ENCRYPT_DATA	allow: -	CKM_DES3_CBC_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES3_CBC_PAD	allow: -	CKM_DES3_CBC_PAD is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES3_CMAC	allow: -	CKM_DES3_CMAC is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES3_CMAC_GENERAL	allow: -	CKM_DES3_CMAC_GENERAL is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES3_ECB	allow: -	CKM_DES3_ECB is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES3_ECB_ENCRYPT_DATA	allow: -	CKM_DES3_ECB_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES3_KEY_GEN	allow: -	CKM_DES3_KEY_GEN is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES3_MAC	allow: -	CKM_DES3_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES3_MAC_GENERAL	allow: -	CKM_DES3_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_CBC	allow: -	CKM_DES_CBC is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES_CBC_ENCRYPT_DATA	allow: -	CKM_DES_CBC_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_CBC_PAD	allow: -	CKM_DES_CBC_PAD is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES_CFB64	allow: -	CKM_DES_CFB64 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_CFB8	allow: -	CKM_DES_CFB8 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_ECB	allow: -	CKM_DES_ECB is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES_ECB_ENCRYPT_DATA	allow: -	CKM_DES_ECB_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_KEY_GEN	allow: -	CKM_DES_KEY_GEN is not allowed: DES and TDEA are not part of CNSA 2.0. Use AES-256 (CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys).
+mechanism	CKM_DES_MAC	allow: -	CKM_DES_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_MAC_GENERAL	allow: -	CKM_DES_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_OFB64	allow: -	CKM_DES_OFB64 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DES_OFB8	allow: -	CKM_DES_OFB8 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DH_PKCS_DERIVE	allow: -	CKM_DH_PKCS_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+mechanism	CKM_DH_PKCS_KEY_PAIR_GEN	allow: -	CKM_DH_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+mechanism	CKM_DH_PKCS_PARAMETER_GEN	allow: -	CKM_DH_PKCS_PARAMETER_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DSA	allow: -	CKM_DSA is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_FIPS_G_GEN	allow: -	CKM_DSA_FIPS_G_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DSA_KEY_PAIR_GEN	allow: -	CKM_DSA_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no elliptic-curve algorithms; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+mechanism	CKM_DSA_PARAMETER_GEN	allow: -	CKM_DSA_PARAMETER_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DSA_PROBABILISTIC_PARAMETER_GEN	allow: -	CKM_DSA_PROBABILISTIC_PARAMETER_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_DSA_SHA1	allow: -	CKM_DSA_SHA1 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA224	allow: -	CKM_DSA_SHA224 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA256	allow: -	CKM_DSA_SHA256 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA384	allow: -	CKM_DSA_SHA384 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA3_224	allow: -	CKM_DSA_SHA3_224 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA3_256	allow: -	CKM_DSA_SHA3_256 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA3_384	allow: -	CKM_DSA_SHA3_384 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA3_512	allow: -	CKM_DSA_SHA3_512 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHA512	allow: -	CKM_DSA_SHA512 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN	allow: -	CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ECDH1_COFACTOR_DERIVE	allow: -	CKM_ECDH1_COFACTOR_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+mechanism	CKM_ECDH1_DERIVE	allow: -	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+mechanism	CKM_ECDH_AES_KEY_WRAP	allow: -	CKM_ECDH_AES_KEY_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ECDH_COF_AES_KEY_WRAP	allow: -	CKM_ECDH_COF_AES_KEY_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ECDH_X_AES_KEY_WRAP	allow: -	CKM_ECDH_X_AES_KEY_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ECDSA	allow: -	CKM_ECDSA is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA1	allow: -	CKM_ECDSA_SHA1 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA224	allow: -	CKM_ECDSA_SHA224 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA256	allow: -	CKM_ECDSA_SHA256 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA384	allow: -	CKM_ECDSA_SHA384 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA3_224	allow: -	CKM_ECDSA_SHA3_224 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA3_256	allow: -	CKM_ECDSA_SHA3_256 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA3_384	allow: -	CKM_ECDSA_SHA3_384 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA3_512	allow: -	CKM_ECDSA_SHA3_512 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECDSA_SHA512	allow: -	CKM_ECDSA_SHA512 is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_ECMQV_DERIVE	allow: -	CKM_ECMQV_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_EC_EDWARDS_KEY_PAIR_GEN	allow: -	CKM_EC_EDWARDS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no elliptic-curve algorithms; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+mechanism	CKM_EC_KEY_PAIR_GEN	allow: -	CKM_EC_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no elliptic-curve algorithms; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+mechanism	CKM_EC_KEY_PAIR_GEN_W_EXTRA_BITS	allow: -	CKM_EC_KEY_PAIR_GEN_W_EXTRA_BITS is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_EC_MONTGOMERY_KEY_PAIR_GEN	allow: -	CKM_EC_MONTGOMERY_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no elliptic-curve algorithms; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+mechanism	CKM_EDDSA	allow: -	CKM_EDDSA is not allowed: CNSA 2.0 has no DSA or elliptic-curve signature; ML-DSA-87 replaces them. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_EXTRACT_KEY_FROM_KEY	allow: -	CKM_EXTRACT_KEY_FROM_KEY is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_FASTHASH	allow: -	CKM_FASTHASH is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_FORTEZZA_TIMESTAMP	allow: -	CKM_FORTEZZA_TIMESTAMP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GENERIC_SECRET_KEY_GEN	allow: GenerateKey	CKM_GENERIC_SECRET_KEY_GEN is allowed under Cnsa20 only for GenerateKey; {op} is not. Secret / HMAC key generation, at least 256 bits
+mechanism	CKM_GOST28147	allow: -	CKM_GOST28147 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOST28147_ECB	allow: -	CKM_GOST28147_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOST28147_KEY_GEN	allow: -	CKM_GOST28147_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOST28147_KEY_WRAP	allow: -	CKM_GOST28147_KEY_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOST28147_MAC	allow: -	CKM_GOST28147_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOSTR3410	allow: -	CKM_GOSTR3410 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOSTR3410_DERIVE	allow: -	CKM_GOSTR3410_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOSTR3410_KEY_PAIR_GEN	allow: -	CKM_GOSTR3410_KEY_PAIR_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOSTR3410_KEY_WRAP	allow: -	CKM_GOSTR3410_KEY_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOSTR3410_WITH_GOSTR3411	allow: -	CKM_GOSTR3410_WITH_GOSTR3411 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOSTR3411	allow: -	CKM_GOSTR3411 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_GOSTR3411_HMAC	allow: -	CKM_GOSTR3411_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_HASH_ML_DSA	allow: -	CKM_HASH_ML_DSA is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA224	allow: -	CKM_HASH_ML_DSA_SHA224 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA256	allow: -	CKM_HASH_ML_DSA_SHA256 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA384	allow: -	CKM_HASH_ML_DSA_SHA384 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA3_224	allow: -	CKM_HASH_ML_DSA_SHA3_224 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA3_256	allow: -	CKM_HASH_ML_DSA_SHA3_256 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA3_384	allow: -	CKM_HASH_ML_DSA_SHA3_384 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA3_512	allow: -	CKM_HASH_ML_DSA_SHA3_512 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHA512	allow: -	CKM_HASH_ML_DSA_SHA512 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHAKE128	allow: -	CKM_HASH_ML_DSA_SHAKE128 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_ML_DSA_SHAKE256	allow: -	CKM_HASH_ML_DSA_SHAKE256 is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA	allow: -	CKM_HASH_SLH_DSA is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA224	allow: -	CKM_HASH_SLH_DSA_SHA224 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA256	allow: -	CKM_HASH_SLH_DSA_SHA256 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA384	allow: -	CKM_HASH_SLH_DSA_SHA384 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA3_224	allow: -	CKM_HASH_SLH_DSA_SHA3_224 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA3_256	allow: -	CKM_HASH_SLH_DSA_SHA3_256 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA3_384	allow: -	CKM_HASH_SLH_DSA_SHA3_384 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA3_512	allow: -	CKM_HASH_SLH_DSA_SHA3_512 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHA512	allow: -	CKM_HASH_SLH_DSA_SHA512 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHAKE128	allow: -	CKM_HASH_SLH_DSA_SHAKE128 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HASH_SLH_DSA_SHAKE256	allow: -	CKM_HASH_SLH_DSA_SHAKE256 is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_HKDF_DATA	allow: -	CKM_HKDF_DATA is not allowed: derives a data object whose value is readable; CNSA 2.0 keys stay on the token. Use CKM_HKDF_DERIVE.
+mechanism	CKM_HKDF_DERIVE	allow: -	CKM_HKDF_DERIVE is allowed under Cnsa20 only for Derive; {op} is not. SP 800-56C Rev.2 HKDF over SHA-384 / SHA-512 || CNSA 2.0: CKM_HKDF_DERIVE requires CkmHkdfParams naming SHA-384 or SHA-512 (hash or _HMAC form).
+mechanism	CKM_HKDF_KEY_GEN	allow: GenerateKey	CKM_HKDF_KEY_GEN is allowed under Cnsa20 only for GenerateKey; {op} is not. Secret / HMAC key generation, at least 256 bits
+mechanism	CKM_HOTP	allow: -	CKM_HOTP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_HOTP_KEY_GEN	allow: -	CKM_HOTP_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_HSS	allow: Sign,Verify	CKM_HSS is allowed under Cnsa20 only for Sign, Verify; {op} is not. CNSA 2.0 LMS (single-level HSS) / XMSS (SP 800-208)
+mechanism	CKM_HSS_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_HSS_KEY_PAIR_GEN is allowed under Cnsa20 only for GenerateKeyPair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) || CKM_HSS_KEY_PAIR_GEN is allowed under Cnsa20 only for {op}Pair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208)
+mechanism	CKM_IDEA_CBC	allow: -	CKM_IDEA_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IDEA_CBC_PAD	allow: -	CKM_IDEA_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IDEA_ECB	allow: -	CKM_IDEA_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IDEA_KEY_GEN	allow: -	CKM_IDEA_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IDEA_MAC	allow: -	CKM_IDEA_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IDEA_MAC_GENERAL	allow: -	CKM_IDEA_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IKE1_EXTENDED_DERIVE	allow: -	CKM_IKE1_EXTENDED_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IKE1_PRF_DERIVE	allow: -	CKM_IKE1_PRF_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IKE2_PRF_PLUS_DERIVE	allow: -	CKM_IKE2_PRF_PLUS_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_IKE_PRF_DERIVE	allow: -	CKM_IKE_PRF_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_JUNIPER_CBC128	allow: -	CKM_JUNIPER_CBC128 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_JUNIPER_COUNTER	allow: -	CKM_JUNIPER_COUNTER is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_JUNIPER_ECB128	allow: -	CKM_JUNIPER_ECB128 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_JUNIPER_KEY_GEN	allow: -	CKM_JUNIPER_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_JUNIPER_SHUFFLE	allow: -	CKM_JUNIPER_SHUFFLE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_JUNIPER_WRAP	allow: -	CKM_JUNIPER_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KEA_DERIVE	allow: -	CKM_KEA_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KEA_KEY_DERIVE	allow: -	CKM_KEA_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KEA_KEY_PAIR_GEN	allow: -	CKM_KEA_KEY_PAIR_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KEY_WRAP_LYNKS	allow: -	CKM_KEY_WRAP_LYNKS is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KEY_WRAP_SET_OAEP	allow: -	CKM_KEY_WRAP_SET_OAEP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KIP_DERIVE	allow: -	CKM_KIP_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KIP_MAC	allow: -	CKM_KIP_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_KIP_WRAP	allow: -	CKM_KIP_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD2	allow: -	CKM_MD2 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD2_HMAC	allow: -	CKM_MD2_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD2_HMAC_GENERAL	allow: -	CKM_MD2_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD2_KEY_DERIVATION	allow: -	CKM_MD2_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD2_RSA_PKCS	allow: -	CKM_MD2_RSA_PKCS is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD5	allow: -	CKM_MD5 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD5_HMAC	allow: -	CKM_MD5_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD5_HMAC_GENERAL	allow: -	CKM_MD5_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD5_KEY_DERIVATION	allow: -	CKM_MD5_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_MD5_RSA_PKCS	allow: -	CKM_MD5_RSA_PKCS is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_ML_DSA	allow: Sign,Verify	CKM_ML_DSA is allowed under Cnsa20 only for Sign, Verify; {op} is not. CNSA 2.0 ML-DSA-87 (FIPS 204)
+mechanism	CKM_ML_DSA_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_ML_DSA_KEY_PAIR_GEN is allowed under Cnsa20 only for GenerateKeyPair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) || CKM_ML_DSA_KEY_PAIR_GEN is allowed under Cnsa20 only for {op}Pair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208)
+mechanism	CKM_ML_KEM	allow: Encapsulate,Decapsulate	CKM_ML_KEM is allowed under Cnsa20 only for Encapsulate, Decapsulate; {op} is not. CNSA 2.0 ML-KEM-1024 (FIPS 203)
+mechanism	CKM_ML_KEM_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_ML_KEM_KEY_PAIR_GEN is allowed under Cnsa20 only for GenerateKeyPair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) || CKM_ML_KEM_KEY_PAIR_GEN is allowed under Cnsa20 only for {op}Pair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208)
+mechanism	CKM_NULL	allow: -	CKM_NULL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBA_SHA1_WITH_SHA1_HMAC	allow: -	CKM_PBA_SHA1_WITH_SHA1_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_MD2_DES_CBC	allow: -	CKM_PBE_MD2_DES_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_CAST128_CBC	allow: -	CKM_PBE_MD5_CAST128_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_CAST3_CBC	allow: -	CKM_PBE_MD5_CAST3_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_CAST_CBC	allow: -	CKM_PBE_MD5_CAST_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_DES_CBC	allow: -	CKM_PBE_MD5_DES_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_CAST128_CBC	allow: -	CKM_PBE_SHA1_CAST128_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_DES2_EDE_CBC	allow: -	CKM_PBE_SHA1_DES2_EDE_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_DES3_EDE_CBC	allow: -	CKM_PBE_SHA1_DES3_EDE_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC2_128_CBC	allow: -	CKM_PBE_SHA1_RC2_128_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC2_40_CBC	allow: -	CKM_PBE_SHA1_RC2_40_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC4_128	allow: -	CKM_PBE_SHA1_RC4_128 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC4_40	allow: -	CKM_PBE_SHA1_RC4_40 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PKCS5_PBKD2	allow: -	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+mechanism	CKM_POLY1305	allow: -	CKM_POLY1305 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_POLY1305_KEY_GEN	allow: -	CKM_POLY1305_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_PUB_KEY_FROM_PRIV_KEY	allow: -	CKM_PUB_KEY_FROM_PRIV_KEY is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC2_CBC	allow: -	CKM_RC2_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC2_CBC_PAD	allow: -	CKM_RC2_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC2_ECB	allow: -	CKM_RC2_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC2_KEY_GEN	allow: -	CKM_RC2_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC2_MAC	allow: -	CKM_RC2_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC2_MAC_GENERAL	allow: -	CKM_RC2_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC4	allow: -	CKM_RC4 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC4_KEY_GEN	allow: -	CKM_RC4_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC5_CBC	allow: -	CKM_RC5_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC5_CBC_PAD	allow: -	CKM_RC5_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC5_ECB	allow: -	CKM_RC5_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC5_KEY_GEN	allow: -	CKM_RC5_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC5_MAC	allow: -	CKM_RC5_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RC5_MAC_GENERAL	allow: -	CKM_RC5_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD128	allow: -	CKM_RIPEMD128 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD128_HMAC	allow: -	CKM_RIPEMD128_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD128_HMAC_GENERAL	allow: -	CKM_RIPEMD128_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD128_RSA_PKCS	allow: -	CKM_RIPEMD128_RSA_PKCS is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD160	allow: -	CKM_RIPEMD160 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD160_HMAC	allow: -	CKM_RIPEMD160_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD160_HMAC_GENERAL	allow: -	CKM_RIPEMD160_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RIPEMD160_RSA_PKCS	allow: -	CKM_RIPEMD160_RSA_PKCS is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RSA_9796	allow: -	CKM_RSA_9796 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RSA_AES_KEY_WRAP	allow: -	CKM_RSA_AES_KEY_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RSA_PKCS	allow: -	CKM_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87 and RSA key establishment with ML-KEM-1024. Use CKM_ML_DSA (ML-DSA-87) to sign, CKM_ML_KEM (ML-KEM-1024) to establish keys.
+mechanism	CKM_RSA_PKCS_KEY_PAIR_GEN	allow: -	CKM_RSA_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+mechanism	CKM_RSA_PKCS_OAEP	allow: -	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+mechanism	CKM_RSA_PKCS_OAEP_TPM_1_1	allow: -	CKM_RSA_PKCS_OAEP_TPM_1_1 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RSA_PKCS_PSS	allow: -	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_RSA_PKCS_TPM_1_1	allow: -	CKM_RSA_PKCS_TPM_1_1 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RSA_X9_31	allow: -	CKM_RSA_X9_31 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_RSA_X9_31_KEY_PAIR_GEN	allow: -	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+mechanism	CKM_RSA_X_509	allow: -	CKM_RSA_X_509 is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87 and RSA key establishment with ML-KEM-1024. Use CKM_ML_DSA (ML-DSA-87) to sign, CKM_ML_KEM (ML-KEM-1024) to establish keys.
+mechanism	CKM_SALSA20	allow: -	CKM_SALSA20 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SALSA20_KEY_GEN	allow: -	CKM_SALSA20_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SALSA20_POLY1305	allow: -	CKM_SALSA20_POLY1305 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SECURID	allow: -	CKM_SECURID is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SECURID_KEY_GEN	allow: -	CKM_SECURID_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_CBC	allow: -	CKM_SEED_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_CBC_ENCRYPT_DATA	allow: -	CKM_SEED_CBC_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_CBC_PAD	allow: -	CKM_SEED_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_ECB	allow: -	CKM_SEED_ECB is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_ECB_ENCRYPT_DATA	allow: -	CKM_SEED_ECB_ENCRYPT_DATA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_KEY_GEN	allow: -	CKM_SEED_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_MAC	allow: -	CKM_SEED_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SEED_MAC_GENERAL	allow: -	CKM_SEED_MAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA1_KEY_DERIVATION	allow: -	CKM_SHA1_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA1_RSA_PKCS	allow: -	CKM_SHA1_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA1_RSA_PKCS_PSS	allow: -	CKM_SHA1_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA1_RSA_X9_31	allow: -	CKM_SHA1_RSA_X9_31 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA224	allow: -	CKM_SHA224 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA224_HMAC	allow: -	CKM_SHA224_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA224_HMAC_GENERAL	allow: -	CKM_SHA224_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA224_KEY_DERIVATION	allow: -	CKM_SHA224_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA224_KEY_GEN	allow: -	CKM_SHA224_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA224_RSA_PKCS	allow: -	CKM_SHA224_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA224_RSA_PKCS_PSS	allow: -	CKM_SHA224_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA256	allow: -	CKM_SHA256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA256_HMAC	allow: -	CKM_SHA256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA256_HMAC_GENERAL	allow: -	CKM_SHA256_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA256_KEY_DERIVATION	allow: -	CKM_SHA256_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA256_KEY_GEN	allow: -	CKM_SHA256_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA256_RSA_PKCS	allow: -	CKM_SHA256_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA256_RSA_PKCS_PSS	allow: -	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA384	allow: Digest	CKM_SHA384 is allowed under Cnsa20 only for Digest; {op} is not. CNSA 2.0 SHA-384 / SHA-512 (FIPS 180-4)
+mechanism	CKM_SHA384_HMAC	allow: Sign,Verify	CKM_SHA384_HMAC is allowed under Cnsa20 only for Sign, Verify; {op} is not. HMAC over CNSA 2.0 SHA-384 / SHA-512 (FIPS 198-1), key of at least 256 bits
+mechanism	CKM_SHA384_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA384_HMAC_GENERAL is allowed under Cnsa20 only for Sign, Verify; {op} is not. HMAC over CNSA 2.0 SHA-384 / SHA-512 (FIPS 198-1), key of at least 256 bits
+mechanism	CKM_SHA384_KEY_DERIVATION	allow: -	CKM_SHA384_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA384_KEY_GEN	allow: GenerateKey	CKM_SHA384_KEY_GEN is allowed under Cnsa20 only for GenerateKey; {op} is not. Secret / HMAC key generation, at least 256 bits
+mechanism	CKM_SHA384_RSA_PKCS	allow: -	CKM_SHA384_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA384_RSA_PKCS_PSS	allow: -	CKM_SHA384_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_224	allow: -	CKM_SHA3_224 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA3_224_HMAC	allow: -	CKM_SHA3_224_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_224_HMAC_GENERAL	allow: -	CKM_SHA3_224_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_224_KEY_DERIVE	allow: -	CKM_SHA3_224_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA3_224_KEY_GEN	allow: -	CKM_SHA3_224_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA3_224_RSA_PKCS	allow: -	CKM_SHA3_224_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_224_RSA_PKCS_PSS	allow: -	CKM_SHA3_224_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_256	allow: -	CKM_SHA3_256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA3_256_HMAC	allow: -	CKM_SHA3_256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_256_HMAC_GENERAL	allow: -	CKM_SHA3_256_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_256_KEY_DERIVE	allow: -	CKM_SHA3_256_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA3_256_KEY_GEN	allow: -	CKM_SHA3_256_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA3_256_RSA_PKCS	allow: -	CKM_SHA3_256_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_256_RSA_PKCS_PSS	allow: -	CKM_SHA3_256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_384	allow: -	CKM_SHA3_384 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA3_384_HMAC	allow: -	CKM_SHA3_384_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_384_HMAC_GENERAL	allow: -	CKM_SHA3_384_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_384_KEY_DERIVE	allow: -	CKM_SHA3_384_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA3_384_KEY_GEN	allow: -	CKM_SHA3_384_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA3_384_RSA_PKCS	allow: -	CKM_SHA3_384_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_384_RSA_PKCS_PSS	allow: -	CKM_SHA3_384_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_512	allow: -	CKM_SHA3_512 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA3_512_HMAC	allow: -	CKM_SHA3_512_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_512_HMAC_GENERAL	allow: -	CKM_SHA3_512_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA3_512_KEY_DERIVE	allow: -	CKM_SHA3_512_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA3_512_KEY_GEN	allow: -	CKM_SHA3_512_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA3_512_RSA_PKCS	allow: -	CKM_SHA3_512_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA3_512_RSA_PKCS_PSS	allow: -	CKM_SHA3_512_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA512	allow: Digest	CKM_SHA512 is allowed under Cnsa20 only for Digest; {op} is not. CNSA 2.0 SHA-384 / SHA-512 (FIPS 180-4)
+mechanism	CKM_SHA512_224	allow: -	CKM_SHA512_224 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA512_224_HMAC	allow: -	CKM_SHA512_224_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA512_224_HMAC_GENERAL	allow: -	CKM_SHA512_224_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA512_224_KEY_DERIVATION	allow: -	CKM_SHA512_224_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA512_224_KEY_GEN	allow: -	CKM_SHA512_224_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA512_256	allow: -	CKM_SHA512_256 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA512_256_HMAC	allow: -	CKM_SHA512_256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA512_256_HMAC_GENERAL	allow: -	CKM_SHA512_256_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA512_256_KEY_DERIVATION	allow: -	CKM_SHA512_256_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA512_256_KEY_GEN	allow: -	CKM_SHA512_256_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SHA512_HMAC	allow: Sign,Verify	CKM_SHA512_HMAC is allowed under Cnsa20 only for Sign, Verify; {op} is not. HMAC over CNSA 2.0 SHA-384 / SHA-512 (FIPS 198-1), key of at least 256 bits
+mechanism	CKM_SHA512_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA512_HMAC_GENERAL is allowed under Cnsa20 only for Sign, Verify; {op} is not. HMAC over CNSA 2.0 SHA-384 / SHA-512 (FIPS 198-1), key of at least 256 bits
+mechanism	CKM_SHA512_KEY_DERIVATION	allow: -	CKM_SHA512_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA512_KEY_GEN	allow: GenerateKey	CKM_SHA512_KEY_GEN is allowed under Cnsa20 only for GenerateKey; {op} is not. Secret / HMAC key generation, at least 256 bits
+mechanism	CKM_SHA512_RSA_PKCS	allow: -	CKM_SHA512_RSA_PKCS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA512_RSA_PKCS_PSS	allow: -	CKM_SHA512_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+mechanism	CKM_SHA512_T	allow: -	CKM_SHA512_T is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA512_T_HMAC	allow: -	CKM_SHA512_T_HMAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA512_T_HMAC_GENERAL	allow: -	CKM_SHA512_T_HMAC_GENERAL is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA512_T_KEY_DERIVATION	allow: -	CKM_SHA512_T_KEY_DERIVATION is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA512_T_KEY_GEN	allow: -	CKM_SHA512_T_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHAKE_128_KEY_DERIVE	allow: -	CKM_SHAKE_128_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHAKE_256_KEY_DERIVE	allow: -	CKM_SHAKE_256_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SHA_1	allow: -	CKM_SHA_1 is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use CKM_SHA384 or CKM_SHA512.
+mechanism	CKM_SHA_1_HMAC	allow: -	CKM_SHA_1_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA_1_HMAC_GENERAL	allow: -	CKM_SHA_1_HMAC_GENERAL is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. Use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+mechanism	CKM_SHA_1_KEY_GEN	allow: -	CKM_SHA_1_KEY_GEN is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. Use CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN.
+mechanism	CKM_SKIPJACK_CBC64	allow: -	CKM_SKIPJACK_CBC64 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_CFB16	allow: -	CKM_SKIPJACK_CFB16 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_CFB32	allow: -	CKM_SKIPJACK_CFB32 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_CFB64	allow: -	CKM_SKIPJACK_CFB64 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_CFB8	allow: -	CKM_SKIPJACK_CFB8 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_ECB64	allow: -	CKM_SKIPJACK_ECB64 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_KEY_GEN	allow: -	CKM_SKIPJACK_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_OFB64	allow: -	CKM_SKIPJACK_OFB64 is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_PRIVATE_WRAP	allow: -	CKM_SKIPJACK_PRIVATE_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_RELAYX	allow: -	CKM_SKIPJACK_RELAYX is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SKIPJACK_WRAP	allow: -	CKM_SKIPJACK_WRAP is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SLH_DSA	allow: -	CKM_SLH_DSA is not allowed: SLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing.
+mechanism	CKM_SLH_DSA_KEY_PAIR_GEN	allow: -	CKM_SLH_DSA_KEY_PAIR_GEN is not allowed: SLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing.
+mechanism	CKM_SP800_108_COUNTER_KDF	allow: -	CKM_SP800_108_COUNTER_KDF is allowed under Cnsa20 only for Derive; {op} is not. SP 800-108r1 over HMAC-SHA-384 / HMAC-SHA-512 || CNSA 2.0: SP 800-108 key derivation requires CkmSp800108KdfParams naming HMAC-SHA-384 or HMAC-SHA-512.
+mechanism	CKM_SP800_108_DOUBLE_PIPELINE_KDF	allow: -	CKM_SP800_108_DOUBLE_PIPELINE_KDF is allowed under Cnsa20 only for Derive; {op} is not. SP 800-108r1 over HMAC-SHA-384 / HMAC-SHA-512 || CNSA 2.0: SP 800-108 key derivation requires CkmSp800108KdfParams naming HMAC-SHA-384 or HMAC-SHA-512.
+mechanism	CKM_SP800_108_FEEDBACK_KDF	allow: -	CKM_SP800_108_FEEDBACK_KDF is allowed under Cnsa20 only for Derive; {op} is not. SP 800-108r1 over HMAC-SHA-384 / HMAC-SHA-512 || CNSA 2.0: SP 800-108 key derivation requires CkmSp800108KdfParams naming HMAC-SHA-384 or HMAC-SHA-512.
+mechanism	CKM_SSL3_KEY_AND_MAC_DERIVE	allow: -	CKM_SSL3_KEY_AND_MAC_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SSL3_MASTER_KEY_DERIVE	allow: -	CKM_SSL3_MASTER_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SSL3_MASTER_KEY_DERIVE_DH	allow: -	CKM_SSL3_MASTER_KEY_DERIVE_DH is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SSL3_MD5_MAC	allow: -	CKM_SSL3_MD5_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SSL3_PRE_MASTER_KEY_GEN	allow: -	CKM_SSL3_PRE_MASTER_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_SSL3_SHA1_MAC	allow: -	CKM_SSL3_SHA1_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS10_MAC_CLIENT	allow: -	CKM_TLS10_MAC_CLIENT is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS10_MAC_SERVER	allow: -	CKM_TLS10_MAC_SERVER is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE	allow: -	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE_DH is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_KDF	allow: -	CKM_TLS12_KDF is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_KEY_AND_MAC_DERIVE	allow: -	CKM_TLS12_KEY_AND_MAC_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_KEY_SAFE_DERIVE	allow: -	CKM_TLS12_KEY_SAFE_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_MAC	allow: -	CKM_TLS12_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_MASTER_KEY_DERIVE	allow: -	CKM_TLS12_MASTER_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS12_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS12_MASTER_KEY_DERIVE_DH is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS_KDF	allow: -	CKM_TLS_KDF is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS_KEY_AND_MAC_DERIVE	allow: -	CKM_TLS_KEY_AND_MAC_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS_MAC	allow: -	CKM_TLS_MAC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS_MASTER_KEY_DERIVE	allow: -	CKM_TLS_MASTER_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS_MASTER_KEY_DERIVE_DH is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS_PRE_MASTER_KEY_GEN	allow: -	CKM_TLS_PRE_MASTER_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TLS_PRF	allow: -	CKM_TLS_PRF is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TWOFISH_CBC	allow: -	CKM_TWOFISH_CBC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TWOFISH_CBC_PAD	allow: -	CKM_TWOFISH_CBC_PAD is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_TWOFISH_KEY_GEN	allow: -	CKM_TWOFISH_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_VENDOR_DEFINED	allow: -	CKM_VENDOR_DEFINED is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE	allow: -	CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_WTLS_MASTER_KEY_DERIVE	allow: -	CKM_WTLS_MASTER_KEY_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC	allow: -	CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_WTLS_PRE_MASTER_KEY_GEN	allow: -	CKM_WTLS_PRE_MASTER_KEY_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_WTLS_PRF	allow: -	CKM_WTLS_PRF is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE	allow: -	CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_DECRYPT	allow: -	CKM_X2RATCHET_DECRYPT is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_ENCRYPT	allow: -	CKM_X2RATCHET_ENCRYPT is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_INITIALIZE	allow: -	CKM_X2RATCHET_INITIALIZE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_RESPOND	allow: -	CKM_X2RATCHET_RESPOND is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X3DH_INITIALIZE	allow: -	CKM_X3DH_INITIALIZE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X3DH_RESPOND	allow: -	CKM_X3DH_RESPOND is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_DERIVE	allow: -	CKM_X9_42_DH_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_HYBRID_DERIVE	allow: -	CKM_X9_42_DH_HYBRID_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_KEY_PAIR_GEN	allow: -	CKM_X9_42_DH_KEY_PAIR_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_PARAMETER_GEN	allow: -	CKM_X9_42_DH_PARAMETER_GEN is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_X9_42_MQV_DERIVE	allow: -	CKM_X9_42_MQV_DERIVE is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_XEDDSA	allow: -	CKM_XEDDSA is not on the Cnsa20 allow-list (not reviewed).
+mechanism	CKM_XMSS	allow: Sign,Verify	CKM_XMSS is allowed under Cnsa20 only for Sign, Verify; {op} is not. CNSA 2.0 LMS (single-level HSS) / XMSS (SP 800-208)
+mechanism	CKM_XMSSMT	allow: -	CKM_XMSSMT is not allowed: CNSA 2.0 allows single-tree XMSS, not the multi-tree XMSS^MT (SP 800-208). Use CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN.
+mechanism	CKM_XMSSMT_KEY_PAIR_GEN	allow: -	CKM_XMSSMT_KEY_PAIR_GEN is not allowed: CNSA 2.0 allows single-tree XMSS, not the multi-tree XMSS^MT (SP 800-208). Use CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN.
+mechanism	CKM_XMSS_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_XMSS_KEY_PAIR_GEN is allowed under Cnsa20 only for GenerateKeyPair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) || CKM_XMSS_KEY_PAIR_GEN is allowed under Cnsa20 only for {op}Pair; {op} is not. CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208)
+mechanism	CKM_XOR_BASE_AND_DATA	allow: -	CKM_XOR_BASE_AND_DATA is not on the Cnsa20 allow-list (not reviewed).
+oaep	CKM_SHA224/CKG_MGF1_SHA224	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+oaep	CKM_SHA256/CKG_MGF1_SHA1	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+oaep	CKM_SHA256/CKG_MGF1_SHA256	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+oaep	CKM_SHA384/CKG_MGF1_SHA384	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+oaep	CKM_SHA3_256/CKG_MGF1_SHA3_256	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+oaep	CKM_SHA512/CKG_MGF1_SHA512	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+oaep	CKM_SHA_1/CKG_MGF1_SHA1	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_GOSTR3411	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA1	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA224	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA256	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA384	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512_224	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512_256	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA256	deny	CKM_HASH_ML_DSA is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA3_256	deny	CKM_HASH_ML_DSA is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA512	deny	CKM_HASH_ML_DSA is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA_1	deny	CKM_HASH_ML_DSA is not allowed: CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA256	deny	CKM_HASH_SLH_DSA is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA3_256	deny	CKM_HASH_SLH_DSA is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA512	deny	CKM_HASH_SLH_DSA is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA_1	deny	CKM_HASH_SLH_DSA is not allowed: HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Sign	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Verify	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Sign	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Verify	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+raw	CKM_AES_CCM	deny	CKM_AES_CCM is not allowed: CNSA 2.0 names AES-256 but no mode; this policy allows only the authenticated GCM mode and the KW/KWP key wraps. Use CKM_AES_GCM, or CKM_AES_KEY_WRAP / CKM_AES_KEY_WRAP_KWP for keys.
+raw	CKM_AES_GCM	deny	CNSA 2.0: AES-GCM requires CkmAesGcmParams or CkmGcmMessageParams, so the tag length can be checked.
+raw	CKM_ECDH1_DERIVE	deny	CKM_ECDH1_DERIVE is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM-1024 replaces ECDH and DH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+raw	CKM_HKDF_DERIVE	deny	CNSA 2.0: CKM_HKDF_DERIVE requires CkmHkdfParams naming SHA-384 or SHA-512 (hash or _HMAC form).
+raw	CKM_PKCS5_PBKD2	deny	CKM_PKCS5_PBKD2 is not allowed: CNSA 2.0 has no password-based key derivation. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token.
+raw	CKM_RSA_PKCS_OAEP	deny	CKM_RSA_PKCS_OAEP is not allowed: CNSA 2.0 replaces RSA key establishment with ML-KEM-1024. Use CKM_ML_KEM with an ML-KEM-1024 key.
+raw	CKM_RSA_PKCS_PSS	deny	CKM_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+raw	CKM_SHA256_RSA_PKCS_PSS	deny	CKM_SHA256_RSA_PKCS_PSS is not allowed: CNSA 2.0 replaces RSA signatures with ML-DSA-87. Use CKM_ML_DSA with an ML-DSA-87 key.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 1024	deny	CKM_RSA_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 1536	deny	CKM_RSA_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 2047	deny	CKM_RSA_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 2048	deny	CKM_RSA_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 3072	deny	CKM_RSA_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 4096	deny	CKM_RSA_PKCS_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 1024	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 1536	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 2047	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 2048	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 3072	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 4096	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: CNSA 2.0 has no RSA; generate ML-DSA-87 or ML-KEM-1024 key pairs instead. Use CKM_ML_DSA_KEY_PAIR_GEN or CKM_ML_KEM_KEY_PAIR_GEN.
+sp800-108	CKM_AES_CMAC	deny	CNSA 2.0: CKM_AES_CMAC is not allowed: CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	CKM_MD5_HMAC	deny	CNSA 2.0: CKM_MD5_HMAC is not an allowed SP 800-108 PRF; use CKM_SHA384_HMAC or CKM_SHA512_HMAC.
+sp800-108	CKM_SHA224_HMAC	deny	CNSA 2.0: CKM_SHA224_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	CKM_SHA256_HMAC	deny	CNSA 2.0: CKM_SHA256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	CKM_SHA384_HMAC	allow	
+sp800-108	CKM_SHA3_256_HMAC	deny	CNSA 2.0: CKM_SHA3_256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	CKM_SHA512_HMAC	allow	
+sp800-108	CKM_SHA_1_HMAC	deny	CNSA 2.0: CKM_SHA_1_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	double-pipeline CKM_SHA256_HMAC	deny	CNSA 2.0: CKM_SHA256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	double-pipeline CKM_SHA_1_HMAC	deny	CNSA 2.0: CKM_SHA_1_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	feedback CKM_SHA256_HMAC	deny	CNSA 2.0: CKM_SHA256_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+sp800-108	feedback CKM_SHA_1_HMAC	deny	CNSA 2.0: CKM_SHA_1_HMAC is not allowed: CNSA 2.0 allows only SHA-384 and SHA-512. Use HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF).
+template	private, CKA_SENSITIVE=false	deny	CNSA 2.0 (this policy): keys stay on the token; CKA_SENSITIVE=false is refused.
+template	secret, CKA_EXTRACTABLE=true	allow	
+template	secret, CKA_SENSITIVE=false	deny	CNSA 2.0 (this policy): keys stay on the token; CKA_SENSITIVE=false is refused.
+template	secret, CKA_SENSITIVE=true	allow	

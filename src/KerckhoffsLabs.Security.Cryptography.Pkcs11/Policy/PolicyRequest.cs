@@ -95,6 +95,65 @@ public sealed record KeyAgreementKeyRequest(CKM Mechanism, CKK KeyType) : Policy
     internal override CKM? MechanismType => Mechanism;
 }
 
+/// <summary>
+/// The strength of a key that is about to be created or used: its type, size and, for post-quantum keys, its
+/// parameter set. A policy that inspects keys (<c>InspectsKeys</c>) is asked before the library lets the
+/// token create or use the key; the built-in <c>Recommended</c> and <c>NistApproved</c> policies allow every one.
+/// A <see langword="null"/> property means the value was not reported (absent from the template, or the
+/// token would not say), which a strict policy can refuse.
+/// </summary>
+/// <param name="KeyType">The <c>CKA_KEY_TYPE</c>, or <see langword="null"/> when not reported.</param>
+/// <param name="Source">Where the description of the key comes from.</param>
+public sealed record KeyStrengthRequest(CKK? KeyType, KeyStrengthSource Source) : PolicyRequest
+{
+    /// <summary>The <c>CKA_VALUE_LEN</c> in bytes of a symmetric key, or <see langword="null"/> when not reported.</summary>
+    public int? ValueLengthBytes { get; init; }
+
+    /// <summary>The <c>CKA_PARAMETER_SET</c> of an ML-KEM or ML-DSA key, or <see langword="null"/> when not reported.</summary>
+    public ulong? ParameterSet { get; init; }
+
+    /// <summary>The <c>CKA_HSS_LEVELS</c> of an HSS key, or <see langword="null"/> when not reported.</summary>
+    public ulong? HssLevels { get; init; }
+
+    internal override string Describe()
+    {
+        string text = KeyType is { } type ? $"{KeyTypeNames.Of(type)} key" : "key of unknown type";
+        if (ValueLengthBytes is { } bytes)
+            text += $" of {bytes} bytes";
+        if (ParameterSet is { } set)
+            text += $", parameter set {ParameterSetName(KeyType, set)}";
+        if (HssLevels is { } levels)
+            text += $", {levels} levels";
+        return $"{text} ({SourceName(Source)})";
+    }
+
+    private static string ParameterSetName(CKK? keyType, ulong set) => keyType switch
+    {
+        CKK.CKK_ML_KEM when Enum.IsDefined(typeof(CkpMlKem), set) => ((CkpMlKem)set).ToString(),
+        CKK.CKK_ML_DSA when Enum.IsDefined(typeof(CkpMlDsa), set) => ((CkpMlDsa)set).ToString(),
+        _ => $"0x{set:X}",
+    };
+
+    private static string SourceName(KeyStrengthSource source) => source switch
+    {
+        KeyStrengthSource.Template => "template",
+        KeyStrengthSource.CreatedKey => "created key",
+        KeyStrengthSource.ExistingKey => "existing key",
+        _ => source.ToString(),
+    };
+}
+
+/// <summary>Where a <see cref="KeyStrengthRequest"/> got its description of the key.</summary>
+public enum KeyStrengthSource
+{
+    /// <summary>The caller's template, before the token creates the key.</summary>
+    Template,
+    /// <summary>A key the token has just created, read back to confirm what it chose.</summary>
+    CreatedKey,
+    /// <summary>A key that already exists on the token, read at the moment it is used.</summary>
+    ExistingKey,
+}
+
 /// <summary>Reading secret key material off the token into managed memory.</summary>
 /// <param name="Kind">What is being read.</param>
 public sealed record KeyMaterialExportRequest(KeyMaterialExportKind Kind) : PolicyRequest
