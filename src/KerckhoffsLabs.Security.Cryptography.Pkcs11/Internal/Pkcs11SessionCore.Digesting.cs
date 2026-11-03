@@ -23,6 +23,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Digest);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestKey");
 
@@ -187,6 +188,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(encryptionMechanism, CryptoOperation.Encrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt1");
 
@@ -217,6 +219,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(encryptionMechanism, CryptoOperation.Encrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt2");
 
@@ -248,6 +251,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(encryptionMechanism, CryptoOperation.Encrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, encryptionMechanism, nameof(encryptionMechanism));
 
@@ -296,6 +300,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest1");
 
@@ -335,6 +340,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest2");
 
@@ -366,6 +372,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, decryptionMechanism, nameof(decryptionMechanism));
 

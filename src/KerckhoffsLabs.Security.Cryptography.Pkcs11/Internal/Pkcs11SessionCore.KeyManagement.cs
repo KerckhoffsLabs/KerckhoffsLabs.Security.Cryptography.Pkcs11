@@ -146,6 +146,8 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Wrap);
+        EnforceKeyStrength(wrappingKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
@@ -227,6 +229,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Unwrap);
+        EnforceKeyStrength(unwrappingKeyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
@@ -383,6 +386,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(mechanism, CryptoOperation.Derive, attributes);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
+        EnforceKeyStrength(baseKeyHandle, KeyStrengthSource.ExistingKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
