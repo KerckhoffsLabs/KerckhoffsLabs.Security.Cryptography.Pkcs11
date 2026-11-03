@@ -16,6 +16,8 @@
       href: examples/elliptic-curves.md
     - name: Post-quantum
       href: examples/post-quantum.md
+    - name: Hashes and HMAC
+      href: examples/hashes.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies
