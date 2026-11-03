@@ -146,9 +146,8 @@ needs `make` and `gcc` on Linux/macOS, or `pwsh` and the MSVC build tools on Win
 
 ## License
 
-KerckhoffsLabs.Security.Cryptography.Pkcs11 is available under the terms of the [MIT License](https://opensource.org/license/mit).
-A [human-friendly license summary](https://www.tldrlegal.com/license/mit-license) is available on tldrlegal.com, but the
-[full license text](https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/blob/main/LICENSE) always prevails.
+KerckhoffsLabs.Security.Cryptography.Pkcs11 is available under the terms of the [MIT License](https://opensource.org/license/mit).  
+A [human-friendly license summary](https://www.tldrlegal.com/license/mit-license) is available on tldrlegal.com, but the [full license text](https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/blob/main/LICENSE) always prevails.
 
 ## Support
 
