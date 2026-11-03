@@ -30,14 +30,15 @@ public sealed class WaitForSlotEventTests
     }
 
     [Fact]
-    public void EventOccurred_ReportsSlotId()
+    public void EventOccurred_ReportsSlot()
     {
         using var fake = new SlotEventFake { Rv = CKR.CKR_OK, SlotIdToReport = 5 };
         using var library = fake.Load();
 
-        ulong? slotId = library.WaitForSlotEvent(nonBlocking: false);
+        Pkcs11Slot? slot = library.WaitForSlotEvent(nonBlocking: false);
 
-        Assert.Equal(5UL, slotId);
+        Assert.NotNull(slot);
+        Assert.Equal(new SlotId(5), slot.SlotId);
         Assert.Equal((NativeCULong)0, fake.CapturedFlags); // blocking call: no CKF_DONT_BLOCK
     }
 
@@ -53,14 +54,14 @@ public sealed class WaitForSlotEventTests
     }
 
     [Fact]
-    public void NonBlocking_NoEventPending_ReturnsFalseWithoutThrowing()
+    public void NonBlocking_NoEventPending_ReturnsNullWithoutThrowing()
     {
         using var fake = new SlotEventFake { Rv = CKR.CKR_NO_EVENT };
         using var library = fake.Load();
 
-        ulong? slotId = library.WaitForSlotEvent(nonBlocking: true);
+        Pkcs11Slot? slot = library.WaitForSlotEvent(nonBlocking: true);
 
-        Assert.Null(slotId);
+        Assert.Null(slot);
     }
 
     [Fact]
