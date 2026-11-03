@@ -212,6 +212,25 @@ public sealed class PolicyVerdictSnapshotTests
         foreach (KeyMaterialExportKind kind in Enum.GetValues<KeyMaterialExportKind>())
             Add("export", kind.ToString(), new KeyMaterialExportRequest(kind));
 
+        // Key strength: every policy is asked about each key type and size, against an existing key.
+        KeyStrengthRequest Strength(CKK? type) => new(type, KeyStrengthSource.ExistingKey);
+        foreach (int? bytes in new int?[] { 16, 24, 32, null })
+            Add("key-strength", $"CKK_AES {bytes?.ToString() ?? "null"} bytes", Strength(CKK.CKK_AES) with { ValueLengthBytes = bytes });
+        foreach (CKK type in new[] { CKK.CKK_GENERIC_SECRET, CKK.CKK_HKDF, CKK.CKK_SHA384_HMAC, CKK.CKK_SHA512_HMAC })
+            foreach (int? bytes in new int?[] { 16, 32, 64, null })
+                Add("key-strength", $"{KeyTypeNames.Of(type)} {bytes?.ToString() ?? "null"} bytes", Strength(type) with { ValueLengthBytes = bytes });
+        foreach (CkpMlKem set in Enum.GetValues<CkpMlKem>())
+            Add("key-strength", $"CKK_ML_KEM {set}", Strength(CKK.CKK_ML_KEM) with { ParameterSet = (ulong)set });
+        Add("key-strength", "CKK_ML_KEM null", Strength(CKK.CKK_ML_KEM));
+        foreach (CkpMlDsa set in Enum.GetValues<CkpMlDsa>())
+            Add("key-strength", $"CKK_ML_DSA {set}", Strength(CKK.CKK_ML_DSA) with { ParameterSet = (ulong)set });
+        Add("key-strength", "CKK_ML_DSA null", Strength(CKK.CKK_ML_DSA));
+        foreach (ulong? levels in new ulong?[] { 1, 2, null })
+            Add("key-strength", $"CKK_HSS levels {levels?.ToString() ?? "null"}", Strength(CKK.CKK_HSS) with { HssLevels = levels });
+        foreach (CKK type in new[] { CKK.CKK_XMSS, CKK.CKK_XMSSMT, CKK.CKK_RSA, CKK.CKK_EC })
+            Add("key-strength", KeyTypeNames.Of(type), Strength(type));
+        Add("key-strength", "unknown type", Strength(null));
+
         // A copy keeps every verdict; only the hints that name the policy change.
         ComposedCryptoPolicy copy = policy.ToBuilder("Derived").Build();
         void AddCopy(string request, PolicyRequest r)

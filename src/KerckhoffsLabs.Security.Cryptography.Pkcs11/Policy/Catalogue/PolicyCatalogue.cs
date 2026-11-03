@@ -61,6 +61,9 @@ internal sealed class PolicyCatalogue
     /// <summary>The rule applied to reading secret key material off the token.</summary>
     public required KeyMaterialExportRule KeyMaterialExport { get; init; }
 
+    /// <summary>The rule applied to the strength of keys.</summary>
+    public required KeyStrengthRule KeyStrength { get; init; }
+
     /// <summary>
     /// Appended to an "unlisted mechanism" denial, pointing at how to allow it; <see langword="null"/> for none.
     /// Takes the refusing policy's identity, so a derived policy's hint names it. Never appended to hash,

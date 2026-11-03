@@ -2166,3 +2166,28 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.operator ==(K
 [SYSLIB5006]static KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.Pkcs11CertificateExtensions.GetMLDsaPrivateKey(this KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate! certificate) -> System.Security.Cryptography.MLDsa?
 [SYSLIB5006]static KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.Pkcs11CertificateExtensions.GetMLKemPrivateKey(this KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate! certificate) -> System.Security.Cryptography.MLKem?
 [SYSLIB5006]static KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.Pkcs11CertificateExtensions.GetSlhDsaPrivateKey(this KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate! certificate) -> System.Security.Cryptography.SlhDsa?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Deconstruct(out KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK? KeyType, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource Source) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? other) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.HssLevels.get -> ulong?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.HssLevels.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.KeyStrengthRequest(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK? KeyType, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource Source) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.KeyType.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.KeyType.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.ParameterSet.get -> ulong?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.ParameterSet.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Source.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Source.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.ValueLengthBytes.get -> int?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.ValueLengthBytes.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource.CreatedKey = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource.ExistingKey = 2 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource.Template = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthSource
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest!
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Equals(object? obj) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.GetHashCode() -> int
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.ToString() -> string!
+override sealed KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest? other) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.operator !=(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? right) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.operator ==(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? right) -> bool

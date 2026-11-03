@@ -40,6 +40,7 @@ internal static class CatalogueEvaluator
             KeyAgreementKdfRequest r => EvaluateKdf(catalogue, policyName, r.Kdf),
             KeyAgreementKeyRequest r => EvaluateKeyAgreementKeyType(catalogue, policyName, r.KeyType),
             KeyMaterialExportRequest r => catalogue.KeyMaterialExport.Evaluate(r),
+            KeyStrengthRequest r => catalogue.KeyStrength.Evaluate(r),
             _ => PolicyDecision.Deny($"{policyName} has no rule for {request.GetType().Name}."),
         };
     }

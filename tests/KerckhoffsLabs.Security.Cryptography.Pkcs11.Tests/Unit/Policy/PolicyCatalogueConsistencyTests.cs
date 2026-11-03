@@ -126,6 +126,7 @@ public sealed class PolicyCatalogueConsistencyTests
         RsaKeyGeneration = c.RsaKeyGeneration,
         KeyTemplate = c.KeyTemplate,
         KeyMaterialExport = c.KeyMaterialExport,
+        KeyStrength = c.KeyStrength,
         UnlistedMechanismHint = c.UnlistedMechanismHint,
         DocumentedRefusedMechanisms = FrozenDictionary<CKM, DocumentedRefusal>.Empty,
         DocumentedRefusedHashes = FrozenDictionary<string, DocumentedRefusal>.Empty,
