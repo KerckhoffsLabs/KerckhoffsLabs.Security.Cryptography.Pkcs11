@@ -177,10 +177,14 @@ public sealed record KeyMaterialExportRequest(KeyMaterialExportKind Kind) : Poli
     /// </remarks>
     public ExportKeyInfo? PrivateKey { get; internal init; }
 
-    internal override string Describe() =>
-        KdfBaseKey is { } baseKey ? $"export of {Kind} over a {baseKey.Describe("base key")}"
-        : PrivateKey is { } privateKey ? $"export of {Kind} over a {privateKey.Describe("private key")}"
-        : $"export of {Kind}";
+    internal override string Describe()
+    {
+        if (KdfBaseKey is { } baseKey)
+            return $"export of {Kind} over a {baseKey.Describe("base key")}";
+        if (PrivateKey is { } privateKey)
+            return $"export of {Kind} over a {privateKey.Describe("private key")}";
+        return $"export of {Kind}";
+    }
 }
 
 /// <summary>The kind of secret a <see cref="KeyMaterialExportRequest"/> reads off the token.</summary>
