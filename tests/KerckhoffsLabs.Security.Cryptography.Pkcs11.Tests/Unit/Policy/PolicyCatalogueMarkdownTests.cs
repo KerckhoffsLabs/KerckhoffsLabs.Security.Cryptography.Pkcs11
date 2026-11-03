@@ -65,6 +65,7 @@ public sealed class PolicyCatalogueMarkdownTests
         RsaKeyGeneration = RsaKeyGenerationRule.FromDelegate(_ => PolicyDecision.Allow, "Modulus must be at least 2048 | 4096 bits."),
         KeyTemplate = KeyTemplateRule.FromDelegate(_ => PolicyDecision.Allow, "CKA_SENSITIVE=false is refused."),
         KeyMaterialExport = KeyMaterialExportRule.FromDelegate(_ => PolicyDecision.Allow, "Export is refused."),
+        KeyStrength = KeyStrengthRule.Unchecked,
         DocumentedRefusedMechanisms = new Dictionary<CKM, DocumentedRefusal>
         {
             [CKM.CKM_MD5] = new("MD5 is broken.", "SHA256"),
@@ -397,6 +398,7 @@ public sealed class PolicyCatalogueMarkdownTests
             RsaKeyGeneration = catalogue.RsaKeyGeneration,
             KeyTemplate = catalogue.KeyTemplate,
             KeyMaterialExport = catalogue.KeyMaterialExport,
+            KeyStrength = catalogue.KeyStrength,
             DocumentedRefusedMechanisms = new Dictionary<CKM, DocumentedRefusal>
             {
                 [mechanism] = new("Refused.", null),

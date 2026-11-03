@@ -90,6 +90,7 @@ public sealed class CatalogueEvaluatorTests
                 "TEST-RSA-KEYGEN-RULE"),
             KeyTemplate = KeyTemplateRule.FromDelegate(_ => PolicyDecision.Deny("template rule fired"), "TEST-TEMPLATE-RULE"),
             KeyMaterialExport = KeyMaterialExportRule.FromDelegate(_ => PolicyDecision.Deny("export rule fired"), "TEST-EXPORT-RULE"),
+            KeyStrength = KeyStrengthRule.Unchecked,
             UnlistedMechanismHint = unlistedMechanismHint is null ? null : _ => unlistedMechanismHint,
             DocumentedRefusedMechanisms = new Dictionary<CKM, DocumentedRefusal>
             {

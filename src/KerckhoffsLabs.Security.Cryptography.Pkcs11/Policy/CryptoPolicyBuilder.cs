@@ -36,6 +36,7 @@ public sealed class CryptoPolicyBuilder
     private RsaKeyGenerationRule _rsaKeyGeneration = RsaKeyGenerationRule.Minimum(2048);
     private KeyTemplateRule _keyTemplate = KeyTemplateRule.RequireSensitive();
     private KeyMaterialExportRule _keyMaterialExport = KeyMaterialExportRule.Refuse();
+    private KeyStrengthRule _keyStrength = KeyStrengthRule.Unchecked;
     private Func<PolicyIdentity, string>? _unlistedMechanismHint;
     private string? _builtInReference;
     private PolicyDocumentation _documentation;
@@ -69,6 +70,7 @@ public sealed class CryptoPolicyBuilder
         b._rsaKeyGeneration = c.RsaKeyGeneration;
         b._keyTemplate = c.KeyTemplate;
         b._keyMaterialExport = c.KeyMaterialExport;
+        b._keyStrength = c.KeyStrength;
         b._unlistedMechanismHint = c.UnlistedMechanismHint;
         return b;
     }
@@ -292,6 +294,14 @@ public sealed class CryptoPolicyBuilder
         return this;
     }
 
+    /// <summary>Replaces the key-strength rule.</summary>
+    internal CryptoPolicyBuilder WithKeyStrengthRule(KeyStrengthRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        _keyStrength = rule;
+        return this;
+    }
+
     /// <summary>Adds an allow-list entry as a whole (operations, legacy operations, check and rationale), widening as <see cref="Upsert"/> does.</summary>
     internal CryptoPolicyBuilder AllowRule(CKM mechanism, MechanismRule rule) =>
         Upsert(mechanism, rule.Operations, rule.LegacyOperations, rule.Rationale, rule.ParameterCheck);
@@ -323,6 +333,7 @@ public sealed class CryptoPolicyBuilder
         RsaKeyGeneration = _rsaKeyGeneration,
         KeyTemplate = _keyTemplate,
         KeyMaterialExport = _keyMaterialExport,
+        KeyStrength = _keyStrength,
         UnlistedMechanismHint = _unlistedMechanismHint,
         BuiltInReference = _builtInReference,
         Documentation = _documentation,
