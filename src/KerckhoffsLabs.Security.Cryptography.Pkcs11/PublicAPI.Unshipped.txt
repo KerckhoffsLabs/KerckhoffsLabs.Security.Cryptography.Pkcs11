@@ -1513,7 +1513,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.OpenSessionWithPin(str
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.OpenSessionWithPinpad(string! slotLabel, KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKU userType, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsConcurrentAccess.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsCryptokiVersion(System.Version! version) -> bool
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.WaitForSlotEvent(bool nonBlocking) -> ulong?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.WaitForSlotEvent(bool nonBlocking) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object.Destroy() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object.Dispose() -> void

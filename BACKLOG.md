@@ -4,8 +4,8 @@ _Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (c
 
 ## Summary
 
-- Open items: 93, 23 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (14 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 92, 23 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (15 partly resolved) | Low: 37 (7 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **Only one session per slot is usable.** The second `OpenSession` on a slot throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either session logs the other out (BL-084).
@@ -651,18 +651,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Related:** completes the extension point opened for BL-057's successor work; the raw `Mechanism(type, byte[])` constructor remains the escape hatch meanwhile.
 - **Breaks public API?** No (additive)
 - **Raised by:** vendor-parameter-writer implementation
-
-### [BL-038] ⚠️ PARTIALLY RESOLVED — `WaitForSlotEvent` uses `void` + two `out` params instead of a Try/result shape, with a raw `ulong` slot id
-- **Status:** Partially resolved 2026-09-18. `WaitForSlotEvent` returns `ulong?` (null when a non-blocking poll finds no event) instead of `void` with two `out` parameters (commit 0c41ecee).
-- **Area:** .NET API Design
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Library.cs:523`
-- **Problem:** Classic Try-pattern case shipped as `void WaitForSlotEvent(bool, out bool, out ulong)`; the returned slot id has no path back to a `Pkcs11Slot`.
-- **Remaining scope:** The slot comes back as a raw `ulong` rather than `SlotId?` or a `Pkcs11Slot`, so the BL-039 handle-wrapping rule still stops one call short, and an event still has no path back to a `Pkcs11Slot`. Location: `Pkcs11Library.cs:523`.
-- **Proposed action:** Reshape as `bool TryWaitForSlotEvent(bool nonBlocking, out Pkcs11Slot? slot)` (or a result struct) before the signature is permanent.
-- **Breaks public API?** Yes — land before 1.0
-- **Raised by:** .NET Engineer A
 
 ### [BL-042] No documented SemVer/stability policy; own v3.2-only surface carries no `[Experimental]`
 - **Area:** .NET API Design

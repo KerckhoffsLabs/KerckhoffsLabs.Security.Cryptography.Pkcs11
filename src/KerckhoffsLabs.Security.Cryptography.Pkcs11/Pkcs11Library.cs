@@ -508,8 +508,10 @@ public sealed class Pkcs11Library : IDisposable
     /// <see langword="null"/>). When <see langword="false"/>, blocks until an event occurs.
     /// </param>
     /// <returns>
-    /// The PKCS#11 handle of the slot the event occurred in, or <see langword="null"/> if no event
-    /// occurred — only possible when <paramref name="nonBlocking"/> is <see langword="true"/>.
+    /// The slot the event occurred in, or <see langword="null"/> if no event occurred — only possible
+    /// when <paramref name="nonBlocking"/> is <see langword="true"/>. Call
+    /// <see cref="Pkcs11Slot.GetTokenInfo"/> or <see cref="Pkcs11Slot.GetSlotInfo"/> on it to learn
+    /// whether a token was inserted or removed: the event itself does not say which.
     /// </returns>
     /// <remarks>
     /// A blocking wait needs a module that may be called concurrently (<see cref="SupportsConcurrentAccess"/>):
@@ -520,7 +522,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if <paramref name="nonBlocking"/> is <see langword="false"/>
     /// and <see cref="SupportsConcurrentAccess"/> is <see langword="false"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
-    public ulong? WaitForSlotEvent(bool nonBlocking)
+    public Pkcs11Slot? WaitForSlotEvent(bool nonBlocking)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!nonBlocking && !SupportsConcurrentAccess)
@@ -533,7 +535,7 @@ public sealed class Pkcs11Library : IDisposable
         NativeCULong flags = (NativeCULong)(nonBlocking ? CKF.CKF_DONT_BLOCK : 0UL);
         CKR rv = LowLevel.C_WaitForSlotEvent(flags, out NativeCULong slotIdOut, IntPtr.Zero);
 
-        if (rv == CKR.CKR_OK) return (ulong)slotIdOut;
+        if (rv == CKR.CKR_OK) return new Pkcs11Slot(LowLevel, (ulong)slotIdOut, _loggerFactory);
 
         // CKR_NO_EVENT is expected in non-blocking mode when nothing's pending.
         if (nonBlocking && rv == CKR.CKR_NO_EVENT) return null;
