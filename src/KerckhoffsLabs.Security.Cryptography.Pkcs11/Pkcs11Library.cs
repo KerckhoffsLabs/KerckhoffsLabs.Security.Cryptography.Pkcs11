@@ -519,14 +519,24 @@ public sealed class Pkcs11Library : IDisposable
     /// </para>
     /// <para>
     /// The only way to end the wait without an event is <see cref="Dispose"/>, which finalizes the module
-    /// and so wakes it with a <see cref="Pkcs11Exception"/> (<c>CKR_CRYPTOKI_NOT_INITIALIZED</c>). Many
-    /// modules do not implement a blocking wait and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll
+    /// and so wakes it with a <see cref="Pkcs11Exception"/> (<c>CKR_CRYPTOKI_NOT_INITIALIZED</c>). While
+    /// another <see cref="Pkcs11Library"/> loaded from the same module is still in use, the module cannot
+    /// be finalized: the wait then lasts until the next event, which throws
+    /// <see cref="ObjectDisposedException"/>, or until that library is disposed too. Many modules do not
+    /// implement a blocking wait and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll
     /// <see cref="GetSlotList"/> on those.
+    /// </para>
+    /// <para>
+    /// PKCS#11 leaves simultaneous <c>C_WaitForSlotEvent</c> calls from one application undefined, so only
+    /// one thread may wait at a time, across every <see cref="Pkcs11Library"/> loaded from the module.
+    /// A second <see cref="WaitForSlotEvent"/>, or a <see cref="TryGetSlotEvent"/>, during a wait throws
+    /// <see cref="InvalidOperationException"/>.
     /// </para>
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="SupportsConcurrentAccess"/> is
-    /// <see langword="false"/>.</exception>
+    /// <see langword="false"/>, or another thread is already waiting for or polling a slot event on the
+    /// module.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
     public Pkcs11Slot WaitForSlotEvent()
     {
@@ -554,9 +564,12 @@ public sealed class Pkcs11Library : IDisposable
     /// <remarks>
     /// Works on every module that implements <c>C_WaitForSlotEvent</c>, including one that may not be
     /// called concurrently. Many modules do not, and throw <c>CKR_FUNCTION_NOT_SUPPORTED</c>; poll
-    /// <see cref="GetSlotList"/> on those.
+    /// <see cref="GetSlotList"/> on those. Polls from several threads take turns; a poll during a
+    /// blocking <see cref="WaitForSlotEvent"/> on the same module is refused.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if a blocking <see cref="WaitForSlotEvent"/> is in
+    /// progress on the module, through this library or another one loaded from it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
     public bool TryGetSlotEvent([NotNullWhen(true)] out Pkcs11Slot? slot)
     {
@@ -570,10 +583,33 @@ public sealed class Pkcs11Library : IDisposable
     {
         Log.LibraryTrace(_logger, _libraryPath, blocking ? "WaitForSlotEvent" : "TryGetSlotEvent");
 
-        NativeCULong flags = (NativeCULong)(blocking ? 0UL : CKF.CKF_DONT_BLOCK);
-        CKR rv = LowLevel.C_WaitForSlotEvent(flags, out NativeCULong slotIdOut, IntPtr.Zero);
+        LowLevelPkcs11Library lowLevel = LowLevel;
+        Pkcs11ModuleHandle module = lowLevel.Module;
+        if (!module.EnterSlotEventCall(blocking))
+            throw new InvalidOperationException(
+                "Another thread is already waiting for a slot event on this module, through this library or " +
+                "another one loaded from it. PKCS#11 leaves simultaneous C_WaitForSlotEvent calls undefined, " +
+                "so a blocking WaitForSlotEvent excludes every other one: watch slot events from one thread.");
 
-        if (rv == CKR.CKR_OK) return new Pkcs11Slot(LowLevel, (ulong)slotIdOut, _loggerFactory);
+        CKR rv;
+        NativeCULong slotIdOut;
+        try
+        {
+            NativeCULong flags = (NativeCULong)(blocking ? 0UL : CKF.CKF_DONT_BLOCK);
+            rv = lowLevel.C_WaitForSlotEvent(flags, out slotIdOut, IntPtr.Zero);
+        }
+        finally
+        {
+            module.ExitSlotEventCall(blocking);
+        }
+
+        if (rv == CKR.CKR_OK)
+        {
+            // A blocking wait can outlast Dispose when another load still needs the module, so nothing
+            // finalized it: its event must not hand back a slot of a library already disposed.
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return new Pkcs11Slot(lowLevel, (ulong)slotIdOut, _loggerFactory);
+        }
         if (!blocking && rv == CKR.CKR_NO_EVENT) return null;
 
         throw Pkcs11Exception.Create(rv, Pkcs11Operations.OpWaitForSlotEvent);

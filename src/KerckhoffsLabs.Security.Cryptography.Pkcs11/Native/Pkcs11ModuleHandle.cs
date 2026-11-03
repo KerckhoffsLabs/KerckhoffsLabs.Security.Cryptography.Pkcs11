@@ -22,9 +22,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <para>
 /// Cryptoki state belongs to the module, not to one load of it: a second load of the same module sees
 /// <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c> and shares the first's state. So a requested
-/// <c>C_Finalize</c> runs only when no other load of the same module is live; otherwise it is handed to
-/// the last one, which runs it on release. Loads are matched on the OS module handle (the main program
-/// for a statically linked module), never on the path.
+/// <c>C_Finalize</c> runs only when no other load of the same module still needs it; otherwise it is
+/// handed to the last one, which runs it once it no longer does. A load stops needing the module when
+/// it is disposed and nothing holds off its <c>C_Finalize</c>, even while a blocking wait keeps it
+/// mapped: that wait is what the <c>C_Finalize</c> must wake. Loads are matched on the OS module handle
+/// (the main program for a statically linked module), never on the path.
 /// </para>
 /// <para>
 /// <c>C_Finalize</c> runs on whichever thread releases the last use that held it off: the one disposing
@@ -69,8 +71,12 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     // Uses that hold off C_Finalize: calls in flight (bar a blocking wait) and open sessions.
     private int _finalizeHolds;
 
-    // Set once C_Finalize has run, or been handed to another load, so it is never decided twice.
+    // Set once this load has stopped needing the module, and so decided C_Finalize: run it, hand it to
+    // another load, or (when nothing asked for it) let it go. Never decided twice.
     private int _finalizeDecided;
+
+    // Set when C_Finalize ran through this handle, possibly for another load: it may then be unmapped.
+    private bool _ranFinalize;
 
     // Set by Dispose, before it releases. SafeHandle marks itself closed only when the last reference
     // goes, so while a call is in flight IsClosed stays false and DangerousAddRef keeps succeeding: this
@@ -80,8 +86,21 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// <summary>The live loads of one module, and whether one of them owes it a <c>C_Finalize</c>.</summary>
     private sealed class Loads
     {
+        // Loads still mapped: the entry goes when this reaches zero.
         public int Live;
+
+        // Loads that still need the module: not yet past their C_Finalize decision. A load disposed while
+        // a blocking wait keeps it mapped is Live but no longer Needing.
+        public int Needing;
+
         public bool FinalizeOwed;
+
+        // Whether a C_WaitForSlotEvent is inside the module: 0 none, 1 a poll, -1 a blocking wait.
+        // PKCS#11 leaves simultaneous calls undefined, whatever the module's threading mode.
+        public int SlotEventCall;
+
+        // Serializes polls, so they wait for each other instead of being refused (see EnterSlotEventCall).
+        public readonly Lock PollLock = new();
 
         // How the module was initialized, for every load of it: a ConcurrencyMode, written by the load
         // whose C_Initialize succeeded. Not under s_loadsLock: it is set from inside a call.
@@ -160,6 +179,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
             if (!s_loads.TryGetValue(module._identity, out Loads? loads))
                 s_loads[module._identity] = loads = new Loads();
             loads.Live++;
+            loads.Needing++;
             module._loads = loads;
         }
         return module;
@@ -245,6 +265,42 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
 
     /// <summary>Releases the call lock taken by <see cref="EnterCall"/>.</summary>
     internal void ExitCall() => _loads!.CallLock.Exit();
+
+    /// <summary>
+    /// Claims the module's one <c>C_WaitForSlotEvent</c> slot, across every load of it. PKCS#11 leaves
+    /// simultaneous calls from one application undefined, even on a module initialized for concurrent
+    /// access. Polls queue behind one another, since each returns at once; a blocking wait never queues
+    /// and is never queued behind, since it may not return for as long as the process runs.
+    /// </summary>
+    /// <param name="blocking">Whether the call is a blocking wait rather than a <c>CKF_DONT_BLOCK</c> poll.</param>
+    /// <returns>
+    /// <see langword="false"/> when a blocking wait is in progress, or <paramref name="blocking"/> is set
+    /// and any call is; otherwise <see langword="true"/>, and <see cref="ExitSlotEventCall"/> must follow.
+    /// </returns>
+    /// <remarks>Lock order: the poll lock, then the call lock. Neither is held when this is called.</remarks>
+    internal bool EnterSlotEventCall(bool blocking)
+    {
+        if (_loads is not { } loads)
+            return true;
+        if (blocking)
+            return Interlocked.CompareExchange(ref loads.SlotEventCall, -1, 0) == 0;
+
+        loads.PollLock.Enter();
+        if (Interlocked.CompareExchange(ref loads.SlotEventCall, 1, 0) == 0)
+            return true;
+        loads.PollLock.Exit();
+        return false;
+    }
+
+    /// <summary>Releases the claim taken by <see cref="EnterSlotEventCall"/>.</summary>
+    internal void ExitSlotEventCall(bool blocking)
+    {
+        if (_loads is not { } loads)
+            return;
+        Volatile.Write(ref loads.SlotEventCall, 0);
+        if (!blocking)
+            loads.PollLock.Exit();
+    }
 
     /// <summary>Count of still-live tracked sessions (test/diagnostic seam).</summary>
     internal int TrackedSessionCount
@@ -347,22 +403,35 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
 
     private void TryFinalize()
     {
-        if (!_finalizeOnRelease || Volatile.Read(ref _disposed) == 0 || Volatile.Read(ref _finalizeHolds) != 0)
+        if (Volatile.Read(ref _disposed) == 0 || Volatile.Read(ref _finalizeHolds) != 0)
             return;
         if (Interlocked.Exchange(ref _finalizeDecided, 1) != 0)
             return;
 
         // Under the lock, so a load of the same module cannot slip in between this decision and the
-        // C_Finalize: it either counts as live here, or initializes afresh once this has finalized.
+        // C_Finalize: it either counts as needing the module here, or initializes afresh once this has
+        // finalized.
         lock (s_loadsLock)
         {
-            if (_loads is { Live: > 1 })
+            if (_loads is null)
             {
-                _loads.FinalizeOwed = true; // another load still uses the module; the last one finalizes
-                _finalizeOutcome = FinalizeOutcome.HandedOff;
+                if (_finalizeOnRelease)
+                    RunFinalize();
+                return;
             }
-            else
+
+            _loads.Needing--;
+            if (_finalizeOnRelease)
+                _loads.FinalizeOwed = true;
+
+            if (_loads.Needing > 0)
             {
+                if (_finalizeOnRelease)
+                    _finalizeOutcome = FinalizeOutcome.HandedOff; // the last load to stop needing it finalizes
+            }
+            else if (_loads.FinalizeOwed)
+            {
+                // Wakes any blocking wait still inside the module, on this load or one already disposed.
                 RunFinalize();
             }
         }
@@ -371,23 +440,16 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// <inheritdoc/>
     protected override bool ReleaseHandle()
     {
+        // Decides C_Finalize for a handle abandoned without Dispose; a no-op once it has been decided.
         TryFinalize();
 
-        bool finalizedForOthers = false;
         lock (s_loadsLock)
         {
             if (_loads is not null && --_loads.Live == 0)
-            {
-                if (_loads.FinalizeOwed)
-                {
-                    RunFinalize();
-                    finalizedForOthers = true;
-                }
                 s_loads.Remove(_identity);
-            }
         }
 
-        if (_initialized && !_finalizeOnRelease && !finalizedForOthers)
+        if (_initialized && !_finalizeOnRelease && !_ranFinalize)
             return true; // abandoned while initialized: never unmap it (see remarks)
 
         if (!_freeOnRelease)
@@ -414,7 +476,15 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         }
         if (!finalized)
             return;
+        _ranFinalize = true;
         _finalizeOutcome = _finalizeReturnValue == CKR.CKR_OK ? FinalizeOutcome.Succeeded : FinalizeOutcome.Failed;
+
+        // Decided once: a load of the module that comes later initializes it afresh, and owes nothing.
+        if (_loads is not null)
+        {
+            _loads.FinalizeOwed = false;
+            Volatile.Write(ref _loads.Mode, (int)ConcurrencyMode.Unknown);
+        }
     }
 }
 
@@ -440,7 +510,7 @@ internal enum FinalizeOutcome
     /// <summary>Waiting for a call in flight or an open session to release the module.</summary>
     Deferred,
 
-    /// <summary>Left to another load of the same module, which is still live and finalizes when it goes.</summary>
+    /// <summary>Left to another load of the same module, which still needs it and finalizes once it no longer does.</summary>
     HandedOff,
 
     /// <summary>Ran and returned <c>CKR_OK</c>.</summary>
