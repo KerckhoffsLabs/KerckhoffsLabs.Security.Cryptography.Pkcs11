@@ -18,23 +18,23 @@ public sealed partial class DocsSnippetTests
     private static string RepoRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-            if (File.Exists(Path.Combine(dir.FullName, "KerckhoffsLabs.sln")))
+            if (File.Exists(Path.Join(dir.FullName, "KerckhoffsLabs.sln")))
                 return dir.FullName;
         throw new InvalidOperationException("KerckhoffsLabs.sln not found above the test binaries.");
     }
 
     private static IEnumerable<(string Page, string File, string Region)> Includes()
     {
-        string docs = Path.Combine(RepoRoot(), "docs");
+        string docs = Path.Join(RepoRoot(), "docs");
         foreach (string page in Directory.EnumerateFiles(docs, "*.md", SearchOption.AllDirectories)
                      .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}_site{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
             foreach (Match m in Include().Matches(File.ReadAllText(page)))
-                yield return (page, Path.GetFullPath(Path.Combine(Path.GetDirectoryName(page)!, m.Groups[1].Value)), m.Groups[2].Value);
+                yield return (page, Path.GetFullPath(Path.Join(Path.GetDirectoryName(page)!, m.Groups[1].Value)), m.Groups[2].Value);
     }
 
     private static IEnumerable<(string File, string Region)> SampleRegions()
     {
-        string samples = Path.Combine(RepoRoot(), "samples");
+        string samples = Path.Join(RepoRoot(), "samples");
         foreach (string file in Directory.EnumerateFiles(samples, "*.cs", SearchOption.AllDirectories)
                      .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
             foreach (Match m in Region().Matches(File.ReadAllText(file)))

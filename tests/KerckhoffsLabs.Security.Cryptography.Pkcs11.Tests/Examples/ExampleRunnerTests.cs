@@ -23,14 +23,14 @@ public sealed class ExampleRunnerTests
     [Fact]
     public void Run_OptionalBackendMissingMechanism_Skips()
     {
-        Assert.IsType<SkipException>(Caught(() =>
+        Assert.NotNull(CaughtSkip(() =>
             ExampleRunner.Run(new NoMechanismBackend(), ExampleBackend.SoftHsm2, NeedsGcm, coverageRequired: true)));
     }
 
     [Fact]
     public void Run_RequiredBackendMissingMechanism_SkipsWithoutCoverage()
     {
-        Assert.IsType<SkipException>(Caught(() =>
+        Assert.NotNull(CaughtSkip(() =>
             ExampleRunner.Run(new NoMechanismBackend(), ExampleBackend.Kryoptic, NeedsGcm, coverageRequired: false)));
     }
 
@@ -53,7 +53,7 @@ public sealed class ExampleRunnerTests
 
     [Fact]
     public void Run_UnsupportedOnOptionalBackend_Skips() =>
-        Assert.IsType<SkipException>(Caught(() =>
+        Assert.NotNull(CaughtSkip(() =>
             ExampleRunner.Run(new NoMechanismBackend(), ExampleBackend.SoftHsm2, GatedOff, coverageRequired: true)));
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class ExampleRunnerTests
 
     [Fact]
     public void Run_SkipInsideExample_SkipsWithoutCoverage() =>
-        Assert.IsType<SkipException>(Caught(() =>
+        Assert.NotNull(CaughtSkip(() =>
             ExampleRunner.Run(new NoMechanismBackend(), ExampleBackend.Kryoptic, SkipsInside, coverageRequired: false)));
 
     [Fact]
@@ -92,14 +92,15 @@ public sealed class ExampleRunnerTests
     }
 
     // Assert.Throws lets xUnit's skip exception through, which would skip the test instead of checking it.
-    private static Exception? Caught(Action action)
+    // Any other exception propagates and fails the test.
+    private static SkipException? CaughtSkip(Action action)
     {
         try
         {
             action();
             return null;
         }
-        catch (Exception ex)
+        catch (SkipException ex)
         {
             return ex;
         }
