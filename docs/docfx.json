@@ -29,7 +29,8 @@
         "files": [
           "*.md",
           "toc.yml",
-          "policies/*.md"
+          "policies/*.md",
+          "examples/*.md"
         ]
       }
     ],

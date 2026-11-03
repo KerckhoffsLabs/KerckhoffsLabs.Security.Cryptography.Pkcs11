@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The code shown on the documentation site. Every snippet a docs page includes (docfx
+    [!code-csharp[](...#region)]) is a #region of a file here, and the test project runs every example
+    against real tokens, so what a reader sees is what CI compiles and runs. Public API only: no test
+    fakes, no internals. Not packed or published.
+  -->
+  <PropertyGroup>
+    <!-- See the PKCS#11 library's project file for why every project restores from a lock file. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- The examples are documented by the pages that include them, not by XML docs. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
+    <!-- The shipped analyzer runs here as in a consumer's build, so a legacy example shows the
+         diagnostic it raises and the precise suppression docs/diagnostics.md recommends. -->
+    <ProjectReference
+      Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

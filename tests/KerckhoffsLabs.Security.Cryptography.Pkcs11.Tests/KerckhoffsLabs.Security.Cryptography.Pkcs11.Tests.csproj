@@ -31,6 +31,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
+    <!-- The documentation examples, which Examples/ExamplesTests.* run against every backend. -->
+    <ProjectReference Include="..\..\samples\KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples\KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples.csproj" />
     <!--
       Run the shipped analyzer against the tests, exactly as a consumer's build would: the tests are
       the closest thing we have to real consumer code, so the insecure-RSA-padding diagnostic

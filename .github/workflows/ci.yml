@@ -347,6 +347,9 @@ jobs:
           PKCS11_TEST_EXPECT_CRATON_HSM: '1'
           PKCS11_TEST_EXPECT_FREEHSM: '1'
           PKCS11_TEST_EXPECT_WOLFPKCS11: '1'
+          # Every documentation example must run on each backend its catalogue entry requires; a skip there
+          # fails (tests/.../Examples/ExampleRunner.cs). Only this leg builds every backend.
+          PKCS11_TEST_REQUIRE_EXAMPLE_COVERAGE: '1'
         # NSS's libsoftokn3 carries an $ORIGIN runpath for its own siblings; its dir is also added to
         # LD_LIBRARY_PATH (belt-and-suspenders under sg's stripped environment). PKCS11_TEST_NSS_* come
         # from $GITHUB_ENV, set by the NSS step above.

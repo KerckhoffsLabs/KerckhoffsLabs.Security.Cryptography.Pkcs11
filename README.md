@@ -118,6 +118,7 @@ allow-lists, and the [diagnostics](https://kerckhoffslabs.github.io/KerckhoffsLa
 
 ## Documentation
 
+- [**Getting started**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/getting-started.html) — from a module path to an operation on a token key, step by step.
 - [**Security model**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/security-model.html) — what the library protects, from whom, and where its protection ends.
 - [**Using crypto policies**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/crypto-policies.html) — choosing, adjusting and writing a policy.
 - [**API reference**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/api/) — the full generated surface.
