@@ -23,7 +23,7 @@ The examples use the namespaces `KerckhoffsLabs.Security.Cryptography.Pkcs11`, `
 Read the PIN from your secret store at run time. Here it comes from an environment variable that the
 deployment sets:
 
-[!code-csharp[](../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/GettingStartedExamples.cs#ReadPinFromEnvironment)]
+[!code-csharp[](../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/GettingStarted/GettingStartedExamples.cs#ReadPinFromEnvironment)]
 
 `SecurePin` holds the PIN in a buffer the garbage collector cannot move, and zeroes it when you dispose
 it. A string cannot be zeroed, so when your secret store can hand you the PIN as characters
@@ -32,7 +32,7 @@ holds the PIN. See [Secrets in memory](security-model.md#secrets-in-memory).
 
 ## From module to operation
 
-[!code-csharp[](../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/GettingStartedExamples.cs#EncryptAndDecryptWithTokenKey)]
+[!code-csharp[](../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/GettingStarted/GettingStartedExamples.cs#EncryptAndDecryptWithTokenKey)]
 
 What each step does:
 

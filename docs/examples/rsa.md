@@ -12,18 +12,18 @@ Each RSA key pair has one role. `GenerateRsaSigningKeyPair` creates a pair that 
 
 Sign on the token:
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/RsaExamples.cs#SignPss)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#SignPss)]
 
 Verify anywhere, with the public key and the plain BCL:
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/RsaExamples.cs#VerifyPssWithBcl)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#VerifyPssWithBcl)]
 
 The signature is a standard RSASSA-PSS signature: the verifier does not need a token, PKCS#11 or this
 library. `RSAPkcs11.VerifyData` also works, and runs on the token.
 
 ## Signing with RSASSA-PKCS1-v1_5
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/RsaExamples.cs#SignPkcs1v15)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#SignPkcs1v15)]
 
 PKCS#1 v1.5 *signatures* with a SHA-2 or SHA-3 hash are allowed by the default policy: they are
 FIPS 186-5-approved and required by JWT `RS256`, TLS 1.2, X.509 and code signing. Prefer PSS for new
@@ -33,17 +33,17 @@ formats. PKCS#1 v1.5 *encryption* is a different matter; see below.
 
 # [PKCS#11](#tab/pkcs11)
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/RsaExamples.cs#OaepEncryptDecrypt)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#OaepEncryptDecrypt)]
 
 # [System.Security.Cryptography](#tab/bcl)
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/RsaExamples.cs#BclOaepEncryptDecrypt)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#BclOaepEncryptDecrypt)]
 
 ---
 
 RSA encrypts only a short message (with a 3072-bit key and OAEP-SHA-256, at most 318 bytes). To encrypt
-data, encrypt a random AES key with RSA-OAEP and the data with [AES-GCM](aead.md) under that key, or
-use [ML-KEM](post-quantum.md) as the key-establishment step.
+data, encrypt a random AES key with RSA-OAEP and the data with [AES-GCM](aes-gcm.md) under that key, or
+use [ML-KEM](ml-kem.md) as the key-establishment step.
 
 ## What differs from `RSA`
 

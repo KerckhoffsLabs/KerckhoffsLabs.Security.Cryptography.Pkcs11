@@ -9,7 +9,7 @@ and `CKA_ID`. Its private key is a separate object with the same `CKA_ID`. The e
 
 The BCL's `CertificateRequest` builds the certificate; the token key signs it:
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/CertificateExamples.cs#IssueSelfSignedCertificate)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#IssueSelfSignedCertificate)]
 
 Two details matter:
 
@@ -24,7 +24,7 @@ Two details matter:
 
 ## Signing with a certificate's key — `Pkcs11CertificateExtensions`
 
-[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/CertificateExamples.cs#SignWithCertificateKey)]
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#SignWithCertificateKey)]
 
 **What differs from `X509Certificate2.GetECDsaPrivateKey()`:**
 
