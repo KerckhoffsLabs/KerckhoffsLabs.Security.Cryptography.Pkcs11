@@ -42,11 +42,15 @@ internal static class Cnsa20Definition
     /// <summary>Builds the Cnsa20 policy.</summary>
     internal static ComposedCryptoPolicy Create()
     {
-        // RsaKeyGenerationRule keeps the builder default: RSA key generation is unreachable, its mechanism is refused.
         CryptoPolicyBuilder b = CryptoPolicyBuilder.ForBuiltIn("Cnsa20")
             .WithBuiltInReference("CryptoPolicy.Cnsa20")
             .WithDocumentation(PolicyDocumentation.Cnsa20)
             .AllowsOverride(false)
+            // Unreachable while the RSA key-generation mechanisms are refused; it states that rather than a minimum.
+            .WithRsaKeyGenerationRule(RsaKeyGenerationRule.Refuse(
+                "RSA key generation is refused: RSA is not part of CNSA 2.0.",
+                modulus => $"CNSA 2.0 (this policy): RSA-{modulus} key generation is refused; RSA is not part of CNSA 2.0. " +
+                           "Generate ML-DSA-87 or ML-KEM-1024 key pairs instead."))
             .WithKeyTemplateRule(KeyTemplateRule.RequireSensitive(
                 "Keys stay on the token: a key template with CKA_SENSITIVE=false is refused (CNSA 2.0 policy).",
                 "CNSA 2.0 (this policy): keys stay on the token; CKA_SENSITIVE=false is refused."))
@@ -99,8 +103,7 @@ internal static class Cnsa20Definition
         // --- KDFs over SHA-384 / SHA-512 ---
         AllowChecked(S.Derive, "SP 800-108r1 over HMAC-SHA-384 / HMAC-SHA-512", Cnsa20Wording.Sp800108Prf,
             CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF, CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF);
-        AllowChecked(S.Derive, "SP 800-56C Rev.2 HKDF over SHA-384 / SHA-512", Cnsa20Wording.HkdfPrf,
-            CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA);
+        AllowChecked(S.Derive, "SP 800-56C Rev.2 HKDF over SHA-384 / SHA-512", Cnsa20Wording.HkdfPrf, CKM.CKM_HKDF_DERIVE);
 
         // --- Post-quantum: ML-KEM-1024, ML-DSA-87, LMS / XMSS; sizes are the key-strength rule's ---
         Allow(S.Encapsulate | S.Decapsulate, "CNSA 2.0 ML-KEM-1024 (FIPS 203)", CKM.CKM_ML_KEM);
@@ -208,6 +211,10 @@ internal static class Cnsa20Definition
             CKM.CKM_SHA512_224_KEY_GEN, CKM.CKM_SHA512_256_KEY_GEN,
             CKM.CKM_SHA3_224_KEY_GEN, CKM.CKM_SHA3_256_KEY_GEN, CKM.CKM_SHA3_384_KEY_GEN, CKM.CKM_SHA3_512_KEY_GEN);
 
+        // --- HKDF into a data object ---
+        Refuse("derives a data object whose value is readable; CNSA 2.0 keys stay on the token.", "CKM_HKDF_DERIVE",
+            CKM.CKM_HKDF_DATA);
+
         // --- Password-based key derivation ---
         Refuse("CNSA 2.0 has no password-based key derivation.",
             "CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token",
@@ -289,7 +296,8 @@ internal static class Cnsa20Definition
             CKM.CKM_SHA3_224_HMAC, CKM.CKM_SHA3_256_HMAC, CKM.CKM_SHA3_384_HMAC, CKM.CKM_SHA3_512_HMAC,
         }.ToDictionary(p => p.ToString(), _ => refusal, StringComparer.Ordinal);
         prfs[nameof(CKM.CKM_AES_CMAC)] = new DocumentedRefusal(
-            "This policy allows only HMAC-SHA-384 and HMAC-SHA-512 as the SP 800-108 PRF.", "HMAC-SHA-384 or HMAC-SHA-512");
+            "CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF.",
+            "HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF)");
         return prfs.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }

@@ -37,7 +37,6 @@ An allow-list of the NSA CNSA 2.0 algorithms at their CNSA 2.0 sizes (see the ba
 
 | Mechanism | Operations | Legacy operations | Parameter check | Rationale |
 |---|---|---|---|---|
-| `CKM_HKDF_DATA` | Derive | — | requires CkmHkdfParams naming SHA-384 or SHA-512 (hash or _HMAC form) | SP 800-56C Rev.2 HKDF over SHA-384 / SHA-512 |
 | `CKM_HKDF_DERIVE` | Derive | — | requires CkmHkdfParams naming SHA-384 or SHA-512 (hash or _HMAC form) | SP 800-56C Rev.2 HKDF over SHA-384 / SHA-512 |
 | `CKM_HKDF_KEY_GEN` | GenerateKey | — | — | Secret / HMAC key generation, at least 256 bits |
 | `CKM_SP800_108_COUNTER_KDF` | Derive | — | requires CkmSp800108KdfParams naming HMAC-SHA-384 or HMAC-SHA-512 | SP 800-108r1 over HMAC-SHA-384 / HMAC-SHA-512 |
@@ -96,7 +95,7 @@ Beyond the allow-lists above, four rules apply: the modulus rule to RSA key-pair
 
 | Rule | Rationale |
 |---|---|
-| RSA key-pair generation modulus | RSA key generation requires a modulus of at least 2048 bits. |
+| RSA key-pair generation modulus | RSA key generation is refused: RSA is not part of CNSA 2.0. |
 | Key template (`CKA_SENSITIVE`) | Keys stay on the token: a key template with CKA_SENSITIVE=false is refused (CNSA 2.0 policy). |
 | Key-material export | Reading key material off the token in plaintext is refused (CNSA 2.0 policy); wrap it with AES-256 KW/KWP or GCM instead. |
 | Key strength | Every key is inspected when it is created and each time it is used: AES keys must be AES-256 (CKA_VALUE_LEN = 32); generic-secret, HKDF and HMAC-SHA-384/512 keys must hold a secret of at least 256 bits; ML-KEM keys must be ML-KEM-1024 and ML-DSA keys ML-DSA-87 (CKA_PARAMETER_SET); HSS keys must be single-level LMS (CKA_HSS_LEVELS = 1); XMSS keys are allowed. Every other key type is refused, and so is a key whose type, length, parameter set or HSS levels the token does not report. |
@@ -243,6 +242,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 | Mechanism | Reason | Alternative |
 |---|---|---|
+| `CKM_HKDF_DATA` | derives a data object whose value is readable; CNSA 2.0 keys stay on the token. | CKM_HKDF_DERIVE |
 | `CKM_PKCS5_PBKD2` | CNSA 2.0 has no password-based key derivation. | CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF) over a 256-bit secret held on the token |
 
 #### Post-quantum
@@ -376,7 +376,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 | PRF | Reason | Alternative |
 |---|---|---|
-| `CKM_AES_CMAC` | This policy allows only HMAC-SHA-384 and HMAC-SHA-512 as the SP 800-108 PRF. | HMAC-SHA-384 or HMAC-SHA-512 |
+| `CKM_AES_CMAC` | CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
 | `CKM_SHA224` | CNSA 2.0 allows only SHA-384 and SHA-512. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
 | `CKM_SHA224_HMAC` | CNSA 2.0 allows only SHA-384 and SHA-512. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
 | `CKM_SHA256` | CNSA 2.0 allows only SHA-384 and SHA-512. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
@@ -405,6 +405,8 @@ Documentation only: every item below is refused because it is absent from the al
 - Each keyed operation costs one or two extra `C_GetAttributeValue` calls, because the key is read again on every use rather than cached.
 - `C_SetOperationState` restores a saved operation whose own mechanism and key are not inspected; only the key handles passed to it are.
 - Keys returned through TLS/SSL3 key-and-MAC parameters are not judged after creation. Cnsa20 refuses those mechanisms, but a policy derived from it that allows them again would not judge those keys.
+- Some tokens (SoftHSM2) do not report `CKA_VALUE_LEN` on unwrapped secret keys; under Cnsa20 those unwraps are refused.
+- A custom policy that wraps Cnsa20 must forward `InspectsKeys`, or key sizes are no longer checked.
 
 ---
 

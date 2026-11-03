@@ -26,11 +26,13 @@ public sealed class ComposedCryptoPolicy : ICryptoPolicy
     /// <summary>The allow-lists, rules and documented refusals this policy evaluates.</summary>
     internal PolicyCatalogue Catalogue { get; }
 
-    /// <summary>
-    /// Whether the policy judges key strength, so the session must read a key's attributes from the token
-    /// before using it. <see langword="false"/> for policies that allow every <see cref="KeyStrengthRequest"/>.
-    /// </summary>
-    internal bool InspectsKeys => Catalogue.KeyStrength.InspectsKeys;
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <see langword="true"/> when the policy's <see cref="KeyStrengthRule"/> inspects keys, as
+    /// <see cref="CryptoPolicy.Cnsa20"/>'s does; <see langword="false"/> for policies that allow every
+    /// <see cref="KeyStrengthRequest"/>.
+    /// </remarks>
+    public bool InspectsKeys => Catalogue.KeyStrength.InspectsKeys;
 
     /// <inheritdoc/>
     public PolicyDecision Evaluate(PolicyRequest request)

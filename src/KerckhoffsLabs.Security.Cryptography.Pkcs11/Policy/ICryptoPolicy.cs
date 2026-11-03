@@ -27,6 +27,12 @@ public interface ICryptoPolicy
     /// </summary>
     bool AllowsOverride { get; }
 
+    /// <summary>
+    /// Whether sessions under this policy read each key's type and size from the token and submit them as
+    /// <see cref="KeyStrengthRequest"/>s. A policy that delegates to another must forward this.
+    /// </summary>
+    bool InspectsKeys => false;
+
     /// <summary>Evaluates one request.</summary>
     /// <param name="request">The operation being attempted.</param>
     /// <returns><see cref="PolicyDecision.Allow"/>, or a denial carrying the reason.</returns>

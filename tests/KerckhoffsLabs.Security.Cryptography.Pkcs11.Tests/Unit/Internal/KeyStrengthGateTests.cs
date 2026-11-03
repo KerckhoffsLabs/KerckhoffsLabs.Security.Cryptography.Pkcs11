@@ -33,6 +33,9 @@ public sealed class KeyStrengthGateTests
 
         public HashSet<CKA> Sensitive { get; } = [];
 
+        /// <summary>When set, every <c>C_GetAttributeValue</c> call fails with this return value.</summary>
+        public CKR? ReadFailure { get; set; }
+
         /// <summary>Attribute reads, each the two-call sequence for one template.</summary>
         public int AttributeReads => _getAttributeValueCalls / 2;
 
@@ -48,6 +51,8 @@ public sealed class KeyStrengthGateTests
         protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
             _getAttributeValueCalls++;
+            if (ReadFailure is { } failure)
+                return failure;
             return Keys.TryGetValue((ulong)objectHandle, out var values)
                 ? KeyStrengthAttributes.Answer(template, values, Sensitive)
                 : CKR.CKR_OBJECT_HANDLE_INVALID;
@@ -123,6 +128,26 @@ public sealed class KeyStrengthGateTests
         public PolicyDecision Evaluate(PolicyRequest request) => PolicyDecision.Allow;
     }
 
+    /// <summary>
+    /// A custom policy that delegates every decision to <paramref name="inner"/>, as docs/crypto-policies.md
+    /// shows, forwarding <see cref="ICryptoPolicy.InspectsKeys"/> too.
+    /// </summary>
+    private sealed class ForwardingDecorator(ICryptoPolicy inner) : ICryptoPolicy
+    {
+        public string Name => "Decorated" + inner.Name;
+        public bool AllowsOverride => inner.AllowsOverride;
+        public bool InspectsKeys => inner.InspectsKeys;
+        public PolicyDecision Evaluate(PolicyRequest request) => inner.Evaluate(request);
+    }
+
+    /// <summary>A decorator that leaves <see cref="ICryptoPolicy.InspectsKeys"/> at its default.</summary>
+    private sealed class NonForwardingDecorator(ICryptoPolicy inner) : ICryptoPolicy
+    {
+        public string Name => "Decorated" + inner.Name;
+        public bool AllowsOverride => inner.AllowsOverride;
+        public PolicyDecision Evaluate(PolicyRequest request) => inner.Evaluate(request);
+    }
+
     private static byte[] Encrypt(Pkcs11SessionCore session, ObjectHandle key)
         => session.Encrypt(new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], 128)), key, new byte[16].AsSpan());
 
@@ -148,6 +173,58 @@ public sealed class KeyStrengthGateTests
         using var fake = new StrengthFake();
         fake.SetKey(Key, CKK.CKK_AES, 16);
         using var session = fake.CreateSession(policy: new AllowEverything());
+
+        Encrypt(session, Key);
+
+        Assert.Equal(0, fake.AttributeReads);
+        Assert.Equal(1, fake.EncryptInitCalls);
+    }
+
+    [Fact]
+    public void NistApproved_ReadsNoAttributes()
+    {
+        using var fake = new StrengthFake();
+        fake.SetKey(Key, CKK.CKK_AES, 16);
+        using var session = fake.CreateSession(policy: CryptoPolicy.NistApproved);
+
+        Encrypt(session, Key);
+
+        Assert.Equal(0, fake.AttributeReads);
+        Assert.Equal(1, fake.EncryptInitCalls);
+    }
+
+    [Fact]
+    public void PlainCustomPolicy_DoesNotInspectKeys_ByDefault()
+    {
+        Assert.False(((ICryptoPolicy)new AllowEverything()).InspectsKeys);
+        Assert.False(((ICryptoPolicy)CryptoPolicy.Recommended).InspectsKeys);
+        Assert.False(((ICryptoPolicy)CryptoPolicy.NistApproved).InspectsKeys);
+        Assert.True(((ICryptoPolicy)CryptoPolicy.Cnsa20).InspectsKeys);
+    }
+
+    // A custom policy that wraps Cnsa20 and forwards InspectsKeys keeps the key-size checks (F1).
+    [Fact]
+    public void ForwardingDecoratorOverCnsa20_RefusesAes128_AtUse()
+    {
+        using var fake = new StrengthFake();
+        fake.SetKey(Key, CKK.CKK_AES, 16);
+        using var session = fake.CreateSession(policy: new ForwardingDecorator(CryptoPolicy.Cnsa20));
+
+        KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
+
+        Assert.Equal(CKK.CKK_AES, request.KeyType);
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(0, fake.EncryptInitCalls);
+    }
+
+    // The documented limit: a wrapper that does not forward InspectsKeys turns the key checks off.
+    [Fact]
+    public void NonForwardingDecoratorOverCnsa20_ReadsNoAttributes()
+    {
+        using var fake = new StrengthFake();
+        fake.SetKey(Key, CKK.CKK_AES, 16);
+        using var session = fake.CreateSession(policy: new NonForwardingDecorator(CryptoPolicy.Cnsa20));
 
         Encrypt(session, Key);
 
@@ -224,6 +301,55 @@ public sealed class KeyStrengthGateTests
 
         Assert.Equal(CKK.CKK_AES, request.KeyType);
         Assert.Null(request.ValueLengthBytes);
+        Assert.Equal(0, fake.EncryptInitCalls);
+    }
+
+    // SoftHSM2 reports CKA_VALUE_LEN = 0 on unwrapped keys: no key has length 0, so it reads as unreported (F3).
+    [Fact]
+    public void ZeroLength_IsRefusedAsUnreported_UnderCnsa20()
+    {
+        using var fake = new StrengthFake();
+        fake.SetKey(Key, CKK.CKK_AES, 0);
+        using var session = fake.CreateSession(policy: CryptoPolicy.Cnsa20);
+
+        CryptoPolicyViolationException ex = Assert.Throws<CryptoPolicyViolationException>(() => Encrypt(session, Key));
+
+        KeyStrengthRequest request = Assert.IsType<KeyStrengthRequest>(ex.Request);
+        Assert.Null(request.ValueLengthBytes);
+        Assert.Contains("did not report", ex.Reason, StringComparison.Ordinal);
+        Assert.Contains("so CNSA 2.0 compliance can't be verified", ex.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("AES-0", ex.Reason, StringComparison.Ordinal);
+        Assert.Equal(0, fake.EncryptInitCalls);
+    }
+
+    // Only "this attribute or handle is unreadable" answers become an unreported value (F6); the
+    // handle the token rejects as a key handle is one of them.
+    [Fact]
+    public void KeyHandleInvalid_IsRefused_BeforeTheToken()
+    {
+        using var fake = new StrengthFake { ReadFailure = CKR.CKR_KEY_HANDLE_INVALID };
+        using var session = fake.CreateSession(policy: AllowAllButKeyStrength());
+
+        KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
+
+        Assert.Null(request.KeyType);
+        Assert.Equal(0, fake.EncryptInitCalls);
+    }
+
+    // A session or device failure is the token's error, not a policy refusal; it still stops the operation (F6).
+    [Theory]
+    [InlineData(CKR.CKR_DEVICE_ERROR)]
+    [InlineData(CKR.CKR_SESSION_HANDLE_INVALID)]
+    [InlineData(CKR.CKR_GENERAL_ERROR)]
+    public void DeviceOrSessionError_Propagates_AndNoInitIsCalled(CKR failure)
+    {
+        using var fake = new StrengthFake { ReadFailure = failure };
+        fake.SetKey(Key, CKK.CKK_AES, 32);
+        using var session = fake.CreateSession(policy: AllowAllButKeyStrength());
+
+        Pkcs11Exception ex = Assert.ThrowsAny<Pkcs11Exception>(() => Encrypt(session, Key));
+
+        Assert.Equal(failure, ex.ReturnValue);
         Assert.Equal(0, fake.EncryptInitCalls);
     }
 

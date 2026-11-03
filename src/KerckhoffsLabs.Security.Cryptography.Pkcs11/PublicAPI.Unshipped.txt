@@ -1574,6 +1574,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoOperation.Wrap = 4 -> K
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicy
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy.AllowsOverride.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy.InspectsKeys.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy.Evaluate(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest! request) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyDecision
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy.Name.get -> string!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ComposedCryptoPolicy.ToBuilder(string! name) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicyBuilder!
@@ -1618,6 +1619,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.HashUseRequest.Operation.init
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy.AllowsOverride.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy.Evaluate(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest! request) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyDecision
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy.InspectsKeys.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy.Name.get -> string!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyAgreementKdfRequest
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyAgreementKdfRequest.Deconstruct(out KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKM Mechanism, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKD Kdf) -> void

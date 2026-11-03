@@ -28,6 +28,13 @@ public sealed class RsaKeyGenerationRule
         return new(r => r.ModulusBits < bits ? PolicyDecision.Deny(tooSmall(r.ModulusBits)) : PolicyDecision.Allow, rationale);
     }
 
+    /// <summary>
+    /// Refuses every RSA key generation, for a policy that has no RSA at all; <paramref name="refusal"/> is the
+    /// reason, given the requested modulus.
+    /// </summary>
+    internal static RsaKeyGenerationRule Refuse(string rationale, Func<int, string> refusal) =>
+        new(r => PolicyDecision.Deny(refusal(r.ModulusBits)), rationale);
+
     /// <summary>A rule backed by a delegate. Test seam: production policies use the public factories.</summary>
     internal static RsaKeyGenerationRule FromDelegate(Func<RsaKeyGenerationRequest, PolicyDecision> evaluate, string rationale) =>
         new(evaluate, rationale);

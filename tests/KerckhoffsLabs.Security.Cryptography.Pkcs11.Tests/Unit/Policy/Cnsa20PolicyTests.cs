@@ -81,7 +81,7 @@ public sealed class Cnsa20PolicyTests
         Add(CryptoOperations.Digest, CKM.CKM_SHA384, CKM.CKM_SHA512);
         Add(signature, CKM.CKM_SHA384_HMAC, CKM.CKM_SHA384_HMAC_GENERAL, CKM.CKM_SHA512_HMAC, CKM.CKM_SHA512_HMAC_GENERAL);
         Add(CryptoOperations.Derive, CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF,
-            CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF, CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA);
+            CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF, CKM.CKM_HKDF_DERIVE);
         Add(CryptoOperations.Encapsulate | CryptoOperations.Decapsulate, CKM.CKM_ML_KEM);
         Add(CryptoOperations.GenerateKeyPair, CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_DSA_KEY_PAIR_GEN,
             CKM.CKM_HSS_KEY_PAIR_GEN, CKM.CKM_XMSS_KEY_PAIR_GEN);
@@ -168,7 +168,7 @@ public sealed class Cnsa20PolicyTests
     [Fact]
     public void Cnsa20_Hkdf_AllowsOnlySha384And512_InHashOrHmacForm()
     {
-        foreach (CKM mechanism in new[] { CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA })
+        foreach (CKM mechanism in new[] { CKM.CKM_HKDF_DERIVE })
         {
             foreach (CKM prf in new[] { CKM.CKM_SHA384, CKM.CKM_SHA512, CKM.CKM_SHA384_HMAC, CKM.CKM_SHA512_HMAC })
                 Assert.True(Evaluate(new Mechanism(mechanism, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, prf)), CryptoOperation.Derive).IsAllowed,
@@ -177,6 +177,48 @@ public sealed class Cnsa20PolicyTests
                 Assert.False(Evaluate(new Mechanism(mechanism, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, prf)), CryptoOperation.Derive).IsAllowed,
                     $"{mechanism} {prf}");
         }
+    }
+
+    // CKM_HKDF_DATA makes a CKO_DATA object whose CKA_VALUE is readable: refused, with CKM_HKDF_DERIVE as the way out.
+    [Fact]
+    public void Cnsa20_RefusesHkdfData_PointingAtHkdfDerive()
+    {
+        DocumentedRefusal refusal = Policy.Catalogue.DocumentedRefusedMechanisms[CKM.CKM_HKDF_DATA];
+        Assert.Equal("derives a data object whose value is readable; CNSA 2.0 keys stay on the token.", refusal.Reason);
+        Assert.Equal("CKM_HKDF_DERIVE", refusal.Alternative);
+        Assert.False(Policy.Catalogue.AllowedMechanisms.ContainsKey(CKM.CKM_HKDF_DATA));
+
+        PolicyDecision d = Evaluate(new Mechanism(CKM.CKM_HKDF_DATA, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA384)),
+            CryptoOperation.Derive);
+        Assert.False(d.IsAllowed);
+        Assert.Contains(refusal.Reason, d.Reason, StringComparison.Ordinal);
+    }
+
+    // The CMAC PRF refusal is read by SP 800-108 and HKDF requests alike, so it names neither family alone.
+    [Fact]
+    public void Cnsa20_CmacPrfRefusal_IsFamilyNeutral()
+    {
+        DocumentedRefusal refusal = Policy.Catalogue.DocumentedRefusedPrfs[nameof(CKM.CKM_AES_CMAC)];
+        Assert.Equal("CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF.", refusal.Reason);
+
+        PolicyDecision hkdf = Evaluate(new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_AES_CMAC)),
+            CryptoOperation.Derive);
+        Assert.False(hkdf.IsAllowed);
+        Assert.DoesNotContain("SP 800-108", hkdf.Reason, StringComparison.Ordinal);
+    }
+
+    // RSA key generation is unreachable (its mechanisms are refused); the rule says so instead of naming a minimum.
+    [Fact]
+    public void Cnsa20_RsaKeyGenerationRule_RefusesEveryModulus()
+    {
+        Assert.Equal("RSA key generation is refused: RSA is not part of CNSA 2.0.", Policy.Catalogue.RsaKeyGeneration.Rationale);
+        foreach (int bits in new[] { 2048, 3072, 4096, 16384 })
+        {
+            PolicyDecision d = Policy.Evaluate(new RsaKeyGenerationRequest(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, bits));
+            Assert.False(d.IsAllowed, $"RSA-{bits}");
+            Assert.Contains("CNSA 2.0", d.Reason, StringComparison.Ordinal);
+        }
+        Assert.DoesNotContain("at least 2048 bits", PolicyCatalogueMarkdown.Render(Policy.Catalogue, "Cnsa20"), StringComparison.Ordinal);
     }
 
     private const ulong MlKem512 = (ulong)CkpMlKem.CKP_ML_KEM_512;
@@ -294,6 +336,10 @@ public sealed class Cnsa20PolicyTests
             Assert.Contains(fragment, Policy.Catalogue.KeyStrength.Rationale, StringComparison.Ordinal);
         Assert.Contains("C_SetOperationState", page, StringComparison.Ordinal);
         Assert.Contains("TLS", page, StringComparison.Ordinal);
+        Assert.Contains("A custom policy that wraps Cnsa20 must forward `InspectsKeys`, or key sizes are no longer checked.", page,
+            StringComparison.Ordinal);
+        Assert.Contains("Some tokens (SoftHSM2) do not report `CKA_VALUE_LEN` on unwrapped secret keys; under Cnsa20 those unwraps are refused.",
+            page, StringComparison.Ordinal);
         Assert.DoesNotContain("NIST-approved security functions", page, StringComparison.Ordinal);
         Assert.DoesNotContain("The size and curve of keys already on the token are not inspected", page, StringComparison.Ordinal);
     }
