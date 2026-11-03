@@ -4,9 +4,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
-/// Keeps the generated policy catalogue documentation — <c>docs/guide/policies/recommended.md</c>
-/// and <c>docs/guide/policies/nist-approved.md</c> — byte-for-byte in sync with what <see cref="PolicyCatalogueMarkdown"/>
-/// renders from the real <c>Recommended</c>/<c>NistApproved</c> catalogues.
+/// Keeps the generated policy catalogue documentation — <c>docs/guide/policies/recommended.md</c>,
+/// <c>docs/guide/policies/nist-approved.md</c> and <c>docs/guide/policies/cnsa-2.0.md</c> — byte-for-byte in sync with what
+/// <see cref="PolicyCatalogueMarkdown"/> renders from the real <c>Recommended</c>/<c>NistApproved</c>/<c>Cnsa20</c> catalogues.
 /// </summary>
 /// <remarks>
 /// Run with the <c>UPDATE_POLICY_DOCS=1</c> environment variable set to regenerate the committed files
@@ -22,12 +22,14 @@ public sealed class PolicyDocsAreCurrentTests
     {
         { "Recommended", "docs/guide/policies/recommended.md" },
         { "NistApproved", "docs/guide/policies/nist-approved.md" },
+        { "Cnsa20", "docs/guide/policies/cnsa-2.0.md" },
     };
 
     private static PolicyCatalogue CatalogueFor(string policyName) => policyName switch
     {
         "Recommended" => CryptoPolicy.Recommended.Catalogue,
         "NistApproved" => CryptoPolicy.NistApproved.Catalogue,
+        "Cnsa20" => CryptoPolicy.Cnsa20.Catalogue,
         _ => throw new ArgumentOutOfRangeException(nameof(policyName)),
     };
 

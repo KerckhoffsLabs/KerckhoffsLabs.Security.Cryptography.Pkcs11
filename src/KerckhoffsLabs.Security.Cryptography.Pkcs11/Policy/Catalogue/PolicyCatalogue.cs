@@ -130,4 +130,7 @@ internal enum PolicyDocumentation
 
     /// <summary>NistApproved: the FIPS 140-3 disclaimer, the NIST baseline and its known limit.</summary>
     NistApproved,
+
+    /// <summary>Cnsa20: the not-a-certification disclaimer, the CNSA 2.0 baseline and its known limits.</summary>
+    Cnsa20,
 }

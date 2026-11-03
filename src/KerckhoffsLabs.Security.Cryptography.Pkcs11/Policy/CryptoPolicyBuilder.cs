@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 /// </remarks>
 public sealed class CryptoPolicyBuilder
 {
-    private static readonly string[] ReservedNames = ["Recommended", "NistApproved"];
+    private static readonly string[] ReservedNames = ["Recommended", "NistApproved", "Cnsa20"];
 
     private readonly string _name;
     private bool _allowsOverride = true;
@@ -42,7 +42,7 @@ public sealed class CryptoPolicyBuilder
     private PolicyDocumentation _documentation;
 
     /// <summary>Starts an empty policy named <paramref name="name"/>, which denies everything until you allow it.</summary>
-    /// <param name="name">The policy's name; not <c>"Recommended"</c> or <c>"NistApproved"</c>.</param>
+    /// <param name="name">The policy's name; not <c>"Recommended"</c>, <c>"NistApproved"</c> or <c>"Cnsa20"</c>.</param>
     /// <exception cref="ArgumentException"><paramref name="name"/> is blank or reserved.</exception>
     public CryptoPolicyBuilder(string name) => _name = ValidateName(name);
 

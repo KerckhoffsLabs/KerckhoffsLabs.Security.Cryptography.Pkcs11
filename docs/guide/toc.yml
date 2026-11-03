@@ -12,6 +12,8 @@
           href: policies/recommended.md
         - name: NistApproved
           href: policies/nist-approved.md
+        - name: Cnsa20
+          href: policies/cnsa-2.0.md
 - name: Reference
   expanded: true
   items:
