@@ -130,6 +130,14 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(state);
 
+        // The keys the restored operations will use are judged like any other key put to use. A zero
+        // handle (CK_INVALID_HANDLE) means "no key" and is not read. The operation's own mechanism and
+        // the key it was started with live inside the opaque state blob and are not inspected; that gap
+        // exists under every policy.
+        if (!encryptionKey.IsInvalid)
+            EnforceKeyStrength(encryptionKey, KeyStrengthSource.ExistingKey);
+        if (!authenticationKey.IsInvalid)
+            EnforceKeyStrength(authenticationKey, KeyStrengthSource.ExistingKey);
 
         CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpSetOperationState);

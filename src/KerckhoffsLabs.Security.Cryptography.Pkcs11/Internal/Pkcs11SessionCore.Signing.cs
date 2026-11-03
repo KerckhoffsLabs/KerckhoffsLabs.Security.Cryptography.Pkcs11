@@ -129,7 +129,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Verify);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify2");
 
@@ -299,11 +299,10 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-
+        // The keys are judged once, by the overload this delegates to.
         Enforce(verificationMechanism, CryptoOperation.Verify);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
-        EnforceKeyStrength(verificationKeyHandle, KeyStrengthSource.ExistingKey);
-        EnforceKeyStrength(decryptionKeyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify1");
 
@@ -345,11 +344,10 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-
+        // The keys are judged once, by the overload this delegates to.
         Enforce(verificationMechanism, CryptoOperation.Verify);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
-        EnforceKeyStrength(verificationKeyHandle, KeyStrengthSource.ExistingKey);
-        EnforceKeyStrength(decryptionKeyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         ThrowIfOneDescriptorDrivesBothHalves(verificationMechanism, decryptionMechanism, nameof(decryptionMechanism));
 

@@ -122,7 +122,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Encrypt);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt2");
 
@@ -429,7 +429,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(mechanism);
 
         Enforce(mechanism, CryptoOperation.Decrypt);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt2");
 

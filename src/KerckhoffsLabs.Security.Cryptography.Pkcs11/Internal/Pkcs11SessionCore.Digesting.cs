@@ -188,7 +188,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(encryptionMechanism, CryptoOperation.Encrypt);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt1");
 
@@ -219,7 +219,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(encryptionMechanism, CryptoOperation.Encrypt);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt2");
 
@@ -300,7 +300,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest1");
 
@@ -340,7 +340,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(digestingMechanism, CryptoOperation.Digest);
         Enforce(decryptionMechanism, CryptoOperation.Decrypt);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        // The key is judged once, by the overload this delegates to.
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest2");
 

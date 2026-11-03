@@ -68,6 +68,28 @@ public sealed class KeyStrengthGateTests
             return CKR.CKR_OK;
         }
 
+        protected override CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen)
+        {
+            if (!encryptedPart.IsNull)
+                part.CopyTo(encryptedPart.Span);
+            encryptedPartLen = (NativeCULong)(ulong)part.Length;
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_EncryptFinal(NativeCULong session, NativeBuffer<byte> lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
+        {
+            lastEncryptedPartLen = (NativeCULong)0UL;
+            return CKR.CKR_OK;
+        }
+
+        public int SetOperationStateCalls { get; private set; }
+
+        protected override CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey, NativeCULong authenticationKey)
+        {
+            SetOperationStateCalls++;
+            return CKR.CKR_OK;
+        }
+
         protected override CKR C_WrapKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, NativeBuffer<byte> wrappedKey, ref NativeCULong wrappedKeyLen)
         {
             WrapCalls++;
@@ -250,6 +272,43 @@ public sealed class KeyStrengthGateTests
         fake.SetKey(Key, CKK.CKK_AES, 16);
         Assert.Equal(16, RefusedRequest(() => Encrypt(session, Key)).ValueLengthBytes);
         Assert.Equal(2, fake.EncryptInitCalls);
+    }
+
+    // The 4-argument stream overload delegates to the 5-argument one: the key is read once, not once per layer.
+    [Fact]
+    public void StreamEncrypt_ReadsTheKeyOnce()
+    {
+        using var fake = new StrengthFake();
+        fake.SetKey(Key, CKK.CKK_AES, 32);
+        using var session = fake.CreateSession(policy: AllowAllButKeyStrength());
+        using var input = new MemoryStream(new byte[64]);
+        using var output = new MemoryStream();
+
+        session.Encrypt(new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], 128)), Key, input, output);
+
+        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(1, fake.EncryptInitCalls);
+    }
+
+    // Restoring an operation puts its keys to use: a weak one is refused, and a zero handle ("no key") is not read.
+    [Fact]
+    public void SetOperationState_JudgesItsKeys_AndSkipsTheInvalidHandle()
+    {
+        using var fake = new StrengthFake();
+        fake.SetKey(Key, CKK.CKK_AES, 16);
+        using var session = fake.CreateSession(policy: AllowAllButKeyStrength());
+
+        KeyStrengthRequest request = RefusedRequest(() => session.SetOperationState([0x01], Key, ObjectHandle.Invalid));
+
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(0, fake.SetOperationStateCalls);
+
+        fake.SetKey(Key, CKK.CKK_AES, 32);
+        session.SetOperationState([0x01], ObjectHandle.Invalid, Key);
+
+        Assert.Equal(4, fake.AttributeReads);
+        Assert.Equal(1, fake.SetOperationStateCalls);
     }
 
     // A key type with no size attribute in the list is described by its type alone: one read.
