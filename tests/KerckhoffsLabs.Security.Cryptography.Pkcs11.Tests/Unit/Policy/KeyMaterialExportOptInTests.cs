@@ -1440,4 +1440,121 @@ public sealed class KeyMaterialExportOptInTests
         Assert.Equal("key template (CKO_SECRET_KEY) (read-back for KdfOutput)", request.Describe());
         Assert.Equal("key template (CKO_SECRET_KEY)", new KeyTemplateRequest(CKO.CKO_SECRET_KEY, []).Describe());
     }
+
+    // === Inventory of the requests a read-back tags ===============================================
+
+    // A tagged request is exempt from part of the policy (a template from CKA_SENSITIVE / CKA_EXTRACTABLE, an ECDH
+    // CKD_NULL from the KDF allow-list). The tag is ambient: whatever the session judges while a read-back creates its
+    // ephemeral key is tagged. This pins, for every read-back path, exactly which requests that is, so new work inside
+    // the armed window (a helper object, a vendor-quirk retry, an unfenced call-out) fails here and gets reviewed
+    // instead of silently inheriting the exemption.
+
+    // Allows everything and records each tagged request as it is judged: its description and, for a template, the
+    // attribute types it carries (the attributes are released after the call, so they are read here).
+    private sealed class TagInventoryPolicy : ICryptoPolicy
+    {
+        public List<string> Tagged { get; } = [];
+        public string Name => "Tag inventory";
+        public bool AllowsOverride => false;
+
+        public PolicyDecision Evaluate(PolicyRequest request)
+        {
+            switch (request)
+            {
+                case KeyTemplateRequest { ReadBackFor: not null } template:
+                    Tagged.Add($"{template.Describe()} [{string.Join(", ", template.Attributes.Select(a => a.Type))}]");
+                    break;
+                case KeyAgreementKdfRequest { ReadBackFor: not null } kdf:
+                    Tagged.Add(kdf.Describe());
+                    break;
+            }
+            return PolicyDecision.Allow;
+        }
+    }
+
+    private static readonly Dictionary<string, Action<TagInventoryPolicy>> ReadBackPaths = new()
+    {
+        ["Pkcs11Key.DeriveRawSecret (P-256)"] = policy => WithSession(policy, session =>
+        {
+            using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+            using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+            alice.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo());
+        }),
+        ["Pkcs11Key.DeriveRawSecret (X25519)"] = policy =>
+            WithMontgomeryKey(X25519Oid, X25519Shared, policy, (key, _) => key.DeriveRawSecret(MontgomerySpki("1.3.101.110", X25519BobPublic))),
+        ["Pkcs11Key.DeriveBytes (HKDF)"] = policy => WithSession(policy, session =>
+        {
+            using var ikm = ImportIkm(session);
+            ikm.DeriveBytes(HkdfMechanism(), 42);
+        }),
+        ["HkdfPkcs11.DeriveKey"] = policy => WithSession(policy, session =>
+        {
+            using var ikm = ImportIkm(session);
+            HkdfPkcs11.DeriveKey(Sha256, ikm, 42, Salt, Info);
+        }),
+        ["SP800108HmacCounterKdfPkcs11.DeriveKey"] = policy => WithSession(policy, session =>
+        {
+            using var ikm = ImportIkm(session);
+            using var kdf = new SP800108HmacCounterKdfPkcs11(ikm, Sha256);
+            kdf.DeriveKey(Salt, Info, 32);
+        }),
+        // The managed token has no CKM_PKCS5_PBKD2: the policy judges the template, then the token refuses.
+        ["Rfc2898DeriveBytesPkcs11.Pbkdf2"] = policy => WithSession(policy, session =>
+            Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Ikm, Salt, 1000, Sha256, 32))),
+        // The fake ML-KEM module answers attribute reads only: the policy judges the template, then it refuses.
+        ["MLKemPkcs11.Encapsulate"] = policy => WithFakeMlKem(policy, publicOnly: true, mlkem =>
+            AssertModuleRefused(() => mlkem.Encapsulate(out _, out _))),
+        ["MLKemPkcs11.Decapsulate"] = policy => WithFakeMlKem(policy, publicOnly: false, mlkem =>
+            AssertModuleRefused(() => mlkem.Decapsulate(new byte[MLKemAlgorithm.MLKem768.CiphertextSizeInBytes]))),
+    };
+
+    // The ephemeral object every read-back creates: a generic secret, non-sensitive and extractable so it can be read,
+    // with every usage attribute present and false.
+    private const string EphemeralSecretAttributes =
+        "CKA_CLASS, CKA_KEY_TYPE, CKA_SENSITIVE, CKA_EXTRACTABLE, CKA_ENCRYPT, CKA_DECRYPT, CKA_SIGN, CKA_VERIFY, CKA_WRAP, CKA_UNWRAP, CKA_DERIVE";
+
+    private const string EcdhCkdNull = "CKM_ECDH1_DERIVE with CKD_NULL (read-back for EcdhSharedSecret)";
+    private const string EcdhTemplate = $"key template (read-back for EcdhSharedSecret) [{EphemeralSecretAttributes}, CKA_VALUE_LEN]";
+    private const string KdfTemplate = $"key template (read-back for KdfOutput) [{EphemeralSecretAttributes}, CKA_VALUE_LEN]";
+    private const string KemTemplate = $"key template (read-back for KemSharedSecret) [{EphemeralSecretAttributes}, CKA_TOKEN, CKA_VALUE_LEN]";
+
+    // Changing a row is a security review: say in the PR why the new request needs the read-back exemption.
+    private static readonly Dictionary<string, string[]> ExpectedTags = new()
+    {
+        ["Pkcs11Key.DeriveRawSecret (P-256)"] = [EcdhCkdNull, EcdhTemplate],
+        ["Pkcs11Key.DeriveRawSecret (X25519)"] = [EcdhCkdNull, EcdhTemplate],
+        ["Pkcs11Key.DeriveBytes (HKDF)"] = [KdfTemplate],
+        ["HkdfPkcs11.DeriveKey"] = [KdfTemplate],
+        ["SP800108HmacCounterKdfPkcs11.DeriveKey"] = [KdfTemplate],
+        // C_GenerateKey is the one path that knows the class for certain.
+        ["Rfc2898DeriveBytesPkcs11.Pbkdf2"] = [$"key template (CKO_SECRET_KEY) (read-back for KdfOutput) [{EphemeralSecretAttributes}, CKA_VALUE_LEN]"],
+        ["MLKemPkcs11.Encapsulate"] = [KemTemplate],
+        ["MLKemPkcs11.Decapsulate"] = [KemTemplate],
+    };
+
+    public static TheoryData<string> ReadBackPathNames() => [.. ReadBackPaths.Keys];
+
+    [Theory]
+    [MemberData(nameof(ReadBackPathNames))]
+    public void ReadBack_TagsExactlyTheInventoriedRequests(string path)
+    {
+        var policy = new TagInventoryPolicy();
+
+        ReadBackPaths[path](policy);
+
+        Assert.Equal(ExpectedTags[path], policy.Tagged);
+    }
+
+    // Every read-back path is inventoried, and only these two request types can carry the tag: a new one would be
+    // exempted by the evaluator without appearing here.
+    [Fact]
+    public void ReadBack_InventoryCoversEveryPathAndTaggableRequestType()
+    {
+        Assert.Equal(ExpectedTags.Keys.Order(), ReadBackPaths.Keys.Order());
+
+        Type[] taggable = [.. typeof(PolicyRequest).Assembly.GetTypes()
+            .Where(t => t.IsSubclassOf(typeof(PolicyRequest)) && t.GetProperty(nameof(KeyTemplateRequest.ReadBackFor)) is not null)
+            .OrderBy(t => t.Name)];
+        Assert.Equal([typeof(KeyAgreementKdfRequest), typeof(KeyTemplateRequest)], taggable);
+    }
 }
