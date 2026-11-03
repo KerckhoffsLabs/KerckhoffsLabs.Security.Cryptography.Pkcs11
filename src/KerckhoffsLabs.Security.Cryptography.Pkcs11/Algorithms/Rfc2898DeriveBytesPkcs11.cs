@@ -37,9 +37,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind.KdfOutput"/>.</b> Every derivation here returns
 /// <c>byte[]</c> (or fills a caller-supplied buffer), so the value must be read back off the token.
 /// Every built-in policy refuses it; opt in with
-/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "reason"))</c>
-/// (reported as KLPKCS11012). A scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also
-/// allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. To use the result as a key, call
+/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "reason", kdfBaseKeys: KdfBaseKeyScope.NeverProtected))</c>
+/// (reported as KLPKCS11012; the scope says which keys the secret may come from, see
+/// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Allow"/>), applied as a scoped
+/// <c>Pkcs11Session.UsePolicy</c> lease around the call or on a session of its own, not as a session\'s base policy.
+/// A <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. To use the result as a key, call
 /// <see cref="Pbkdf2Key(Pkcs11Session, SecurePassword, ReadOnlySpan{byte}, int, HashAlgorithmName, ObjectTemplate)"/> instead: it keeps the derived key on the token (sensitive and
 /// non-extractable by default) and needs no override.
 /// </para>

@@ -250,23 +250,44 @@ public sealed partial class Pkcs11Key : IDisposable
     }
 
     /// <summary>
-    /// What a KDF-output export policy judges about this key as a KDF's base key
-    /// (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>), read in one <c>C_GetAttributeValue</c>. An attribute the
-    /// token does not report reads as protected (<see cref="KdfBaseKeyInfo.AlwaysSensitive"/> and
-    /// <see cref="KdfBaseKeyInfo.NeverExtractable"/> <see langword="true"/>), so an unknown key never passes for an
-    /// unprotected one.
+    /// What an export policy judges about this key as the source of a secret read off the token: a KDF's base key
+    /// (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>) or an agreement's or decapsulation's private key
+    /// (<see cref="KeyMaterialExportRequest.PrivateKey"/>), read off the secret or private object in one
+    /// <c>C_GetAttributeValue</c>, never off a public companion. An attribute the token does not report, or a key with
+    /// no secret or private object, reads as protected and persistent (<see cref="ExportKeyInfo.Unread"/>), so an
+    /// unknown key never passes for an unprotected or ephemeral one.
     /// </summary>
-    internal KdfBaseKeyInfo ReadKdfBaseKeyInfo()
+    internal ExportKeyInfo ReadExportKeyInfo()
     {
-        using var attrs = GetAttributeValue(
-            CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE);
-        static bool Readable(ObjectAttribute a) => !a.CannotBeRead;
-        return new KdfBaseKeyInfo(
-            KeyType: Readable(attrs[0]) ? (CKK)attrs[0].GetValueAsUlong() : null,
-            Id: Readable(attrs[1]) ? attrs[1].GetValueAsByteArray() : ReadOnlyMemory<byte>.Empty,
-            Label: Readable(attrs[2]) ? attrs[2].GetValueAsString() : null,
-            AlwaysSensitive: !Readable(attrs[3]) || attrs[3].GetValueAsBool(),
-            NeverExtractable: !Readable(attrs[4]) || attrs[4].GetValueAsBool());
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectHandle handle = PrivateHandle;
+        if (handle.IsInvalid)
+            return ExportKeyInfo.Unread;
+
+        using var attrs = _session.Core.GetAttributeValue(handle,
+            [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_TOKEN, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE]);
+        return new ExportKeyInfo(
+            KeyType: Decode(attrs[0], static a => (CKK?)(CKK)a.GetValueAsUlong(), null),
+            Id: Decode(attrs[1], static a => (ReadOnlyMemory<byte>)a.GetValueAsByteArray(), ReadOnlyMemory<byte>.Empty),
+            Label: Decode(attrs[2], static a => a.GetValueAsString(), null),
+            Token: Decode(attrs[3], static a => a.GetValueAsBool(), true),
+            AlwaysSensitive: Decode(attrs[4], static a => a.GetValueAsBool(), true),
+            NeverExtractable: Decode(attrs[5], static a => a.GetValueAsBool(), true));
+    }
+
+    // An attribute the token does not report, or reports in a form that does not decode (a module that stops filling
+    // the template at its first invalid attribute leaves the rest zero-length), reads as the fail-closed fallback.
+    private static T Decode<T>(ObjectAttribute attribute, Func<ObjectAttribute, T> decode, T fallback)
+    {
+        if (attribute.CannotBeRead) return fallback;
+        try
+        {
+            return decode(attribute);
+        }
+        catch (Pkcs11AttributeException)
+        {
+            return fallback;
+        }
     }
 
     /// <summary>

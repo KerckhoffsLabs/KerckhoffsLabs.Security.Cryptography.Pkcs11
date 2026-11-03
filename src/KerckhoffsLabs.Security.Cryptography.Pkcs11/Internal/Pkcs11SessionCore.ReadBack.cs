@@ -20,19 +20,19 @@ internal sealed partial class Pkcs11SessionCore
     private readonly ConditionalWeakTable<ICryptoPolicy, StrongBox<int>> _exportsWarned = [];
 
     /// <summary>
-    /// The kind a <see cref="KeyTemplateRequest"/> or <see cref="KeyAgreementKdfRequest"/> raised now is a
-    /// read-back of (<see cref="KeyTemplateRequest.ReadBackFor"/>), or <see langword="null"/>. The only source of
-    /// the tag, and deliberately narrow: the open grant's kind only while it is armed (inside the library call that
+    /// The export a <see cref="KeyTemplateRequest"/> or <see cref="KeyAgreementKdfRequest"/> raised now is a
+    /// read-back of (<see cref="KeyTemplateRequest.ReadBackFor"/>), as the policy allowed it, or <see langword="null"/>.
+    /// The only source of the tag, and deliberately narrow: the open grant's request only while it is armed (inside the library call that
     /// creates the ephemeral key, <see cref="ReadBackGrant.Create{T}"/>), only on the thread that holds it, and
     /// never while caller code runs on that thread (<see cref="CallOutScope"/>). The session lock is reentrant, so
     /// without the last two a logger sink or a custom policy calling back into the session from inside the
     /// read-back would have its own templates judged as the library's read-back.
     /// </summary>
-    private KeyMaterialExportKind? ReadBackKind =>
+    private KeyMaterialExportRequest? ReadBackRequest =>
         _readBack is { Armed: true } grant
         && grant.OwnerThreadId == Environment.CurrentManagedThreadId
         && !CallOutScope.Active
-            ? grant.Kind
+            ? grant.Request
             : null;
 
     /// <summary>
@@ -43,20 +43,23 @@ internal sealed partial class Pkcs11SessionCore
     /// sets the tag.
     /// </summary>
     /// <remarks>
-    /// The policy is asked once, under the session lock, with what <paramref name="readKdfBaseKey"/> read off the
-    /// KDF's base key (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>). If the lock is busy (another thread is
+    /// The policy is asked once, under the session lock, with what <paramref name="readSourceKey"/> read off the key
+    /// the secret comes from: the KDF's base key for <see cref="KeyMaterialExportKind.KdfOutput"/>
+    /// (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>), the private key otherwise
+    /// (<see cref="KeyMaterialExportRequest.PrivateKey"/>). If the lock is busy (another thread is
     /// using the session), the policy is first asked about the kind alone, so a kind it refuses surfaces as the
     /// <see cref="CryptoPolicyViolationException"/> callers rely on whatever the session is doing; otherwise the
-    /// contention is reported, as the base key cannot be read without the lock.
+    /// contention is reported, as the key cannot be read without the lock.
     /// </remarks>
     /// <param name="kind">The kind of secret to read.</param>
-    /// <param name="readKdfBaseKey">
-    /// For <see cref="KeyMaterialExportKind.KdfOutput"/> over a base key, reads its attributes (under the lock, on
-    /// this thread); <see langword="null"/> for every other read-back, and for a KDF with no base key.
+    /// <param name="readSourceKey">
+    /// Reads the attributes of the key the secret comes from (under the lock, on this thread): the KDF's base key, or
+    /// the private key of an agreement or decapsulation. <see langword="null"/> for a KDF with no base key (PBKDF2) and
+    /// for a KEM encapsulation.
     /// </param>
     /// <exception cref="CryptoPolicyViolationException">The policy refuses the export.</exception>
     /// <exception cref="InvalidOperationException">Another thread is using the session, or a read-back is already open on it.</exception>
-    internal ReadBackGrant BeginReadBack(KeyMaterialExportKind kind, Func<KdfBaseKeyInfo>? readKdfBaseKey = null)
+    internal ReadBackGrant BeginReadBack(KeyMaterialExportKind kind, Func<ExportKeyInfo>? readSourceKey = null)
     {
         ExclusiveLease lease;
         try
@@ -65,8 +68,8 @@ internal sealed partial class Pkcs11SessionCore
         }
         catch (InvalidOperationException)
         {
-            // Contention: a refusal of the kind itself is the answer the caller acts on. No base key in the
-            // request means no base-key scope to fail, so this verdict is the kind's alone.
+            // Contention: a refusal of the kind itself is the answer the caller acts on. No key in the request
+            // means no key scope to fail, so this verdict is the kind's alone.
             EnforceUnder(new KeyMaterialExportRequest(kind));
             throw;
         }
@@ -76,9 +79,12 @@ internal sealed partial class Pkcs11SessionCore
             if (_readBack is not null)
                 throw new InvalidOperationException("A secret read-back is already in progress on this session.");
 
-            var request = new KeyMaterialExportRequest(kind) { KdfBaseKey = readKdfBaseKey?.Invoke() };
+            ExportKeyInfo? sourceKey = readSourceKey?.Invoke();
+            var request = kind == KeyMaterialExportKind.KdfOutput
+                ? new KeyMaterialExportRequest(kind) { KdfBaseKey = sourceKey }
+                : new KeyMaterialExportRequest(kind) { PrivateKey = sourceKey };
             ICryptoPolicy policy = EnforceUnder(request);
-            var grant = new ReadBackGrant(this, lease, kind, policy);
+            var grant = new ReadBackGrant(this, lease, request, policy);
             _readBack = grant;
             return grant;
         }
@@ -119,17 +125,20 @@ internal sealed partial class Pkcs11SessionCore
         private readonly ICryptoPolicy _policy;
         private bool _disposed;
 
-        internal ReadBackGrant(Pkcs11SessionCore core, ExclusiveLease lease, KeyMaterialExportKind kind, ICryptoPolicy policy)
+        internal ReadBackGrant(Pkcs11SessionCore core, ExclusiveLease lease, KeyMaterialExportRequest request, ICryptoPolicy policy)
         {
             _core = core;
             _lease = lease;
             _policy = policy;
-            Kind = kind;
+            Request = request;
             OwnerThreadId = Environment.CurrentManagedThreadId;
         }
 
+        /// <summary>The export the policy allowed, key info included.</summary>
+        internal KeyMaterialExportRequest Request { get; }
+
         /// <summary>The kind of secret the policy allowed to be read.</summary>
-        internal KeyMaterialExportKind Kind { get; }
+        internal KeyMaterialExportKind Kind => Request.Kind;
 
         /// <summary>The thread that opened the grant and holds the session's lease.</summary>
         internal int OwnerThreadId { get; }
@@ -184,7 +193,7 @@ internal sealed partial class Pkcs11SessionCore
     /// <summary>
     /// Marks the current thread as running caller code on the library's behalf: a policy's
     /// <see cref="ICryptoPolicy.Evaluate"/> or a logger sink. While one is active, nothing the session judges
-    /// on this thread is tagged as a read-back (<see cref="ReadBackKind"/>). Thread-static, so it covers a call
+    /// on this thread is tagged as a read-back (<see cref="ReadBackRequest"/>). Thread-static, so it covers a call
     /// back into any session, and nests.
     /// </summary>
     internal readonly struct CallOutScope : IDisposable

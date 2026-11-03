@@ -334,7 +334,8 @@ internal sealed partial class Pkcs11SessionCore
     private void EnforceKeyTemplate(List<ObjectAttribute>? attributes, CKO? objectClass)
     {
         if (attributes is null) return;
-        Enforce(new KeyTemplateRequest(objectClass, attributes) { ReadBackFor = ReadBackKind });
+        KeyMaterialExportRequest? readBack = ReadBackRequest;
+        Enforce(new KeyTemplateRequest(objectClass, attributes) { ReadBackFor = readBack?.Kind, ReadBackExport = readBack });
     }
 
     /// <summary>

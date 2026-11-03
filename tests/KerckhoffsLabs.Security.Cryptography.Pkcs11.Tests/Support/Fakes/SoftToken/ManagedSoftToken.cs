@@ -271,6 +271,8 @@ internal sealed partial class ManagedSoftToken : FakeModule
         bool neverExtractable = generated && !extractable && (baseKey is null || Bool(baseKey, CKA.CKA_NEVER_EXTRACTABLE));
         attrs[(ulong)CKA.CKA_ALWAYS_SENSITIVE] = [alwaysSensitive ? (byte)1 : (byte)0];
         attrs[(ulong)CKA.CKA_NEVER_EXTRACTABLE] = [neverExtractable ? (byte)1 : (byte)0];
+        // A token always reports CKA_TOKEN; a key created without it is a session object (PKCS#11 default).
+        attrs.TryAdd((ulong)CKA.CKA_TOKEN, [0]);
     }
 
     private ulong Store(Dictionary<ulong, byte[]> attrs)

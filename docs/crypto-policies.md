@@ -87,7 +87,7 @@ using var session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, po
 | An EC curve below the 128-bit baseline | `AllowCurve(curve, reason)` |
 | A key-agreement KDF | `AllowKeyAgreementKdf(kdf, reason)` |
 | Key agreement with an existing key of a type | `AllowKeyAgreementKeyType(keyType, reason)` |
-| Reading secret key material off the token | `WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, reason))`, see [below](#reading-secret-key-material-off-the-token) |
+| Reading secret key material off the token | `WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, reason, kdfBaseKeys, privateKeys))`, see [below](#reading-secret-key-material-off-the-token) |
 
 Allowing a mechanism that is already allowed adds operations and keeps its existing parameter check (see
 [Building a policy from scratch](#building-a-policy-from-scratch)); a different check is refused, so remove
@@ -112,33 +112,92 @@ Every built-in policy refuses to read secret key material off the token in the c
 token where you can: `Pkcs11Key.DeriveSecretAgreement` (EC, X25519 and X448) then `Pkcs11Key.Derive` to a
 sensitive key, `EncapsulateKey` / `DecapsulateKey`. Where an
 application genuinely needs the bytes (a drop-in class whose contract returns a shared secret, a value a
-protocol sends or compares), opt in for exactly the kinds it needs, with a reason:
+protocol sends or compares), opt in for exactly the kinds it needs, over exactly the keys it needs them for, with
+a reason:
 
 ```csharp
 #pragma warning disable KLPKCS11012 // the X25519 secret feeds <protocol>'s managed key schedule, see <ticket>
-ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
+ComposedCryptoPolicy exportPolicy = CryptoPolicy.Recommended.ToBuilder("MyApp X25519 export")
     .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(
         [KeyMaterialExportKind.EcdhSharedSecret],
-        "X25519 shared secret for <protocol>'s managed key schedule."))
+        "X25519 shared secret of an ephemeral key, for <protocol>'s managed key schedule.",
+        privateKeys: PrivateKeyScope.SessionObjects))
     .Build();
 #pragma warning restore KLPKCS11012
 ```
 
-| Kind | What it lets the session return |
-|---|---|
-| `EcdhSharedSecret` | The raw shared secret Z of an ECDH agreement: `Pkcs11Key.DeriveRawSecret` for EC (`CKK_EC`) and X25519 / X448 (`CKK_EC_MONTGOMERY`) keys, and `ECDiffieHellmanPkcs11`'s derive methods |
-| `KemSharedSecret` | An ML-KEM shared secret: `MLKemPkcs11` encapsulate / decapsulate |
-| `KdfOutput` | KDF output over a base key in the opt-in's `KdfBaseKeyScope` (by default, one the token has not always protected): `Pkcs11Key.DeriveBytes`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11`. See [the base-key scope](#kdfoutput-base-key-scope) below |
+| Kind | What it lets the session return | Scope it needs |
+|---|---|---|
+| `EcdhSharedSecret` | The raw shared secret Z of an ECDH agreement: `Pkcs11Key.DeriveRawSecret` for EC (`CKK_EC`) and X25519 / X448 (`CKK_EC_MONTGOMERY`) keys, and `ECDiffieHellmanPkcs11`'s derive methods | `privateKeys`, see [the private-key scope](#private-key-scope) |
+| `KemSharedSecret` | An ML-KEM shared secret: `MLKemPkcs11` encapsulate / decapsulate | `privateKeys` (judged on decapsulation only) |
+| `KdfOutput` | KDF output: `Pkcs11Key.DeriveBytes`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11` | `kdfBaseKeys`, see [the base-key scope](#kdfoutput-base-key-scope) |
 
-`Allow` copies the kinds and throws on an empty list, an undefined kind or a blank reason. It refuses every
-kind it does not name exactly as `KeyMaterialExportRule.Refuse()` does. Its reason is shown in the policy
-catalogue. An export is logged once the secret has actually been read and checked (a read-back the token or a
-later policy check stops logs nothing): the first export of a kind a policy allows on a session logs a
+Every kind is scoped by the on-token key the secret comes from, and **there is no default scope**: `Allow` throws
+when a kind it names has no scope, and when a scope is given for a kind it does not name. Each scope's presets
+rely on something the token or the deployment has to get right (described below), so the choice is the caller's
+to make and to justify.
+
+`Allow` also copies the kinds and throws on an empty list, an undefined kind or a blank reason. It refuses every
+kind it does not name exactly as `KeyMaterialExportRule.Refuse()` does. Its reason and scopes are shown in the
+policy catalogue. An export is logged once the secret has actually been read and checked (a read-back the token or
+a later policy check stops logs nothing): the first export of a kind a policy allows on a session logs a
 `KeyMaterialExportAllowed` warning naming the kind and the policy, never the secret, and every later one of
 that kind under that policy logs the same at Debug, so a hot KDF path does not flood the log. Every `Allow`
 call site (and method-group reference) is reported at build time as
 [KLPKCS11012](diagnostics.md#KLPKCS11012), so the opt-in is visible in review; suppress it with a
 justification.
+
+<a id="where-to-apply-an-export-opt-in"></a>
+#### Where to apply the opt-in
+
+An export rule allows the read to every caller of every session whose policy carries it. So keep it off the
+policy your sessions are opened with, and apply it only where the bytes are needed:
+
+- **A scoped lease around the code that needs the bytes**, when nothing else uses the session meanwhile. The
+  lease applies to the whole session (every thread using it, not just the caller's) until it is disposed:
+
+  ```csharp
+  using (session.UsePolicy(exportPolicy))
+  {
+      byte[] z = ephemeral.DeriveRawSecret(peerSpki);
+      // ... feed z to the managed key schedule, then zero it
+  }
+  ```
+
+- **A session of its own**, opened with the export policy, for code that runs the export on its own threads (a
+  drop-in layer whose agreement, KEM or KDF interface returns bytes) or for a session opened under a policy that
+  refuses leases (`AllowsOverride` false, such as `NistApproved`). Keep long-lived keys the scopes do not admit
+  out of it.
+
+Build the export policy from the session's own (`ToBuilder`), so the lease or session loosens nothing but the
+export.
+
+<a id="private-key-scope"></a>
+#### The `EcdhSharedSecret` / `KemSharedSecret` private-key scope
+
+The secret an agreement or a decapsulation reads depends only on the private key and public inputs: the peer's
+public key, or the KEM ciphertext. So over a long-lived private key, the read turns the key into an oracle for
+everything it has protected. `DeriveRawSecret` with a recorded peer public key returns the same Z that an earlier
+`DeriveSecretAgreement` kept on the token, and so every key derived from Z. An ML-KEM decapsulation of a recorded
+ciphertext returns the shared secret that `DecapsulateKey` kept on the token. Before it asks the policy, the
+library reads the private key (`KeyMaterialExportRequest.PrivateKey`: its type, `CKA_ID`, `CKA_LABEL`,
+`CKA_TOKEN`, `CKA_ALWAYS_SENSITIVE` and `CKA_NEVER_EXTRACTABLE`, off the private object), and the rule checks it
+against a `PrivateKeyScope`:
+
+| Scope | Private keys it admits |
+|---|---|
+| `PrivateKeyScope.SessionObjects` | Keys that are session objects (`CKA_TOKEN` false): ephemeral keys, such as the key pair of an ephemeral-static agreement or one generated for a single KEM exchange. A persistent token key is refused |
+| `PrivateKeyScope.None` | No key: only a KEM encapsulation, which uses no private key and returns a fresh secret. Every agreement and decapsulation is refused |
+| `PrivateKeyScope.Where(predicate, description)` | What the predicate decides from `ExportKeyInfo`; it decides alone |
+| `PrivateKeyScope.Any` | Every private key the session can use, long-lived token keys included. Name it only when reproducing what earlier agreements or decapsulations kept on the token is acceptable |
+
+A KEM encapsulation is in every scope. An attribute the token does not report reads as a token object, so an
+unknown key is never taken for an ephemeral one.
+
+`SessionObjects` relies on `CKA_TOKEN`, which cannot change on an existing object. A session copy of a token key
+(`C_CopyObject`, which the library does not expose) would pass it, so keep a vendor tool or another library from
+copying long-lived private keys into sessions whose policy allows these kinds, or create those keys
+`CKA_COPYABLE=false`.
 
 <a id="kdfoutput-base-key-scope"></a>
 #### The `KdfOutput` base-key scope
@@ -146,14 +205,13 @@ justification.
 KDF output is the value of a key the token could derive from the same base with the same mechanism:
 `z.DeriveBytes(hkdf, 32)` over the agreed secret Z of `DeriveSecretAgreement` *is* the AES key
 `z.Derive(hkdf, aes256Template)` makes on the token. So a `KdfOutput` opt-in is scoped by base key: before it asks
-the policy, the library reads the KDF's base key (`KeyMaterialExportRequest.KdfBaseKey`: its type, `CKA_ID`,
-`CKA_LABEL`, `CKA_ALWAYS_SENSITIVE` and `CKA_NEVER_EXTRACTABLE`), and the rule checks it against a
-`KdfBaseKeyScope`:
+the policy, the library reads the KDF's base key (`KeyMaterialExportRequest.KdfBaseKey`: the same
+`ExportKeyInfo`), and the rule checks it against a `KdfBaseKeyScope`:
 
 | Scope | Base keys it admits |
 |---|---|
-| `KdfBaseKeyScope.NeverProtected` (the default of `Allow(kinds, reason)`) | Keys that are not `CKA_ALWAYS_SENSITIVE`: key material the application imported (`C_CreateObject`), and keys the token derived from it, such as the PRK of `HkdfPkcs11.ExtractKey`. A generated sensitive key, and anything derived from one as sensitive (Z, a master key's children), is refused |
-| `KdfBaseKeyScope.Where(predicate, description)` | What the predicate decides from `KdfBaseKeyInfo`; it decides alone, so check `AlwaysSensitive` in it to keep the default's protection |
+| `KdfBaseKeyScope.NeverProtected` | Keys that are not `CKA_ALWAYS_SENSITIVE`: key material the application imported (`C_CreateObject`), and keys the token derived from it, such as the PRK of `HkdfPkcs11.ExtractKey`. A generated sensitive key, and anything derived from one as sensitive (Z, a master key's children), is refused, subject to the limits below |
+| `KdfBaseKeyScope.Where(predicate, description)` | What the predicate decides from `ExportKeyInfo`; it decides alone, so check `AlwaysSensitive` in it to keep `NeverProtected`'s protection |
 | `KdfBaseKeyScope.Any` | Every base key the session can use. Name it only when reproducing derived keys is the point |
 
 ```csharp
@@ -161,14 +219,14 @@ the policy, the library reads the KDF's base key (`KeyMaterialExportRequest.KdfB
 KeyMaterialExportRule rule = KeyMaterialExportRule.Allow(
     [KeyMaterialExportKind.KdfOutput],
     "HKDF output for <protocol>, over its own derive keys.",
-    KdfBaseKeyScope.Where(k => !k.AlwaysSensitive && k.Label == "<protocol>-ikm", "<protocol>'s IKM"));
+    kdfBaseKeys: KdfBaseKeyScope.Where(k => !k.AlwaysSensitive && k.Label == "<protocol>-ikm", "<protocol>'s IKM"));
 #pragma warning restore KLPKCS11012
 ```
 
 An attribute the token does not report reads as protected, so an unknown key is never taken for an imported one.
 PBKDF2 has no base key (its input is a password the caller holds) and is in every scope.
 
-The default relies on the token keeping `CKA_ALWAYS_SENSITIVE` as PKCS#11 specifies, and it has two limits:
+`NeverProtected` relies on the token keeping `CKA_ALWAYS_SENSITIVE` as PKCS#11 specifies, and it has two limits:
 
 - **Unwrapped keys.** PKCS#11 makes every unwrapped key not `CKA_ALWAYS_SENSITIVE`, whatever its history, and no
   attribute tells a key provisioned under a KEK from one imported in the clear. `NeverProtected` admits both.
@@ -195,11 +253,12 @@ and every policy from `ToBuilder` or `CryptoPolicyBuilder`) judges a tagged temp
 kind, **and then** by the template rule without `CKA_SENSITIVE` and `CKA_EXTRACTABLE`: an opt-in exempts its own
 read-back object from exactly those two attributes, and a custom `WithKeyTemplateRule` still judges everything
 else about it (`CKA_TOKEN`, `CKA_VALUE_LEN`, …), as it judges every template you pass yourself. The CKD_NULL
-key-agreement KDF of a raw ECDH read-back is judged by the export rule, and only for `EcdhSharedSecret`: a
+key-agreement KDF of a raw ECDH read-back is judged by the export rule (private-key scope included), and only for `EcdhSharedSecret`: a
 `KdfOutput` or `KemSharedSecret` opt-in never approves a derivation that would return Z. A custom
 `ICryptoPolicy` sees these requests tagged with the kind (`KeyTemplateRequest.ReadBackFor`,
 `KeyAgreementKdfRequest.ReadBackFor`), after the matching `KeyMaterialExportRequest`, whose `KdfBaseKey` it
-should judge too when it allows `KdfOutput`.
+should judge too when it allows `KdfOutput`, and whose `PrivateKey` it should judge when it allows
+`EcdhSharedSecret` or `KemSharedSecret`.
 
 ## Allowing less
 

@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// <see cref="Pkcs11Key.DeriveRawSecret"/> on X25519 / X448 (<see cref="CKK.CKK_EC_MONTGOMERY"/>) keys, and
 /// <see cref="Pkcs11Key.DeriveBytes"/>; and <see cref="Pkcs11Key.DeriveSecretAgreement"/> on the same keys,
 /// which keeps the secret on the token and needs no opt-in. Each case runs under <c>Recommended</c> with
-/// <see cref="KeyMaterialExportRule.Allow(IEnumerable{KeyMaterialExportKind}, string)"/> for its kind only, so it also shows that the opt-in is all such
+/// <see cref="KeyMaterialExportRule.Allow"/> for its kind only, so it also shows that the opt-in is all such
 /// a read-back needs.
 /// </summary>
 /// <remarks>
@@ -64,7 +64,9 @@ internal static class RawOutputTestCases
 
     private static ICryptoPolicy OptIn(KeyMaterialExportKind kind) =>
         CryptoPolicy.Recommended.ToBuilder("Raw-output opt-in")
-            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([kind], "Integration test of the raw-output entry points."))
+            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([kind], "Integration test of the raw-output entry points.",
+                kind == KeyMaterialExportKind.KdfOutput ? KdfBaseKeyScope.NeverProtected : null,
+                kind == KeyMaterialExportKind.KdfOutput ? null : PrivateKeyScope.Any))
             .Build();
 
     // === X25519 / X448 DeriveRawSecret ==========================================================
@@ -231,12 +233,55 @@ internal static class RawOutputTestCases
         }
     }
 
-    // The default KdfOutput scope refuses KDF output over the agreed secret Z of DeriveSecretAgreement: Z is derived
+    // === The private-key scope =================================================================
+
+    // PrivateKeyScope.SessionObjects relies on the token reporting CKA_TOKEN on the private object: an ephemeral
+    // (session) key is in scope and agrees with the BCL, a persistent token key is refused.
+    internal static void Assert_DeriveRawSecret_SessionObjectsScope(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE);
+        using var session = backend.OpenSession();
+        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        string label = $"kl-raw-static-{Guid.NewGuid():N}";
+#pragma warning disable KLPKCS11012 // the integration case under test is the scoped opt-in
+        ICryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("Session-key ECDH opt-in")
+            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.EcdhSharedSecret],
+                "Integration test of the private-key scope.", privateKeys: PrivateKeyScope.SessionObjects))
+            .Build();
+#pragma warning restore KLPKCS11012
+        try
+        {
+            using (session.UsePolicy(policy))
+            {
+                using var ephemeral = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+                Assert.False(ephemeral.ReadExportKeyInfo().Token);
+                using var ephemeralPublic = ECDiffieHellman.Create();
+                ephemeralPublic.ImportSubjectPublicKeyInfo(ephemeral.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo), out _);
+                Assert.Equal(bob.DeriveRawSecretAgreement(ephemeralPublic.PublicKey), ephemeral.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
+
+                if (!backend.SupportsTokenObjects)
+                    return;
+                using var persistent = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, label, persistOnToken: true);
+                var e = Assert.Throws<CryptoPolicyViolationException>(() => persistent.DeriveRawSecret(bob.ExportSubjectPublicKeyInfo()));
+                Assert.True(Assert.IsType<KeyMaterialExportRequest>(e.Request).PrivateKey!.Token);
+            }
+        }
+        finally
+        {
+            if (backend.SupportsTokenObjects)
+            {
+                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+                    DestroyByLabel(session, label);
+            }
+        }
+    }
+
+    // NeverProtected refuses KDF output over the agreed secret Z of DeriveSecretAgreement: Z is derived
     // from a generated, sensitive private key, so a token that keeps CKA_ALWAYS_SENSITIVE reports it always sensitive,
     // and the output would reproduce every sensitive key derived from Z. A token that resets the attribute on derive
-    // reports Z as not always sensitive, which the default scope cannot tell from imported key material: pinned here,
+    // reports Z as not always sensitive, which NeverProtected cannot tell from imported key material: pinned here,
     // so the case changes the day the token does.
-    internal static void Assert_DeriveBytes_OverAnAgreedSecret_DefaultScope(IPkcs11Backend backend)
+    internal static void Assert_DeriveBytes_OverAnAgreedSecret_NeverProtectedScope(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_HKDF_DERIVE);
         using var session = backend.OpenSession();
@@ -249,7 +294,7 @@ internal static class RawOutputTestCases
             using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
             using Pkcs11Key z = alice.DeriveSecretAgreement(bob.ExportSubjectPublicKeyInfo());
 
-            KdfBaseKeyInfo info = z.ReadKdfBaseKeyInfo();
+            ExportKeyInfo info = z.ReadExportKeyInfo();
             if (backend.KeepsAlwaysSensitiveOnDerive)
             {
                 Assert.True(info.AlwaysSensitive);

@@ -182,11 +182,16 @@ The same builder allows a hash, curve or key-agreement KDF (`AllowHash`, `AllowC
 `AllowKeyAgreementKdf`), tightens a copy (`RemoveMechanism`, `WithRsaKeyGenerationRule`), or starts a policy
 from scratch (`new CryptoPolicyBuilder(name)`); see [Using crypto policies](crypto-policies.md). Reading a
 shared secret or KDF output off the token is an explicit, per-kind opt-in with a reason
-(`WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, reason))`): the first export of each kind under a
-policy logs a warning (later ones log at Debug), and each `Allow` call site is reported as `KLPKCS11012`.
-KDF output is further scoped by base key: by default only over keys the token has not always protected
-(`CKA_ALWAYS_SENSITIVE` false), so it cannot reproduce keys derived on the token from an agreed secret or a
-generated master key ([the base-key scope](crypto-policies.md#kdfoutput-base-key-scope), with its limits). The
+(`WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(kinds, reason, kdfBaseKeys, privateKeys))`): the first
+export of each kind under a policy logs a warning (later ones log at Debug), and each `Allow` call site is reported
+as `KLPKCS11012`. Every kind is scoped by the key the secret comes from, with no default, so the opt-in says which
+keys it may reproduce secrets of. KDF output is scoped by base key (for example only keys the token has not always
+protected, so it cannot reproduce keys derived on the token from an agreed secret or a generated master key;
+[the base-key scope](crypto-policies.md#kdfoutput-base-key-scope), with its limits). Shared secrets are scoped by
+private key (for example only ephemeral session keys, so a long-lived key cannot be turned into an oracle for what
+its earlier agreements and decapsulations kept on the token;
+[the private-key scope](crypto-policies.md#private-key-scope)). Apply such a policy as a scoped `UsePolicy` lease
+or on a dedicated session, not as a session's base policy. The
 generated [Recommended](policies/recommended.md) and [NistApproved](policies/nist-approved.md) pages list
 exactly what each policy allows, for which operations, and why.
 

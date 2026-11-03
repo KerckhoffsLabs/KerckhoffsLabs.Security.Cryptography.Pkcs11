@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Architecture;
 
 /// <summary>
-/// KLPKCS11012 marks every <see cref="KeyMaterialExportRule.Allow(IEnumerable{KeyMaterialExportKind}, string)"/> call site, so an opt-in to reading
+/// KLPKCS11012 marks every <see cref="KeyMaterialExportRule.Allow"/> call site, so an opt-in to reading
 /// secrets off the token shows up in review and must be suppressed with a reason. The tests' own build
 /// proves it fires (the suppressions there would otherwise be unused); these compile in-memory source
 /// against the library to pin what it reports, where, and what it leaves alone.
@@ -20,7 +20,7 @@ public sealed class KeyMaterialExportOptInAnalyzerTests
     [Fact]
     public async Task Allow_CallSite_ReportsKLPKCS11012()
     {
-        const string call = "KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], \"HKDF in managed code\")";
+        const string call = "KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], \"HKDF in managed code\", KdfBaseKeyScope.NeverProtected)";
         string source = Usings + $"static class C {{ static object M() => {call}; }}";
 
         ImmutableArray<Diagnostic> diagnostics = await AnalyzeAsync(source);
@@ -39,7 +39,7 @@ public sealed class KeyMaterialExportOptInAnalyzerTests
     {
         string source = Usings +
             "static class C { static object M() => KeyMaterialExportRule.Allow(" +
-            "new[] { KeyMaterialExportKind.EcdhSharedSecret, KeyMaterialExportKind.KemSharedSecret }, \"r\"); }";
+            "new[] { KeyMaterialExportKind.EcdhSharedSecret, KeyMaterialExportKind.KemSharedSecret }, \"r\", privateKeys: PrivateKeyScope.SessionObjects); }";
 
         Diagnostic diagnostic = Assert.Single(await AnalyzeAsync(source));
 
@@ -52,7 +52,7 @@ public sealed class KeyMaterialExportOptInAnalyzerTests
     public async Task Allow_KindsNotKnownAtCompileTime_SaysTheListedKinds()
     {
         string source = Usings +
-            "static class C { static object M(KeyMaterialExportKind[] kinds) => KeyMaterialExportRule.Allow(kinds, \"r\"); }";
+            "static class C { static object M(KeyMaterialExportKind[] kinds) => KeyMaterialExportRule.Allow(kinds, \"r\", KdfBaseKeyScope.NeverProtected, PrivateKeyScope.SessionObjects); }";
 
         Diagnostic diagnostic = Assert.Single(await AnalyzeAsync(source));
 
@@ -63,13 +63,13 @@ public sealed class KeyMaterialExportOptInAnalyzerTests
 
     // A method group escapes an invocation-only analyzer: the call it stands for happens through a delegate.
     [Theory]
-    [InlineData("System.Func<KeyMaterialExportKind[], string, KeyMaterialExportRule> allow = KeyMaterialExportRule.Allow; return allow([KeyMaterialExportKind.KdfOutput], \"r\");")]
+    [InlineData("System.Func<KeyMaterialExportKind[], string, KdfBaseKeyScope, PrivateKeyScope, KeyMaterialExportRule> allow = KeyMaterialExportRule.Allow; return allow([KeyMaterialExportKind.KdfOutput], \"r\", KdfBaseKeyScope.NeverProtected, null);")]
     [InlineData("return Apply(KeyMaterialExportRule.Allow);")]
     public async Task Allow_MethodGroup_ReportsKLPKCS11012(string body)
     {
         string source = Usings +
             "static class C {\n" +
-            "  static KeyMaterialExportRule Apply(System.Func<KeyMaterialExportKind[], string, KeyMaterialExportRule> f) => f([KeyMaterialExportKind.KdfOutput], \"r\");\n" +
+            "  static KeyMaterialExportRule Apply(System.Func<KeyMaterialExportKind[], string, KdfBaseKeyScope, PrivateKeyScope, KeyMaterialExportRule> f) => f([KeyMaterialExportKind.KdfOutput], \"r\", KdfBaseKeyScope.NeverProtected, null);\n" +
             $"  static KeyMaterialExportRule M() {{ {body} }} }}";
 
         Diagnostic diagnostic = Assert.Single(await AnalyzeAsync(source));

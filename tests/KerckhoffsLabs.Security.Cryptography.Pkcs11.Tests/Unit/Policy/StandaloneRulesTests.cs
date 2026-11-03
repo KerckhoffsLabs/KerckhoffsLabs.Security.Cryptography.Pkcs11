@@ -49,7 +49,7 @@ public sealed class StandaloneRulesTests
     [Fact]
     public void KeyMaterialExportAllow_AllowsOnlyTheNamedKinds()
     {
-        KeyMaterialExportRule rule = KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "r");
+        KeyMaterialExportRule rule = KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "r", KdfBaseKeyScope.Any);
         Assert.True(rule.Evaluate(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput)).IsAllowed);
         foreach (KeyMaterialExportKind other in new[] { KeyMaterialExportKind.EcdhSharedSecret, KeyMaterialExportKind.KemSharedSecret })
         {
@@ -63,7 +63,7 @@ public sealed class StandaloneRulesTests
     public void KeyMaterialExportAllow_CopiesTheKindsAtCallTime()
     {
         var kinds = new List<KeyMaterialExportKind> { KeyMaterialExportKind.KdfOutput };
-        KeyMaterialExportRule rule = KeyMaterialExportRule.Allow(kinds, "r");
+        KeyMaterialExportRule rule = KeyMaterialExportRule.Allow(kinds, "r", KdfBaseKeyScope.Any);
         kinds.Add(KeyMaterialExportKind.EcdhSharedSecret);
         Assert.False(rule.Evaluate(new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret)).IsAllowed);
     }
@@ -76,7 +76,7 @@ public sealed class StandaloneRulesTests
     [InlineData("")]
     [InlineData("  ")]
     public void KeyMaterialExportAllow_BlankRationale_Throws(string rationale) =>
-        Assert.Throws<ArgumentException>(() => KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], rationale));
+        Assert.Throws<ArgumentException>(() => KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], rationale, KdfBaseKeyScope.Any));
 
     [Fact]
     public void KeyMaterialExportAllow_UndefinedKind_Throws() =>
@@ -86,7 +86,9 @@ public sealed class StandaloneRulesTests
     public void KeyMaterialExportAllow_RationaleAppearsInCatalogue()
     {
         ComposedCryptoPolicy policy = new CryptoPolicyBuilder("Custom")
-            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput, KeyMaterialExportKind.KemSharedSecret], "HKDF in managed code"))
+            .WithKeyMaterialExportRule(KeyMaterialExportRule.Allow(
+                [KeyMaterialExportKind.KdfOutput, KeyMaterialExportKind.KemSharedSecret], "HKDF in managed code",
+                KdfBaseKeyScope.NeverProtected, PrivateKeyScope.SessionObjects))
             .Build();
         string rationale = policy.Catalogue.KeyMaterialExport.Rationale;
         Assert.Contains("HKDF in managed code", rationale);
