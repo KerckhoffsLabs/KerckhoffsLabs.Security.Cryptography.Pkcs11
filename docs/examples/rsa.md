@@ -4,7 +4,7 @@
 `SignData`, `VerifyData`, `Encrypt`, `Decrypt`, `ExportParameters(false)` — works unchanged; the private
 key operations run on the token, and the private key never leaves it.
 
-A key pair has one role. `GenerateRsaSigningKeyPair` creates a pair that can only sign and verify;
+Each RSA key pair has one role. `GenerateRsaSigningKeyPair` creates a pair that can only sign and verify;
 `GenerateRsaKeyTransportKeyPair` one that can only encrypt and decrypt. See
 [Key role separation](../security-model.md#key-role-separation).
 

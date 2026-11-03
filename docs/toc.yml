@@ -12,6 +12,8 @@
       href: examples/aes.md
     - name: RSA
       href: examples/rsa.md
+    - name: Elliptic curves
+      href: examples/elliptic-curves.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies
