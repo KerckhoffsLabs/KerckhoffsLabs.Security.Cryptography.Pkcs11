@@ -74,6 +74,11 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): {PolicyName} policy refused {Request}")]
     public static partial void PolicyDenied(ILogger logger, ulong sessionId, string policyName, string request);
 
+    // A key the token created and the policy then refused could not be destroyed: it stays on the token,
+    // and only an operator who reads this can remove it. The handle is not secret.
+    [LoggerMessage(Level = LogLevel.Error, Message = "Session({SessionId}): {PolicyName} policy refused a created key, which could not be destroyed and remains on the token as handle {ObjectHandle}")]
+    public static partial void PolicyCleanupFailed(ILogger logger, ulong sessionId, string policyName, ulong objectHandle);
+
     // Written before the first derivation on a slot: sent the structure it does not read, a module may
     // crash the process, and this line is then the only trace of the choice.
     [LoggerMessage(Level = LogLevel.Debug, Message = "Session({SessionId}): CKM_PKCS5_PBKD2 sends {Structure} to slot {SlotId} ({Reason})")]
