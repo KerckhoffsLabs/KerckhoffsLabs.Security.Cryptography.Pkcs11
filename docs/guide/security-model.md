@@ -131,11 +131,13 @@ list (reason and alternative), is generated straight from the policy source into
 and `NistApproved` don't, and sessions under them read no key attributes for it. Under an inspecting policy the
 session reads the key's `CKA_KEY_TYPE` and its `CKA_VALUE_LEN`, `CKA_PARAMETER_SET` or `CKA_HSS_LEVELS` before
 every keyed operation (again on every use, with no cache, so a handle that now points at a weaker key is still
-caught). It also checks templates before the token creates a key, and reads back every key the token creates:
-a created key that fails is destroyed before its handle is returned, and if that destroy fails the exception
-names the handle and an error is logged. An attribute the token does not report is refused, never assumed.
-Only the key type, its length, parameter-set name or HSS levels, and object handles appear in refusals and
-logs; key values never do. See [CNSA 2.0](crypto-policies.md#cnsa-20) for the policy's known limits.
+caught). It also checks templates before the token creates a key, and reads back each key the token generates,
+unwraps, derives, encapsulates, decapsulates or imports: a created key that fails is destroyed before its handle
+is returned, and if that destroy fails the exception names the handle and an error is logged. A copy made with
+`CopyObject` is not judged when it is created; it is judged when it is used. An attribute the token does not
+report is refused, never assumed. Only the key type, its length, parameter-set name or HSS levels, and object
+handles appear in refusals and logs; key values never do. See [CNSA 2.0](crypto-policies.md#cnsa-20) for the
+policy's known limits.
 
 > **`NistApproved` is not FIPS certification.** It restricts what this library sends to the token. FIPS 140-3
 > compliance also requires a validated cryptographic module operating in its approved mode. Under
