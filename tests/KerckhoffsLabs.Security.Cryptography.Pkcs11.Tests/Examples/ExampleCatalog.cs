@@ -263,7 +263,68 @@ internal static class ExampleCatalog
                 byte[] raw = RandomNumberGenerator.GetBytes(32);
                 Assert.Equal(HMACSHA256.HashData(raw, Message), HashExamples.BclHmacSha256(raw, Message));
             }),
+
+        // Key derivation (docs/examples/key-derivation.md)
+        new(Kdf(nameof(KdfExamples.HkdfDeriveAesKey)), [typeof(HkdfPkcs11)], [CKM.CKM_HKDF_DERIVE, CKM.CKM_AES_GCM],
+            ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                byte[] ikm = RandomNumberGenerator.GetBytes(32), salt = RandomNumberGenerator.GetBytes(32), info = "example"u8.ToArray();
+                using Pkcs11Key ikmKey = ImportDeriveKey(s, ikm);
+                using Pkcs11Key derived = KdfExamples.HkdfDeriveAesKey(ikmKey, salt, info);
+                AssertSameAesKey(derived, KdfExamples.BclHkdf(ikm, salt, info));
+            }),
+            Unsupported: ExampleGates.ClassicAesGcm),
+        new(Kdf(nameof(KdfExamples.BclHkdf)), [], [], ExampleBackend.SoftHsm2,
+            _ => Assert.Equal(32, KdfExamples.BclHkdf(new byte[32], new byte[16], []).Length)),
+        new(Kdf(nameof(KdfExamples.Pbkdf2DeriveAesKey)), [typeof(Rfc2898DeriveBytesPkcs11)], [CKM.CKM_PKCS5_PBKD2, CKM.CKM_AES_GCM],
+            ExampleBackend.Nss,
+            b => WithSession(b, s =>
+            {
+                byte[] salt = RandomNumberGenerator.GetBytes(16);
+                using var password = new SecurePassword("correct horse battery staple".AsSpan());
+                using Pkcs11Key derived = KdfExamples.Pbkdf2DeriveAesKey(s, password, salt);
+                AssertSameAesKey(derived, KdfExamples.BclPbkdf2("correct horse battery staple"u8.ToArray(), salt));
+            }),
+            Unsupported: ExampleGates.ClassicAesGcm),
+        new(Kdf(nameof(KdfExamples.BclPbkdf2)), [], [], ExampleBackend.SoftHsm2,
+            _ => Assert.Equal(
+                Rfc2898DeriveBytes.Pbkdf2("pw"u8, new byte[16], 600_000, HashAlgorithmName.SHA256, 32),
+                KdfExamples.BclPbkdf2("pw"u8.ToArray(), new byte[16]))),
+        new(Kdf(nameof(KdfExamples.Sp800108DeriveAesKey)), [typeof(SP800108HmacCounterKdfPkcs11)],
+            [CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SHA256_HMAC, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
+            b => WithSession(b, s =>
+            {
+                byte[] kdk = RandomNumberGenerator.GetBytes(32);
+                using Pkcs11Key kdkKey = ImportDeriveKey(s, kdk);
+                using Pkcs11Key derived = KdfExamples.Sp800108DeriveAesKey(kdkKey, "orders"u8.ToArray(), "tenant-42"u8.ToArray());
+                AssertSameAesKey(derived, KdfExamples.BclSp800108(kdk, "orders"u8.ToArray(), "tenant-42"u8.ToArray()));
+            }),
+            Unsupported: ExampleGates.ClassicAesGcm),
+        new(Kdf(nameof(KdfExamples.BclSp800108)), [], [], ExampleBackend.SoftHsm2,
+            _ => Assert.Equal(32, KdfExamples.BclSp800108(new byte[32], [1], [2]).Length)),
     ];
+
+    private static string Kdf(string method) => $"{nameof(KdfExamples)}.{method}";
+
+    // A known secret imported as a derive-only generic secret, so a token KDF can be compared with the BCL's.
+    private static Pkcs11Key ImportDeriveKey(Pkcs11Session session, byte[] raw)
+    {
+        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(raw).Derive().Build();
+        return session.ImportKey(template);
+    }
+
+    // The token key and the BCL's key bytes are the same key when what one encrypts, the other decrypts.
+    private static void AssertSameAesKey(Pkcs11Key tokenKey, byte[] bclKey)
+    {
+        using var onToken = new AesGcmPkcs11(tokenKey, 16);
+        byte[] nonce = RandomNumberGenerator.GetBytes(12), ciphertext = new byte[Message.Length], tag = new byte[16];
+        onToken.Encrypt(nonce, Message, ciphertext, tag);
+        using var inSoftware = new AesGcm(bclKey, 16);
+        byte[] decrypted = new byte[ciphertext.Length];
+        inSoftware.Decrypt(nonce, ciphertext, tag, decrypted);
+        Assert.Equal(Message, decrypted);
+    }
 
     private static string Hash(string method) => $"{nameof(HashExamples)}.{method}";
 

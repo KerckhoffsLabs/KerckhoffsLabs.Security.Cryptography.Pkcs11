@@ -18,6 +18,8 @@
       href: examples/post-quantum.md
     - name: Hashes and HMAC
       href: examples/hashes.md
+    - name: Key derivation
+      href: examples/key-derivation.md
 - name: Diagnostics
   href: diagnostics.md
 - name: Crypto policies
