@@ -89,9 +89,9 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         // read-back owns the shared-secret key from here; the ciphertext is checked with the secret, so a
         // bad one fails the read-back (zeroing the secret and destroying the key) rather than following it.
         byte[] value = readBack.Read(
-            () =>
+            grant =>
             {
-                EncapsulationResult encapsulated = _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes);
+                EncapsulationResult encapsulated = _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes, grant);
                 ct = encapsulated.Ciphertext;
                 return encapsulated.SharedSecret;
             },
@@ -137,10 +137,10 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         // A span cannot be captured; the ciphertext is public, so a copy is harmless.
         byte[] ct = ciphertext.ToArray();
         byte[] value = readBack.Read(
-            () => library.MlKemDecapsulateOmitsValueLen switch
+            grant => library.MlKemDecapsulateOmitsValueLen switch
             {
-                bool omit => DecapsulateWith(mech, ct, includeValueLen: !omit),
-                null => DecapsulateProbing(mech, ct, library),
+                bool omit => DecapsulateWith(mech, ct, includeValueLen: !omit, grant),
+                null => DecapsulateProbing(mech, ct, library, grant),
             },
             Algorithm.SharedSecretSizeInBytes,
             SharedSecretFailures);
@@ -150,27 +150,27 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     // First decapsulation against a token: try the conventional CKA_VALUE_LEN form, fall back to
     // omitting it on SoftHSM's read-only rejection, and record the winning form on the library so
     // subsequent calls skip the probe (and the failed, side-effect-free first attempt).
-    private Pkcs11Key DecapsulateProbing(Mechanism mechanism, byte[] ciphertext, Pkcs11Library library)
+    private Pkcs11Key DecapsulateProbing(Mechanism mechanism, byte[] ciphertext, Pkcs11Library library, IReadBackGrant readBack)
     {
         try
         {
-            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: true);
+            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: true, readBack);
             library.MlKemDecapsulateOmitsValueLen = false;
             return sharedKey;
         }
         catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
         {
-            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: false);
+            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: false, readBack);
             library.MlKemDecapsulateOmitsValueLen = true;
             return sharedKey;
         }
     }
 
     // Single decapsulation attempt with a shared-secret template that optionally carries CKA_VALUE_LEN.
-    private Pkcs11Key DecapsulateWith(Mechanism mechanism, byte[] ciphertext, bool includeValueLen)
+    private Pkcs11Key DecapsulateWith(Mechanism mechanism, byte[] ciphertext, bool includeValueLen, IReadBackGrant readBack)
     {
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes, includeValueLen);
-        return _key.DecapsulateKey(mechanism, ciphertext, template);
+        return _key.DecapsulateKey(mechanism, ciphertext, template, readBack);
     }
 
     // -----------------------------------------------------------------------

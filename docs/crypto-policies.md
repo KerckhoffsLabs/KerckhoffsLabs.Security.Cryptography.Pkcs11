@@ -247,8 +247,10 @@ consulted, a key-agreement mechanism above all, so a `KdfOutput` opt-in can neve
 parameters gives the same bytes. The mechanism and its PRF must still be allowed by the policy.
 
 To read a secret, the library has the token produce it as a short-lived extractable, non-sensitive session object,
-reads it and destroys it. The session tags the templates it judges for that object with the kind being read, and
-only while that read-back, which the policy allowed, is in progress. A `ComposedCryptoPolicy` (every built-in,
+reads it and destroys it. The session tags the templates it judges for that object with the kind being read: the
+read-back the policy allowed hands its grant to the one operation that creates the object, and only that operation's
+requests are tagged. Code that calls back into the session meanwhile (a logger sink, a custom policy) holds no grant,
+so its requests are judged as the caller's. A `ComposedCryptoPolicy` (every built-in,
 and every policy from `ToBuilder` or `CryptoPolicyBuilder`) judges a tagged template by the export rule for the
 kind, **and then** by the template rule without `CKA_SENSITIVE` and `CKA_EXTRACTABLE`: an opt-in exempts its own
 read-back object from exactly those two attributes, and a custom `WithKeyTemplateRule` still judges everything

@@ -1258,8 +1258,8 @@ public sealed class KeyMaterialExportOptInTests
 
     // === The read-back grant ======================================================================
 
-    // The tag is set only while the grant creates its ephemeral key: the same derivation from the caller, before,
-    // inside the grant but outside that call, or after, is untagged.
+    // The tag is set only on the operation the grant is passed to: the same derivation from the caller, before,
+    // while the read-back is open but without the grant, or after, is untagged.
     [Fact]
     public void ReadBackGrant_TagsOnlyTheEphemeralKeysCreation()
     {
@@ -1273,7 +1273,7 @@ public sealed class KeyMaterialExportOptInTests
             using (SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput))
             {
                 using (Pkcs11Key insideGrant = ikm.Derive(HkdfMechanism(), template)) { }
-                byte[] value = readBack.Read(() => ikm.Derive(HkdfMechanism(), template), 32, ReadBackFailures.KdfOutput);
+                byte[] value = readBack.Read(grant => ikm.Derive(HkdfMechanism(), template, grant), 32, ReadBackFailures.KdfOutput);
                 CryptographicOperations.ZeroMemory(value);
             }
             using Pkcs11Key after = ikm.Derive(HkdfMechanism(), template);
@@ -1284,6 +1284,49 @@ public sealed class KeyMaterialExportOptInTests
             Assert.Equal(KeyMaterialExportKind.KdfOutput, templates[1].ReadBackFor);
             Assert.Null(templates[2].ReadBackFor);
         });
+    }
+
+    // Only the grant open on the session tags: a closed grant, another session's, or anything else implementing the
+    // interface is refused before the policy or the token is asked, so a tag can never outlive or escape its read-back.
+    [Fact]
+    public void ReadBackGrant_NotOpenOnTheSession_IsRefused()
+    {
+        ICryptoPolicy policy = OptIn(KeyMaterialExportKind.KdfOutput);
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, policy);
+        using var other = ManagedToken.OpenSession(library, policy);
+        using var ikm = ImportIkm(session);
+        using var otherIkm = ImportIkm(other);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Extractable().Sensitive(false).Build();
+
+        IReadBackGrant closed;
+        using (SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput))
+            closed = CaptureGrant(readBack, ikm, template);
+        Assert.Throws<InvalidOperationException>(() => ikm.Derive(HkdfMechanism(), template, closed));
+        Assert.Throws<InvalidOperationException>(() => ikm.Derive(HkdfMechanism(), template, new ForeignGrant()));
+
+        using SecretReadBack otherReadBack = other.BeginReadBack(KeyMaterialExportKind.KdfOutput);
+        IReadBackGrant otherGrant = CaptureGrant(otherReadBack, otherIkm, template);
+        Assert.Throws<InvalidOperationException>(() => ikm.Derive(HkdfMechanism(), template, otherGrant));
+    }
+
+    // The grant a read-back hands its factory, captured after one successful read.
+    private static IReadBackGrant CaptureGrant(SecretReadBack readBack, Pkcs11Key ikm, ObjectTemplate template)
+    {
+        IReadBackGrant? captured = null;
+        byte[] value = readBack.Read(grant =>
+        {
+            captured = grant;
+            return ikm.Derive(HkdfMechanism(), template, grant);
+        }, 32, ReadBackFailures.KdfOutput);
+        CryptographicOperations.ZeroMemory(value);
+        return captured!;
+    }
+
+    private sealed class ForeignGrant : IReadBackGrant
+    {
+        public void ReportExport() { }
+        public void Dispose() { }
     }
 
     // A logger sink that calls back into the session while the library creates a read-back's ephemeral key
@@ -1444,10 +1487,9 @@ public sealed class KeyMaterialExportOptInTests
     // === Inventory of the requests a read-back tags ===============================================
 
     // A tagged request is exempt from part of the policy (a template from CKA_SENSITIVE / CKA_EXTRACTABLE, an ECDH
-    // CKD_NULL from the KDF allow-list). The tag is ambient: whatever the session judges while a read-back creates its
-    // ephemeral key is tagged. This pins, for every read-back path, exactly which requests that is, so new work inside
-    // the armed window (a helper object, a vendor-quirk retry, an unfenced call-out) fails here and gets reviewed
-    // instead of silently inheriting the exemption.
+    // CKD_NULL from the KDF allow-list). Whatever the operation handed the read-back's grant submits is tagged. This
+    // pins, for every read-back path, exactly which requests that is, so a change that hands the grant further (a
+    // helper object, a vendor-quirk retry) fails here and gets reviewed instead of silently inheriting the exemption.
 
     // Allows everything and records each tagged request as it is judged: its description and, for a template, the
     // attribute types it carries (the attributes are released after the call, so they are read here).

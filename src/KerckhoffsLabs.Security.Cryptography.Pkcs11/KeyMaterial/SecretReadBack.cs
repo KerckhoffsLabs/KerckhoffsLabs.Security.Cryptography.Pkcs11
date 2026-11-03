@@ -29,17 +29,14 @@ internal sealed record ReadBackFailures(
 }
 
 /// <summary>
-/// The session's half of an open read-back (<c>Pkcs11SessionCore.ReadBackGrant</c>): the tag, the export report
-/// and the exclusive lease, released on dispose.
+/// The session's half of an open read-back (<c>Pkcs11SessionCore.ReadBackGrant</c>): the allowed export, the export
+/// report and the exclusive lease, released on dispose. Passed to the one operation that creates the read-back's
+/// ephemeral key (the internal <c>readBack</c> overloads of <c>Pkcs11Key.Derive</c>, <c>EncapsulateKey</c>,
+/// <c>DecapsulateKey</c> and <c>Pkcs11Session.GenerateKey</c>): the templates and key-agreement KDFs that operation
+/// submits, and nothing else, are tagged as this read-back.
 /// </summary>
 internal interface IReadBackGrant : IDisposable
 {
-    /// <summary>
-    /// Runs <paramref name="createEphemeral"/> with the grant armed: the templates and key-agreement KDFs the
-    /// session judges during it, and only then, are tagged as this read-back.
-    /// </summary>
-    T Create<T>(Func<T> createEphemeral);
-
     /// <summary>Logs the export; called once the value has been read, checked and its key destroyed.</summary>
     void ReportExport();
 }
@@ -47,18 +44,21 @@ internal interface IReadBackGrant : IDisposable
 /// <summary>
 /// An open read-back of one kind of secret, from <see cref="Pkcs11Session.BeginReadBack"/>: the only way the
 /// library reads secret key material off the token. The policy allowed the kind before this was created; while it
-/// is open the session is held exclusively, and the templates and key-agreement KDFs judged while the ephemeral key
-/// is created (and only then) are tagged as this read-back (<c>KeyTemplateRequest.ReadBackFor</c>). Dispose it when
+/// is open the session is held exclusively, and the templates and key-agreement KDFs of the operation the grant is
+/// passed to (and only those) are tagged as this read-back (<c>KeyTemplateRequest.ReadBackFor</c>). Dispose it when
 /// the read is done.
 /// </summary>
-/// <param name="grant">The session's half of the read-back (the tag, the export report and the exclusive lease), released on dispose.</param>
+/// <param name="grant">The session's half of the read-back (the allowed export, the export report and the exclusive lease), released on dispose.</param>
 internal sealed class SecretReadBack(IReadBackGrant grant) : IDisposable
 {
     /// <summary>
     /// Creates the ephemeral, extractable key holding the secret, reads its <c>CKA_VALUE</c>, checks it and
     /// destroys the key: the single read-back flow behind every byte-returning path.
     /// </summary>
-    /// <param name="createEphemeral">Creates the key on the token; its templates are judged as this read-back.</param>
+    /// <param name="createEphemeral">
+    /// Creates the key on the token, passing the grant it is given to the operation that creates it: that operation's
+    /// templates are judged as this read-back, and nothing else is.
+    /// </param>
     /// <param name="expectedLength">The length the value must have.</param>
     /// <param name="failures">How the calling path reports a failure.</param>
     /// <param name="check">Further checks on the value (it is zeroed if one throws), or <see langword="null"/>.</param>
@@ -71,10 +71,11 @@ internal sealed class SecretReadBack(IReadBackGrant grant) : IDisposable
     /// the token collects at <c>C_CloseSession</c> either way. The export is logged only once the value is
     /// in hand and the ephemeral key gone.
     /// </remarks>
-    internal byte[] Read(Func<Pkcs11Key> createEphemeral, int expectedLength, ReadBackFailures failures, Action<byte[]>? check = null)
+    internal byte[] Read(Func<IReadBackGrant, Pkcs11Key> createEphemeral, int expectedLength, ReadBackFailures failures, Action<byte[]>? check = null)
     {
-        // Armed only for this call: the read, the checks and the export report below run untagged.
-        Pkcs11Key ephemeral = grant.Create(createEphemeral);
+        // Only the operation createEphemeral hands the grant to is tagged: the read, the checks and the export
+        // report below run untagged.
+        Pkcs11Key ephemeral = createEphemeral(grant);
         byte[] value;
         using (ephemeral)
         {

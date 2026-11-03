@@ -723,6 +723,17 @@ public sealed partial class Pkcs11Session : IDisposable
         return HydrateKeyFromHandle(handle);
     }
 
+    /// <summary><see cref="GenerateKey(Mechanism, ObjectTemplate)"/> for the ephemeral key of an open secret read-back.</summary>
+    internal Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template, KeyMaterial.IReadBackGrant readBack)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(template);
+
+        var handle = _core.GenerateKey(mechanism, [.. template.Attributes], readBack);
+        return HydrateKeyFromHandle(handle);
+    }
+
     /// <summary>
     /// Generates a new asymmetric key pair using <c>C_GenerateKeyPair</c> and returns
     /// it as a single <see cref="Pkcs11Key"/> carrying both handles.

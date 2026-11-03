@@ -29,7 +29,7 @@ internal static class DerivedKeyMaterial
         // key derived from it (KdfBaseKeyScope).
         using SecretReadBack readBack = baseKey.Session.BeginReadBack(KeyMaterialExportKind.KdfOutput, baseKey);
         using var template = ExtractableSecretTemplate(length);
-        return readBack.Read(() => baseKey.Derive(mechanism, template), length, ReadBackFailures.KdfOutput);
+        return readBack.Read(grant => baseKey.Derive(mechanism, template, grant), length, ReadBackFailures.KdfOutput);
     }
 
     /// <summary>

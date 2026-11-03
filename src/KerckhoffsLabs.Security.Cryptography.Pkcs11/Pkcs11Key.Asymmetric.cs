@@ -221,7 +221,7 @@ public sealed partial class Pkcs11Key
         // a token that drops its leading zero bytes (SoftHSM2 did before 8bc65b5) or returns more would
         // hand back a different secret, which the read-back's length check refuses.
         return readBack.Read(
-            () => Derive(mechanism, template),
+            grant => Derive(mechanism, template, grant),
             peer.SecretLength,
             RawSecretFailures,
             _keyType == CKK.CKK_EC_MONTGOMERY ? RefuseAllZeroSecret : null);
