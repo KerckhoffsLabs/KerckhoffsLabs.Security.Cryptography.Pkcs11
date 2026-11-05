@@ -250,7 +250,7 @@ jobs:
           key: vcpkg-openssl-${{ matrix.arch || 'x64' }}-windows-v1
 
       # Second independent real backend, on the Linux x64 leg only: opencryptoki's software token,
-      # built from source from the pinned vendor/opencryptoki submodule (master after v3.27.0) —
+      # built from source from the pinned vendor/opencryptoki submodule (the v3.28.0 release tag) —
       # reproducible and independent of what ubuntu-latest ships. Running the same operations
       # against a module unrelated to SoftHSM catches a mis-encoding the wrapper and SoftHSM happen
       # to share. It is built against the OpenSSL 3.5 above, staged to /opt (outside /home) so the

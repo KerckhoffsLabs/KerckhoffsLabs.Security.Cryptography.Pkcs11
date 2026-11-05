@@ -11,12 +11,9 @@ public sealed class BufferConventionTests_OpenCryptoki(OpenCryptokiBackendFixtur
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(BufferConventionTestCases.MultipartFinals), MemberType = typeof(BufferConventionTestCases))]
-    public void MultipartFinal_BufferTooSmall_KeepsTheOperation(string operation)
-    {
-        if (operation == "ECDSA-SHA256 sign")
-            Assert.Skip("opencryptoki answers a C_SignFinal length query for CKM_ECDSA_SHA256 with CKR_MECHANISM_INVALID.");
-        BufferConventionTestCases.Assert_MultipartFinal_BufferTooSmall_KeepsTheOperation(_backend, operation);
-    }
+    // The ECDSA-SHA256 row runs from opencryptoki 3.28.0, whose C_SignFinal into a buffer too small keeps the
+    // operation (7180039e); the master commit pinned before it ended the operation.
+    public void MultipartFinal_BufferTooSmall_KeepsTheOperation(string operation) => BufferConventionTestCases.Assert_MultipartFinal_BufferTooSmall_KeepsTheOperation(_backend, operation);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(BufferConventionTestCases.EmptyEncryptions), MemberType = typeof(BufferConventionTestCases))]
@@ -61,4 +58,7 @@ public sealed class BufferConventionTests_OpenCryptoki(OpenCryptokiBackendFixtur
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(BufferConventionTestCases.LargeBufferAttributes), MemberType = typeof(BufferConventionTestCases))]
     public void GetAttributeValue_LargeBuffer_SetsTheExactLength(string attribute) => BufferConventionTestCases.Assert_GetAttributeValue_LargeBuffer_SetsTheExactLength(_backend, attribute);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.EmptyHmacStreamVerifyAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "opencryptoki answers C_VerifyFinal of an HMAC over no data with CKR_OPERATION_ACTIVE")]
+    public void HmacVerify_EmptyStream_IsTheMacOfNothing() => BufferConventionTestCases.Assert_HmacVerify_EmptyStream_IsTheMacOfNothing(_backend);
 }
