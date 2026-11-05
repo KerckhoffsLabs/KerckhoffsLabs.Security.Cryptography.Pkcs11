@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -580,8 +581,9 @@ public sealed partial class Pkcs11Session : IDisposable
     /// Stores <paramref name="certificate"/> on the token as an X.509 certificate object and returns it.
     /// </summary>
     /// <remarks>
-    /// Writes <c>CKA_VALUE</c> (the DER certificate), <c>CKA_SUBJECT</c> and <c>CKA_ISSUER</c>, with
-    /// <paramref name="label"/> and <paramref name="id"/>. Give it the <c>CKA_ID</c> of its key:
+    /// Writes <c>CKA_VALUE</c> (the DER certificate), <c>CKA_SUBJECT</c>, <c>CKA_ISSUER</c> and
+    /// <c>CKA_SERIAL_NUMBER</c>, with <paramref name="label"/> and <paramref name="id"/>. The serial number
+    /// is optional in PKCS#11 but NSS softoken refuses a certificate without it. Give it the <c>CKA_ID</c> of its key:
     /// that is how <see cref="Pkcs11Certificate.GetPrivateKey"/> and <see cref="Pkcs11Key.GetCertificate"/>
     /// find each other. Only the public certificate is stored, never a private key it may carry.
     /// </remarks>
@@ -610,10 +612,22 @@ public sealed partial class Pkcs11Session : IDisposable
             .OnToken(persistOnToken)
             .Subject(certificate.SubjectName.RawData)
             .Issuer(certificate.IssuerName.RawData)
+            .SerialNumber(EncodedSerialNumber(certificate.RawData))
             .Value(certificate.RawData)
             .Build();
         ObjectHandle handle = _core.CreateObject([.. template.Attributes]);
         return HydrateCertificateFromHandle(handle);
+    }
+
+    // CKA_SERIAL_NUMBER is the DER encoding of the serial number (PKCS#11 v3.2 §4.6.3): the INTEGER exactly as
+    // the certificate's TBSCertificate holds it, read rather than re-encoded so a certificate whose serial is not
+    // minimally encoded keeps the bytes it was issued with.
+    private static byte[] EncodedSerialNumber(byte[] certificate)
+    {
+        var tbs = new AsnReader(certificate, AsnEncodingRules.BER).ReadSequence().ReadSequence();
+        if (tbs.PeekTag().HasSameClassAndValue(new Asn1Tag(TagClass.ContextSpecific, 0)))
+            tbs.ReadEncodedValue();
+        return tbs.ReadEncodedValue().ToArray();
     }
 
     private Pkcs11Certificate HydrateCertificateFromHandle(ObjectHandle handle)

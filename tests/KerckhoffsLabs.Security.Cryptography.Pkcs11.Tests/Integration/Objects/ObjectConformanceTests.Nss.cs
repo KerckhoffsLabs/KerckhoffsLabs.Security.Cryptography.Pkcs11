@@ -125,4 +125,7 @@ public sealed class ObjectConformanceTests_Nss(NssBackendFixture backend)
             Assert.Skip("NSS takes CKA_UNIQUE_ID in a key pair template");
         ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
     }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.CopyableAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS has no CKA_COPYABLE")]
+    public void UncopyableObject_RefusesCopies() => ObjectConformanceTestCases.Assert_UncopyableObject_RefusesCopies(_backend);
 }

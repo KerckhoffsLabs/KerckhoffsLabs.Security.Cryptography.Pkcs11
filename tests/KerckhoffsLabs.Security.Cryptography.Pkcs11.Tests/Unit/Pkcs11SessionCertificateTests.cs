@@ -65,11 +65,13 @@ public sealed class Pkcs11SessionCertificateTests : IDisposable
         Assert.Equal(KeyId, stored.Id.ToArray());
 
         using var attrs = _session.Core.GetAttributeValue(stored.Handle,
-            [CKA.CKA_CERTIFICATE_TYPE, CKA.CKA_SUBJECT, CKA.CKA_ISSUER, CKA.CKA_TOKEN]);
+            [CKA.CKA_CERTIFICATE_TYPE, CKA.CKA_SUBJECT, CKA.CKA_ISSUER, CKA.CKA_TOKEN, CKA.CKA_SERIAL_NUMBER]);
         Assert.Equal((ulong)CKC.CKC_X_509, attrs[0].GetValueAsUlong());
         Assert.Equal(original.SubjectName.RawData, attrs[1].GetValueAsByteArray());
         Assert.Equal(original.IssuerName.RawData, attrs[2].GetValueAsByteArray());
         Assert.False(attrs[3].GetValueAsBool());
+        // The DER INTEGER: tag, length, then the serial's bytes as the certificate carries them.
+        Assert.Equal([0x02, (byte)original.SerialNumberBytes.Length, .. original.SerialNumberBytes.Span], attrs[4].GetValueAsByteArray());
     }
 
     [Fact]
