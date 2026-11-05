@@ -89,6 +89,17 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the SO private-object case: see <see cref="FreeHsmRefusesPrivateObjectsToTheSo"/>.</summary>
     public static bool SoPrivateObjectRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesPrivateObjectsToTheSo;
 
+    /// <summary>
+    /// False while a session opened after <c>C_Logout</c>, with nobody logged in, finds the token's private objects
+    /// and reads their <c>CKA_VALUE</c>, as it finds the public ones. PKCS#11 v3.2 §4.4: a private object is visible
+    /// only to a session logged in as the normal user. Before 2.6.0 every search without a login answered
+    /// <c>CKR_USER_NOT_LOGGED_IN</c>, so the case could not run.
+    /// </summary>
+    public const bool FreeHsmHidesPrivateTokenObjectsAfterLogout = false;
+
+    /// <summary>Gate for the visibility case: see <see cref="FreeHsmHidesPrivateTokenObjectsAfterLogout"/>.</summary>
+    public static bool PrivateObjectHidingAvailable => FreeHsmAvailable && FreeHsmHidesPrivateTokenObjectsAfterLogout;
+
     /// <summary>Gate for the C_Logout handle case: see <see cref="FreeHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => FreeHsmAvailable && FreeHsmDestroysPrivateSessionObjectsOnLogout;
 

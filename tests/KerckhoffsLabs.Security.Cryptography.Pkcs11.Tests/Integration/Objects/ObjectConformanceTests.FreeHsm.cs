@@ -27,8 +27,8 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void ProvenanceAttributes_TellGeneratedFromImported()
     {
-        // FreeHSM does not report CKA_KEY_GEN_MECHANISM, and reports an imported key as CKA_NEVER_EXTRACTABLE.
-        ObjectConformanceTestCases.Assert_ProvenanceAttributes_TellGeneratedFromImported(_backend, [CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE], importedNeverExtractable: true);
+        // FreeHSM does not report CKA_KEY_GEN_MECHANISM. Before 2.6.0 it reported an imported key as CKA_NEVER_EXTRACTABLE.
+        ObjectConformanceTestCases.Assert_ProvenanceAttributes_TellGeneratedFromImported(_backend, [CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE]);
     }
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]

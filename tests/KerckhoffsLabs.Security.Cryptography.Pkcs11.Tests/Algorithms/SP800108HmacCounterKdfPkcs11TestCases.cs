@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// Backend-agnostic SP800108HmacCounterKdfPkcs11 tests: argument / key-type / PRF-validation / dispose
 /// cases run on any backend (they throw before any token call); the known-answer derivations require
 /// the token to implement <c>CKM_SP800_108_COUNTER_KDF</c> and skip where it does not (neither SoftHSM
-/// nor opencryptoki do today — ready for a capable HSM).
+/// nor opencryptoki does; FreeHSM does from 2.6.0).
 ///
 /// The <c>*_MatchesBclViaSignProbe</c> case proves the same thing without reading the derived key
 /// back: derive it non-extractable (via <see cref="SP800108HmacCounterKdfPkcs11.DeriveKey(ReadOnlySpan{byte}, ReadOnlySpan{byte}, ObjectTemplate)"/>,

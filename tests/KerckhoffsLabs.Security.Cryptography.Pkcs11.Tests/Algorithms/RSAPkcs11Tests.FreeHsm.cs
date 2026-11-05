@@ -9,7 +9,9 @@ public sealed class RSAPkcs11Tests_FreeHsm(FreeHsmBackendFixture backend)
     private readonly FreeHsmBackendFixture _backend = backend;
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
-    // FreeHSM generates RSA 2048, 3072 and 4096 only (CKM_RSA_PKCS_KEY_PAIR_GEN); other sizes get CKR_KEY_SIZE_RANGE.
+    // FreeHSM generates RSA 2048, 3072 and 4096 (CKM_RSA_PKCS_KEY_PAIR_GEN), and from 2.6.0 RSA 1024 in an
+    // all-mechanisms build in permissive mode, which the fixture runs; other sizes get CKR_KEY_SIZE_RANGE.
+    [InlineData(1024)]
     [InlineData(2048)]
     [InlineData(3072)]
     [InlineData(4096)]
@@ -118,9 +120,10 @@ public sealed class RSAPkcs11Tests_FreeHsm(FreeHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void SignData_Pss_VerifiesUnderBclFromExportedPublicKey() => RSAPkcs11TestCases.Assert_SignData_Pss_VerifiesUnderBclFromExportedPublicKey(_backend);
 
-    // No SignHash_Pss_InteropsWithSignDataAndBcl: FreeHSM lists raw CKM_RSA_PKCS_PSS for sign and verify, but its
-    // C_Sign over a digest answers CKR_FUNCTION_FAILED and its C_Verify rejects a valid signature over one, so it
-    // signs over the data only, through the CKM_SHA*_RSA_PKCS_PSS mechanisms.
+    // Raw CKM_RSA_PKCS_PSS signs a caller's digest from FreeHSM 2.6.0, which takes the digest from hashAlg;
+    // earlier versions fell back to SHA-1 and failed a SHA-256 digest with CKR_FUNCTION_FAILED.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void SignHash_Pss_InteropsWithSignDataAndBcl() => RSAPkcs11TestCases.Assert_SignHash_Pss_InteropsWithSignDataAndBcl(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData() => RSAPkcs11TestCases.Assert_SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(_backend);

@@ -250,6 +250,49 @@ internal static class KeyProvenanceTestCases
         }
     }
 
+    // CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE record a key's history, not its present (PKCS#11 v3.2 §4.10):
+    // a key generated in the clear and made sensitive and unextractable afterwards has had its value readable,
+    // so both stay FALSE. The change itself is allowed (CKA_SENSITIVE may become TRUE, CKA_EXTRACTABLE FALSE,
+    // §4.10 footnotes 11 and 12), and is checked to have taken. Skips a token that does not report both attributes.
+    internal static void Assert_KeyProtectedAfterItsCreation_HasNoProtectedHistory(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+        using Pkcs11SessionCore session = TestKeys.OpenLoggedInSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrClear = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        ObjectHandle key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrClass, attrType, attrToken, attrLen, attrClear, attrExtractable]);
+        try
+        {
+            using (var before = session.GetAttributeValue(key, [CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE]))
+            {
+                if (before[0].CannotBeRead || before[1].CannotBeRead)
+                    Assert.Skip("The backend does not report CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE.");
+                Assert.False(before[0].GetValueAsBool(), "A key generated with CKA_SENSITIVE FALSE is CKA_ALWAYS_SENSITIVE.");
+                Assert.False(before[1].GetValueAsBool(), "A key generated with CKA_EXTRACTABLE TRUE is CKA_NEVER_EXTRACTABLE.");
+            }
+
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+            using var attrUnextractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+            session.SetAttributeValue(key, [attrSensitive, attrUnextractable]);
+
+            using var after = session.GetAttributeValue(key, [CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE]);
+            Assert.True(after[0].GetValueAsBool(), "C_SetAttributeValue did not make the key sensitive.");
+            Assert.False(after[1].GetValueAsBool(), "C_SetAttributeValue did not make the key unextractable.");
+            Assert.False(after[2].GetValueAsBool(), "A key made sensitive after its creation is CKA_ALWAYS_SENSITIVE.");
+            Assert.False(after[3].GetValueAsBool(), "A key made unextractable after its creation is CKA_NEVER_EXTRACTABLE.");
+        }
+        finally
+        {
+            session.DestroyObject(key);
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
     private static bool ReadBool(Pkcs11SessionCore session, ObjectHandle handle, CKA attribute)
     {
         using var read = session.GetAttributeValue(handle, [attribute]);
