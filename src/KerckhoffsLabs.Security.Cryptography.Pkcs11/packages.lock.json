@@ -27,7 +27,7 @@
         "type": "Direct",
         "requested": "[10.0.14, )",
         "resolved": "10.0.14",
-        "contentHash": "YgO/Gkx7Ebb/0FIjQoNRdqn2e1IuzCZaiT3KzPkIIbTvQ17QRGfYNGBCDwkcMOtx2JOzWn0Kwqnuh6SdbSfZqw=="
+        "contentHash": "YlTamXppEQls6DYWt7RdUuwWDb0lyw/vXCaGeQpLCpsLmfwGuCkOz/vIGgMTV7ECsJcavkCOkxZXv9s8rdAHkQ=="
       },
       "Microsoft.SourceLink.GitHub": {
         "type": "Direct",
