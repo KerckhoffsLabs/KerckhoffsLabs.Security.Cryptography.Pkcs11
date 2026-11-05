@@ -415,6 +415,29 @@ internal static class SessionConformanceTestCases
     // A wrong PIN is CKR_PIN_INCORRECT and logs nobody in; the right PIN right after it does. Tried once, and
     // followed at once by a successful login, so no token's retry counter is left lowered. The exception the
     // library raises for it does not carry the PIN.
+    // With a session open on the token, C_InitToken answers CKR_SESSION_EXISTS (PKCS#11 v3.2 §5.6.3, "If an application
+    // has a session open with the token, C_InitToken fails") and leaves the token as it was. The SO PIN given is
+    // wrong, so a module that re-initialized the token anyway would still not: it answers CKR_PIN_INCORRECT, and the
+    // case fails without destroying the shared token's objects and PINs. Wire it only for a module that refuses
+    // before it checks the PIN, or the wrong PIN costs an SO attempt on every run.
+    internal static void Assert_InitToken_WithASessionOpen_IsSessionExists(IPkcs11Backend backend)
+    {
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        byte[] wrongSoPin = [.. backend.SoPin.Span];
+        wrongSoPin[^1] ^= 0x01;
+        byte[] label = System.Text.Encoding.UTF8.GetBytes(backend.TokenLabel.PadRight(32));
+        NativeCULong session = OpenRawSession(lowLevel, backend.SlotId);
+        try
+        {
+            AssertRv(CKR.CKR_SESSION_EXISTS, lowLevel.C_InitToken(backend.SlotId, wrongSoPin, label), "C_InitToken with a session open");
+            Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, session).State);
+        }
+        finally { lowLevel.C_CloseSession(session); }
+        using var pin = new SecurePin(backend.UserPin.Span);
+        using var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin);
+        Assert.Equal(16, opened.GenerateRandom(16).Length);
+    }
+
     internal static void Assert_WrongPin_IsPinIncorrect_AndTheRightOneStillLogsIn(IPkcs11Backend backend)
     {
         LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;

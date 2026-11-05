@@ -33,9 +33,10 @@ public sealed class SlhDsaPkcs11Tests_FreeHsm(FreeHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void SignData_ContextTooLong_Throws() => SlhDsaPkcs11TestCases.Assert_SignData_ContextTooLong_Throws(_backend);
 
-    // No ExportSlhDsaPublicKey_ReturnsStandardEncoding: FreeHSM stores an SLH-DSA public key's CKA_VALUE as the
-    // DER SubjectPublicKeyInfo (50 bytes for SHA2-128f), where PKCS#11 v3.2 has the raw FIPS 205 key (32), so
-    // Pkcs11Key.Export refuses the length. Its ML-DSA keys hold the raw form.
+    // FreeHSM 2.6.0 gives an SLH-DSA public key's CKA_VALUE as the raw FIPS 205 key, as PKCS#11 v3.2 defines it;
+    // earlier versions gave the DER SubjectPublicKeyInfo.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void ExportSlhDsaPublicKey_ReturnsStandardEncoding() => SlhDsaPkcs11TestCases.Assert_ExportSlhDsaPublicKey_ReturnsStandardEncoding(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void ExportSlhDsaPrivateKey_ThrowsInsecure() => SlhDsaPkcs11TestCases.Assert_ExportSlhDsaPrivateKey_ThrowsInsecure(_backend);

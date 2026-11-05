@@ -11,7 +11,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// Backend-agnostic tests of the SP 800-108 feedback (<c>CKM_SP800_108_FEEDBACK_KDF</c>) and
 /// double-pipeline (<c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c>) modes built with
 /// <see cref="Sp800108KdfBuilder"/>, against a managed reference of NIST SP 800-108 §5.2 and §5.3.
-/// Counter mode is covered by <c>SP800108HmacCounterKdfPkcs11TestCases</c>.
+/// Counter mode is covered by <c>SP800108HmacCounterKdfPkcs11TestCases</c>, except for the additional derived keys
+/// it can make alongside the primary one, which <see cref="Assert_Counter_AdditionalDerivedKey_TakesTheNextBytes"/> covers.
 /// </summary>
 /// <remarks>
 /// The PRF input follows the data segments in order. The iteration variable is the chaining value: K(i-1)
@@ -46,6 +47,63 @@ internal static class Sp800108ChainedKdfTestCases
         byte[] actual = DeriveDoublePipeline(backend);
 
         Assert.Equal(Convert.ToHexString(ReferenceDoublePipeline()), Convert.ToHexString(actual));
+    }
+
+    // A counter-mode derive that also makes one additional key (CK_SP800_108_KDF_PARAMS.pAdditionalDerivedKeys).
+    // PKCS#11 v3.2 §2.42 hands the keying material out in order: the primary key first, then each additional key
+    // as listed. With CK_SP800_108_DKM_LENGTH_SUM_OF_KEYS, [L]_32 is the length of both keys together, so the
+    // two keys are the first 48 bytes of one 48-byte counter-mode derivation, cut 32 and 16.
+    internal static void Assert_Counter_AdditionalDerivedKey_TakesTheNextBytes(IPkcs11Backend backend)
+    {
+        const int primaryLength = 32, additionalLength = 16;
+        backend.RequireMechanisms(CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SHA256_HMAC);
+        using var session = backend.OpenSession();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var baseTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label($"kl-sp800108-{Guid.NewGuid():N}").Value(BaseKey).Derive().Extractable().Sensitive(false).Build();
+        using var primaryTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(primaryLength).Extractable().Sensitive(false).Build();
+        using var additionalTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(additionalLength).Extractable().Sensitive(false).Build();
+        CkmSp800108KdfParams parameters = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+            .IterationCounter()
+            .ByteArray(Label)
+            .ByteArray([0x00])
+            .ByteArray(Context)
+            .DkmLength(Sp800108DkmLengthMethod.SumOfKeys)
+            .AddDerivedKey([.. additionalTemplate.Attributes])
+            .Build();
+
+        using var baseKey = session.ImportKey(baseTemplate);
+        try
+        {
+            using Pkcs11Key primary = baseKey.Derive(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, parameters), primaryTemplate);
+            Pkcs11Key additional = Assert.Single(parameters.AdditionalDerivedKeys)
+                ?? throw new Xunit.Sdk.XunitException("The token made no additional key.");
+            try
+            {
+                byte[] expected = ReferenceCounter(primaryLength + additionalLength);
+                using var primaryValue = primary.GetAttributeValue(CKA.CKA_VALUE);
+                using var additionalValue = additional.GetAttributeValue(CKA.CKA_VALUE);
+                Assert.Equal(Convert.ToHexString(expected[..primaryLength]), Convert.ToHexString(primaryValue[0].GetValueAsByteArray()));
+                Assert.Equal(Convert.ToHexString(expected[primaryLength..]), Convert.ToHexString(additionalValue[0].GetValueAsByteArray()));
+            }
+            finally
+            {
+                additional.Destroy();
+                primary.Destroy();
+            }
+        }
+        finally { baseKey.Destroy(); }
+    }
+
+    // NIST SP 800-108 §5.1: K(i) = PRF(K_I, [i]_32 || Label || 0x00 || Context || [L]_32).
+    private static byte[] ReferenceCounter(int length)
+    {
+        var output = new List<byte>();
+        for (uint i = 1; output.Count < length; i++)
+            output.AddRange(HMACSHA256.HashData(BaseKey, (byte[])[.. BigEndian(i), .. Label, 0x00, .. Context, .. BigEndian((uint)length * 8)]));
+        return [.. output.Take(length)];
     }
 
     internal static byte[] DeriveDoublePipeline(IPkcs11Backend backend) =>

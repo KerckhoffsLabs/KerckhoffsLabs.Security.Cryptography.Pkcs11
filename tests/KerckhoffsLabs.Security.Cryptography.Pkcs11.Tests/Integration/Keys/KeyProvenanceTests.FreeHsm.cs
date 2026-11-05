@@ -26,4 +26,8 @@ public sealed class KeyProvenanceTests_FreeHsm(FreeHsmBackendFixture backend)
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(KeyProvenanceTestCases.DerivationMechanisms), MemberType = typeof(KeyProvenanceTestCases))]
     public void DerivedKey_TakesItsHistoryFromTheBase(string derivation) => KeyProvenanceTestCases.Assert_DerivedKey_TakesItsHistoryFromTheBase(_backend, derivation);
+
+    // FreeHSM records the history from 2.6.0; earlier versions repeated the key's current flags.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void KeyProtectedAfterItsCreation_HasNoProtectedHistory() => KeyProvenanceTestCases.Assert_KeyProtectedAfterItsCreation_HasNoProtectedHistory(_backend);
 }

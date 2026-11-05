@@ -348,7 +348,9 @@ internal static class WrapUnwrapCurve25519TestCases
         public byte[] Wrap(ObjectHandle privateKey) =>
             _aes.DecryptCbc(_session.WrapKey(CbcPad, _handle, privateKey), _iv, PaddingMode.PKCS7);
 
-        // Extractable, so a case can wrap the result again.
+        // Extractable, so a case can wrap the result again. Both usages are stated, as the library's
+        // PrivateKeyTemplateBuilder states every usage: a private key's CKA_SIGN default is token-specific,
+        // and FreeHSM 2.6.0 gives an unwrapped private key CKA_DERIVE when the template leaves it out.
         public ObjectHandle Unwrap(byte[] pkcs8, CKK keyType, CKA usage)
         {
             using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
@@ -357,8 +359,9 @@ internal static class WrapUnwrapCurve25519TestCases
             using var sensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
             using var extractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
             using var use = new ObjectAttribute(usage, true);
+            using var unused = new ObjectAttribute(usage == CKA.CKA_SIGN ? CKA.CKA_DERIVE : CKA.CKA_SIGN, false);
             byte[] wrapped = _aes.EncryptCbc(pkcs8, _iv, PaddingMode.PKCS7);
-            return _session.UnwrapKey(CbcPad, _handle, wrapped, [cls, type, token, sensitive, extractable, use]);
+            return _session.UnwrapKey(CbcPad, _handle, wrapped, [cls, type, token, sensitive, extractable, use, unused]);
         }
     }
 

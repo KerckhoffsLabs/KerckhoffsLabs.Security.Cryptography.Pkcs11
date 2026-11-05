@@ -52,8 +52,8 @@ public sealed class Pkcs11CertificateExtensionsTests_FreeHsm(FreeHsmBackendFixtu
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetMLKemPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);
 
-    // No GetSlhDsaPrivateKey_SignsForTheCertificate: FreeHSM's SLH-DSA CKA_VALUE is a SubjectPublicKeyInfo, not the
-    // raw key (see SlhDsaPkcs11Tests_FreeHsm), so the public key cannot be exported for the certificate.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void GetSlhDsaPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_SignsForTheCertificate);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetSlhDsaPrivateKey_ReturnsNull_WithoutAKeyOnTheToken);

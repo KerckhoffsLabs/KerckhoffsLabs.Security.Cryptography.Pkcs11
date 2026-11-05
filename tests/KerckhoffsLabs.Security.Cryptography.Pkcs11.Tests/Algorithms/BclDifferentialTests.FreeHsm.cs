@@ -72,7 +72,6 @@ public sealed class BclDifferentialTests_FreeHsm(FreeHsmBackendFixture backend)
     [MemberData(nameof(PropertyTestSupport.MlDsaParameterSets), MemberType = typeof(PropertyTestSupport))]
     public void MlDsaSignData_VerifiesWithBcl(CkpMlDsa parameterSet) => BclDifferentialTestCases.Assert_MlDsaSignData_VerifiesWithBcl(_backend, parameterSet);
 
-    // No SlhDsaSignData_VerifiesWithBcl: the BCL verifies under the exported public key, and FreeHSM stores an
-    // SLH-DSA public key's CKA_VALUE as the DER SubjectPublicKeyInfo, where PKCS#11 v3.2 has the raw FIPS 205
-    // key, so Pkcs11Key.Export refuses the length (see SlhDsaPkcs11Tests_FreeHsm).
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void SlhDsaSignData_VerifiesWithBcl() => BclDifferentialTestCases.Assert_SlhDsaSignData_VerifiesWithBcl(_backend);
 }

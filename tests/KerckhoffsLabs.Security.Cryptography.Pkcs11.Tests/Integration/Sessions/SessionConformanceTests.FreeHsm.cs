@@ -39,6 +39,15 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
         Assert.Skip("FreeHSM refuses a second C_Initialize in one process with CKR_FUNCTION_FAILED, not CKR_CRYPTOKI_ALREADY_INITIALIZED.");
     }
 
+    // Searches before a login find the public objects from FreeHSM 2.6.0; earlier versions answered
+    // C_FindObjectsInit with CKR_USER_NOT_LOGGED_IN.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.PrivateObjectHidingAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM shows its private token objects to a session after C_Logout")]
+    public void PrivateObjects_AreHiddenWithoutALogin() => SessionConformanceTestCases.Assert_PrivateObjects_AreHiddenWithoutALogin(_backend);
+
+    // FreeHSM refuses before it checks the SO PIN, from 2.6.0; earlier versions re-initialized the token.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void InitToken_WithASessionOpen_IsSessionExists() => SessionConformanceTestCases.Assert_InitToken_WithASessionOpen_IsSessionExists(_backend);
+
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCreations), MemberType = typeof(SessionConformanceTestCases))]
     public void PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(string call) => SessionConformanceTestCases.Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(_backend, call);
