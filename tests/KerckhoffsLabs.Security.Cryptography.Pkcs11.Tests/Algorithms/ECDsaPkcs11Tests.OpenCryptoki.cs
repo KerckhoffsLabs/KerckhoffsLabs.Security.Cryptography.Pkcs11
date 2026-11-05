@@ -65,4 +65,15 @@ public sealed class ECDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void SignHash_VerifiesUnderBcl() => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, "P-256");
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void TrySignData_Sha224_UnderAllowInsecure_RoundTrips() => ECDsaPkcs11TestCases.Assert_TrySignData_Sha224_UnderAllowInsecure_RoundTrips(_backend, "P-256");
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void TrySignData_Sha224_WithoutAllowInsecure_Throws() => ECDsaPkcs11TestCases.Assert_TrySignData_Sha224_WithoutAllowInsecure_Throws(_backend);
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.PointAtInfinitySignatureRefusalAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "opencryptoki answers C_Verify of a signature whose check reaches the point at infinity with CKR_FUNCTION_FAILED")]
+    [MemberData(nameof(ECDsaPkcs11TestCases.PointAtInfinityVectors), MemberType = typeof(ECDsaPkcs11TestCases))]
+    public void VerifyData_PointAtInfinityVector_ReturnsFalse(int tcId, string publicKey, string signature)
+        => ECDsaPkcs11TestCases.Assert_VerifyData_PointAtInfinityVector_ReturnsFalse(_backend, tcId, publicKey, signature);
 }

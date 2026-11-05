@@ -70,4 +70,8 @@ public sealed class OperationStateTests_OpenCryptoki(OpenCryptokiBackendFixture 
             Assert.Skip("opencryptoki refuses a key wrap ciphertext of a wrong length with CKR_DATA_LEN_RANGE or CKR_GENERAL_ERROR");
         OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
     }
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [MemberData(nameof(OperationStateTestCases.PartialBlockDecryptions), MemberType = typeof(OperationStateTestCases))]
+    public void PartialBlock_Decrypt_IsEncryptedDataLenRange(CKM mechanism, int length) => OperationStateTestCases.Assert_PartialBlock_Decrypt_IsEncryptedDataLenRange(_backend, mechanism, length);
 }

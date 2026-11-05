@@ -166,6 +166,38 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool OpenCryptokiRefusesALongRsaExponentAsInconsistent = false;
 
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> refuses a blob that fails the RFC 3394 integrity check (a byte
+    /// flipped, truncated, all <c>0xFF</c>) with <c>CKR_GENERAL_ERROR</c>, and a blob of the wrong length with
+    /// <c>CKR_GENERAL_ERROR</c> (8 bytes) or <c>CKR_DATA_LEN_RANGE</c> (20 bytes). PKCS#11 v3.2 §5.18.6:
+    /// <c>CKR_WRAPPED_KEY_INVALID</c> and <c>CKR_WRAPPED_KEY_LEN_RANGE</c>. The untouched blob unwraps. Seen on v3.28.0
+    /// and on the master commit pinned before it.
+    /// </summary>
+    public const bool OpenCryptokiReportsATamperedKeyWrapBlobAsInvalid = false;
+
+    /// <summary>Gate for the tampered key wrap case: see <see cref="OpenCryptokiReportsATamperedKeyWrapBlobAsInvalid"/>.</summary>
+    public static bool TamperedKeyWrapRefusalAvailable => OpenCryptokiAvailable && OpenCryptokiReportsATamperedKeyWrapBlobAsInvalid;
+
+    /// <summary>
+    /// False while <c>C_Verify(CKM_ECDSA)</c> on P-256 answers <c>CKR_FUNCTION_FAILED</c> for the Wycheproof signatures
+    /// whose verification reaches the point at infinity (tcId 169 and 208), where an invalid signature is
+    /// <c>CKR_SIGNATURE_INVALID</c> (PKCS#11 v3.2 §5.13.2). Nothing verifies. Seen on v3.28.0 and the commit before it.
+    /// </summary>
+    public const bool OpenCryptokiRefusesAPointAtInfinitySignatureAsInvalid = false;
+
+    /// <summary>Gate for the point-at-infinity case: see <see cref="OpenCryptokiRefusesAPointAtInfinitySignatureAsInvalid"/>.</summary>
+    public static bool PointAtInfinitySignatureRefusalAvailable => OpenCryptokiAvailable && OpenCryptokiRefusesAPointAtInfinitySignatureAsInvalid;
+
+    /// <summary>
+    /// False while <c>C_VerifyInit(CKM_SHA256_HMAC)</c> followed by <c>C_VerifyFinal</c> with no <c>C_VerifyUpdate</c>, the MAC of
+    /// an empty message, answers <c>CKR_OPERATION_ACTIVE</c>. PKCS#11 v3.2 §5.13.4 allows a multi-part verify of no parts; the
+    /// right MAC is <c>CKR_OK</c>. Seen on v3.28.0 and the commit before it.
+    /// </summary>
+    public const bool OpenCryptokiVerifiesAnEmptyHmacStream = false;
+
+    /// <summary>Gate for the empty HMAC verify case: see <see cref="OpenCryptokiVerifiesAnEmptyHmacStream"/>.</summary>
+    public static bool EmptyHmacStreamVerifyAvailable => OpenCryptokiAvailable && OpenCryptokiVerifiesAnEmptyHmacStream;
+
     public OpenCryptokiBackendFixture()
     {
         string? libPath = Settings.OpenCryptokiLibraryPath;
