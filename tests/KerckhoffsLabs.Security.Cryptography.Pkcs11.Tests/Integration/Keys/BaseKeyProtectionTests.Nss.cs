@@ -10,5 +10,13 @@ public sealed class BaseKeyProtectionTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(BaseKeyProtectionTestCases.Derivations), MemberType = typeof(BaseKeyProtectionTestCases))]
-    public void KeyMadeFromAProtectedKey_KeepsItsProtection(string derivation) => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, derivation);
+    public void KeyMadeFromAProtectedKey_KeepsItsProtection(string derivation)
+    {
+        // Before 3.97, CKM_CONCATENATE_BASE_AND_KEY forced CKA_SENSITIVE onto the second key instead of the
+        // derived key, and ignored the second key's CKA_EXTRACTABLE. Fixed by Bug 1871630 (PK11_ConcatSymKeys).
+        if (derivation.EndsWith("protected second key", StringComparison.Ordinal))
+            _backend.RequireSoftoken(3, 97, "the derived key does not take the second key's protection (Bug 1871630)");
+
+        BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, derivation);
+    }
 }
