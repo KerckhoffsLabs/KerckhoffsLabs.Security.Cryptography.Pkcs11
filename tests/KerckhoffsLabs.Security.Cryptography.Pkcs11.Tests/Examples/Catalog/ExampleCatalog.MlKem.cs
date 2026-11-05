@@ -13,7 +13,7 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.MlKemReceiveAesKey)), [typeof(MLKemPkcs11)],
             [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
-            AssertMlKemReceiveAesKey, Unsupported: ExampleGates.ClassicAesGcm),
+            AssertMlKemReceiveAesKey, Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b)),
     ];
 
     private static void AssertMlKemReceiveAesKey(IPkcs11Backend backend)

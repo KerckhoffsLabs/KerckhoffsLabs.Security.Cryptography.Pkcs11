@@ -140,6 +140,16 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for cases that verify an empty RSA signature: see <see cref="BouncyHsmAcceptsEmptySignature"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptySignature;
 
+    /// <summary>
+    /// False while a <c>CKM_SP800_108_COUNTER_KDF</c> derive that asks for an additional key
+    /// (<c>CK_SP800_108_KDF_PARAMS.pAdditionalDerivedKeys</c>) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §6.65.6
+    /// derives each additional key from the next bytes of the KDF output. Seen on the pinned BouncyHsm.
+    /// </summary>
+    public const bool BouncyHsmDerivesAdditionalSp800108Keys = false;
+
+    /// <summary>Gate for the SP 800-108 additional-key case: see <see cref="BouncyHsmDerivesAdditionalSp800108Keys"/>.</summary>
+    public static bool Sp800108AdditionalKeyAvailable => BouncyHsmAvailable && BouncyHsmDerivesAdditionalSp800108Keys;
+
     /// <summary>Gate for SP 800-108 double-pipeline cases: see <see cref="BouncyHsmDoublePipelineMatchesSp800108"/>.</summary>
     public static bool Sp800108DoublePipelineAvailable => BouncyHsmAvailable && BouncyHsmDoublePipelineMatchesSp800108;
 

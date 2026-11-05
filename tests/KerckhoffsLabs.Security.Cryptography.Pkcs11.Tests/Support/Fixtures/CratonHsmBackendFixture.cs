@@ -248,6 +248,15 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool CratonHsmKeepsThePublicExponentAsked = false;
 
+    /// <summary>
+    /// False while <c>CKM_EDDSA</c> ignores its <c>CK_EDDSA_PARAMS</c>: an Ed25519ctx signature verifies under another
+    /// context, and an Ed25519ph signature verifies as plain Ed25519, because both are plain Ed25519 (RFC 8032 §5.1).
+    /// </summary>
+    public const bool CratonHsmTakesEdDsaParams = false;
+
+    /// <summary>Gate for the Ed25519ctx and Ed25519ph cases: see <see cref="CratonHsmTakesEdDsaParams"/>.</summary>
+    public static bool EdDsaParamsAvailable => CratonHsmAvailable && CratonHsmTakesEdDsaParams;
+
     /// <summary>Gate for the RSA public exponent case: see <see cref="CratonHsmKeepsThePublicExponentAsked"/>.</summary>
     public static bool PublicExponentAvailable => CratonHsmAvailable && CratonHsmKeepsThePublicExponentAsked;
 

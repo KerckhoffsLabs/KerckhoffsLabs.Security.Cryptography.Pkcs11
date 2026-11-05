@@ -17,6 +17,9 @@ internal enum ExampleBackend
     Nss = 4,
     BouncyHsm = 8,
     WolfPkcs11 = 16,
+    OpenCryptoki = 32,
+    FreeHsm = 64,
+    CratonHsm = 128,
 }
 
 /// <summary>One documentation example, as the tests run it.</summary>
@@ -46,6 +49,21 @@ internal static class ExampleGates
     public static string? ClassicAesGcm(IPkcs11Backend backend) =>
         backend is NssBackendFixture nss && !nss.Library.LowLevelLibrary!.IsBoundThroughV3Interface
             ? "NSS before 3.52 reads CK_GCM_PARAMS without ulIvBits, so classic AES-GCM fails on it"
+            : null;
+
+    /// <summary>FreeHSM answers <c>CKR_FUNCTION_FAILED</c> to the <c>C_Initialize</c> of a second instance of the
+    /// module in a process that already has one, which an example that loads the module itself makes.</summary>
+    public static string? SecondModuleInstance(IPkcs11Backend backend) =>
+        backend is FreeHsmBackendFixture
+            ? "FreeHSM's C_Initialize fails for a second instance of the module in the same process"
+            : null;
+
+    /// <summary>opencryptoki answers <c>CKR_TEMPLATE_INCONSISTENT</c> to a decapsulation template without
+    /// <c>CKA_VALUE_LEN</c>, which SoftHSM refuses as read-only, so a template that runs on both cannot be written.
+    /// <see cref="Pkcs11.Algorithms.MLKemPkcs11"/> probes for the form; an example that passes its own template cannot.</summary>
+    public static string? DecapsulationNeedsValueLen(IPkcs11Backend backend) =>
+        backend is OpenCryptokiBackendFixture
+            ? "opencryptoki needs CKA_VALUE_LEN in a decapsulated key's template, which SoftHSM refuses"
             : null;
 }
 
