@@ -132,6 +132,28 @@ internal static class PropertyTestSupport
 
     private static readonly string[] CurveNames = ["P-256", "P-384", "P-521"];
 
+    /// <summary>
+    /// The named curves past NIST's that the Recommended policy allows and OpenSSL's .NET can check: the RFC 5639
+    /// Brainpool r1 curves and SEC 2's secp256k1. Wired for the tokens that take them (SoftHSM, opencryptoki,
+    /// BouncyHsm, FreeHSM); NSS, Kryoptic, Craton HSM and wolfPKCS11 refuse them.
+    /// </summary>
+    public static TheoryData<string> MoreCurves => new(MoreCurveNames);
+
+    private static readonly string[] MoreCurveNames = ["brainpoolP256r1", "brainpoolP384r1", "brainpoolP512r1", "secp256k1"];
+
+    /// <summary><see cref="MoreCurves"/> by ECDSA signature encoding.</summary>
+    public static TheoryData<string, DSASignatureFormat> MoreCurvesAndSignatureFormats
+    {
+        get
+        {
+            var data = new TheoryData<string, DSASignatureFormat>();
+            foreach (string curve in MoreCurveNames)
+                foreach (DSASignatureFormat format in new[] { DSASignatureFormat.IeeeP1363FixedFieldConcatenation, DSASignatureFormat.Rfc3279DerSequence })
+                    data.Add(curve, format);
+            return data;
+        }
+    }
+
     /// <summary>The NIST curves by ECDSA signature encoding.</summary>
     public static TheoryData<string, DSASignatureFormat> CurvesAndSignatureFormats
     {
@@ -150,6 +172,10 @@ internal static class PropertyTestSupport
         "P-256" => (BclECCurve.NamedCurves.nistP256, HashAlgorithmName.SHA256),
         "P-384" => (BclECCurve.NamedCurves.nistP384, HashAlgorithmName.SHA384),
         "P-521" => (BclECCurve.NamedCurves.nistP521, HashAlgorithmName.SHA512),
+        "brainpoolP256r1" => (BclECCurve.NamedCurves.brainpoolP256r1, HashAlgorithmName.SHA256),
+        "brainpoolP384r1" => (BclECCurve.NamedCurves.brainpoolP384r1, HashAlgorithmName.SHA384),
+        "brainpoolP512r1" => (BclECCurve.NamedCurves.brainpoolP512r1, HashAlgorithmName.SHA512),
+        "secp256k1" => (BclECCurve.CreateFromValue("1.3.132.0.10"), HashAlgorithmName.SHA256),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 

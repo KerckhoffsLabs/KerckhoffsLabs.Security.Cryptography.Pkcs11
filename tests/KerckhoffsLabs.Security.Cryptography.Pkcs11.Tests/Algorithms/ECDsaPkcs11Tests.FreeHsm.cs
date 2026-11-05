@@ -93,4 +93,17 @@ public sealed class ECDsaPkcs11Tests_FreeHsm(FreeHsmBackendFixture f)
     [MemberData(nameof(ECDsaPkcs11TestCases.PointAtInfinityVectors), MemberType = typeof(ECDsaPkcs11TestCases))]
     public void VerifyData_PointAtInfinityVector_ReturnsFalse(int tcId, string publicKey, string signature)
         => ECDsaPkcs11TestCases.Assert_VerifyData_PointAtInfinityVector_ReturnsFalse(_backend, tcId, publicKey, signature);
+
+    // The Brainpool r1 curves and secp256k1, which this token takes as well as the NIST ones.
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
+    public void SignData_VerifiesUnderBclFromExportedPublicKey_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_SignData_VerifiesUnderBclFromExportedPublicKey(_backend, curve);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
+    public void ExportParameters_PublicOnly_FromPublicHandle_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(_backend, curve);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
+    public void SignHash_VerifiesUnderBcl_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, curve);
 }

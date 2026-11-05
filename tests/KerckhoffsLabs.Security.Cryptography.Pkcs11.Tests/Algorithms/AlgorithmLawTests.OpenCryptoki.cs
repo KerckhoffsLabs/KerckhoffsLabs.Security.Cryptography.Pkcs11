@@ -41,10 +41,12 @@ public sealed class AlgorithmLawTests_OpenCryptoki(OpenCryptokiBackendFixture ba
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(PropertyTestSupport.CurvesAndSignatureFormats), MemberType = typeof(PropertyTestSupport))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurvesAndSignatureFormats), MemberType = typeof(PropertyTestSupport))]
     public void EcdsaSignature_VerifiesOnlyUnaltered(string curve, DSASignatureFormat format) => AlgorithmLawTestCases.Assert_EcdsaSignature_VerifiesOnlyUnaltered(_backend, curve, format);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(PropertyTestSupport.Curves), MemberType = typeof(PropertyTestSupport))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
     public void Ecdh_TokenKeysAgree(string curve) => AlgorithmLawTestCases.Assert_Ecdh_TokenKeysAgree(_backend, curve);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]

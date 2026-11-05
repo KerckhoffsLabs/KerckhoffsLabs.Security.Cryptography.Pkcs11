@@ -23,6 +23,10 @@ internal static class ECDsaPkcs11TestCases
         "P-256" => (TestKeys.EcP256Oid, HashAlgorithmName.SHA256, BclECCurve.NamedCurves.nistP256.Oid.Value),
         "P-384" => (TestKeys.EcP384Oid, HashAlgorithmName.SHA384, BclECCurve.NamedCurves.nistP384.Oid.Value),
         "P-521" => (TestKeys.EcP521Oid, HashAlgorithmName.SHA512, BclECCurve.NamedCurves.nistP521.Oid.Value),
+        "brainpoolP256r1" => (TestKeys.EcBrainpoolP256r1Oid, HashAlgorithmName.SHA256, "1.3.36.3.3.2.8.1.1.7"),
+        "brainpoolP384r1" => (TestKeys.EcBrainpoolP384r1Oid, HashAlgorithmName.SHA384, "1.3.36.3.3.2.8.1.1.11"),
+        "brainpoolP512r1" => (TestKeys.EcBrainpoolP512r1Oid, HashAlgorithmName.SHA512, "1.3.36.3.3.2.8.1.1.13"),
+        "secp256k1" => (TestKeys.EcSecp256k1Oid, HashAlgorithmName.SHA256, "1.3.132.0.10"),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 
