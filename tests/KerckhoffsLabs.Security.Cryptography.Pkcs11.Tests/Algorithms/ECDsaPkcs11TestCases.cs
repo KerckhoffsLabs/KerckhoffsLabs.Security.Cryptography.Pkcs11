@@ -23,6 +23,10 @@ internal static class ECDsaPkcs11TestCases
         "P-256" => (TestKeys.EcP256Oid, HashAlgorithmName.SHA256, BclECCurve.NamedCurves.nistP256.Oid.Value),
         "P-384" => (TestKeys.EcP384Oid, HashAlgorithmName.SHA384, BclECCurve.NamedCurves.nistP384.Oid.Value),
         "P-521" => (TestKeys.EcP521Oid, HashAlgorithmName.SHA512, BclECCurve.NamedCurves.nistP521.Oid.Value),
+        "brainpoolP256r1" => (TestKeys.EcBrainpoolP256r1Oid, HashAlgorithmName.SHA256, "1.3.36.3.3.2.8.1.1.7"),
+        "brainpoolP384r1" => (TestKeys.EcBrainpoolP384r1Oid, HashAlgorithmName.SHA384, "1.3.36.3.3.2.8.1.1.11"),
+        "brainpoolP512r1" => (TestKeys.EcBrainpoolP512r1Oid, HashAlgorithmName.SHA512, "1.3.36.3.3.2.8.1.1.13"),
+        "secp256k1" => (TestKeys.EcSecp256k1Oid, HashAlgorithmName.SHA256, "1.3.132.0.10"),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 
@@ -356,7 +360,9 @@ internal static class ECDsaPkcs11TestCases
     // Cross-library verification: export the public key, rebuild an ECDsa from it, verify the PKCS#11
     // signature under the BCL — catches a wrong named-curve OID or mangled point. CKM_ECDSA emits raw
     // r‖s, so the BCL interprets the signature as IEEE P1363.
-    internal static void Assert_SignData_VerifiesUnderBclFromExportedPublicKey(IPkcs11Backend backend, string curve) =>
+    internal static void Assert_SignData_VerifiesUnderBclFromExportedPublicKey(IPkcs11Backend backend, string curve)
+    {
+        PropertyTestSupport.RequireBclCurve(curve);
         WithEcDsa(backend, curve, (ec, hash) =>
         {
             byte[] data = Encoding.UTF8.GetBytes("cross-library verify");
@@ -365,6 +371,7 @@ internal static class ECDsaPkcs11TestCases
             using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
             Assert.True(bcl.VerifyData(data, sig, hash, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
         });
+    }
 
     internal static void Assert_ExportParameters_Private_ThrowsInsecure(IPkcs11Backend backend) =>
         WithEcDsa(backend, "P-256", (ec, _) =>
@@ -560,7 +567,9 @@ internal static class ECDsaPkcs11TestCases
 
     // Raw CKM_ECDSA signs the hash it is given. A module that digested it again verified its own signatures
     // (verification digested too), so only a third party can tell: the BCL verifies the token's signature.
-    internal static void Assert_SignHash_VerifiesUnderBcl(IPkcs11Backend backend, string curve) =>
+    internal static void Assert_SignHash_VerifiesUnderBcl(IPkcs11Backend backend, string curve)
+    {
+        PropertyTestSupport.RequireBclCurve(curve);
         WithEcDsa(backend, curve, (ec, hash) =>
         {
             byte[] digest = hash.Name switch
@@ -574,6 +583,7 @@ internal static class ECDsaPkcs11TestCases
             using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
             Assert.True(bcl.VerifyHash(digest, signature));
         });
+    }
 
     // Wycheproof ecdsa_secp256r1_sha256_p1363_test.json, tcId 169 ("point at infinity during verify") and
     // tcId 208 ("comparison with point at infinity"): (public key, message, r||s). Verification reaches the

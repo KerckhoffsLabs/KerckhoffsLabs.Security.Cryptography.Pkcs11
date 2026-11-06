@@ -64,10 +64,12 @@ public sealed class BclDifferentialTests_BouncyHsm(BouncyHsmBackendFixture backe
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(PropertyTestSupport.CurvesAndSignatureFormats), MemberType = typeof(PropertyTestSupport))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurvesAndSignatureFormats), MemberType = typeof(PropertyTestSupport))]
     public void EcdsaSignData_VerifiesWithBcl(string curve, DSASignatureFormat format) => BclDifferentialTestCases.Assert_EcdsaSignData_VerifiesWithBcl(_backend, curve, format);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(PropertyTestSupport.Curves), MemberType = typeof(PropertyTestSupport))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
     public void Ecdh_AgreesWithBcl(string curve) => BclDifferentialTestCases.Assert_Ecdh_AgreesWithBcl(_backend, curve);
 
     // No empty message: the server refuses to sign one with ML-DSA (C_Sign gives CKR_DATA_LEN_RANGE).

@@ -132,6 +132,28 @@ internal static class PropertyTestSupport
 
     private static readonly string[] CurveNames = ["P-256", "P-384", "P-521"];
 
+    /// <summary>
+    /// The named curves past NIST's that the Recommended policy allows and OpenSSL's .NET can check: the RFC 5639
+    /// Brainpool r1 curves and SEC 2's secp256k1. Wired for the tokens that take them (SoftHSM, opencryptoki,
+    /// BouncyHsm, FreeHSM); NSS, Kryoptic, Craton HSM and wolfPKCS11 refuse them.
+    /// </summary>
+    public static TheoryData<string> MoreCurves => new(MoreCurveNames);
+
+    private static readonly string[] MoreCurveNames = ["brainpoolP256r1", "brainpoolP384r1", "brainpoolP512r1", "secp256k1"];
+
+    /// <summary><see cref="MoreCurves"/> by ECDSA signature encoding.</summary>
+    public static TheoryData<string, DSASignatureFormat> MoreCurvesAndSignatureFormats
+    {
+        get
+        {
+            var data = new TheoryData<string, DSASignatureFormat>();
+            foreach (string curve in MoreCurveNames)
+                foreach (DSASignatureFormat format in new[] { DSASignatureFormat.IeeeP1363FixedFieldConcatenation, DSASignatureFormat.Rfc3279DerSequence })
+                    data.Add(curve, format);
+            return data;
+        }
+    }
+
     /// <summary>The NIST curves by ECDSA signature encoding.</summary>
     public static TheoryData<string, DSASignatureFormat> CurvesAndSignatureFormats
     {
@@ -145,11 +167,38 @@ internal static class PropertyTestSupport
         }
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> BclCurves = new();
+
+    /// <summary>
+    /// Skips the calling test unless this platform's .NET cryptography takes <paramref name="curve"/>. On macOS
+    /// .NET uses Apple's library, which has the NIST curves only, so a case that checks a Brainpool or secp256k1
+    /// key against .NET (or hands .NET the peer's public key, as ECDH does) cannot run there.
+    /// </summary>
+    internal static void RequireBclCurve(string curve)
+    {
+        bool supported = BclCurves.GetOrAdd(curve, static name =>
+        {
+            try
+            {
+                using (ECDsa.Create(EcSpec(name).Curve)) { }
+                return true;
+            }
+            catch (PlatformNotSupportedException) { return false; }
+            catch (CryptographicException) { return false; }
+        });
+        if (!supported)
+            Assert.Skip($".NET on this platform does not support {curve}.");
+    }
+
     internal static (BclECCurve Curve, HashAlgorithmName Hash) EcSpec(string curve) => curve switch
     {
         "P-256" => (BclECCurve.NamedCurves.nistP256, HashAlgorithmName.SHA256),
         "P-384" => (BclECCurve.NamedCurves.nistP384, HashAlgorithmName.SHA384),
         "P-521" => (BclECCurve.NamedCurves.nistP521, HashAlgorithmName.SHA512),
+        "brainpoolP256r1" => (BclECCurve.NamedCurves.brainpoolP256r1, HashAlgorithmName.SHA256),
+        "brainpoolP384r1" => (BclECCurve.NamedCurves.brainpoolP384r1, HashAlgorithmName.SHA384),
+        "brainpoolP512r1" => (BclECCurve.NamedCurves.brainpoolP512r1, HashAlgorithmName.SHA512),
+        "secp256k1" => (BclECCurve.CreateFromValue("1.3.132.0.10"), HashAlgorithmName.SHA256),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 
@@ -157,6 +206,7 @@ internal static class PropertyTestSupport
     // runs body with it. A token that does not generate keys on the curve skips.
     internal static void WithEcKey(IPkcs11Backend backend, Pkcs11Session session, string curve, bool derive, Action<Pkcs11Key> body)
     {
+        RequireBclCurve(curve);
         string label = $"prop-ec-{Guid.NewGuid():N}";
         byte[] id = TestKeys.IdFor(label);
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC).Label(label).Id(id).EcParams(TestKeys.EcParams(curve));

@@ -239,12 +239,22 @@ internal static class TestKeys
     public static readonly byte[] EcP384Oid = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22];
     public static readonly byte[] EcP521Oid = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23];
 
-    /// <summary>Maps a NIST P-curve name ("P-256"/"P-384"/"P-521") to its DER-encoded CKA_EC_PARAMS OID.</summary>
+    // brainpoolP256r1/P384r1/P512r1 = 1.3.36.3.3.2.8.1.1.{7,11,13} (RFC 5639)   secp256k1 = 1.3.132.0.10 (SEC 2)
+    public static readonly byte[] EcBrainpoolP256r1Oid = [0x06, 0x09, 0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x07];
+    public static readonly byte[] EcBrainpoolP384r1Oid = [0x06, 0x09, 0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0B];
+    public static readonly byte[] EcBrainpoolP512r1Oid = [0x06, 0x09, 0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0D];
+    public static readonly byte[] EcSecp256k1Oid = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x0A];
+
+    /// <summary>Maps a curve name ("P-256", "brainpoolP384r1", "secp256k1", ...) to its DER-encoded CKA_EC_PARAMS OID.</summary>
     public static byte[] EcParams(string curve) => curve switch
     {
         "P-256" => EcP256Oid,
         "P-384" => EcP384Oid,
         "P-521" => EcP521Oid,
+        "brainpoolP256r1" => EcBrainpoolP256r1Oid,
+        "brainpoolP384r1" => EcBrainpoolP384r1Oid,
+        "brainpoolP512r1" => EcBrainpoolP512r1Oid,
+        "secp256k1" => EcSecp256k1Oid,
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 

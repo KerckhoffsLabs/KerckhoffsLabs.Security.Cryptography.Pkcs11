@@ -3,7 +3,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>ECDsaPkcs11 over BouncyHsm — thin wrapper over <see cref="ECDsaPkcs11TestCases"/>.
-/// The curve-parameterized cases run at P-256, as on Kryoptic and opencryptoki; SoftHSM's wrapper covers P-384 and P-521.</summary>
+/// The curve-hash matrix runs on the three NIST curves; the other curve-parameterized cases run at P-256, and on the
+/// Brainpool r1 curves and secp256k1.</summary>
 [Collection("BouncyHsm")]
 public sealed class ECDsaPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
 {
@@ -13,6 +14,12 @@ public sealed class ECDsaPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
     [InlineData("P-256", "SHA256")]
     [InlineData("P-256", "SHA384")]
     [InlineData("P-256", "SHA512")]
+    [InlineData("P-384", "SHA256")]
+    [InlineData("P-384", "SHA384")]
+    [InlineData("P-384", "SHA512")]
+    [InlineData("P-521", "SHA256")]
+    [InlineData("P-521", "SHA384")]
+    [InlineData("P-521", "SHA512")]
     public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName) => ECDsaPkcs11TestCases.Assert_SignVerifyData_CurveHashMatrix_RoundTrips(_backend, curve, hashName);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -98,4 +105,17 @@ public sealed class ECDsaPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void TrySignData_Sha224_WithoutAllowInsecure_Throws() => ECDsaPkcs11TestCases.Assert_TrySignData_Sha224_WithoutAllowInsecure_Throws(_backend);
+
+    // The Brainpool r1 curves and secp256k1, which this token takes as well as the NIST ones.
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
+    public void SignData_VerifiesUnderBclFromExportedPublicKey_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_SignData_VerifiesUnderBclFromExportedPublicKey(_backend, curve);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
+    public void ExportParameters_PublicOnly_FromPublicHandle_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint(_backend, curve);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
+    public void SignHash_VerifiesUnderBcl_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, curve);
 }
