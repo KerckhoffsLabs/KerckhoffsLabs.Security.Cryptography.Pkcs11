@@ -390,6 +390,29 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// secret key's class), §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c> (or <c>CKR_ATTRIBUTE_VALUE_INVALID</c>).</summary>
     public const bool NssRefusesADataObjectFromHkdfAsInconsistent = false;
 
+    /// <summary>
+    /// False while softoken does not enforce a wrapping key's templates: <c>C_WrapKey</c> under a KEK whose
+    /// <c>CKA_WRAP_TEMPLATE</c> asks for <c>CKA_SENSITIVE = TRUE</c> wraps a non-sensitive key, and <c>C_UnwrapKey</c> under a
+    /// KEK whose <c>CKA_UNWRAP_TEMPLATE</c> fixes an attribute makes a key with a template that contradicts it. PKCS#11 v3.2
+    /// §4.8: the wrap template must match the key to be wrapped, and the unwrap template is applied to the unwrapped key,
+    /// a conflict being <c>CKR_TEMPLATE_INCONSISTENT</c>. Seen on NSS 3.132 and 3.133.
+    /// </summary>
+    public const bool NssEnforcesTheKekTemplates = false;
+
+    /// <summary>Gate for the KEK template cases: see <see cref="NssEnforcesTheKekTemplates"/>.</summary>
+    public static bool KekTemplateEnforcementAvailable => NssAvailable && NssEnforcesTheKekTemplates;
+
+    /// <summary>
+    /// False while softoken refuses a <c>CKM_AES_CBC</c> <c>C_EncryptUpdate</c> whose input is not whole blocks, with
+    /// <c>CKR_DATA_LEN_RANGE</c>, where the other tokens hold the partial block back for the next update. Only the
+    /// whole message must be whole blocks; a caller streaming through <c>AesPkcs11</c> on NSS needs a buffer that is a
+    /// multiple of 16 bytes. Seen on NSS 3.132 and 3.133.
+    /// </summary>
+    public const bool NssBuffersAPartialCbcBlock = false;
+
+    /// <summary>Gate for the CBC stream-piece cases: see <see cref="NssBuffersAPartialCbcBlock"/>.</summary>
+    public static bool PartialCbcBlockAvailable => NssAvailable && NssBuffersAPartialCbcBlock;
+
     /// <summary>Gate for the out-of-range AES-CTR counter width case: see <see cref="NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid"/>.</summary>
     public static bool CtrCounterWidthRefusalAvailable => NssAvailable && NssRefusesAnOutOfRangeCtrCounterWidthAsInvalid;
 

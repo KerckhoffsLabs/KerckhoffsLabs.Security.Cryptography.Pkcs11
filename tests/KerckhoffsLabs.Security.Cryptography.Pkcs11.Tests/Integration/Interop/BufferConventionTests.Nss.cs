@@ -73,4 +73,11 @@ public sealed class BufferConventionTests_Nss(NssBackendFixture backend)
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(BufferConventionTestCases.LargeBufferAttributes), MemberType = typeof(BufferConventionTestCases))]
     public void GetAttributeValue_LargeBuffer_SetsTheExactLength(string attribute) => BufferConventionTestCases.Assert_GetAttributeValue_LargeBuffer_SetsTheExactLength(_backend, attribute);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.AttributeBufferLengthAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS copies an attribute past a buffer too short for it")]
+    public void GetAttributeValue_ShortBuffer_IsUnavailableInformation() => BufferConventionTestCases.Assert_GetAttributeValue_ShortBuffer_IsUnavailableInformation(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.PartialCbcBlockAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS refuses a CBC update that is not whole blocks with CKR_DATA_LEN_RANGE")]
+    [MemberData(nameof(BufferConventionTestCases.StreamPieceLengths), MemberType = typeof(BufferConventionTestCases))]
+    public void StreamCbc_AnyPieceLength_MatchesBcl(int bufferLength) => BufferConventionTestCases.Assert_StreamCbc_AnyPieceLength_MatchesBcl(_backend, bufferLength);
 }

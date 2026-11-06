@@ -745,7 +745,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Effort:** S
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/CKF.cs` (no `CKF_END_OF_MESSAGE`, no `CKF_HKDF_SALT_NULL`/`_DATA`/`_KEY`); `Native/LowLevelPkcs11Library.MessageEncryption.cs:64` and `.MessageDecryption.cs:64` reference `CKF_END_OF_MESSAGE` by name in XML docs
 - **Problem:** These are the only four v3.x `CKF_*` constants missing from `CKF`, verified by diffing all 69 `CKF_*` defines in `vendor/nss/lib/util/pkcs11t.h` against `Common/CKF.cs` — every other name and value matches exactly. The public `CkmHkdfParams` constructor therefore asks callers for a bare `ulong` and spells the legal values out in prose, which is the opposite of the project's strongly-typed-constants rule. `CkmXeddsaParams` has the same shape for `CK_XEDDSA_HASH_TYPE`.
-- **Remaining scope:** `Common/CKF.cs` still has no `CKF_END_OF_MESSAGE` or `CKF_HKDF_SALT_NULL`/`_DATA`/`_KEY`. These are the only 4 of the 72 `CKF_*` defines in the vendored NSS 3.132 `pkcs11t.h` that it lacks. `CKF_END_OF_MESSAGE` is still named only in the XML docs of `LowLevelPkcs11Library.MessageEncryption.cs:64` and `MessageDecryption.cs:64`.
+- **Remaining scope:** `Common/CKF.cs` still has no `CKF_END_OF_MESSAGE` or `CKF_HKDF_SALT_NULL`/`_DATA`/`_KEY`. These are the only 4 of the 72 `CKF_*` defines in the vendored NSS 3.133 `pkcs11t.h` that it lacks. `CKF_END_OF_MESSAGE` is still named only in the XML docs of `LowLevelPkcs11Library.MessageEncryption.cs:64` and `MessageDecryption.cs:64`.
 - **Proposed action:** Add `CKF_END_OF_MESSAGE = 0x00000001` and `CKF_HKDF_SALT_NULL`/`_DATA`/`_KEY` = 0x01/0x02/0x04 to `CKF`, and add a typed salt-type enum overload on `CkmHkdfParams` (keeping the `ulong` form for vendor salt types) plus an `XEdDsaHashType` enum on `CkmXeddsaParams`.
 - **Breaks public API?** No — additive
 - **Raised by:** PKCS#11 Specialist A, Cryptographer A
@@ -848,7 +848,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** QA C
 
 ### [BL-155] ⚠️ PARTIALLY RESOLVED — Vendored submodules are pinned to untagged upstream commits, with no in-tree record of why and no review gate on bumps
-- **Status:** Partially resolved 2026-10-29 (#211, #128, #242, #243, #261, the FreeHSM v2.5.1 and v2.6.0 bumps, and the opencryptoki v3.28.0 bump). `.github/CODEOWNERS` assigns every path to the maintainer, and the main ruleset requires a code owner's review (#211, 2026-10-19). The `ci.yml` comment described the opencryptoki pin correctly as master after v3.27.0 (#128). NSS, Kryoptic, BouncyHsm, pkcs11-mock, FreeHSM and opencryptoki are pinned to release tags (`NSS_3_132_RTM`, `v1.5.4`, `v2.3.4`, `v2.0.0`, `v2.6.0`, `v3.28.0`; #242, #243, #261 and the FreeHSM and opencryptoki bumps).
+- **Status:** Partially resolved 2026-10-29 (#211, #128, #242, #243, #261, the FreeHSM v2.5.1 and v2.6.0 bumps, the opencryptoki v3.28.0 bump, and the NSS 3.133 bump). `.github/CODEOWNERS` assigns every path to the maintainer, and the main ruleset requires a code owner's review (#211, 2026-10-19). The `ci.yml` comment described the opencryptoki pin correctly as master after v3.27.0 (#128). NSS, Kryoptic, BouncyHsm, pkcs11-mock, FreeHSM and opencryptoki are pinned to release tags (`NSS_3_133_RTM`, `v1.5.4`, `v2.3.4`, `v2.0.0`, `v2.6.0`, `v3.28.0`; #242, #243, #261 and the FreeHSM, opencryptoki and NSS bumps).
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S

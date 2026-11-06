@@ -19,8 +19,7 @@ internal static partial class ExampleCatalog
                 using Pkcs11Certificate stored = CertificateExamples.IssueSelfSignedCertificate(s, label);
                 Assert.Equal("CN=Example Signing", stored.Certificate.Subject);
                 Assert.False(stored.Certificate.HasPrivateKey);
-            }),
-            Unsupported: ExampleGates.NoCertificateObjects),
+            })),
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.SignWithCertificateKey)), [typeof(Pkcs11CertificateExtensions)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithSession(b, s =>
@@ -31,7 +30,6 @@ internal static partial class ExampleCatalog
                 using (certificate)
                 using (ECDsa verifier = certificate.GetECDsaPublicKey()!)
                     Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
-            }),
-            Unsupported: ExampleGates.NoCertificateObjects),
+            })),
     ];
 }

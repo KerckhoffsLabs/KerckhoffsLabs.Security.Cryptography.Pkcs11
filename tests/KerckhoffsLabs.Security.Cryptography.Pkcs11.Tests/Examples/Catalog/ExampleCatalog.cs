@@ -42,11 +42,6 @@ internal sealed record ExampleCase(
 /// <summary>Known capability gaps the catalogue's <see cref="ExampleCase.Unsupported"/> gates reuse.</summary>
 internal static class ExampleGates
 {
-    /// <summary>NSS's crypto token does not store certificate objects: <c>C_CreateObject</c> returns
-    /// <c>CKR_TEMPLATE_INCOMPLETE</c> (the certificate suite has no NSS wrapper either).</summary>
-    public static string? NoCertificateObjects(IPkcs11Backend backend) =>
-        backend is NssBackendFixture ? "NSS's crypto token does not store certificate objects" : null;
-
     /// <summary>NSS before 3.52 cannot run classic AES-GCM (see <see cref="NssBackendFixture.RequireClassicAesGcm"/>).</summary>
     public static string? ClassicAesGcm(IPkcs11Backend backend) =>
         backend is NssBackendFixture nss && !nss.Library.LowLevelLibrary!.IsBoundThroughV3Interface
