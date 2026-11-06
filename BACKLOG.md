@@ -4,8 +4,8 @@ _Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (c
 
 ## Summary
 
-- Open items: 93, 23 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (15 partly resolved) | Low: 38 (7 partly resolved; includes the Info entry BL-158)
+- Open items: 93, 24 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (15 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **Only one session per slot is usable.** The second `OpenSession` on a slot throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either session logs the other out (BL-084).
@@ -1032,13 +1032,15 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** wolfPKCS11 backend
 
-### [BL-182] No cancellable way to wait for a slot event
+### [BL-182] ⚠️ PARTIALLY RESOLVED — No cancellable way to wait for a slot event
+- **Status:** Partially resolved 2026-11-03. Slot events now go through one dispatcher per module: `WaitForSlotEvent(CancellationToken)` and `WaitForSlotEventAsync(CancellationToken)` end on cancellation or on `Dispose` of their own library, without `C_Finalize`, and every `Pkcs11Library` loaded from the module sees every event.
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** S
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Library.cs` (`WaitForSlotEvent`, `TryGetSlotEvent`)
 - **Problem:** The blocking `WaitForSlotEvent()` takes no `CancellationToken` or timeout and holds a thread for as long as it waits. The only way to end it without an event is `Dispose`, which finalizes the module and so ends every session. It is also refused on a module that may not be called concurrently. A caller that wants to watch for token insertion from async code has to write its own loop around `TryGetSlotEvent`.
 - **Proposed action:** Add `ValueTask<Pkcs11Slot> WaitForSlotEventAsync(TimeSpan pollInterval, CancellationToken cancellationToken)`, which polls `TryGetSlotEvent` with `Task.Delay(pollInterval, cancellationToken)` in between. Cancellation then works without `C_Finalize`, it works on every module that implements `C_WaitForSlotEvent`, and no call stays in the module. Document it as the recommended way to watch slots, and keep the blocking call for a dedicated thread.
+- **Remaining scope:** The blocking wait is still refused on a module that may not be called concurrently (`SupportsConcurrentAccess` false). The dispatcher could serve it there by polling with `CKF_DONT_BLOCK` at an interval set in `Pkcs11LibraryOptions`, holding the call lock only for each poll, so the same API works on every module.
 - **Breaks public API?** No (additive)
 - **Raised by:** `WaitForSlotEvent` design review (PR #331)
 
