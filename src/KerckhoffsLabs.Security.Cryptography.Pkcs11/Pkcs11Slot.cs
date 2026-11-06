@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using System.Runtime.CompilerServices;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -13,7 +14,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// point for querying slot and token information and for opening sessions against the token it
 /// contains.
 /// </summary>
-public sealed class Pkcs11Slot
+/// <remarks>
+/// Two instances are equal when they name the same slot id of the same <see cref="Pkcs11Library"/>, so a
+/// slot returned by <see cref="Pkcs11Library.WaitForSlotEvent"/> can be found in the list
+/// <see cref="Pkcs11Library.GetSlotList"/> returned. The same id from another <see cref="Pkcs11Library"/>,
+/// even one loaded from the same module, is another slot: it calls through, and stops working with, that
+/// library.
+/// </remarks>
+public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
 {
     /// <summary>
     /// Logger responsible for message logging
@@ -62,6 +70,19 @@ public sealed class Pkcs11Slot
         _pkcs11Library = pkcs11Library;
         _slotId = (NativeCULong)(slotId);
     }
+
+    /// <summary>Whether <paramref name="other"/> is the same slot of the same <see cref="Pkcs11Library"/>.</summary>
+    /// <param name="other">The slot to compare with.</param>
+    /// <returns><see langword="true"/> if both name the same slot id through the same library.</returns>
+    public bool Equals(Pkcs11Slot? other)
+        => other is not null && ReferenceEquals(_pkcs11Library, other._pkcs11Library) && _slotId == other._slotId;
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => Equals(obj as Pkcs11Slot);
+
+    /// <inheritdoc/>
+    public override int GetHashCode()
+        => HashCode.Combine(RuntimeHelpers.GetHashCode(_pkcs11Library), (ulong)_slotId);
 
     /// <summary>
     /// Obtains information about a particular slot in the system

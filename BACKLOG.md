@@ -5,7 +5,7 @@ _Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (c
 ## Summary
 
 - Open items: 93, 23 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (14 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
+- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (15 partly resolved) | Low: 38 (7 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **Only one session per slot is usable.** The second `OpenSession` on a slot throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either session logs the other out (BL-084).
@@ -599,7 +599,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Severity:** Medium
 - **Effort:** M
 - **Location:** `Directory.Build.props:9` (`EnableNETAnalyzers`, with no `AnalysisMode`/`AnalysisLevel` in any `.props` or `.csproj`); `.editorconfig` (no `dotnet_diagnostic.CAxxxx` entries)
-- **Problem:** With `AnalysisMode` unset the SDK uses `Default`, which leaves roughly half the CA catalogue disabled — including rules that map directly onto findings this review process discovered by hand. CA1045 (avoid `out` parameters) is exactly BL-038; CA1707 (identifiers should not contain underscores) is exactly BL-009; CA1002 (`List<T>` in public signatures) is BL-142; and CA1062, CA2000, CA1014 (`[CLSCompliant]`, never declared although `uint`-backed enums and `ulong` parameters make the surface non-CLS-compliant), CA1815, CA1032, CA1064 and CA2225 all bear on the public surface this project calls its #1 risk. The naming section of `.editorconfig` is documentation only, so nothing in it fails a build. `TreatWarningsAsErrors` gives the repo the machinery to enforce all of this; it simply is not pointed at it.
+- **Problem:** With `AnalysisMode` unset the SDK uses `Default`, which leaves roughly half the CA catalogue disabled — including rules that map directly onto findings this review process discovered by hand. CA1021 (avoid `out` parameters) is exactly the resolved BL-038, the `void WaitForSlotEvent(bool, out bool, out ulong)` that became `WaitForSlotEvent()` plus `TryGetSlotEvent(out Pkcs11Slot?)` (a Try-pattern method, the case CA1021 allows, so suppress it there if the rule is turned on); CA1707 (identifiers should not contain underscores) is exactly BL-009; CA1002 (`List<T>` in public signatures) is BL-142; and CA1062, CA2000, CA1014 (`[CLSCompliant]`, never declared although `uint`-backed enums and `ulong` parameters make the surface non-CLS-compliant), CA1815, CA1032, CA1064 and CA2225 all bear on the public surface this project calls its #1 risk. The naming section of `.editorconfig` is documentation only, so nothing in it fails a build. `TreatWarningsAsErrors` gives the repo the machinery to enforce all of this; it simply is not pointed at it.
 - **Proposed action:** Set `<AnalysisMode>All</AnalysisMode>` (or at minimum `Recommended`, or `AnalysisModeApiDesign=All`) on the library project, then triage the resulting diagnostics into either fixes or explicit `.editorconfig` `dotnet_diagnostic.CAxxxx.severity = none` entries with a stated reason — a documented opt-out per rule is auditable, whereas today's silence is not. This also converts BL-009's naming decision from tribal knowledge into a checked-in, reviewable statement.
 - **Breaks public API?** No
 - **Raised by:** QA C, .NET Engineer A
@@ -651,18 +651,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Related:** completes the extension point opened for BL-057's successor work; the raw `Mechanism(type, byte[])` constructor remains the escape hatch meanwhile.
 - **Breaks public API?** No (additive)
 - **Raised by:** vendor-parameter-writer implementation
-
-### [BL-038] ⚠️ PARTIALLY RESOLVED — `WaitForSlotEvent` uses `void` + two `out` params instead of a Try/result shape, with a raw `ulong` slot id
-- **Status:** Partially resolved 2026-09-18. `WaitForSlotEvent` returns `ulong?` (null when a non-blocking poll finds no event) instead of `void` with two `out` parameters (commit 0c41ecee).
-- **Area:** .NET API Design
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Library.cs:523`
-- **Problem:** Classic Try-pattern case shipped as `void WaitForSlotEvent(bool, out bool, out ulong)`; the returned slot id has no path back to a `Pkcs11Slot`.
-- **Remaining scope:** The slot comes back as a raw `ulong` rather than `SlotId?` or a `Pkcs11Slot`, so the BL-039 handle-wrapping rule still stops one call short, and an event still has no path back to a `Pkcs11Slot`. Location: `Pkcs11Library.cs:523`.
-- **Proposed action:** Reshape as `bool TryWaitForSlotEvent(bool nonBlocking, out Pkcs11Slot? slot)` (or a result struct) before the signature is permanent.
-- **Breaks public API?** Yes — land before 1.0
-- **Raised by:** .NET Engineer A
 
 ### [BL-042] No documented SemVer/stability policy; own v3.2-only surface carries no `[Experimental]`
 - **Area:** .NET API Design
@@ -1043,6 +1031,16 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Restore the rows on every backend; triage any refusal inside an advertised range.
 - **Breaks public API?** No
 - **Raised by:** wolfPKCS11 backend
+
+### [BL-182] No cancellable way to wait for a slot event
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Library.cs` (`WaitForSlotEvent`, `TryGetSlotEvent`)
+- **Problem:** The blocking `WaitForSlotEvent()` takes no `CancellationToken` or timeout and holds a thread for as long as it waits. The only way to end it without an event is `Dispose`, which finalizes the module and so ends every session. It is also refused on a module that may not be called concurrently. A caller that wants to watch for token insertion from async code has to write its own loop around `TryGetSlotEvent`.
+- **Proposed action:** Add `ValueTask<Pkcs11Slot> WaitForSlotEventAsync(TimeSpan pollInterval, CancellationToken cancellationToken)`, which polls `TryGetSlotEvent` with `Task.Delay(pollInterval, cancellationToken)` in between. Cancellation then works without `C_Finalize`, it works on every module that implements `C_WaitForSlotEvent`, and no call stays in the module. Document it as the recommended way to watch slots, and keep the blocking call for a dedicated thread.
+- **Breaks public API?** No (additive)
+- **Raised by:** `WaitForSlotEvent` design review (PR #331)
 
 ## PKCS#11 v3.2 Coverage Matrix
 

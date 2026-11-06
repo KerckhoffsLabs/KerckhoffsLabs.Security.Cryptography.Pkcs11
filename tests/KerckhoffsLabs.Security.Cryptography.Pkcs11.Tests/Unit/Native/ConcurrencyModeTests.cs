@@ -112,8 +112,8 @@ public sealed class ConcurrencyModeTests
         using var module = new LockingModule { CannotLock = true };
         Pkcs11Library library = module.Load();
 
-        Assert.Throws<InvalidOperationException>(() => library.WaitForSlotEvent(nonBlocking: false));
-        Assert.Null(library.WaitForSlotEvent(nonBlocking: true));
+        Assert.Throws<InvalidOperationException>(() => library.WaitForSlotEvent());
+        Assert.False(library.TryGetSlotEvent(out _));
         Assert.Equal(1, module.CallCount("C_WaitForSlotEvent"));
         library.Dispose();
     }

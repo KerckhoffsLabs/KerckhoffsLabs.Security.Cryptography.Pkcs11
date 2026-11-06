@@ -100,7 +100,7 @@ public sealed class LibraryDisposeRaceTests
         using var module = new WaitingModule();
         Pkcs11Library library = module.Load();
 
-        Task<Exception?> wait = Task.Run(() => Record.Exception(() => library.WaitForSlotEvent(nonBlocking: false)), Token);
+        Task<Exception?> wait = Task.Run(() => Record.Exception(() => library.WaitForSlotEvent()), Token);
         Assert.True(module.Waiting.Wait(Generous, Token), "the wait never reached the module");
 
         library.Dispose();
