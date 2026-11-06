@@ -167,6 +167,29 @@ internal static class PropertyTestSupport
         }
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> BclCurves = new();
+
+    /// <summary>
+    /// Skips the calling test unless this platform's .NET cryptography takes <paramref name="curve"/>. On macOS
+    /// .NET uses Apple's library, which has the NIST curves only, so a case that checks a Brainpool or secp256k1
+    /// key against .NET (or hands .NET the peer's public key, as ECDH does) cannot run there.
+    /// </summary>
+    internal static void RequireBclCurve(string curve)
+    {
+        bool supported = BclCurves.GetOrAdd(curve, static name =>
+        {
+            try
+            {
+                using (ECDsa.Create(EcSpec(name).Curve)) { }
+                return true;
+            }
+            catch (PlatformNotSupportedException) { return false; }
+            catch (CryptographicException) { return false; }
+        });
+        if (!supported)
+            Assert.Skip($".NET on this platform does not support {curve}.");
+    }
+
     internal static (BclECCurve Curve, HashAlgorithmName Hash) EcSpec(string curve) => curve switch
     {
         "P-256" => (BclECCurve.NamedCurves.nistP256, HashAlgorithmName.SHA256),
@@ -183,6 +206,7 @@ internal static class PropertyTestSupport
     // runs body with it. A token that does not generate keys on the curve skips.
     internal static void WithEcKey(IPkcs11Backend backend, Pkcs11Session session, string curve, bool derive, Action<Pkcs11Key> body)
     {
+        RequireBclCurve(curve);
         string label = $"prop-ec-{Guid.NewGuid():N}";
         byte[] id = TestKeys.IdFor(label);
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC).Label(label).Id(id).EcParams(TestKeys.EcParams(curve));
