@@ -71,4 +71,7 @@ public sealed class SessionConformanceTests_OpenCryptoki(OpenCryptokiBackendFixt
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.AdvertisedKeyWraps), MemberType = typeof(SessionConformanceTestCases))]
     public void AdvertisedWrapMechanism_WrapsAnAesKey(CKM mechanism) => SessionConformanceTestCases.Assert_AdvertisedWrapMechanism_WrapsAnAesKey(_backend, mechanism);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void InitToken_WithASessionOpen_IsSessionExists() => SessionConformanceTestCases.Assert_InitToken_WithASessionOpen_IsSessionExists(_backend);
 }

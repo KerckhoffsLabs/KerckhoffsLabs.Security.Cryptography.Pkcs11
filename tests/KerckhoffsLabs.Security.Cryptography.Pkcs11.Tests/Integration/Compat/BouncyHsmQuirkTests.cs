@@ -70,6 +70,15 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void Sp800108AdditionalKey_QuirkStillPresent()
+    {
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Sp800108ChainedKdfTestCases.Assert_Counter_AdditionalDerivedKey_TakesTheNextBytes(_backend));
+        Assert.True(ex.ReturnValue == CKR.CKR_GENERAL_ERROR,
+            $"An SP 800-108 derive with an additional key now answers {ex.ReturnValue}, not CKR_GENERAL_ERROR: if it derives, set " +
+            "BouncyHsmBackendFixture.BouncyHsmDerivesAdditionalSp800108Keys to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void PrivateSessionObjectAfterLogout_QuirkStillPresent()
     {
         Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);

@@ -63,4 +63,9 @@ public sealed class AesPkcs11Tests_FreeHsm(FreeHsmBackendFixture f)
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void ManagedKeyAndStreamingSurface_NotSupported() => AesPkcs11TestCases.Assert_ManagedKeyAndStreamingSurface_NotSupported(_backend);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(AesPkcs11TestCases.InvalidKeyWrapVectors), MemberType = typeof(AesPkcs11TestCases))]
+    public void DecryptKeyWrapPadded_InvalidWrap_Throws(string keyHex, string ciphertextHex)
+        => AesPkcs11TestCases.Assert_DecryptKeyWrapPadded_InvalidWrap_Throws(_backend, keyHex, ciphertextHex);
 }

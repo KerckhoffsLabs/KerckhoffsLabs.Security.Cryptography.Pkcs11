@@ -37,4 +37,7 @@ public sealed class SP800108HmacCounterKdfPkcs11Tests_BouncyHsm(BouncyHsmBackend
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void DeriveKey_OnToken_ReturnsNonExtractableKey() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_OnToken_ReturnsNonExtractableKey(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void DeriveKey_MatchesBclViaSignProbe() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_MatchesBclViaSignProbe(_backend);
 }

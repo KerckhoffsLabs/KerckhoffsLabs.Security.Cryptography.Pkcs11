@@ -45,7 +45,7 @@ internal static class BackendRegressionTestCases
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"ecdh-z0-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
-            .Label(label).Id(Encoding.ASCII.GetBytes(label)).Derive()
+            .Label(label).Id(Guid.NewGuid().ToByteArray()).Derive()
             .Attribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid).Attribute(CKA.CKA_VALUE, LeadingZeroPrivate)
             .OnToken(backend.SupportsTokenObjects).Build();
         try
@@ -68,7 +68,8 @@ internal static class BackendRegressionTestCases
         using var session = backend.OpenSession();
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"mismatch-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
+        // A 16-byte id: FreeHSM takes a CKA_ID of at most 32 bytes, shorter than the label.
+        byte[] id = Guid.NewGuid().ToByteArray();
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC).Label(label).Id(id).Verify().EcParams(TestKeys.EcP256Oid).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Label(label).Id(id).Sign().Build();
         using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);

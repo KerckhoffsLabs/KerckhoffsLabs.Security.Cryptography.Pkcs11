@@ -15,4 +15,8 @@ public sealed class Sp800108ChainedKdfTests_BouncyHsm(BouncyHsmBackendFixture ba
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.Sp800108DoublePipelineAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm runs the double-pipeline A chain one PRF ahead")]
     public void DoublePipeline_HmacSha256_MatchesReference() =>
         Sp800108ChainedKdfTestCases.Assert_DoublePipeline_HmacSha256_MatchesReference(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.Sp800108AdditionalKeyAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm answers an SP 800-108 derive with an additional key with CKR_GENERAL_ERROR")]
+    public void Counter_AdditionalDerivedKey_TakesTheNextBytes() =>
+        Sp800108ChainedKdfTestCases.Assert_Counter_AdditionalDerivedKey_TakesTheNextBytes(_backend);
 }

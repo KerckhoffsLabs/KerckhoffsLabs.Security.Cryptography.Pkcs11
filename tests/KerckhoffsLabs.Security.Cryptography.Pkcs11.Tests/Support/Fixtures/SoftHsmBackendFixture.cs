@@ -223,6 +223,16 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool SoftHsmRefusesAnRsaKeyGenAttributeAsInvalid = false;
 
+    /// <summary>
+    /// False while <c>CKM_EDDSA</c> ignores its <c>CK_EDDSA_PARAMS</c>: an Ed25519ctx signature verifies under another
+    /// context, and an Ed25519ph signature verifies as plain Ed25519, because both are plain Ed25519 (RFC 8032 §5.1).
+    /// SoftHSM issue #619.
+    /// </summary>
+    public const bool SoftHsmTakesEdDsaParams = false;
+
+    /// <summary>Gate for the Ed25519ctx and Ed25519ph cases: see <see cref="SoftHsmTakesEdDsaParams"/>.</summary>
+    public static bool EdDsaParamsAvailable => SoftHsmAvailable && SoftHsmTakesEdDsaParams;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

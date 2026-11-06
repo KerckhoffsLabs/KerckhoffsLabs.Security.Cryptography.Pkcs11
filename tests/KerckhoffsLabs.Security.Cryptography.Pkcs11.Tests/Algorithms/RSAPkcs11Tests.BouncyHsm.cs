@@ -140,4 +140,22 @@ public sealed class RSAPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Encrypt_OaepMessageOverTheLimit_Throws_SessionReusable() => RSAPkcs11TestCases.Assert_Encrypt_OaepMessageOverTheLimit_Throws_SessionReusable(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void EncryptDecrypt_OaepSha224_UnderAllowInsecure_RoundTrips() => RSAPkcs11TestCases.Assert_EncryptDecrypt_OaepSha224_UnderAllowInsecure_RoundTrips(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void Encrypt_OaepSha224_WithoutAllowInsecure_Throws() => RSAPkcs11TestCases.Assert_Encrypt_OaepSha224_WithoutAllowInsecure_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SignData_Sha224Pkcs1_WithoutAllowInsecure_Throws() => RSAPkcs11TestCases.Assert_SignData_Sha224Pkcs1_WithoutAllowInsecure_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SignData_Sha224Pss_WithoutAllowInsecure_Throws() => RSAPkcs11TestCases.Assert_SignData_Sha224Pss_WithoutAllowInsecure_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SignVerifyData_Sha224Pkcs1_UnderAllowInsecure_RoundTrips() => RSAPkcs11TestCases.Assert_SignVerifyData_Sha224Pkcs1_UnderAllowInsecure_RoundTrips(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SignVerifyData_Sha224Pss_UnderAllowInsecure_RoundTrips() => RSAPkcs11TestCases.Assert_SignVerifyData_Sha224Pss_UnderAllowInsecure_RoundTrips(_backend);
 }

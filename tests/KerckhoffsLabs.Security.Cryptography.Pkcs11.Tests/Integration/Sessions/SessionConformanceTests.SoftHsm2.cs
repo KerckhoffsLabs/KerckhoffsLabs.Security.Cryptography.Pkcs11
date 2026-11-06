@@ -80,4 +80,7 @@ public sealed class SessionConformanceTests_SoftHsm(SoftHsmBackendFixture backen
             Assert.Skip("SoftHSM 2.5 takes only SHA-1 as the OAEP hash, and refuses SHA-256 with CKR_ARGUMENTS_BAD.");
         SessionConformanceTestCases.Assert_AdvertisedWrapMechanism_WrapsAnAesKey(_backend, mechanism);
     }
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void InitToken_WithASessionOpen_IsSessionExists() => SessionConformanceTestCases.Assert_InitToken_WithASessionOpen_IsSessionExists(_backend);
 }

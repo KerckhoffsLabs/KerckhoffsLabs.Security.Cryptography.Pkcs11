@@ -92,4 +92,10 @@ public sealed class ECDsaPkcs11Tests_BouncyHsm(BouncyHsmBackendFixture backend)
     [MemberData(nameof(ECDsaPkcs11TestCases.PointAtInfinityVectors), MemberType = typeof(ECDsaPkcs11TestCases))]
     public void VerifyData_PointAtInfinityVector_ReturnsFalse(int tcId, string publicKey, string signature)
         => ECDsaPkcs11TestCases.Assert_VerifyData_PointAtInfinityVector_ReturnsFalse(_backend, tcId, publicKey, signature);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void TrySignData_Sha224_UnderAllowInsecure_RoundTrips() => ECDsaPkcs11TestCases.Assert_TrySignData_Sha224_UnderAllowInsecure_RoundTrips(_backend, "P-256");
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void TrySignData_Sha224_WithoutAllowInsecure_Throws() => ECDsaPkcs11TestCases.Assert_TrySignData_Sha224_WithoutAllowInsecure_Throws(_backend);
 }
