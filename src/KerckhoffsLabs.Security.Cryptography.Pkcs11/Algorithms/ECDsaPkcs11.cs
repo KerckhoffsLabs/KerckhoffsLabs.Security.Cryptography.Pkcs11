@@ -295,7 +295,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     // Stream verification overload) with Verify. SignHash / VerifyHash(byte[]) take
     // caller-supplied digest bytes and cannot know the algorithm, so they are outside this gate.
     private void GuardWeakHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
-        => _key.Session.Enforce(new HashUseRequest(hashAlgorithm, operation));
+        => _key.Session.EnforcePolicy(new HashUseRequest(hashAlgorithm, operation));
 
     /// <inheritdoc/>
     protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)

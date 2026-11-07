@@ -2210,3 +2210,6 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.Any.ge
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.None.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.SessionObjects.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.Where(System.Func<KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo!, bool>! predicate, string! description) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Session.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.EnforcePolicy(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest! request) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.IsAllowedByPolicy(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest! request) -> bool

@@ -187,7 +187,7 @@ public sealed class AesPkcs11 : Aes
         // padding block, so it goes to the token. Padded decryption of nothing is refused as the BCL refuses it:
         // a padded ciphertext holds at least one block. Tokens disagree here (NSS answers
         // CKR_ENCRYPTED_DATA_LEN_RANGE), and returning empty would accept a ciphertext with no padding.
-        if (input.IsEmpty && _key.Session.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt)))
+        if (input.IsEmpty && _key.Session.IsAllowedByPolicy(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt)))
         {
             if (mechanism.Type != CKM.CKM_AES_CBC_PAD)
             {

@@ -153,11 +153,11 @@ public sealed class Pkcs11SessionCorePolicyTests
         using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
         var request = new KeyMaterialExportRequest(KeyMaterialExportKind.KemSharedSecret);
 
-        var ex = Assert.Throws<CryptoPolicyViolationException>(() => session.Enforce(request));
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() => session.EnforcePolicy(request));
 
         Assert.Equal("Recommended", ex.PolicyName);
         Assert.Same(request, ex.Request);
-        Assert.False(session.IsPermitted(request));
+        Assert.False(session.IsAllowedByPolicy(request));
     }
 
     [Fact]
@@ -187,14 +187,45 @@ public sealed class Pkcs11SessionCorePolicyTests
     }
 
     [Fact]
-    public void IsPermitted_OnADisposedPublicSession_Throws()
+    public void IsAllowedByPolicy_OnADisposedPublicSession_Throws()
     {
         using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
         var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
         session.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => session.IsPermitted(
+        Assert.Throws<ObjectDisposedException>(() => session.IsAllowedByPolicy(
             new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput)));
+    }
+
+    [Fact]
+    public void EnforcePolicy_OnADisposedPublicSession_Throws()
+    {
+        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
+        var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
+        session.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => session.EnforcePolicy(
+            new MechanismUseRequest(new Mechanism(CKM.CKM_AES_GCM), CryptoOperation.Encrypt)));
+    }
+
+    [Fact]
+    public void PublicPolicyChecks_RefuseANullRequest()
+    {
+        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
+        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
+
+        Assert.Throws<ArgumentNullException>(() => session.EnforcePolicy(null!));
+        Assert.Throws<ArgumentNullException>(() => session.IsAllowedByPolicy(null!));
+    }
+
+    [Fact]
+    public void Key_ExposesTheSessionItWasMadeIn()
+    {
+        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
+        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
+        using var key = session.GenerateAesKey(256);
+
+        Assert.Same(session, key.Session);
     }
 
     [Fact]

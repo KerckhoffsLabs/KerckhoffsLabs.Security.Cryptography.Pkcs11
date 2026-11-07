@@ -140,7 +140,7 @@ public sealed class DSAPkcs11 : DSA
                 return VerifyIeeeP1363(mech, hash, signature);
             case DSASignatureFormat.Rfc3279DerSequence:
                 // A malformed signature does not verify, as for the BCL's own conversion.
-                _key.Session.Enforce(new MechanismUseRequest(mech, CryptoOperation.Verify));
+                _key.Session.EnforcePolicy(new MechanismUseRequest(mech, CryptoOperation.Verify));
                 byte[]? ieee = DssSignatureEncoding.DerToIeeeP1363(signature, GetSubprimeLength());
                 return ieee is not null ? _key.Verify(mech, hash, ieee) : DoesNotVerify();
             default:
@@ -155,7 +155,7 @@ public sealed class DSAPkcs11 : DSA
     // first, as the token path asks it, so a refused mechanism is refused before the token is read.
     private bool VerifyIeeeP1363(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
-        _key.Session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
+        _key.Session.EnforcePolicy(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
         return signature.Length == 2 * GetSubprimeLength() ? _key.Verify(mechanism, data, signature) : DoesNotVerify();
     }
 
@@ -337,7 +337,7 @@ public sealed class DSAPkcs11 : DSA
     // CreateSignature and VerifySignature take a caller's digest and cannot know the hash, so they are
     // outside this check, as ECDsaPkcs11's SignHash and VerifyHash are.
     private void GuardHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
-        => _key.Session.Enforce(new HashUseRequest(hashAlgorithm, operation));
+        => _key.Session.EnforcePolicy(new HashUseRequest(hashAlgorithm, operation));
 
     // As the BCL: a missing name is an ArgumentNullException and an empty one an ArgumentException, both
     // naming hashAlgorithm rather than its Name.
