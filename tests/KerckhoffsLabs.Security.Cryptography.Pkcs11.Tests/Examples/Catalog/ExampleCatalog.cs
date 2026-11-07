@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -219,33 +220,32 @@ internal static partial class ExampleCatalog
 
     // What a generation example promises, checked on the token: the key (or the named half of a pair) is a
     // token object; a secret or private key is sensitive and non-extractable; and it has exactly the roles
-    // given, every other role being off (or not an attribute that key type has). Each property is checked by
-    // a C_FindObjects that matches on it, so it reads the object of that class itself: reading attributes
-    // through a Pkcs11Key opened on one half of a pair whose halves share a CKA_ID reads the public half.
+    // given, every other role being off (or not an attribute that key type has). The half is read on its own
+    // through GetAttributeValue(KeyHandlePart, ...), in one call.
     private static void AssertGeneratedKey(IPkcs11Backend backend, string label, CKO keyClass, params CKA[] roles)
     {
         using Pkcs11Session session = backend.OpenSession();
-        Assert.True(CountMatches(session, label, keyClass) == 1, $"Expected one {keyClass} labelled {label}.");
-        Assert.True(CountMatches(session, label, keyClass, (CKA.CKA_TOKEN, true)) == 1, $"The {keyClass} is not a token object.");
+        using (ObjectTemplate filter = ObjectTemplate.Empty().Label(label).Attribute(CKA.CKA_CLASS, (ulong)keyClass).Build())
+        using (ReadOnlyDisposableList<Pkcs11Object> found = session.FindObjects(filter))
+            Assert.True(found.Count == 1, $"Expected one {keyClass} labelled {label}.");
+
+        using Pkcs11Key key = session.OpenKey(label);
+        KeyHandlePart part = keyClass is CKO.CKO_PUBLIC_KEY ? KeyHandlePart.Public : KeyHandlePart.Private;
+        using ReadOnlyDisposableList<ObjectAttribute> attributes =
+            key.GetAttributeValue(part, [CKA.CKA_CLASS, CKA.CKA_TOKEN, CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE, .. KeyRoles]);
+        bool IsTrue(CKA type) => attributes.Single(a => a.Type == type) is { CannotBeRead: false } a && a.GetValueAsBool();
+
+        Assert.Equal(keyClass, (CKO)attributes.Single(a => a.Type == CKA.CKA_CLASS).GetValueAsUlong());
+        Assert.True(IsTrue(CKA.CKA_TOKEN), $"The {keyClass} is not a token object.");
         foreach (CKA role in KeyRoles)
         {
-            bool granted = CountMatches(session, label, keyClass, (role, true)) == 1;
+            bool granted = IsTrue(role);
             Assert.True(granted == roles.Contains(role), $"The {keyClass} has {role} = {granted}.");
         }
 
         if (keyClass is CKO.CKO_PUBLIC_KEY) return;
-        Assert.True(CountMatches(session, label, keyClass, (CKA.CKA_SENSITIVE, true)) == 1, $"The {keyClass} is not sensitive.");
-        Assert.True(CountMatches(session, label, keyClass, (CKA.CKA_EXTRACTABLE, false)) == 1, $"The {keyClass} is extractable.");
-    }
-
-    private static int CountMatches(Pkcs11Session session, string label, CKO keyClass, params (CKA Type, bool Value)[] attributes)
-    {
-        var builder = ObjectTemplate.Empty().Label(label).Attribute(CKA.CKA_CLASS, (ulong)keyClass);
-        foreach ((CKA type, bool value) in attributes)
-            builder = builder.Attribute(type, value);
-        using ObjectTemplate filter = builder.Build();
-        using ReadOnlyDisposableList<Pkcs11Object> found = session.FindObjects(filter);
-        return found.Count;
+        Assert.True(IsTrue(CKA.CKA_SENSITIVE), $"The {keyClass} is not sensitive.");
+        Assert.False(IsTrue(CKA.CKA_EXTRACTABLE), $"The {keyClass} is extractable.");
     }
 
     // After an example that loaded and disposed its own instance of the module: the fixture's still works.
