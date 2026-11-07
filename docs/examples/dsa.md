@@ -2,6 +2,9 @@
 
 It is a legacy algorithm: read [Legacy algorithms](legacy.md) for the two steps every use takes.
 
+The example opens a key that is already on the token. These docs do not show creating new keys for this
+algorithm, and the default policy refuses it: to replace the key, generate one as on the [ECDSA](ecdsa.md#generating-a-key-pair) or [ML-DSA](ml-dsa.md#generating-a-key-pair) page.
+
 ## Verifying an old DSA signature
 
 # [PKCS#11](#tab/pkcs11)

@@ -24,6 +24,26 @@ public static class AesCcmExamples
         return decrypted;
     }
 
+    public static void GenerateAesCcmKey(string modulePath, string tokenLabel, SecurePin pin, string keyLabel)
+    {
+        #region GenerateAesCcmKey
+        // 1. Load the module and log in. The module path and token label come from configuration; the PIN
+        //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 2. Generate an AES-256 key on the token. The helper makes it sensitive (CKA_SENSITIVE: its value is
+        //    never revealed) and non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped off the token),
+        //    and allows encryption and decryption only. persistOnToken: true makes it a token object
+        //    (CKA_TOKEN), which stays on the token when the session closes; without it the key is gone with
+        //    the session. keyLabel becomes its CKA_LABEL, by which the application opens it: pick one no
+        //    other key on the token has, as OpenKey refuses an ambiguous label.
+        using Pkcs11Key key = session.GenerateAesKey(bitLength: 256, label: keyLabel, persistOnToken: true);
+        // 3. The using declarations dispose the key handle, the session and the library. The key itself stays
+        //    on the token.
+        #endregion
+    }
+
     public static byte[] AesCcmEncryptDecrypt(
         string modulePath, string tokenLabel, SecurePin pin, string keyLabel, byte[] plaintext, byte[] associatedData)
     {

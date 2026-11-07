@@ -8,9 +8,21 @@ Each RSA key pair has one role. `GenerateRsaSigningKeyPair` creates a pair that 
 `GenerateRsaKeyTransportKeyPair` one that can only encrypt and decrypt. See
 [Key role separation](../guide/security-model.md#key-role-separation).
 
+## Generating a signing key pair
+
+Once, when you provision the token, generate the key pair on it, as token objects under a label. Both
+halves stay on the token after the session closes; the private key is sensitive and non-extractable, and
+the pair may only sign and verify. The example exports the public key (SubjectPublicKeyInfo), for
+verifiers.
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#GenerateRsaSigningKey)]
+
+The BCL has nothing like this to store: `RSA.Create(3072)` makes the key pair in your process, as on the
+BCL tab below, and keeping the private key is up to you.
+
 ## Signing with RSA-PSS
 
-Sign on the token:
+In the application, open the pair by its label and sign on the token:
 
 # [PKCS#11](#tab/pkcs11)
 
@@ -46,6 +58,13 @@ FIPS 186-5-approved and required by JWT `RS256`, TLS 1.2, X.509 and code signing
 formats. PKCS#1 v1.5 *encryption* is a different matter; see below.
 
 ## Encrypting with RSA-OAEP
+
+A key-transport key pair has a different role, so it is a different pair. Generate it once, as above:
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#GenerateRsaKeyTransportKey)]
+
+Then, in the application, open it by its label; anyone with the public key encrypts, and the token
+decrypts:
 
 # [PKCS#11](#tab/pkcs11)
 

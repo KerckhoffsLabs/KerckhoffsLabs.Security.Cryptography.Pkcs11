@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Examples;
 
@@ -10,14 +11,15 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] ChaCha20Poly1305Cases() =>
     [
+        new(Name(nameof(ChaCha20Poly1305Examples), nameof(ChaCha20Poly1305Examples.GenerateChaCha20Key)), [],
+            [CKM.CKM_CHACHA20_KEY_GEN, CKM.CKM_CHACHA20_POLY1305], ExampleBackend.Kryoptic,
+            b => GenerateAndUseChaCha20Key(b, checkAttributes: true),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(ChaCha20Poly1305Examples), nameof(ChaCha20Poly1305Examples.ChaCha20Poly1305EncryptDecrypt)),
             [typeof(ChaCha20Poly1305Pkcs11)], [CKM.CKM_CHACHA20_KEY_GEN, CKM.CKM_CHACHA20_POLY1305], ExampleBackend.Kryoptic,
-            b =>
-            {
-                using (SecurePin pin = UserPin(b))
-                    Assert.Equal(Message, ChaCha20Poly1305Examples.ChaCha20Poly1305EncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, Message, Header));
-                AssertFixtureLibraryStillWorks(b);
-            },
+            // The generation example provisions the key; this one opens it by label.
+            b => GenerateAndUseChaCha20Key(b, checkAttributes: false),
             NeedsUserLogin: true,
             Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(ChaCha20Poly1305Examples), nameof(ChaCha20Poly1305Examples.BclChaCha20Poly1305EncryptDecrypt)), [], [],
@@ -28,4 +30,15 @@ internal static partial class ExampleCatalog
                 Assert.Equal(Message, ChaCha20Poly1305Examples.BclChaCha20Poly1305EncryptDecrypt(Message, Header));
             }),
     ];
+
+    private static void GenerateAndUseChaCha20Key(IPkcs11Backend backend, bool checkAttributes) =>
+        WithGeneratedKey(backend, label =>
+        {
+            using SecurePin pin = UserPin(backend);
+            ChaCha20Poly1305Examples.GenerateChaCha20Key(backend.LibraryPath, backend.TokenLabel, pin, label);
+            if (checkAttributes)
+                AssertGeneratedKey(backend, label, CKO.CKO_SECRET_KEY, CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT);
+            Assert.Equal(Message, ChaCha20Poly1305Examples.ChaCha20Poly1305EncryptDecrypt(
+                backend.LibraryPath, backend.TokenLabel, pin, label, Message, Header));
+        });
 }

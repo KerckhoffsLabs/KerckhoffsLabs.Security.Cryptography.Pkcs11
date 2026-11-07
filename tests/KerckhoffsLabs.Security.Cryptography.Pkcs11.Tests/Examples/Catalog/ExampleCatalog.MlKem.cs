@@ -11,9 +11,13 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] MlKemCases() =>
     [
+        new(Name(nameof(MlKemExamples), nameof(MlKemExamples.GenerateMlKemKey)), [],
+            [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
+            b => AssertMlKemReceiveAesKey(b, checkAttributes: true), NeedsUserLogin: true,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b) ?? ExampleGates.SecondModuleInstance(b)),
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.MlKemReceiveAesKey)), [typeof(MLKemPkcs11)],
             [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
-            AssertMlKemReceiveAesKey, NeedsUserLogin: true,
+            b => AssertMlKemReceiveAesKey(b, checkAttributes: false), NeedsUserLogin: true,
             Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b) ?? ExampleGates.SecondModuleInstance(b)),
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.BclMlKemReceive)), [], [], ExampleBackend.SoftHsm2,
             _ =>
@@ -25,14 +29,24 @@ internal static partial class ExampleCatalog
             }),
     ];
 
-    private static void AssertMlKemReceiveAesKey(IPkcs11Backend backend)
+    // The generation example provisions the receiver's key pair; the receiving example opens it by label.
+    private static void AssertMlKemReceiveAesKey(IPkcs11Backend backend, bool checkAttributes)
     {
         if (!backend.SupportsMlKem) Assert.Skip("The backend cannot operate ML-KEM.");
         if (!MLKem.IsSupported) Assert.Skip("ML-KEM is not supported by this platform's BCL (the sender side).");
         // The sender encrypts with its copy of the shared secret, and the token decrypts with its own: the
         // message comes back only if both hold the same secret.
-        using (SecurePin pin = UserPin(backend))
-            Assert.Equal(Message, MlKemExamples.MlKemReceiveAesKey(backend.LibraryPath, backend.TokenLabel, pin, Message));
-        AssertFixtureLibraryStillWorks(backend);
+        WithGeneratedKey(backend, label =>
+        {
+            using SecurePin pin = UserPin(backend);
+            byte[] encapsulationKey = MlKemExamples.GenerateMlKemKey(backend.LibraryPath, backend.TokenLabel, pin, label);
+            if (checkAttributes)
+            {
+                AssertGeneratedKey(backend, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_DECAPSULATE);
+                AssertGeneratedKey(backend, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_ENCAPSULATE);
+                using MLKem imported = MLKem.ImportEncapsulationKey(MLKemAlgorithm.MLKem768, encapsulationKey);
+            }
+            Assert.Equal(Message, MlKemExamples.MlKemReceiveAesKey(backend.LibraryPath, backend.TokenLabel, pin, label, Message));
+        });
     }
 }

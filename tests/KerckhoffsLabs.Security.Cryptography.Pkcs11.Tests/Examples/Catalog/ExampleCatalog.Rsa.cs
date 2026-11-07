@@ -11,6 +11,37 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] RsaCases() =>
     [
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.GenerateRsaSigningKey)), [],
+            [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                byte[] spki = RsaExamples.GenerateRsaSigningKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_SIGN);
+                AssertGeneratedKey(b, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_VERIFY);
+                (byte[] signature, _) = RsaExamples.SignPss(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                // The exported public key verifies what the opened pair signed: they are the same pair.
+                using RSA verifier = RSA.Create();
+                verifier.ImportSubjectPublicKeyInfo(spki, out _);
+                Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+            }),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.GenerateRsaKeyTransportKey)), [],
+            [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                byte[] spki = RsaExamples.GenerateRsaKeyTransportKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_DECRYPT);
+                AssertGeneratedKey(b, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_ENCRYPT);
+                Assert.Equal(3072 / 8, RsaKeySize(spki));
+                Assert.Equal(Message, RsaExamples.OaepEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message));
+            }),
+            NeedsUserLogin: true,
+            Unsupported: b => b is SoftHsmBackendFixture && SoftHsmBackendFixture.IsV240Leg
+                ? "SoftHSM 2.5 implements RSA-OAEP with SHA-1 only"
+                : ExampleGates.SecondModuleInstance(b)),
         new(Name(nameof(RsaExamples), nameof(RsaExamples.SignPss)), [typeof(RSAPkcs11)],
             [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithProvisionedKey(b,
@@ -69,4 +100,11 @@ internal static partial class ExampleCatalog
         new(Name(nameof(RsaExamples), nameof(RsaExamples.BclOaepEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(Message, RsaExamples.BclOaepEncryptDecrypt(Message))),
     ];
+
+    private static int RsaKeySize(byte[] subjectPublicKeyInfo)
+    {
+        using RSA rsa = RSA.Create();
+        rsa.ImportSubjectPublicKeyInfo(subjectPublicKeyInfo, out _);
+        return rsa.KeySize / 8;
+    }
 }

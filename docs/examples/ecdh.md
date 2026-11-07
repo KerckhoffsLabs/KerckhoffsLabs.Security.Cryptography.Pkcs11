@@ -1,8 +1,22 @@
 # ECDH — `ECDiffieHellmanPkcs11`
 
-Two parties agree on an AES key by exchanging public keys. On our side, everything stays on the token,
-with a key pair from `GenerateEcKeyAgreementKeyPair` (see [Elliptic curves](elliptic-curves.md)); the
-other party is any ECDH implementation, here the BCL's:
+Two parties agree on an AES key by exchanging public keys. On our side, everything stays on the token
+(see [Elliptic curves](elliptic-curves.md) for the curves); the other party is any ECDH implementation,
+here the BCL's.
+
+## Generating a key pair
+
+Once, when you provision the token, generate our P-256 key-agreement key pair on it, as token objects under a label. Both halves
+stay on the token after the session closes; the private key is sensitive and non-extractable, and each
+half may do only its one job. The example exports the public key (SubjectPublicKeyInfo), to send to the other party.
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/EllipticCurves/EcdhExamples.cs#GenerateEcdhKey)]
+
+The BCL has nothing like this to store: `ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256)` makes the key pair in your process, as on the BCL tab below, and keeping the private key is up to you.
+
+## Agreeing on a key
+
+In the application, open our pair by its label, agree on a key with the peer, and use it:
 
 # [PKCS#11](#tab/pkcs11)
 

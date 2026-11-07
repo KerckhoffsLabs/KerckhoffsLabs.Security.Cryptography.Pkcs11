@@ -18,16 +18,20 @@ public static class CertificateExamples
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
 
-        // 2. A P-256 key pair, kept on the token (OnToken). A certificate finds its private key by CKA_ID,
-        //    so the key pair and the certificate share an id.
+        // 2. A P-256 key pair, kept on the token (OnToken: CKA_TOKEN, so it outlives the session) under the
+        //    certificate's label. A certificate finds its private key by CKA_ID, so the key pair and the
+        //    certificate share an id. ForPrivateKey starts sensitive and non-extractable, with every role
+        //    off: the private key may sign, the public key verify, nothing else.
         byte[] id = RandomNumberGenerator.GetBytes(16);
         using ObjectTemplate publicTemplate = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .Label(label)
             .Id(id)
             .OnToken()
             .EcParams(Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams())
             .Verify()
             .Build();
         using ObjectTemplate privateTemplate = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
+            .Label(label)
             .Id(id)
             .OnToken()
             .Sign()

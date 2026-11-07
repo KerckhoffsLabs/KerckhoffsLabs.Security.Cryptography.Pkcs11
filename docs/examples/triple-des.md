@@ -2,6 +2,9 @@
 
 It is a legacy algorithm: read [Legacy algorithms](legacy.md) for the two steps every use takes.
 
+The example opens a key that is already on the token. These docs do not show creating new keys for this
+algorithm, and the default policy refuses it: to replace the key, generate one as on the [AES-GCM](aes-gcm.md#generating-a-key) page.
+
 ## Decrypting a Triple-DES archive
 
 # [PKCS#11](#tab/pkcs11)

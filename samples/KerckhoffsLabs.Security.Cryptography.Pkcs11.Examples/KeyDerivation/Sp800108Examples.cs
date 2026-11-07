@@ -8,6 +8,33 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 /// <summary>docs/examples/sp800-108.md: SP 800-108 counter-mode HMAC KDF, deriving into a token key.</summary>
 public static class Sp800108Examples
 {
+    public static void GenerateKeyDerivationKey(string modulePath, string tokenLabel, SecurePin pin, string keyLabel)
+    {
+        #region GenerateKeyDerivationKey
+        // 1. Load the module and log in. The module path and token label come from configuration; the PIN
+        //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 2. Generate a 256-bit generic secret, the master key to derive from on the token, from a template.
+        //    ObjectTemplate.ForSecretKey starts sensitive (CKA_SENSITIVE: the value is never revealed) and
+        //    non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped off the token), with every role
+        //    off; the template grants derivation (CKA_DERIVE) only. OnToken() makes it a token object
+        //    (CKA_TOKEN), which stays on the token when the session closes; without it the key is gone with
+        //    the session. keyLabel becomes its CKA_LABEL, by which the application opens it: pick one no
+        //    other key on the token has, as OpenKey refuses an ambiguous label.
+        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label(keyLabel)
+            .OnToken()
+            .ValueLen(32)
+            .Derive()
+            .Build();
+        using Pkcs11Key key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), template);
+        // 3. The using declarations dispose the key handle, the session and the library. The key itself stays
+        //    on the token.
+        #endregion
+    }
+
     public static (byte[] Nonce, byte[] Ciphertext, byte[] Tag) Sp800108DeriveAesKey(
         string modulePath, string tokenLabel, SecurePin pin, string keyLabel, byte[] label, byte[] context, byte[] plaintext)
     {

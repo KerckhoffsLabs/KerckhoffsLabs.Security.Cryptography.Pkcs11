@@ -9,6 +9,17 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] AesGcmCases() =>
     [
+        new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.GenerateAesGcmKey)), [],
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                AesGcmExamples.GenerateAesGcmKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_SECRET_KEY, CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT);
+                Assert.Equal(Message, AesGcmExamples.AesGcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
+            }),
+            NeedsUserLogin: true,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
         new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.AesGcmEncryptDecrypt)), [typeof(AesGcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithProvisionedKey(b,

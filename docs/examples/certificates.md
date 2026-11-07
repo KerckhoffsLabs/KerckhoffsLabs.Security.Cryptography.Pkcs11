@@ -7,7 +7,10 @@ and `CKA_ID`. Its private key is a separate object with the same `CKA_ID`. The e
 
 ## Issuing a certificate for a token key
 
-The BCL's `CertificateRequest` builds the certificate; the token key signs it:
+This is where the key pair is generated: once, at provisioning, as token objects that carry the
+certificate's label and `CKA_ID`, sensitive and non-extractable, the private key allowed only to sign.
+The BCL's `CertificateRequest` builds the certificate; the token key signs it, and the certificate is
+stored next to it. The signing example further down opens both again by the label:
 
 # [PKCS#11](#tab/pkcs11)
 

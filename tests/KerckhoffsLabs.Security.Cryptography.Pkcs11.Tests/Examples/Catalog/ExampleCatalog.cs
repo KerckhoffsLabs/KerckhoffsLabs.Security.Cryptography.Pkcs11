@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -190,6 +191,59 @@ internal static partial class ExampleCatalog
             found.Destroy();
     }
 
+    // Runs a key-generation example, and the page's example that uses the key, under a fresh label; then
+    // destroys every object with the label and checks the fixture's library still works.
+    private static void WithGeneratedKey(IPkcs11Backend backend, Action<string> body)
+    {
+        string label = NewLabel();
+        try
+        {
+            body(label);
+        }
+        finally
+        {
+            WithSessionOrKeeper(backend, null, s => DestroyObjectsLabelled(s, label));
+        }
+        AssertFixtureLibraryStillWorks(backend);
+    }
+
+    private static readonly CKA[] KeyRoles =
+    [
+        CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_SIGN, CKA.CKA_VERIFY, CKA.CKA_WRAP, CKA.CKA_UNWRAP,
+        CKA.CKA_DERIVE, CKA.CKA_ENCAPSULATE, CKA.CKA_DECAPSULATE,
+    ];
+
+    // What a generation example promises, checked on the token: the key (or the named half of a pair) is a
+    // token object; a secret or private key is sensitive and non-extractable; and it has exactly the roles
+    // given, every other role being off (or not an attribute that key type has). Each property is checked by
+    // a C_FindObjects that matches on it, so it reads the object of that class itself: reading attributes
+    // through a Pkcs11Key opened on one half of a pair whose halves share a CKA_ID reads the public half.
+    private static void AssertGeneratedKey(IPkcs11Backend backend, string label, CKO keyClass, params CKA[] roles)
+    {
+        using Pkcs11Session session = backend.OpenSession();
+        Assert.True(CountMatches(session, label, keyClass) == 1, $"Expected one {keyClass} labelled {label}.");
+        Assert.True(CountMatches(session, label, keyClass, (CKA.CKA_TOKEN, true)) == 1, $"The {keyClass} is not a token object.");
+        foreach (CKA role in KeyRoles)
+        {
+            bool granted = CountMatches(session, label, keyClass, (role, true)) == 1;
+            Assert.True(granted == roles.Contains(role), $"The {keyClass} has {role} = {granted}.");
+        }
+
+        if (keyClass is CKO.CKO_PUBLIC_KEY) return;
+        Assert.True(CountMatches(session, label, keyClass, (CKA.CKA_SENSITIVE, true)) == 1, $"The {keyClass} is not sensitive.");
+        Assert.True(CountMatches(session, label, keyClass, (CKA.CKA_EXTRACTABLE, false)) == 1, $"The {keyClass} is extractable.");
+    }
+
+    private static int CountMatches(Pkcs11Session session, string label, CKO keyClass, params (CKA Type, bool Value)[] attributes)
+    {
+        var builder = ObjectTemplate.Empty().Label(label).Attribute(CKA.CKA_CLASS, (ulong)keyClass);
+        foreach ((CKA type, bool value) in attributes)
+            builder = builder.Attribute(type, value);
+        using ObjectTemplate filter = builder.Build();
+        using ReadOnlyDisposableList<Pkcs11Object> found = session.FindObjects(filter);
+        return found.Count;
+    }
+
     // After an example that loaded and disposed its own instance of the module: the fixture's still works.
     private static void AssertFixtureLibraryStillWorks(IPkcs11Backend backend)
     {
@@ -213,6 +267,19 @@ internal static partial class ExampleCatalog
         using var inSoftware = new AesGcm(bclKey, 16);
         byte[] decrypted = new byte[sealedMessage.Ciphertext.Length];
         inSoftware.Decrypt(sealedMessage.Nonce, sealedMessage.Ciphertext, sealedMessage.Tag, decrypted);
+        Assert.Equal(Message, decrypted);
+    }
+
+    // What an example encrypted with AES-GCM under a key it derived, the same derivation, run again in a
+    // session of the test, decrypts on the token.
+    private static void AssertDecryptsWithTokenKey(
+        IPkcs11Backend backend, (byte[] Nonce, byte[] Ciphertext, byte[] Tag) sealedMessage, Func<Pkcs11Session, Pkcs11Key> deriveAgain)
+    {
+        using Pkcs11Session session = backend.OpenSession();
+        using Pkcs11Key key = deriveAgain(session);
+        using var aesGcm = new AesGcmPkcs11(key, 16);
+        byte[] decrypted = new byte[sealedMessage.Ciphertext.Length];
+        aesGcm.Decrypt(sealedMessage.Nonce, sealedMessage.Ciphertext, sealedMessage.Tag, decrypted);
         Assert.Equal(Message, decrypted);
     }
 

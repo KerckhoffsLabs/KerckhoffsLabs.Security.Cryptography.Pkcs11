@@ -11,20 +11,20 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] HmacCases() =>
     [
-        new(Name(nameof(HmacExamples), nameof(HmacExamples.GenerateHmacKey)), [typeof(HMACPkcs11)],
+        new(Name(nameof(HmacExamples), nameof(HmacExamples.GenerateHmacKey)), [],
             [CKM.CKM_GENERIC_SECRET_KEY_GEN, CKM.CKM_SHA256_HMAC], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            // The provisioning example: the key it generates is a token object, which the HMAC example then
-            // opens by its label.
-            b => WithProvisionedKey(b, HmacExamples.GenerateHmacKey,
-                label =>
-                {
-                    using SecurePin pin = UserPin(b);
-                    byte[] tag = HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message);
-                    Assert.Equal(32, tag.Length);
-                    Assert.Equal(tag, HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message));
-                }),
+            // The generation example stores the key on the token; the HMAC example then opens it by its label.
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                HmacExamples.GenerateHmacKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_SECRET_KEY, CKA.CKA_SIGN, CKA.CKA_VERIFY);
+                byte[] tag = HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                Assert.Equal(32, tag.Length);
+                Assert.Equal(tag, HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message));
+            }),
             NeedsUserLogin: true,
-            Unsupported: b => b.SupportsTokenObjects ? ExampleGates.SecondModuleInstance(b) : "the token keeps no token objects"),
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(HmacExamples), nameof(HmacExamples.HmacSha256)), [typeof(HMACPkcs11)], [CKM.CKM_SHA256_HMAC],
             ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b =>

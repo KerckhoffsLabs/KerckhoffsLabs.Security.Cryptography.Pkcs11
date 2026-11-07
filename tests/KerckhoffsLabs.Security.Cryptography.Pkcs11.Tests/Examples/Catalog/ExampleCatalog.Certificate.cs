@@ -17,6 +17,9 @@ internal static partial class ExampleCatalog
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithIssuedCertificate(b, label =>
             {
+                AssertGeneratedKey(b, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_SIGN);
+                AssertGeneratedKey(b, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_VERIFY);
+
                 // The certificate and its key outlived the example's session: token objects, linked by CKA_ID.
                 using Pkcs11Session s = b.OpenSession();
                 using Pkcs11Certificate stored = s.OpenCertificate(label);

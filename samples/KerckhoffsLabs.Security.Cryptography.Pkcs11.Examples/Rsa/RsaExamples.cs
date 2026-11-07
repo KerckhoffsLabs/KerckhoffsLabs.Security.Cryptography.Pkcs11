@@ -8,6 +8,32 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 /// <summary>docs/examples/rsa.md: RSA signatures and RSA-OAEP with a token key.</summary>
 public static class RsaExamples
 {
+    public static byte[] GenerateRsaSigningKey(string modulePath, string tokenLabel, SecurePin pin, string keyLabel)
+    {
+        #region GenerateRsaSigningKey
+        // 1. Load the module and log in. The module path and token label come from configuration; the PIN
+        //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 2. Generate a 3072-bit RSA signing key pair on the token. The private key is sensitive
+        //    (CKA_SENSITIVE: never revealed) and non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped
+        //    off the token); the pair may sign and verify only. persistOnToken: true makes both halves token
+        //    objects (CKA_TOKEN), which stay on the token when the session closes; without it the pair is
+        //    gone with the session. keyLabel becomes the CKA_LABEL of both halves, by which the application
+        //    opens it: pick one no other key on the token has, as OpenKey refuses an ambiguous label.
+        using Pkcs11Key key = session.GenerateRsaSigningKeyPair(
+            modulusBits: 3072, label: keyLabel, persistOnToken: true);
+
+        // 3. Export the public half (SubjectPublicKeyInfo DER), for those who verify the signatures.
+        using var rsa = new RSAPkcs11(key);
+        byte[] publicKey = rsa.ExportSubjectPublicKeyInfo();
+        // 4. The using declarations dispose the adapter, the key handle, the session and the library. The key
+        //    pair stays on the token.
+        #endregion
+        return publicKey;
+    }
+
     public static (byte[] Signature, RSAParameters PublicKey) SignPss(
         string modulePath, string tokenLabel, SecurePin pin, string keyLabel, byte[] data)
     {
@@ -17,10 +43,10 @@ public static class RsaExamples
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
 
-        // 2. Open the signing key pair that is already on the token, by its CKA_LABEL (OpenKey(id)
-        //    finds it by CKA_ID instead): for example one GenerateRsaSigningKeyPair(3072, label,
-        //    persistOnToken: true) made, allowed to sign and verify only. The private key is sensitive
-        //    and non-extractable: only its public half can leave the token.
+        // 2. Open the signing key pair that is already on the token (generated as above), by its
+        //    CKA_LABEL; OpenKey(id) finds it by CKA_ID instead. Both halves carry the label, so OpenKey
+        //    returns the pair. The private key is sensitive and non-extractable: only its public half
+        //    can leave the token.
         using Pkcs11Key key = session.OpenKey(keyLabel);
         using var rsa = new RSAPkcs11(key);                     // an RSA: SignData, VerifyData, ...
 
@@ -65,6 +91,33 @@ public static class RsaExamples
         return (signature, rsa.ExportParameters(includePrivateParameters: false));
     }
 
+    public static byte[] GenerateRsaKeyTransportKey(string modulePath, string tokenLabel, SecurePin pin, string keyLabel)
+    {
+        #region GenerateRsaKeyTransportKey
+        // 1. Load the module and log in. The module path and token label come from configuration; the PIN
+        //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 2. Generate a 3072-bit RSA key-transport key pair on the token. The private key is sensitive
+        //    (CKA_SENSITIVE: never revealed) and non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped
+        //    off the token); the pair may encrypt and decrypt only, not sign. persistOnToken: true makes both
+        //    halves token objects (CKA_TOKEN), which stay on the token when the session closes; without it
+        //    the pair is gone with the session. keyLabel becomes the CKA_LABEL of both halves, by which the
+        //    application opens it: pick one no other key on the token has, as OpenKey refuses an ambiguous
+        //    label.
+        using Pkcs11Key key = session.GenerateRsaKeyTransportKeyPair(
+            modulusBits: 3072, label: keyLabel, persistOnToken: true);
+
+        // 3. Export the public half (SubjectPublicKeyInfo DER), for those who encrypt to it.
+        using var rsa = new RSAPkcs11(key);
+        byte[] publicKey = rsa.ExportSubjectPublicKeyInfo();
+        // 4. The using declarations dispose the adapter, the key handle, the session and the library. The key
+        //    pair stays on the token.
+        #endregion
+        return publicKey;
+    }
+
     public static byte[] OaepEncryptDecrypt(
         string modulePath, string tokenLabel, SecurePin pin, string keyLabel, byte[] plaintext)
     {
@@ -73,8 +126,8 @@ public static class RsaExamples
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
 
-        // 2. Open the key-transport key pair that is already on the token, by its CKA_LABEL: encrypt
-        //    and decrypt only, a different role from signing (GenerateRsaKeyTransportKeyPair makes one).
+        // 2. Open the key-transport key pair that is already on the token (generated as above), by its
+        //    CKA_LABEL: encrypt and decrypt only, a different role from signing.
         using Pkcs11Key key = session.OpenKey(keyLabel);
         using var rsa = new RSAPkcs11(key);
 

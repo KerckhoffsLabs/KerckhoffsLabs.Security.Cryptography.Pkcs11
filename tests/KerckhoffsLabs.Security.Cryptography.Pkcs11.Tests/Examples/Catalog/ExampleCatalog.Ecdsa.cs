@@ -10,6 +10,22 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] EcdsaCases() =>
     [
+        new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.GenerateEcdsaKey)), [],
+            [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                byte[] spki = EcdsaExamples.GenerateEcdsaKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_SIGN);
+                AssertGeneratedKey(b, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_VERIFY);
+                (byte[] signature, _) = EcdsaExamples.SignP256(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                // The exported public key verifies what the opened pair signed: they are the same pair.
+                using ECDsa verifier = ECDsa.Create();
+                verifier.ImportSubjectPublicKeyInfo(spki, out _);
+                Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
+            }),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.SignP256)), [typeof(ECDsaPkcs11)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithProvisionedKey(b,

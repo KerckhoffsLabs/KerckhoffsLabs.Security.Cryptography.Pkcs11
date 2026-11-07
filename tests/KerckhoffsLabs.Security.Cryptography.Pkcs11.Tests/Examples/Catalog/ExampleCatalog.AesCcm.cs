@@ -10,6 +10,17 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] AesCcmCases() =>
     [
+        new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.GenerateAesCcmKey)), [],
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CCM], ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                AesCcmExamples.GenerateAesCcmKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_SECRET_KEY, CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT);
+                Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
+            }),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.AesCcmEncryptDecrypt)), [typeof(AesCcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CCM], ExampleBackend.Kryoptic,
             b => WithProvisionedKey(b,
