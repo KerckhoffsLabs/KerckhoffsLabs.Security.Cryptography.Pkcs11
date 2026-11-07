@@ -54,6 +54,53 @@ internal static class LayerDependencies
            && !allowed.Any(ns => InNamespace(type, ns))
            && !allowedExactly.Contains(type.Namespace, StringComparer.Ordinal);
 
+    /// <summary>
+    /// "<c>Type.Member</c>" (relative to <see cref="Root"/>) for every non-public type or member of this
+    /// library outside <paramref name="layer"/> that a type in <paramref name="layer"/> refers to, sorted.
+    /// A member counts as non-public when it is, or when a type it is declared in is; a type counts when
+    /// its definition uses it anywhere (see <see cref="ReferencedTypes"/>). Property and event accessors
+    /// are listed by their accessor names (<c>get_X</c>, <c>set_X</c>), so a read and a write differ.
+    /// </summary>
+    public static string[] NonPublicReferences(string layer)
+        => [.. Library.GetTypes()
+            .Where(t => InNamespace(t, layer))
+            .SelectMany(t => ReferencedTypes(t).SelectMany(RootTypes)
+                .Where(r => IsOutside(r, [layer]) && !IsVisible(r))
+                .Select(Name)
+                .Concat(ReferencedMembers(t)
+                    .Where(m => m.DeclaringType is { } d && IsOutside(d, [layer]) && !IsVisible(m))
+                    .Select(m => $"{Name(m.DeclaringType!)}.{m.Name}")))
+            .Distinct()
+            .Order(StringComparer.Ordinal)];
+
+    private static string Name(Type type)
+        => (type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type).FullName![(Root.Length + 1)..].Replace('+', '.');
+
+    // Reachable from another assembly: protected counts, since a consumer can derive to reach it.
+    private static bool IsVisible(Type type)
+    {
+        for (Type? t = type; t is not null; t = t.DeclaringType)
+        {
+            if (!(t.IsPublic || t.IsNestedPublic || t.IsNestedFamily || t.IsNestedFamORAssem))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool IsVisible(MemberInfo member)
+        => IsVisible(member.DeclaringType!) && member switch
+        {
+            MethodBase m => m.IsPublic || m.IsFamily || m.IsFamilyOrAssembly,
+            FieldInfo f => f.IsPublic || f.IsFamily || f.IsFamilyOrAssembly,
+            _ => true,
+        };
+
+    // The fields and methods the IL of type's methods and constructors refers to.
+    private static IEnumerable<MemberInfo> ReferencedMembers(Type type)
+        => type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared))
+            .SelectMany(m => m.GetMethodBody() is { } body ? IlReferences(m, body) : [])
+            .Where(m => m is FieldInfo or MethodBase);
+
     private static bool InNamespace(Type type, string ns)
         => type.Namespace is { } n && (n == ns || n.StartsWith(ns + ".", StringComparison.Ordinal));
 
