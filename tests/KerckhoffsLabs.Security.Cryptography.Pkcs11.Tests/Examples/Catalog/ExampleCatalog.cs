@@ -144,29 +144,33 @@ internal static partial class ExampleCatalog
         Action<Pkcs11Key>? thenWithKey = null)
     {
         string label = NewLabel();
-        Pkcs11Session? keeper = null;
-        try
+        using (Pkcs11Session? keeper = backend.SupportsTokenObjects ? null : backend.OpenSession())
         {
-            Pkcs11Session provisioning = backend.OpenSession();
-            using (provision(provisioning, label)) { }
-            if (backend.SupportsTokenObjects)
-                provisioning.Dispose();
-            else
-                keeper = provisioning;
-
-            example(label);
-
-            if (thenWithKey is not null)
-                WithSessionOrKeeper(backend, keeper, s =>
+            try
+            {
+                if (keeper is null)
                 {
-                    using Pkcs11Key key = s.OpenKey(label);
-                    thenWithKey(key);
-                });
-        }
-        finally
-        {
-            WithSessionOrKeeper(backend, keeper, s => DestroyObjectsLabelled(s, label));
-            keeper?.Dispose();
+                    using Pkcs11Session provisioning = backend.OpenSession();
+                    using (provision(provisioning, label)) { }
+                }
+                else
+                {
+                    using (provision(keeper, label)) { }
+                }
+
+                example(label);
+
+                if (thenWithKey is not null)
+                    WithSessionOrKeeper(backend, keeper, s =>
+                    {
+                        using Pkcs11Key key = s.OpenKey(label);
+                        thenWithKey(key);
+                    });
+            }
+            finally
+            {
+                WithSessionOrKeeper(backend, keeper, s => DestroyObjectsLabelled(s, label));
+            }
         }
         AssertFixtureLibraryStillWorks(backend);
     }
