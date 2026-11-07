@@ -227,6 +227,12 @@ public sealed partial class Pkcs11Key : IDisposable
     /// the private-key handle otherwise — covering both public-companion key pairs and private-only
     /// keys that carry their own attributes.
     /// </summary>
+    /// <remarks>
+    /// On a key pair this reads the <b>public</b> key: <c>CKA_CLASS</c> is <c>CKO_PUBLIC_KEY</c>,
+    /// <c>CKA_SIGN</c> and <c>CKA_SENSITIVE</c> are not the private key's. To read the private key's
+    /// attributes (whether it is sensitive, extractable, may sign, …), name the object with
+    /// <see cref="GetAttributeValue(KeyHandlePart, ReadOnlySpan{CKA})"/>.
+    /// </remarks>
     /// <param name="types">CKA types to read.</param>
     /// <returns>The attribute values, in the same order as <paramref name="types"/>. Attributes the
     /// token does not expose come back with <see cref="ObjectAttribute.CannotBeRead"/> set. The list
@@ -245,6 +251,46 @@ public sealed partial class Pkcs11Key : IDisposable
         if (handle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.GetAttributeValue (no readable handle)");
+
+        return _session.Core.GetAttributeValue(handle, types);
+    }
+
+    /// <summary>
+    /// Reads the requested attribute values from one of this key's token objects: the private-key object
+    /// of a key pair (or the single object of a secret key), or the public-key object of a key pair.
+    /// </summary>
+    /// <remarks>
+    /// A key pair is two PKCS#11 objects with attributes of their own. Read the private key's
+    /// <c>CKA_SENSITIVE</c>, <c>CKA_EXTRACTABLE</c> or <c>CKA_SIGN</c> with <see cref="KeyHandlePart.Private"/>;
+    /// <see cref="GetAttributeValue(ReadOnlySpan{CKA})"/> reads the public key whenever the pair has one.
+    /// </remarks>
+    /// <param name="part">Which object to read.</param>
+    /// <param name="types">CKA types to read.</param>
+    /// <returns>The attribute values, in the same order as <paramref name="types"/>. Attributes the
+    /// token does not expose come back with <see cref="ObjectAttribute.CannotBeRead"/> set. The list
+    /// owns the values: dispose it (a <see langword="using"/> will do) to release and zeroize their buffers.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the key has been disposed.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="part"/> is not a defined <see cref="KeyHandlePart"/> member.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="types"/> is empty.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no object of that
+    /// kind (a public part of a secret key, or a private part of a public-only key); otherwise propagated from the
+    /// underlying <c>C_GetAttributeValue</c> call.</exception>
+    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(KeyHandlePart part, params ReadOnlySpan<CKA> types)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        ObjectHandle handle = part switch
+        {
+            KeyHandlePart.Private => PrivateHandle,
+            KeyHandlePart.Public => PublicHandle,
+            _ => throw new ArgumentOutOfRangeException(nameof(part), part, "Not a defined KeyHandlePart member."),
+        };
+
+        if (handle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                part == KeyHandlePart.Private
+                    ? "Pkcs11Key.GetAttributeValue (the key has no private-key or secret-key object)"
+                    : "Pkcs11Key.GetAttributeValue (the key has no public-key object)");
 
         return _session.Core.GetAttributeValue(handle, types);
     }

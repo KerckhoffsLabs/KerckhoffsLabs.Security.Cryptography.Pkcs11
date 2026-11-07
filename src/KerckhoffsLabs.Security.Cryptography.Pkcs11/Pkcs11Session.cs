@@ -312,26 +312,42 @@ public sealed partial class Pkcs11Session : IDisposable
     /// Finds all keys matching the given template.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Only private, public and secret keys are returned, as for <see cref="OpenKey(ObjectTemplate)"/>: a
+    /// certificate or data object that matches the filter (a certificate shares its key's <c>CKA_ID</c>) is
+    /// left out. A <c>CKA_CLASS</c> in the filter must be one of the three key classes. The search is still
+    /// one <c>C_FindObjects</c> pass and one attribute read per object found.
+    /// </para>
+    /// <para>
     /// The other half of a key pair (same <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>) is looked up the first
     /// time an operation on the key needs it, not here. If that lookup fails, the error comes from that
     /// operation (<c>Verify</c>, <c>Encrypt</c>, <c>Sign</c>, <c>GetAttributeValue</c>, …), and the
     /// next use looks again.
+    /// </para>
     /// </remarks>
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder.</param>
     /// <returns>A list of <see cref="Pkcs11Key"/>. May be empty. The list owns the keys: dispose it
     /// (a <see langword="using"/> will do) to release them all.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="filter"/> names a <c>CKA_CLASS</c> that is not a key class.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public ReadOnlyDisposableList<Pkcs11Key> FindKeys(ObjectTemplate filter)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
 
+        _ = ClassesToSearch(filter, Keys); // refuses a CKA_CLASS that is not a key class
+
+        // One search, not one per key class: the class comes with the attribute read each found object
+        // gets anyway, and objects of other classes are dropped there.
         var handles = _core.FindAllObjects([.. filter.Attributes]);
         var result = new List<Pkcs11Key>(handles.Count);
         foreach (var handle in handles)
-            result.Add(HydrateKeyFromHandle(handle));
+        {
+            if (HydrateKeyFromHandle(handle, keysOnly: true) is { } key)
+                result.Add(key);
+        }
         return new ReadOnlyDisposableList<Pkcs11Key>(result);
     }
 
@@ -1108,6 +1124,8 @@ public sealed partial class Pkcs11Session : IDisposable
     private static readonly ObjectFamily Certificates =
         new("certificate", [CKO.CKO_CERTIFICATE], CKA.CKA_CERTIFICATE_TYPE, (ulong)CKC.CKC_X_509);
 
+    private static bool IsKeyClass(CKO objectClass) => Array.IndexOf(Keys.Classes, objectClass) >= 0;
+
     private Pkcs11Key OpenKeyCore(ObjectTemplate filter, string criteria)
         => FindUniqueKey(filter)
             ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No key {criteria} was found on the token.");
@@ -1290,6 +1308,15 @@ public sealed partial class Pkcs11Session : IDisposable
     /// its other half the first time an operation needs it; nothing is searched here.
     /// </summary>
     private Pkcs11Key HydrateKeyFromHandle(ObjectHandle handle)
+        => HydrateKeyFromHandle(handle, keysOnly: false)!;
+
+    /// <summary>
+    /// Wraps a found object as a key, reading its class, key type, label and id in one call when the token
+    /// answers cleanly. With <paramref name="keysOnly"/>, an object whose class is not a key class
+    /// (a certificate that shares its key's <c>CKA_ID</c>, say) returns <see langword="null"/> instead of
+    /// failing on the <c>CKA_KEY_TYPE</c> it does not have.
+    /// </summary>
+    private Pkcs11Key? HydrateKeyFromHandle(ObjectHandle handle, bool keysOnly)
     {
         CKO objectClass;
         CKK keyType;
@@ -1300,6 +1327,8 @@ public sealed partial class Pkcs11Session : IDisposable
         if (_core.TryReadIdentity(handle, withKeyType: true, out ObjectIdentity identity))
         {
             (objectClass, keyType, label, id) = identity;
+            if (keysOnly && !IsKeyClass(objectClass))
+                return null;
         }
         else
         {
@@ -1311,6 +1340,8 @@ public sealed partial class Pkcs11Session : IDisposable
                 CKA.CKA_ID,
             ]);
             objectClass = (CKO)attrs[0].GetValueAsUlong();
+            if (keysOnly && !IsKeyClass(objectClass))
+                return null;
             keyType = (CKK)attrs[1].GetValueAsUlong();
             label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
             id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
