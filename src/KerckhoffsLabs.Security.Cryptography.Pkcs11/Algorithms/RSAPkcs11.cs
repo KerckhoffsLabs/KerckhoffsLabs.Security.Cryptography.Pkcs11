@@ -414,7 +414,7 @@ public sealed class RSAPkcs11 : RSA
     // The combined mechanisms carry the hash, so the policy judges it there; a digest the caller computed
     // reaches the token through a raw mechanism, so the hash is put to the policy on its own.
     private void GuardHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
-        => _key.Session.Enforce(new HashUseRequest(hashAlgorithm, operation));
+        => _key.Session.EnforcePolicy(new HashUseRequest(hashAlgorithm, operation));
 
     private static int DigestLength(HashAlgorithmName hash) => hash.Name switch
     {

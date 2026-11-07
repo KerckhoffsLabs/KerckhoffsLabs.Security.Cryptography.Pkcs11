@@ -308,8 +308,11 @@ public sealed partial class Pkcs11Key : IDisposable
         return _session.OpenCertificateById(_id);
     }
 
-    /// <summary>Internal accessor for the session this key belongs to.</summary>
-    internal Pkcs11Session Session => _session;
+    /// <summary>
+    /// The session this key was opened, generated, derived or unwrapped in. Operations on the key run in it,
+    /// under its <see cref="Pkcs11Session.Policy"/>; the key does not own it.
+    /// </summary>
+    public Pkcs11Session Session => _session;
 
     /// <summary>
     /// Internal accessor for the private handle. <see cref="ObjectHandle.Invalid"/> for public-only keys.
@@ -554,7 +557,7 @@ public sealed partial class Pkcs11Key : IDisposable
         // Fall back to managed verify via synthesized public parameters. No session call happens on this
         // path, so the session policy is consulted here — the same verdict the token path gets from
         // the session's own check.
-        _session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
+        _session.EnforcePolicy(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
 
         if (_keyType == CKK.CKK_RSA)
         {
@@ -602,7 +605,7 @@ public sealed partial class Pkcs11Key : IDisposable
 
         // No session call happens on this path, so the policy is asked here, as Verify asks it.
         (CKM scheme, _) = Pkcs1DigestInfo.Encode(hash, digest);
-        _session.Enforce(new MechanismUseRequest(new Mechanism(scheme), CryptoOperation.Verify));
+        _session.EnforcePolicy(new MechanismUseRequest(new Mechanism(scheme), CryptoOperation.Verify));
 
         if (_keyType == CKK.CKK_RSA && GetSynthesizedRsaParameters() is { } rsaParams)
         {

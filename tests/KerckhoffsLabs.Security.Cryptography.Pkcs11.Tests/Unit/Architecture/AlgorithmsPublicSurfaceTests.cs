@@ -19,11 +19,6 @@ public sealed class AlgorithmsPublicSurfaceTests
     // public façade method, instead.
     private static readonly string[] Known =
     [
-        // The key's session, and the policy checks the adapters run on it themselves.
-        "Pkcs11Key.get_Session",
-        "Pkcs11Session.Enforce",
-        "Pkcs11Session.IsPermitted",
-
         // Reading a secret back off the token under the export rule.
         "KeyMaterial.ReadBackFailures",
         "KeyMaterial.ReadBackFailures..ctor",

@@ -54,8 +54,27 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <summary>The session's native calls and policy enforcement. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
     internal Pkcs11SessionCore Core => _core;
 
-    /// <summary>Submits <paramref name="request"/> to the session's effective policy; throws on denial.</summary>
-    internal void Enforce(PolicyRequest request) => _core.Enforce(request);
+    /// <summary>
+    /// Submits <paramref name="request"/> to the session's effective <see cref="Policy"/>, as every operation
+    /// of this library does before it reaches the token, and throws if the policy refuses it. A refusal is
+    /// logged, as for a refused operation.
+    /// </summary>
+    /// <remarks>
+    /// For work done off the token on the session's behalf, which no session or key method sees: an
+    /// adapter that hashes in managed code before signing on the token checks the hash with a
+    /// <see cref="HashUseRequest"/> here first. Operations of this library check their own requests; a
+    /// request it allows here grants nothing to them.
+    /// </remarks>
+    /// <param name="request">The request to judge.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The policy refuses <paramref name="request"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
+    public void EnforcePolicy(PolicyRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _core.Enforce(request);
+    }
 
     /// <summary>
     /// Opens a read-back of <paramref name="kind"/> once the policy allows it; see <see cref="SecretReadBack"/>.
@@ -72,8 +91,20 @@ public sealed partial class Pkcs11Session : IDisposable
     internal SecretReadBack BeginReadBack(KeyMaterialExportKind kind, Pkcs11Key? sourceKey = null)
         => new(_core.BeginReadBack(kind, sourceKey is null ? null : sourceKey.ReadExportKeyInfo));
 
-    /// <summary>Evaluates <paramref name="request"/> without throwing or logging.</summary>
-    internal bool IsPermitted(PolicyRequest request) => _core.IsPermitted(request);
+    /// <summary>
+    /// Whether the session's effective <see cref="Policy"/> allows <paramref name="request"/>; unlike
+    /// <see cref="EnforcePolicy"/>, it neither throws on a refusal nor logs it.
+    /// </summary>
+    /// <param name="request">The request to judge.</param>
+    /// <returns><see langword="true"/> if the policy allows <paramref name="request"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
+    public bool IsAllowedByPolicy(PolicyRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _core.IsPermitted(request);
+    }
 
     /// <summary>
     /// The crypto policy currently enforced by this session: the one it was opened with, unless a

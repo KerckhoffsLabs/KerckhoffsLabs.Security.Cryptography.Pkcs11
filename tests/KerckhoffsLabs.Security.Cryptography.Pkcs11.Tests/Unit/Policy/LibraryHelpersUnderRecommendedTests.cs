@@ -54,8 +54,8 @@ public sealed class LibraryHelpersUnderRecommendedTests
 
         foreach (CKM wrap in (CKM[])[CKM.CKM_AES_KEY_WRAP_KWP, CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_PAD])
         {
-            Assert.True(session.IsPermitted(new MechanismUseRequest(new Mechanism(wrap), CryptoOperation.Wrap)), $"{wrap} Wrap");
-            Assert.True(session.IsPermitted(new MechanismUseRequest(new Mechanism(wrap), CryptoOperation.Unwrap)), $"{wrap} Unwrap");
+            Assert.True(session.IsAllowedByPolicy(new MechanismUseRequest(new Mechanism(wrap), CryptoOperation.Wrap)), $"{wrap} Wrap");
+            Assert.True(session.IsAllowedByPolicy(new MechanismUseRequest(new Mechanism(wrap), CryptoOperation.Unwrap)), $"{wrap} Unwrap");
         }
     });
 
