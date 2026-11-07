@@ -18,9 +18,50 @@ Two details matter:
   example builds the templates.
 - **Use `X509SignatureGenerator`, not `CreateSelfSigned`.** `CertificateRequest.CreateSelfSigned` returns
   a certificate with the private key attached, which means exporting it, and a token key cannot be
-  exported. `request.Create(...)` with `X509SignatureGenerator.CreateForECDsa` (or `CreateForRSA`) only
-  asks the key to sign. To have a certificate authority issue the certificate instead,
+  exported. `request.Create(...)` with `X509SignatureGenerator.CreateForECDsa` (or the generator for another key
+  type, below) only asks the key to sign. To have a certificate authority issue the certificate instead,
   `request.CreateSigningRequest()` works as it is: it only asks the key to sign the request.
+
+## Other key types: RSA, ML-DSA and SLH-DSA
+
+The steps are the same for every signing key: a key pair and a certificate sharing a `CKA_ID`, the
+adapter passed to `CertificateRequest`, and the matching `X509SignatureGenerator`.
+
+| Key | Adapter | `CertificateRequest` | Signature generator |
+|---|---|---|---|
+| EC (above) | `ECDsaPkcs11` | `(subject, ecdsa, hash)` | `X509SignatureGenerator.CreateForECDsa` |
+| RSA | `RSAPkcs11` | `(subject, rsa, hash, padding)` | `X509SignatureGenerator.CreateForRSA(rsa, padding)` |
+| ML-DSA | `MLDsaPkcs11` | `(subject, mlDsa)` | `X509SignatureGenerator.CreateForMLDsa` |
+| SLH-DSA | `SlhDsaPkcs11` | `(subject, slhDsa)` | `X509SignatureGenerator.CreateForSlhDsa` |
+
+**RSA.** Sign with RSASSA-PSS. Use PKCS#1 v1.5 (`RSASignaturePadding.Pkcs1`, in both calls) only for a
+relying party that does not accept PSS certificates; the default policy allows both for signatures.
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#IssueRsaPssCertificate)]
+
+**ML-DSA** (FIPS 204). The parameter set fixes the signature algorithm, so there is no hash to choose.
+`MLDsa` is stable in .NET 10, but its `CertificateRequest` constructor and
+`X509SignatureGenerator.CreateForMLDsa` are `[Experimental]` (SYSLIB5006). It needs a token with ML-DSA
+(Kryoptic, for one), and the BCL needs OpenSSL 3.5 or later on Linux to verify the certificate.
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#IssueMlDsaCertificate)]
+
+**SLH-DSA** (FIPS 205). `SlhDsa` is `[Experimental]` in .NET 10 (SYSLIB5006). The small "s" parameter
+sets are slow to sign and give a certificate with an 8 KB signature.
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#IssueSlhDsaCertificate)]
+
+## Checking a certificate's signature with the BCL
+
+A certificate the token signed is an ordinary certificate. Its signature covers the DER of
+`tbsCertificate`, and a self-signed certificate's own public key verifies it:
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#VerifySelfSignatureWithBcl)]
+
+The tests check every certificate on this page this way. `X509Chain` is not a substitute here: with a
+self-signed certificate added as its own `CustomTrustStore` root, `Build` succeeds even for a certificate
+signed by another key, because a chain does not check its trust anchor's signature. It is the right tool
+once the token key is a CA that issues other certificates: the chain checks those.
 
 ## Signing with a certificate's key — `Pkcs11CertificateExtensions`
 
