@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
@@ -86,5 +88,62 @@ public sealed class DerivedKeyMaterialLeakTests
             _ = ecdh.DeriveRawSecretAgreement(peer.PublicKey);
 
         Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
+    }
+
+    /// <summary>
+    /// The secure defaults appended to SP 800-108 sibling templates own unmanaged buffers: they must be
+    /// released after a derive, and also when a later sibling is refused after earlier ones were built.
+    /// </summary>
+    [Fact]
+    public void Sp800108SiblingDefaults_LeaveNothingInUnmanagedMemory()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var session = ManagedToken.OpenSession(library, CryptoPolicy.Recommended);
+        using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label("kdf-sibling-leak").Value(KeyBytes).Derive().Build();
+        using var baseKey = session.ImportKey(baseTpl);
+
+        // Omits CKA_SENSITIVE / CKA_EXTRACTABLE, so the session builds defaults for it.
+        using var accepted = new ReadOnlyDisposableList<ObjectAttribute>(
+        [
+            new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY),
+            new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET),
+            new ObjectAttribute(CKA.CKA_VALUE_LEN, 16UL),
+        ]);
+        using var refused = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(16).Sensitive(false).Build();
+        using var primaryTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+        void DeriveOnce()
+        {
+            CkmSp800108KdfParams kdfParams = SiblingParams(accepted);
+            var ok = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdfParams);
+            using (Pkcs11Key primary = baseKey.Derive(ok, primaryTpl))
+            {
+                using Pkcs11Key sibling = kdfParams.AdditionalDerivedKeys[0]!;
+                sibling.Destroy();
+                primary.Destroy();
+            }
+
+            var bad = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, SiblingParams(accepted, [.. refused.Attributes]));
+            Assert.Throws<CryptoPolicyViolationException>(() => baseKey.Derive(bad, primaryTpl));
+        }
+
+        DeriveOnce(); // warm-up
+
+        int before = SettledAllocationCount();
+        for (int i = 0; i < 8; i++)
+            DeriveOnce();
+
+        Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
+    }
+
+    private static CkmSp800108KdfParams SiblingParams(params IReadOnlyList<ObjectAttribute>[] siblings)
+    {
+        var builder = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+            .IterationCounter().ByteArray("label"u8.ToArray()).ByteArray([0x00]).ByteArray("context"u8.ToArray())
+            .DkmLength(Sp800108DkmLengthMethod.SumOfKeys);
+        foreach (var sibling in siblings)
+            builder.AddDerivedKey(sibling);
+        return builder.Build();
     }
 }
