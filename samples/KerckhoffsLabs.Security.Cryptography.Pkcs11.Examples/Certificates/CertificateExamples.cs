@@ -44,6 +44,21 @@ public static class CertificateExamples
         return stored;
     }
 
+    public static X509Certificate2 BclIssueSelfSignedCertificate()
+    {
+        #region BclIssueSelfSignedCertificate
+        using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);   // the private key is in your process
+
+        var request = new CertificateRequest("CN=Example Signing", ecdsa, HashAlgorithmName.SHA256);
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, critical: true));
+        // CreateSelfSigned copies the private key into the certificate: HasPrivateKey is true.
+        X509Certificate2 certificate = request.CreateSelfSigned(
+            notBefore: DateTimeOffset.UtcNow,
+            notAfter: DateTimeOffset.UtcNow.AddYears(1));
+        #endregion
+        return certificate;
+    }
+
     public static Pkcs11Certificate IssueRsaPssCertificate(Pkcs11Session session, string label)
     {
         #region IssueRsaPssCertificate
@@ -190,5 +205,17 @@ public static class CertificateExamples
         X509Certificate2 certificate = new(stored.Certificate);  // a copy that outlives the token object
         #endregion
         return (signature, certificate);
+    }
+
+    public static byte[] BclSignWithCertificateKey(X509Certificate2 certificate, byte[] data)
+    {
+        #region BclSignWithCertificateKey
+        // A certificate that carries its private key, from CreateSelfSigned or a PFX.
+        using ECDsa privateKey = certificate.GetECDsaPrivateKey()
+            ?? throw new InvalidOperationException("The certificate has no EC signing key.");
+
+        byte[] signature = privateKey.SignData(data, HashAlgorithmName.SHA256);
+        #endregion
+        return signature;
     }
 }

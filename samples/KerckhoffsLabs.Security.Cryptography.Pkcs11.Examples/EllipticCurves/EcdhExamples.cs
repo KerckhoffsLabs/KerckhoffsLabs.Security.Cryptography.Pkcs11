@@ -38,4 +38,27 @@ public static class EcdhExamples
         #endregion
         return (tokenKey, peerKey);
     }
+
+    public static (byte[] OurKey, byte[] PeerKey) BclAgreeAesKey()
+    {
+        byte[] salt = RandomNumberGenerator.GetBytes(32);      // sent along with the public keys
+        byte[] info = "example.com/v1 session key"u8.ToArray(); // binds the key to its purpose
+
+        #region BclAgreeAesKey
+        // Both sides in software. The two exchange public keys.
+        using ECDiffieHellman ours = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using ECDiffieHellman peer = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+
+        // The shared secret Z and the AES key are bytes in your process: zero Z once HKDF has used it.
+        byte[] z = ours.DeriveRawSecretAgreement(peer.PublicKey);
+        byte[] ourKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, z, outputLength: 32, salt, info);
+        CryptographicOperations.ZeroMemory(z);
+
+        // The peer computes the same Z and runs the same HKDF.
+        byte[] peerZ = peer.DeriveRawSecretAgreement(ours.PublicKey);
+        byte[] peerKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, peerZ, outputLength: 32, salt, info);
+        CryptographicOperations.ZeroMemory(peerZ);
+        #endregion
+        return (ourKey, peerKey);
+    }
 }

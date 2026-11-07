@@ -4,14 +4,24 @@ It is a legacy algorithm: read [Legacy algorithms](legacy.md) for the two steps 
 
 ## Decrypting a single-DES record
 
+# [PKCS#11](#tab/pkcs11)
+
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Legacy/DesExamples.cs#DesDecryptLegacyRecord)]
 
-Many tokens no longer implement single DES at all.
-
-The adapter is a `DES` over the token key, so it decrypts exactly what the BCL's `DES` does with the same key
-bytes. In software the key has to be in your process, which is what keeping it on the token avoids; use
-this only for data whose key already lives in software:
+# [System.Security.Cryptography](#tab/bcl)
 
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Legacy/DesExamples.cs#BclDesDecryptLegacyRecord)]
+
+---
+
+**What differs from `DES`:**
+
+- The constructor takes the token key that holds the legacy key; `Key` cannot be read or set. The BCL's
+  `DES` needs the key bytes in your process, which is what keeping the key on the token avoids.
+- The default policy refuses single DES: each use takes a scoped `UsePolicy(CryptoPolicy.AllowInsecure)`
+  lease, and the adapter is `[Obsolete]` (`KLPKCS11003`), suppressed at the line that needs it.
+- It decrypts exactly what the BCL's `DES` does with the same key bytes, through the one-shot methods
+  (`DecryptCbc`, `DecryptEcb`); there is no `ICryptoTransform`.
+- Many tokens no longer implement single DES at all.
 
 API reference: <xref:KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DESPkcs11>.

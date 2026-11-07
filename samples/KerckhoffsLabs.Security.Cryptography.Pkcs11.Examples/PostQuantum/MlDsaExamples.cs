@@ -29,6 +29,18 @@ public static class MlDsaExamples
         return (signature, publicKey);
     }
 
+    public static (byte[] Signature, byte[] PublicKey) BclMlDsaSign(byte[] data)
+    {
+        #region BclMlDsaSign
+        // In software, where MLDsa.IsSupported (OpenSSL 3.5 or later on Linux). The private key is in your process.
+        using MLDsa mlDsa = MLDsa.GenerateKey(MLDsaAlgorithm.MLDsa65);
+
+        byte[] signature = mlDsa.SignData(data);
+        byte[] publicKey = mlDsa.ExportMLDsaPublicKey();
+        #endregion
+        return (signature, publicKey);
+    }
+
     public static bool MlDsaVerifyWithBcl(byte[] data, byte[] signature, byte[] publicKey)
     {
         #region MlDsaVerifyWithBcl

@@ -2,7 +2,15 @@
 
 Sign on the token, with a key pair from `GenerateEcSigningKeyPair` (see [Elliptic curves](elliptic-curves.md)):
 
+# [PKCS#11](#tab/pkcs11)
+
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/EllipticCurves/EcdsaExamples.cs#SignP256)]
+
+# [System.Security.Cryptography](#tab/bcl)
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/EllipticCurves/EcdsaExamples.cs#BclSignP256)]
+
+---
 
 Verify anywhere, with the public key and the plain BCL:
 
@@ -10,6 +18,8 @@ Verify anywhere, with the public key and the plain BCL:
 
 **What differs from `ECDsa`:**
 
+- The key pair is generated on the token (`session.GenerateEcSigningKeyPair`, a pair that can only sign
+  and verify) instead of by `ECDsa.Create`.
 - `ExportParameters(includePrivateParameters: true)` and the private-key export methods throw; export the
   public half with `ExportParameters(false)` or `ExportSubjectPublicKeyInfo()`.
 - Signatures use the same formats as the BCL: IEEE P1363 (`r || s`) by default, DER with

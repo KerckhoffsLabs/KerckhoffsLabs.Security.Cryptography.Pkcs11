@@ -9,9 +9,17 @@ and `CKA_ID`. Its private key is a separate object with the same `CKA_ID`. The e
 
 The BCL's `CertificateRequest` builds the certificate; the token key signs it:
 
+# [PKCS#11](#tab/pkcs11)
+
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#IssueSelfSignedCertificate)]
 
-Two details matter:
+# [System.Security.Cryptography](#tab/bcl)
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#BclIssueSelfSignedCertificate)]
+
+---
+
+**What differs from `CertificateRequest.CreateSelfSigned`:**
 
 - **The key pair and the certificate share a `CKA_ID`.** That is how PKCS#11 links them, and how
   `GetECDsaPrivateKey` finds the key. The `Pkcs11Session` key-generation helpers do not set an id, so the
@@ -65,7 +73,15 @@ once the token key is a CA that issues other certificates: the chain checks thos
 
 ## Signing with a certificate's key — `Pkcs11CertificateExtensions`
 
+# [PKCS#11](#tab/pkcs11)
+
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#SignWithCertificateKey)]
+
+# [System.Security.Cryptography](#tab/bcl)
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Certificates/CertificateExamples.cs#BclSignWithCertificateKey)]
+
+---
 
 **What differs from `X509Certificate2.GetECDsaPrivateKey()`:**
 

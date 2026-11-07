@@ -31,15 +31,17 @@ public static class SlhDsaExamples
         return (signature, publicKey);
     }
 
-    public static bool SlhDsaVerifyWithBcl(byte[] data, byte[] signature, byte[] publicKey)
+    public static (byte[] Signature, byte[] PublicKey) BclSlhDsaSign(byte[] data)
     {
-        #region SlhDsaVerifyWithBcl
-        // Anyone with the public key verifies in software, off the token (where SlhDsa.IsSupported).
+        #region BclSlhDsaSign
+        // In software, where SlhDsa.IsSupported (OpenSSL 3.5 or later on Linux). The private key is in your process.
 #pragma warning disable SYSLIB5006
-        using SlhDsa verifier = SlhDsa.ImportSlhDsaPublicKey(SlhDsaAlgorithm.SlhDsaSha2_128s, publicKey);
-        bool valid = verifier.VerifyData(data, signature);
+        using SlhDsa slhDsa = SlhDsa.GenerateKey(SlhDsaAlgorithm.SlhDsaSha2_128s);
+
+        byte[] signature = slhDsa.SignData(data);
+        byte[] publicKey = slhDsa.ExportSlhDsaPublicKey();
 #pragma warning restore SYSLIB5006
         #endregion
-        return valid;
+        return (signature, publicKey);
     }
 }

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
@@ -12,10 +11,13 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(Sha2Examples), nameof(Sha2Examples.Sha2OnToken)), [typeof(SHA256Pkcs11), typeof(SHA384Pkcs11), typeof(SHA512Pkcs11)],
             [CKM.CKM_SHA256, CKM.CKM_SHA384, CKM.CKM_SHA512], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(
-                [SHA256.HashData(Message), SHA384.HashData(Message), SHA512.HashData(Message)],
-                Sha2Examples.Sha2OnToken(s, Message)))),
-        new(Name(nameof(Sha2Examples), nameof(Sha2Examples.BclSha256)), [], [], ExampleBackend.SoftHsm2,
-            _ => Assert.Equal(SHA256.HashData(Message), Sha2Examples.BclSha256(Message))),
+            b => WithSession(b, s => Assert.Equal(Sha2Examples.BclSha2(Message), Sha2Examples.Sha2OnToken(s, Message)))),
+        new(Name(nameof(Sha2Examples), nameof(Sha2Examples.BclSha2)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                byte[][] digests = Sha2Examples.BclSha2("abc"u8.ToArray());
+                Assert.Equal(Convert.FromHexString("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"), digests[0]); // FIPS 180 "abc"
+                Assert.Equal([48, 64], digests[1..].Select(d => d.Length));
+            }),
     ];
 }
