@@ -192,10 +192,10 @@ and the exports it allows are logged once the secret has been read: a `KeyMateri
 for the first export of each kind under the policy on a session, then the same line at Debug for every later
 one (the kind and the policy name, never the secret). Every kind is scoped by the key the secret comes from, and
 the call must name the scope: `KdfOutput` by base key
-([the base-key scope](crypto-policies.md#kdfoutput-base-key-scope)), `EcdhSharedSecret` and `KemSharedSecret` by
-private key ([the private-key scope](crypto-policies.md#private-key-scope)). Apply the policy as a scoped
+([the base-key scope](guide/crypto-policies.md#kdfoutput-base-key-scope)), `EcdhSharedSecret` and `KemSharedSecret` by
+private key ([the private-key scope](guide/crypto-policies.md#private-key-scope)). Apply the policy as a scoped
 `UsePolicy` lease or on a session of its own, not as the policy your sessions are opened with
-([where to apply it](crypto-policies.md#where-to-apply-an-export-opt-in)).
+([where to apply it](guide/crypto-policies.md#where-to-apply-an-export-opt-in)).
 
 ## Runtime-only gates
 
