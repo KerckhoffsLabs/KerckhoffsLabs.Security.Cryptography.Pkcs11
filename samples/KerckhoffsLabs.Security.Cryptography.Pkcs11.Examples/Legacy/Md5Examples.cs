@@ -32,7 +32,7 @@ public static class Md5Examples
     public static byte[] BclMd5(byte[] data)
     {
         #region BclMd5
-        // The same identifier in software: no token, no policy lease. Hashing public data on a token gains nothing.
+        // The same identifier in software: no token, so no policy lease.
         byte[] digest = MD5.HashData(data);
         #endregion
         return digest;

@@ -41,4 +41,22 @@ public static class MlKemExamples
         #endregion
         return (tokenKey, senderSecret);
     }
+
+    public static (byte[] ReceiverSecret, byte[] SenderSecret) BclMlKemReceive()
+    {
+        #region BclMlKemReceive
+        // The receiver in software, where MLKem.IsSupported (OpenSSL 3.5 or later on Linux): its
+        // decapsulation key and the shared secret are in your process.
+        using MLKem receiver = MLKem.GenerateKey(MLKemAlgorithm.MLKem768);
+        byte[] encapsulationKey = receiver.ExportEncapsulationKey(); // published to senders
+
+        // The sender, as on the PKCS#11 tab.
+        using MLKem sender = MLKem.ImportEncapsulationKey(MLKemAlgorithm.MLKem768, encapsulationKey);
+        sender.Encapsulate(out byte[] ciphertext, out byte[] senderSecret);
+
+        // The receiver recovers the 32-byte shared secret, to use as an AES-256 key.
+        byte[] receiverSecret = receiver.Decapsulate(ciphertext);
+        #endregion
+        return (receiverSecret, senderSecret);
+    }
 }

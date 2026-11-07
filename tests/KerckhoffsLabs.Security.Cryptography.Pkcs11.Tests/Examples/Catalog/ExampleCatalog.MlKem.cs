@@ -14,6 +14,14 @@ internal static partial class ExampleCatalog
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.MlKemReceiveAesKey)), [typeof(MLKemPkcs11)],
             [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
             AssertMlKemReceiveAesKey, Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b)),
+        new(Name(nameof(MlKemExamples), nameof(MlKemExamples.BclMlKemReceive)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                if (!MLKem.IsSupported) Assert.Skip("ML-KEM is not supported by this platform's BCL.");
+                (byte[] receiverSecret, byte[] senderSecret) = MlKemExamples.BclMlKemReceive();
+                Assert.Equal(32, receiverSecret.Length);
+                Assert.Equal(senderSecret, receiverSecret);
+            }),
     ];
 
     private static void AssertMlKemReceiveAesKey(IPkcs11Backend backend)

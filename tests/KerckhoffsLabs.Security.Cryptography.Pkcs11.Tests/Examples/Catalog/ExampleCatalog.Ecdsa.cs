@@ -18,6 +18,13 @@ internal static partial class ExampleCatalog
                 Assert.True(EcdsaExamples.VerifyWithBcl(Message, signature, publicKey));
                 Assert.False(EcdsaExamples.VerifyWithBcl([.. Message, 0], signature, publicKey));
             })),
+        new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.BclSignP256)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                (byte[] signature, ECParameters publicKey) = EcdsaExamples.BclSignP256(Message);
+                Assert.True(EcdsaExamples.VerifyWithBcl(Message, signature, publicKey));
+                Assert.False(EcdsaExamples.VerifyWithBcl([.. Message, 0], signature, publicKey));
+            }),
         new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.VerifyWithBcl)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

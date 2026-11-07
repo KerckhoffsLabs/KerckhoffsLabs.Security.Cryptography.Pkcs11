@@ -17,12 +17,14 @@ public static class Sha3Examples
         return digests;
     }
 
-    public static byte[]? BclSha3_256(byte[] data)
+    public static byte[][]? BclSha3(byte[] data)
     {
-        #region BclSha3_256
+        #region BclSha3
         // In software, SHA-3 needs platform support (OpenSSL 1.1.1 or later, or a recent Windows): check first.
-        byte[]? digest = SHA3_256.IsSupported ? SHA3_256.HashData(data) : null;
+        byte[][]? digests = SHA3_256.IsSupported
+            ? [SHA3_256.HashData(data), SHA3_384.HashData(data), SHA3_512.HashData(data)]
+            : null;
         #endregion
-        return digest;
+        return digests;
     }
 }

@@ -4,19 +4,34 @@ FIPS 203 key establishment; see [Post-quantum cryptography](post-quantum.md) for
 platform need.
 
 The receiver publishes an encapsulation key; a sender uses it to produce a shared secret and a
-ciphertext; the receiver recovers the same secret from the ciphertext. Here the receiver is the token and
-the secret becomes an AES key on it:
+ciphertext; the receiver recovers the same secret from the ciphertext. On the PKCS#11 tab the receiver
+is the token and the secret becomes an AES key on it:
+
+# [PKCS#11](#tab/pkcs11)
 
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/PostQuantum/MlKemExamples.cs#MlKemReceiveAesKey)]
 
-**Why `DecapsulateKey` and not `MLKemPkcs11.Decapsulate`?** The BCL-shaped `Encapsulate` and
-`Decapsulate` return the shared secret to your process, so the default `Recommended` policy refuses them,
-as it refuses reading an [ECDH](ecdh.md) secret. `Pkcs11Key.DecapsulateKey` (`C_DecapsulateKey`) creates
-the secret as a token key from your template, here an AES key for [AES-GCM](aes-gcm.md). Use
-`MLKemPkcs11` for `ExportEncapsulationKey` and the other public-key members.
+# [System.Security.Cryptography](#tab/bcl)
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/PostQuantum/MlKemExamples.cs#BclMlKemReceive)]
+
+---
 
 ML-KEM-768 is the general-purpose choice; ML-KEM-1024 for the highest security category; ML-KEM-512
 where size matters most.
+
+**What differs from `MLKem`:**
+
+- The key pair is generated on the token from templates that name the parameter set
+  (`CKA_PARAMETER_SET`) and the two roles; there is no `MLKemPkcs11.GenerateKey`. Publish the
+  encapsulation key with `ExportEncapsulationKey`, as with the BCL.
+- **Decapsulate with `Pkcs11Key.DecapsulateKey`, not `MLKemPkcs11.Decapsulate`.** The BCL-shaped
+  `Encapsulate` and `Decapsulate` return the shared secret to your process, so the default
+  `Recommended` policy refuses them, as it refuses reading an [ECDH](ecdh.md) secret.
+  `DecapsulateKey` (`C_DecapsulateKey`) creates the secret as a token key from your template, here an
+  AES key for [AES-GCM](aes-gcm.md). Use `MLKemPkcs11` for `ExportEncapsulationKey` and the other
+  public-key members.
+- The BCL needs `MLKem.IsSupported`; the adapter needs a token with `CKM_ML_KEM`.
 
 API reference: <xref:KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.MLKemPkcs11>,
 <xref:KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DecapsulateKey*>.

@@ -37,5 +37,12 @@ internal static partial class ExampleCatalog
                 Assert.Throws<CryptoPolicyViolationException>(() => ecdh.DeriveKeyFromHash(other.PublicKey, HashAlgorithmName.SHA256));
             }),
             Unsupported: ExampleGates.ClassicAesGcm),
+        new(Name(nameof(EcdhExamples), nameof(EcdhExamples.BclAgreeAesKey)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                (byte[] ourKey, byte[] peerKey) = EcdhExamples.BclAgreeAesKey();
+                Assert.Equal(32, ourKey.Length);
+                Assert.Equal(ourKey, peerKey);
+            }),
     ];
 }

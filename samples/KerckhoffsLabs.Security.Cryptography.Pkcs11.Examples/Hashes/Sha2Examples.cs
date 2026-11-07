@@ -6,12 +6,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 /// <summary>docs/examples/sha-2.md: SHA-256, SHA-384 and SHA-512 on the token.</summary>
 public static class Sha2Examples
 {
-    public static byte[] BclSha256(byte[] data)
+    public static byte[][] BclSha2(byte[] data)
     {
-        #region BclSha256
-        byte[] digest = SHA256.HashData(data);
+        #region BclSha2
+        // In software: the static one-shot methods, no instance to dispose.
+        byte[][] digests = [SHA256.HashData(data), SHA384.HashData(data), SHA512.HashData(data)];
         #endregion
-        return digest;
+        return digests;
     }
 
     public static byte[][] Sha2OnToken(Pkcs11Session session, byte[] data)

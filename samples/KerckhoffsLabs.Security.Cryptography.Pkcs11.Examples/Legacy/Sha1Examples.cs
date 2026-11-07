@@ -30,7 +30,7 @@ public static class Sha1Examples
     public static byte[] BclSha1(byte[] data)
     {
         #region BclSha1
-        // The same identifier in software: no token, no policy lease. Hashing public data on a token gains nothing.
+        // The same identifier in software: no token, so no policy lease.
         byte[] digest = SHA1.HashData(data);
         #endregion
         return digest;

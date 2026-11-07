@@ -28,13 +28,13 @@ public static class DsaExamples
         #endregion
     }
 
-    public static bool DsaVerifyWithBcl(byte[] data, byte[] signature, DSAParameters publicKey)
+    public static bool BclDsaVerifyLegacySignature(DSAParameters publicKey, byte[] data, byte[] signature)
     {
-        #region DsaVerifyWithBcl
-        // Verification needs only the public key, so the BCL's DSA does it off the token, from the token key's
-        // ExportParameters(false). Not on macOS, whose DSA takes only 1024-bit keys.
-        using DSA verifier = DSA.Create(publicKey);
-        return verifier.VerifyData(data, signature, HashAlgorithmName.SHA256);
+        #region BclDsaVerifyLegacySignature
+        // In software: the BCL's DSA from the key's public parameters, with no policy to lift. Not on
+        // macOS, whose DSA takes only 1024-bit keys.
+        using DSA dsa = DSA.Create(publicKey);
+        return dsa.VerifyData(data, signature, HashAlgorithmName.SHA256);
         #endregion
     }
 }

@@ -40,6 +40,19 @@ internal static partial class ExampleCatalog
             Unsupported: b => b is SoftHsmBackendFixture && SoftHsmBackendFixture.IsV240Leg
                 ? "SoftHSM 2.5 implements RSA-OAEP with SHA-1 only"
                 : null),
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclSignPss)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                (byte[] signature, RSAParameters publicKey) = RsaExamples.BclSignPss(Message);
+                Assert.True(RsaExamples.VerifyPssWithBcl(Message, signature, publicKey));
+            }),
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclSignPkcs1v15)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                (byte[] signature, RSAParameters publicKey) = RsaExamples.BclSignPkcs1v15(Message);
+                using RSA verifier = RSA.Create(publicKey);
+                Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+            }),
         new(Name(nameof(RsaExamples), nameof(RsaExamples.BclOaepEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(Message, RsaExamples.BclOaepEncryptDecrypt(Message))),
     ];

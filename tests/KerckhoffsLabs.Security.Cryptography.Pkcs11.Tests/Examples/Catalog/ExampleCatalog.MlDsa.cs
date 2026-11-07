@@ -20,6 +20,14 @@ internal static partial class ExampleCatalog
                 Assert.True(MlDsaExamples.MlDsaVerifyWithBcl(Message, signature, publicKey));
                 Assert.False(MlDsaExamples.MlDsaVerifyWithBcl([.. Message, 0], signature, publicKey));
             })),
+        new(Name(nameof(MlDsaExamples), nameof(MlDsaExamples.BclMlDsaSign)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                if (!MLDsa.IsSupported) Assert.Skip("ML-DSA is not supported by this platform's BCL.");
+                (byte[] signature, byte[] publicKey) = MlDsaExamples.BclMlDsaSign(Message);
+                Assert.True(MlDsaExamples.MlDsaVerifyWithBcl(Message, signature, publicKey));
+                Assert.False(MlDsaExamples.MlDsaVerifyWithBcl([.. Message, 0], signature, publicKey));
+            }),
         new(Name(nameof(MlDsaExamples), nameof(MlDsaExamples.MlDsaVerifyWithBcl)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

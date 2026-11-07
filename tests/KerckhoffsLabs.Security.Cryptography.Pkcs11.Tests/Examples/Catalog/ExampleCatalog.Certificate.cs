@@ -72,6 +72,22 @@ internal static partial class ExampleCatalog
                 Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(stored.Certificate));
             })),
 #pragma warning restore SYSLIB5006
+        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.BclIssueSelfSignedCertificate)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                using X509Certificate2 certificate = CertificateExamples.BclIssueSelfSignedCertificate();
+                Assert.Equal("CN=Example Signing", certificate.Subject);
+                Assert.True(certificate.HasPrivateKey);
+                Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(certificate));
+            }),
+        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.BclSignWithCertificateKey)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                using X509Certificate2 certificate = CertificateExamples.BclIssueSelfSignedCertificate();
+                byte[] signature = CertificateExamples.BclSignWithCertificateKey(certificate, Message);
+                using ECDsa verifier = certificate.GetECDsaPublicKey()!;
+                Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
+            }),
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.VerifySelfSignatureWithBcl)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

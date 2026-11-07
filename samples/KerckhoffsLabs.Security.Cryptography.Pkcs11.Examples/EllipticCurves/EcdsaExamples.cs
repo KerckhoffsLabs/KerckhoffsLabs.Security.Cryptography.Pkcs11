@@ -19,6 +19,17 @@ public static class EcdsaExamples
         return (signature, publicKey);
     }
 
+    public static (byte[] Signature, ECParameters PublicKey) BclSignP256(byte[] data)
+    {
+        #region BclSignP256
+        using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);   // the private key is in your process
+
+        byte[] signature = ecdsa.SignData(data, HashAlgorithmName.SHA256);
+        ECParameters publicKey = ecdsa.ExportParameters(includePrivateParameters: false);
+        #endregion
+        return (signature, publicKey);
+    }
+
     public static bool VerifyWithBcl(byte[] data, byte[] signature, ECParameters publicKey)
     {
         #region VerifyWithBcl

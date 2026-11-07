@@ -12,7 +12,15 @@ Each RSA key pair has one role. `GenerateRsaSigningKeyPair` creates a pair that 
 
 Sign on the token:
 
+# [PKCS#11](#tab/pkcs11)
+
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#SignPss)]
+
+# [System.Security.Cryptography](#tab/bcl)
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#BclSignPss)]
+
+---
 
 Verify anywhere, with the public key and the plain BCL:
 
@@ -23,7 +31,15 @@ library. `RSAPkcs11.VerifyData` also works, and runs on the token.
 
 ## Signing with RSASSA-PKCS1-v1_5
 
+# [PKCS#11](#tab/pkcs11)
+
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#SignPkcs1v15)]
+
+# [System.Security.Cryptography](#tab/bcl)
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Rsa/RsaExamples.cs#BclSignPkcs1v15)]
+
+---
 
 PKCS#1 v1.5 *signatures* with a SHA-2 or SHA-3 hash are allowed by the default policy: they are
 FIPS 186-5-approved and required by JWT `RS256`, TLS 1.2, X.509 and code signing. Prefer PSS for new
