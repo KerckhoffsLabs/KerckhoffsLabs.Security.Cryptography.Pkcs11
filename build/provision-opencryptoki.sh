@@ -67,7 +67,11 @@ sleep 2
   echo "=== mechanisms (pkcsconf -m) ==="; sg pkcs11 -c '"$PKCSCONF" -m -c "$SLOT"' || true
 } >&2
 
-LIB="$(find "${PREFIX}/lib" -name libopencryptoki.so 2>/dev/null | head -1)"
+# `make install` puts the library in ${PREFIX}/lib/opencryptoki. Search ${PREFIX}/lib only when it is
+# not there: on a CI runner that tree holds whole toolchains, and a cold search of it takes ~20 s.
+# libopencryptoki.so is a symlink to libopencryptoki.so.0.0.0, so don't restrict the search to -type f.
+LIB="${PREFIX}/lib/opencryptoki/libopencryptoki.so"
+[[ -e "${LIB}" ]] || LIB="$(find "${PREFIX}/lib" -name libopencryptoki.so 2>/dev/null | head -1)"
 if [[ -z "${LIB}" ]]; then
   echo "libopencryptoki.so not found under ${PREFIX}/lib" >&2
   exit 1
