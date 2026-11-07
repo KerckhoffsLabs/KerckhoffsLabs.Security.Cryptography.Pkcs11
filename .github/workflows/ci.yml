@@ -136,12 +136,13 @@ jobs:
       # on both vendored submodule SHAs and the build scripts, so a submodule bump or script change
       # rebuilds. On a hit we set SkipPkcs11MockBuild/SkipSoftHsmV2Build so the BeforeTargets don't run
       # and the restored artifacts are used as-is (the vcpkg/OpenSSL caches stay as the miss fallback).
-      # Also records the Kryoptic, NSS, Craton HSM, FreeHSM, wolfPKCS11 and wolfSSL revisions, which key their own caches on ubuntu-latest.
+      # Also records the opencryptoki, Kryoptic, NSS, Craton HSM, FreeHSM, wolfPKCS11 and wolfSSL revisions, which key their own caches on ubuntu-latest.
       - name: Submodule revisions
         id: rev
         shell: bash
         run: |
           echo "native=native-${{ runner.os }}-${{ runner.arch }}-${{ matrix.arch || 'native' }}-mock_$(git -C vendor/pkcs11-mock rev-parse HEAD)-hsm_$(git -C vendor/softhsmv2 rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "opencryptoki=$(git -C vendor/opencryptoki rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "kryoptic=$(git -C vendor/kryoptic rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "craton=$(git -C vendor/craton-hsm-core rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "freehsm=$(git -C vendor/freehsm rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -260,6 +261,17 @@ jobs:
       - name: Stage OpenSSL 3.5 outside /home (opencryptoki)
         if: matrix.os == 'ubuntu-latest'
         run: sudo cp -a "$HOME/openssl-3.5" /opt/openssl-3.5
+
+      # build-opencryptoki.sh builds out of tree in obj/opencryptoki and stamps it, so a hit skips the
+      # bootstrap, configure and compile (about 70 s, several minutes on a slow runner) and only runs
+      # `make install`. The build bakes in the OpenSSL 3.5 headers and rpath, so the key also covers
+      # the action that pins that OpenSSL.
+      - name: Cache opencryptoki build
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/cache@v6.1.0
+        with:
+          path: obj/opencryptoki
+          key: opencryptoki-${{ runner.arch }}-${{ steps.rev.outputs.opencryptoki }}-${{ hashFiles('build/build-opencryptoki.sh', 'build/lib/common.sh', '.github/actions/openssl35/action.yml') }}-v1
 
       - name: Build opencryptoki from source
         if: matrix.os == 'ubuntu-latest'
