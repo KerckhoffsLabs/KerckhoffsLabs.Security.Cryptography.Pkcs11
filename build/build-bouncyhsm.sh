@@ -56,7 +56,10 @@ echo "Publishing BouncyHsm server..."
 echo "Building BouncyHsm native client for ${RID}..."
 # Upstream's Makefile defaults to clang; `cc` is whatever the runner's toolchain provides
 # (gcc on ubuntu-latest's build-essential).
-make -C "${SRC_DIR}/${MAKE_DIR}" CC=cc "${MAKE_TARGET}" 2>&1
+# -include platformHelper.h: bouncy-pkcs11-utils.c calls the Linux memcpy_s that platformHelper.c
+# defines without including its declaration (since harrison314/BouncyHsm 9480cc5). GCC 14 makes the
+# implicit declaration an error; the header is guarded, so including it everywhere is harmless.
+make -C "${SRC_DIR}/${MAKE_DIR}" CC=cc EXTRA_FLAGS="-include platformHelper.h" "${MAKE_TARGET}" 2>&1
 
 SRC_LIB="${SRC_DIR}/${MAKE_DIR}/${BUILT}"
 if [[ ! -f "${SRC_LIB}" ]]; then
