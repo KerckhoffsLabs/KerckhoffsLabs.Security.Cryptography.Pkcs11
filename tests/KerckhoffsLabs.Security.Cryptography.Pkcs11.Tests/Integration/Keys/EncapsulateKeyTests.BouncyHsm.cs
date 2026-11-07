@@ -19,17 +19,13 @@ public sealed class EncapsulateKeyTests_BouncyHsm(BouncyHsmBackendFixture backen
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Ecdh1_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(_backend);
 
-    // The shared key comes back readable for the reason pinned on the ML-KEM case below (harrison314/BouncyHsm#137).
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(EncapsulateKeyTestCases.MontgomeryCurves), MemberType = typeof(EncapsulateKeyTestCases))]
     public void Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(string curve) =>
-        EncapsulateKeyTestCases.Assert_Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, curve, tokenKeepsSensitive: false);
+        EncapsulateKeyTestCases.Assert_Ecdh1Montgomery_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, curve);
 
-    // BouncyHsm 2.3.4 clears CKA_SENSITIVE on the key C_EncapsulateKey / C_DecapsulateKey create, whatever the
-    // template asks (P11EncapsulatorBase.UpdateSecretKeyAttributes, harrison314/BouncyHsm#137), and does not hide CKA_VALUE for
-    // CKA_EXTRACTABLE = FALSE (harrison314/BouncyHsm#134), so the shared secret reads back. Pinned until fixed.
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(EncapsulateKeyTestCases.MlKemParameterSets), MemberType = typeof(EncapsulateKeyTestCases))]
     public void MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(CkpMlKem parameterSet) =>
-        EncapsulateKeyTestCases.Assert_MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, parameterSet, tokenKeepsSensitive: false);
+        EncapsulateKeyTestCases.Assert_MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, parameterSet);
 }

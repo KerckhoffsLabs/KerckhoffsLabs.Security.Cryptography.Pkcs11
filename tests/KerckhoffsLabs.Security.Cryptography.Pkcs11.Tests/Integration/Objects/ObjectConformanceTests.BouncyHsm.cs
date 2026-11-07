@@ -22,10 +22,7 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     public void UndestroyableObject_RefusesDestruction() => ObjectConformanceTestCases.Assert_UndestroyableObject_RefusesDestruction(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void CopyObject_KeepsTheProtection()
-    {
-        Assert.Skip("BouncyHsm lets C_CopyObject make an unextractable key extractable (https://github.com/harrison314/BouncyHsm/issues/132).");
-    }
+    public void CopyObject_KeepsTheProtection() => ObjectConformanceTestCases.Assert_CopyObject_KeepsTheProtection(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ProvenanceAttributes_TellGeneratedFromImported()
@@ -50,21 +47,14 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     [MemberData(nameof(ObjectConformanceTestCases.ReadOnlyKeyAttributes), MemberType = typeof(ObjectConformanceTestCases))]
     public void SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(CKA attribute)
     {
-        if (attribute == CKA.CKA_KEY_GEN_MECHANISM)
-            Assert.Skip("BouncyHsm lets C_SetAttributeValue change CKA_KEY_GEN_MECHANISM.");
         if (attribute is CKA.CKA_PRIVATE or CKA.CKA_MODIFIABLE && !BouncyHsmBackendFixture.BouncyHsmFixesThePrivateAndModifiableFlags)
             Assert.Skip("BouncyHsm lets C_SetAttributeValue change CKA_PRIVATE and CKA_MODIFIABLE.");
-        // BouncyHsm answers a change to CKA_CLASS with CKR_OK and leaves it as it was.
-        ObjectConformanceTestCases.Assert_SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(_backend, attribute, ignored: attribute == CKA.CKA_CLASS);
+        ObjectConformanceTestCases.Assert_SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(_backend, attribute);
     }
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.OneWayFlags), MemberType = typeof(ObjectConformanceTestCases))]
-    public void OneWayFlag_CannotBeUndone(CKA flag)
-    {
-        _ = flag;
-        Assert.Skip("BouncyHsm lets C_SetAttributeValue undo CKA_SENSITIVE and CKA_EXTRACTABLE (https://github.com/harrison314/BouncyHsm/issues/132).");
-    }
+    public void OneWayFlag_CannotBeUndone(CKA flag) => ObjectConformanceTestCases.Assert_OneWayFlag_CannotBeUndone(_backend, flag);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.DataValueLengths), MemberType = typeof(ObjectConformanceTestCases))]

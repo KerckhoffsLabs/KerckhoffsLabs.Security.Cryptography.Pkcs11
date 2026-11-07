@@ -259,16 +259,20 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool NonKeyObjectRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesANonKeyObjectAsAKey;
 
     /// <summary>
-    /// False while <c>CKM_AES_CTR</c> takes its parameter as a bare 16-byte counter block rather than a
-    /// <c>CK_AES_CTR_PARAMS</c> (<c>ulCounterBits</c> and <c>cb[16]</c>, PKCS#11 v3.2 §6.11.2): the native library
-    /// passes it on as raw bytes (<c>bouncy-pkcs11-utils.c</c>), so <c>C_EncryptInit</c> with a real
-    /// <c>CK_AES_CTR_PARAMS</c> answers <c>CKR_GENERAL_ERROR</c>. Reported as harrison314/BouncyHsm#138.
-    /// BouncyHsmQuirkTests.AesCtrParams_QuirkStillPresent fails once it is fixed.
+    /// False while <c>C_EncryptInit</c> / <c>C_DecryptInit</c> with <c>CKM_AES_CTR</c> accept a
+    /// <c>CK_AES_CTR_PARAMS.ulCounterBits</c> of 0 or above 128. PKCS#11 v3.2 §6.11.2 takes 1 to 128, and anything
+    /// else is <c>CKR_MECHANISM_PARAM_INVALID</c>. Seen since BouncyHsm took <c>CK_AES_CTR_PARAMS</c> (8592a1d1).
+    /// BouncyHsmQuirkTests.AesCtrCounterBitsRange_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmTakesAesCtrParams = false;
+    public const bool BouncyHsmRefusesOutOfRangeAesCtrCounterBits = false;
 
-    /// <summary>Gate for the AES-CTR cases: see <see cref="BouncyHsmTakesAesCtrParams"/>.</summary>
-    public static bool AesCtrParamsAvailable => BouncyHsmAvailable && BouncyHsmTakesAesCtrParams;
+    /// <summary>
+    /// False while a <c>CKM_AES_CTR</c> message longer than the counter's <c>ulCounterBits</c> can count is encrypted
+    /// instead of refused: the counter wraps within its width, so a longer message would reuse keystream blocks.
+    /// PKCS#11 v3.2 §6.11.2 answers <c>CKR_DATA_LEN_RANGE</c>. Seen since BouncyHsm took <c>CK_AES_CTR_PARAMS</c>
+    /// (8592a1d1). BouncyHsmQuirkTests.AesCtrCounterOverflow_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAesCtrCounterOverflow = false;
 
     /// <summary>
     /// False while a <c>CKM_AES_CBC_PAD</c> <c>C_Decrypt</c> of an empty ciphertext answers <c>CKR_OK</c> with no
