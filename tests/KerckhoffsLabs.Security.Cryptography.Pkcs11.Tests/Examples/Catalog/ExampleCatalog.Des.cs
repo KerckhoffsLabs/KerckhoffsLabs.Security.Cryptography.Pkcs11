@@ -19,6 +19,8 @@ internal static partial class ExampleCatalog
             Unsupported: b => b is SoftHsmBackendFixture
                 ? "SoftHSM advertises single DES, but its OpenSSL needs the legacy provider to run it"
                 : null),
+        new(Name(nameof(DesExamples), nameof(DesExamples.BclDesDecryptLegacyRecord)), [], [], ExampleBackend.Nss,
+            _ => AssertBclLegacyCbc(8, DES.Create, DesExamples.BclDesDecryptLegacyRecord)),
     ];
 #pragma warning restore KLPKCS11003
 }

@@ -5,6 +5,11 @@ the platform need.
 
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/PostQuantum/SlhDsaExamples.cs#SlhDsaSign)]
 
+The signature is a standard FIPS 205 signature: anyone with the public key verifies it with the BCL's
+`SlhDsa`, no token needed:
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/PostQuantum/SlhDsaExamples.cs#SlhDsaVerifyWithBcl)]
+
 SLH-DSA's security rests only on its hash function, which makes it the conservative choice for
 long-lived signatures (firmware, roots of trust). Its signatures are large and slow to make: the "s"
 (small) parameter sets give smaller signatures and slower signing than the "f" (fast) ones. Both

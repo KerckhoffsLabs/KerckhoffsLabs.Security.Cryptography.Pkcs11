@@ -15,6 +15,15 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(DsaExamples), nameof(DsaExamples.DsaVerifyLegacySignature)), [typeof(DSAPkcs11)],
             [CKM.CKM_DSA_KEY_PAIR_GEN, CKM.CKM_DSA_SHA256], ExampleBackend.SoftHsm2, b => WithSession(b, AssertDsaVerifyLegacySignature)),
+        new(Name(nameof(DsaExamples), nameof(DsaExamples.DsaVerifyWithBcl)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                if (OperatingSystem.IsMacOS()) Assert.Skip("macOS's DSA takes only 1024-bit keys.");
+                using DSA bcl = DSA.Create(2048);
+                byte[] signature = bcl.SignData(Message, HashAlgorithmName.SHA256);
+                Assert.True(DsaExamples.DsaVerifyWithBcl(Message, signature, bcl.ExportParameters(false)));
+                Assert.False(DsaExamples.DsaVerifyWithBcl([.. Message, 0], signature, bcl.ExportParameters(false)));
+            }),
     ];
 #pragma warning restore KLPKCS11006
 
@@ -43,6 +52,11 @@ internal static partial class ExampleCatalog
             using var unleased = new DSAPkcs11(key);
 #pragma warning restore KLPKCS11009, KLPKCS11006
             Assert.Throws<CryptoPolicyViolationException>(() => unleased.VerifyData(Message, signature, HashAlgorithmName.SHA256));
+
+            // The token's signature verifies in software too, from the key's public parameters.
+            if (OperatingSystem.IsMacOS()) Assert.Skip("macOS's DSA takes only 1024-bit keys; the token side ran.");
+            DSAParameters publicKey = unleased.ExportParameters(false);
+            Assert.True(DsaExamples.DsaVerifyWithBcl(Message, signature, publicKey));
         }
     }
 }

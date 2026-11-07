@@ -15,6 +15,8 @@ internal static partial class ExampleCatalog
             [CKM.CKM_DES3_CBC_PAD], ExampleBackend.SoftHsm2,
             b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_DES3, 24, 8, TripleDES.Create, TripleDesExamples.TripleDesDecryptLegacyArchive,
                 key => new TripleDESPkcs11(key)))),
+        new(Name(nameof(TripleDesExamples), nameof(TripleDesExamples.BclTripleDesDecryptLegacyArchive)), [], [], ExampleBackend.SoftHsm2,
+            _ => AssertBclLegacyCbc(24, TripleDES.Create, TripleDesExamples.BclTripleDesDecryptLegacyArchive)),
     ];
 #pragma warning restore KLPKCS11004
 }

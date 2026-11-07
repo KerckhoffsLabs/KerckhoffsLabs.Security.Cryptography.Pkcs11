@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 
@@ -25,5 +26,15 @@ public static class Md5Examples
             return md5.ComputeHash(data);
         }
         #endregion
+    }
+
+    [SuppressMessage("Security", "S4790:Use a stronger hashing algorithm", Justification = "The software counterpart of the legacy identifier the token example computes (docs/examples/md5.md).")]
+    public static byte[] BclMd5(byte[] data)
+    {
+        #region BclMd5
+        // The same identifier in software: no token, no policy lease. Hashing public data on a token gains nothing.
+        byte[] digest = MD5.HashData(data);
+        #endregion
+        return digest;
     }
 }

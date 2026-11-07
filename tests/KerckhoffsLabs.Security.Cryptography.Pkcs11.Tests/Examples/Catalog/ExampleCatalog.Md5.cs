@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
@@ -16,10 +15,12 @@ internal static partial class ExampleCatalog
             ExampleBackend.SoftHsm2,
             b => WithSession(b, s =>
             {
-                Assert.Equal(MD5.HashData(Message), Md5Examples.Md5ChecksumForLegacyProtocol(s, Message));
+                Assert.Equal(Md5Examples.BclMd5(Message), Md5Examples.Md5ChecksumForLegacyProtocol(s, Message));
                 using var md5 = new MD5Pkcs11(s);
                 Assert.Throws<CryptoPolicyViolationException>(() => md5.ComputeHash(Message));
             })),
+        new(Name(nameof(Md5Examples), nameof(Md5Examples.BclMd5)), [], [], ExampleBackend.SoftHsm2,
+            _ => Assert.Equal(Convert.FromHexString("900150983cd24fb0d6963f7d28e17f72"), Md5Examples.BclMd5("abc"u8.ToArray()))), // RFC 1321
     ];
 #pragma warning restore KLPKCS11001
 }

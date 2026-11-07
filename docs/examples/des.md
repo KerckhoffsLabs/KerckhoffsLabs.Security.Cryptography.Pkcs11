@@ -8,4 +8,10 @@ It is a legacy algorithm: read [Legacy algorithms](legacy.md) for the two steps 
 
 Many tokens no longer implement single DES at all.
 
+The adapter is a `DES` over the token key, so it decrypts exactly what the BCL's `DES` does with the same key
+bytes. In software the key has to be in your process, which is what keeping it on the token avoids; use
+this only for data whose key already lives in software:
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Legacy/DesExamples.cs#BclDesDecryptLegacyRecord)]
+
 API reference: <xref:KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.DESPkcs11>.

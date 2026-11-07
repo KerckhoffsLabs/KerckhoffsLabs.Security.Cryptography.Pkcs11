@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -28,5 +29,17 @@ public static class SlhDsaExamples
 #pragma warning restore SYSLIB5006
         #endregion
         return (signature, publicKey);
+    }
+
+    public static bool SlhDsaVerifyWithBcl(byte[] data, byte[] signature, byte[] publicKey)
+    {
+        #region SlhDsaVerifyWithBcl
+        // Anyone with the public key verifies in software, off the token (where SlhDsa.IsSupported).
+#pragma warning disable SYSLIB5006
+        using SlhDsa verifier = SlhDsa.ImportSlhDsaPublicKey(SlhDsaAlgorithm.SlhDsaSha2_128s, publicKey);
+        bool valid = verifier.VerifyData(data, signature);
+#pragma warning restore SYSLIB5006
+        #endregion
+        return valid;
     }
 }
