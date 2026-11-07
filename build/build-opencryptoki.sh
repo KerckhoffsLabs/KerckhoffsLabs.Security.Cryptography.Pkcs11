@@ -147,9 +147,11 @@ fi
 ${SUDO} make -C "${BUILD_DIR}" install 2>&1
 ${SUDO} ldconfig 2>/dev/null || true
 
-# Note: libopencryptoki.so is a symlink to libopencryptoki.so.0.0.0, so don't restrict to -type f.
-# Scope the search to ${PREFIX}/lib — searching all of /usr/local is needlessly slow on a runner.
-LIB="$(find "${PREFIX}/lib" -name 'libopencryptoki.so' 2>/dev/null | head -1)"
+# `make install` puts the library in ${PREFIX}/lib/opencryptoki. Search ${PREFIX}/lib only when it is
+# not there: on a CI runner that tree holds whole toolchains, and a cold search of it takes ~20 s.
+# libopencryptoki.so is a symlink to libopencryptoki.so.0.0.0, so don't restrict the search to -type f.
+LIB="${PREFIX}/lib/opencryptoki/libopencryptoki.so"
+[[ -e "${LIB}" ]] || LIB="$(find "${PREFIX}/lib" -name libopencryptoki.so 2>/dev/null | head -1)"
 if [[ -z "${LIB}" || ! -x "${DAEMON}" ]]; then
   echo "build succeeded but libopencryptoki.so / pkcsslotd not found under ${PREFIX}" >&2
   exit 1
