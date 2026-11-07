@@ -46,6 +46,27 @@ public sealed class Pkcs11SessionHydrationTests
         Assert.Equal(3, module.CallCount("C_GetAttributeValue"));
     }
 
+    // A certificate is stored with its key's CKA_ID, so a search by id finds both. FindKeys returns the key
+    // and leaves the certificate out (it has no CKA_KEY_TYPE to wrap), still in one search.
+    [Fact]
+    public void FindKeys_LeavesOutACertificateTheSearchFound()
+    {
+        using var module = new IdentityModule();
+        module.Add(new()
+        {
+            [CKA.CKA_CLASS] = ULong((ulong)CKO.CKO_CERTIFICATE),
+            [CKA.CKA_LABEL] = "certificate"u8.ToArray(),
+            [CKA.CKA_ID] = [0x01],
+        });
+        module.Add(SecretKey("key", [0x01]));
+        using var session = module.OpenSession();
+
+        using var keys = session.FindKeys();
+
+        Assert.Equal("key", Assert.Single(keys).Label);
+        Assert.Equal(1, module.CallCount("C_FindObjectsInit"));
+    }
+
     [Fact]
     public void FindObjects_ReadsEachObjectInOneCall()
     {

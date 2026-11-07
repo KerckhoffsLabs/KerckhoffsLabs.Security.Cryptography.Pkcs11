@@ -33,4 +33,32 @@ public sealed class Pkcs11SessionFindKeysTests_BouncyHsm(BouncyHsmBackendFixture
         using var session = OpenSession();
         SessionKeyTestCases.Assert_ImportKey_AesValue_RoundTrips(session);
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void FindKeys_ById_LeavesOutACertificateWithThatId()
+    {
+        using var session = OpenSession();
+        SessionKeyTestCases.Assert_FindKeys_ById_LeavesOutACertificateWithThatId(session);
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void FindKeys_RefusesANonKeyClass()
+    {
+        using var session = OpenSession();
+        SessionKeyTestCases.Assert_FindKeys_RefusesANonKeyClass(session);
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void GetAttributeValue_ReadsTheNamedHalf()
+    {
+        using var session = OpenSession();
+        SessionKeyTestCases.Assert_GetAttributeValue_ReadsTheNamedHalf(session);
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void GetAttributeValue_PublicPartOfASecretKey_Throws()
+    {
+        using var session = OpenSession();
+        SessionKeyTestCases.Assert_GetAttributeValue_PublicPartOfASecretKey_Throws(session);
+    }
 }

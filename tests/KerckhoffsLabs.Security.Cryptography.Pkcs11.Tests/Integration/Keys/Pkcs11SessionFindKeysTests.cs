@@ -1,5 +1,8 @@
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -73,5 +76,79 @@ internal static class SessionKeyTestCases
             Assert.Equal(CKK.CKK_AES, key.KeyType);
         }
         finally { session.Core.DestroyObject(key.PrivateHandle); }
+    }
+
+    /// <summary>A certificate is stored under its key's <c>CKA_ID</c>; looking keys up by that id must return the
+    /// two halves of the pair and nothing else, not fail turning the certificate into a key.</summary>
+    public static void Assert_FindKeys_ById_LeavesOutACertificateWithThatId(Pkcs11Session session)
+    {
+        string label = $"findkeys-cert-{Guid.NewGuid():N}";
+        byte[] id = RandomNumberGenerator.GetBytes(16);
+        using Pkcs11Key pair = GenerateEcSigningPair(session, label, id);
+
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest("CN=FindKeys leaves certificates out", ecdsa, HashAlgorithmName.SHA256);
+        using X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using Pkcs11Certificate stored = session.ImportCertificate(certificate, label, id);
+
+        using var filter = ObjectTemplate.Empty().Id(id).Build();
+        using var keys = session.FindKeys(filter);
+
+        Assert.Equal(2, keys.Count);
+        Assert.All(keys, key => Assert.Equal(CKK.CKK_EC, key.KeyType));
+    }
+
+    public static void Assert_FindKeys_RefusesANonKeyClass(Pkcs11Session session)
+    {
+        using var filter = ObjectTemplate.Empty().Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_CERTIFICATE).Build();
+        Assert.Throws<ArgumentException>(() => session.FindKeys(filter));
+    }
+
+    /// <summary>A key pair is two objects with attributes of their own: naming the half reads that half, so the
+    /// private key's protection and role can be checked; the unnamed overload still reads the public key.</summary>
+    public static void Assert_GetAttributeValue_ReadsTheNamedHalf(Pkcs11Session session)
+    {
+        // Generated from templates that share a CKA_ID, then opened by label: the two halves are found as one key.
+        string label = $"attr-half-{Guid.NewGuid():N}";
+        using (GenerateEcSigningPair(session, label, RandomNumberGenerator.GetBytes(16))) { }
+        using Pkcs11Key pair = session.OpenKey(label);
+
+        using (var attrs = pair.GetAttributeValue(KeyHandlePart.Private, CKA.CKA_CLASS, CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE, CKA.CKA_SIGN))
+        {
+            Assert.Equal(CKO.CKO_PRIVATE_KEY, (CKO)attrs[0].GetValueAsUlong());
+            Assert.True(attrs[1].GetValueAsBool());
+            Assert.False(attrs[2].GetValueAsBool());
+            Assert.True(attrs[3].GetValueAsBool());
+        }
+
+        using (var attrs = pair.GetAttributeValue(KeyHandlePart.Public, CKA.CKA_CLASS, CKA.CKA_VERIFY))
+        {
+            Assert.Equal(CKO.CKO_PUBLIC_KEY, (CKO)attrs[0].GetValueAsUlong());
+            Assert.True(attrs[1].GetValueAsBool());
+        }
+
+        using (var attrs = pair.GetAttributeValue(CKA.CKA_CLASS))
+            Assert.Equal(CKO.CKO_PUBLIC_KEY, (CKO)attrs[0].GetValueAsUlong());
+    }
+
+    public static void Assert_GetAttributeValue_PublicPartOfASecretKey_Throws(Pkcs11Session session)
+    {
+        using Pkcs11Key secret = session.GenerateAesKey(bitLength: 256);
+
+        using (var attrs = secret.GetAttributeValue(KeyHandlePart.Private, CKA.CKA_CLASS))
+            Assert.Equal(CKO.CKO_SECRET_KEY, (CKO)attrs[0].GetValueAsUlong());
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => secret.GetAttributeValue(KeyHandlePart.Public, CKA.CKA_CLASS));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+    }
+
+    // A P-256 signing pair whose halves share label and CKA_ID; sensitive, non-extractable session objects.
+    private static Pkcs11Key GenerateEcSigningPair(Pkcs11Session session, string label, byte[] id)
+    {
+        using var publicTemplate = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .Label(label).Id(id).Verify().EcParams(Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()).Build();
+        using var privateTemplate = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
+            .Label(label).Id(id).Sign().Sensitive().NonExtractable().Build();
+        return session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), publicTemplate, privateTemplate);
     }
 }
