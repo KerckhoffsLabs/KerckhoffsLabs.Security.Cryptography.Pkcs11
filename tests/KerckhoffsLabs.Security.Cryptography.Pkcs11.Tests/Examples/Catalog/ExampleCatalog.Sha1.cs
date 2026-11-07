@@ -13,12 +13,17 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(Sha1Examples), nameof(Sha1Examples.Sha1ForLegacyProtocol)), [typeof(SHA1Pkcs11)], [CKM.CKM_SHA_1],
             ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
+            b =>
             {
-                Assert.Equal(Sha1Examples.BclSha1(Message), Sha1Examples.Sha1ForLegacyProtocol(s, Message));
+                Assert.Equal(Sha1Examples.BclSha1(Message), Sha1Examples.Sha1ForLegacyProtocol(b.LibraryPath, b.TokenLabel, Message));
+                AssertFixtureLibraryStillWorks(b);
+
+                // Without the example's lease, the default policy refuses the same hash.
+                using Pkcs11Session s = b.OpenSession();
                 using var sha1 = new SHA1Pkcs11(s);
                 Assert.Throws<CryptoPolicyViolationException>(() => sha1.ComputeHash(Message));
-            })),
+            },
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(Sha1Examples), nameof(Sha1Examples.BclSha1)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(Convert.FromHexString("a9993e364706816aba3e25717850c26c9cd0d89d"), Sha1Examples.BclSha1("abc"u8.ToArray()))), // FIPS 180 "abc"
     ];

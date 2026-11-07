@@ -11,8 +11,15 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.AesGcmEncryptDecrypt)), [typeof(AesGcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(Message, AesGcmExamples.AesGcmEncryptDecrypt(s, Message, Header))),
-            Unsupported: ExampleGates.ClassicAesGcm),
+            b => WithProvisionedKey(b,
+                (s, label) => s.GenerateAesKey(256, label, persistOnToken: b.SupportsTokenObjects),
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    Assert.Equal(Message, AesGcmExamples.AesGcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
+                }),
+            NeedsUserLogin: true,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
         new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.BclAesGcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(Message, AesGcmExamples.BclAesGcmEncryptDecrypt(Message, Header))),
         new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.AesGcmDetectsTampering)), [typeof(AesGcmPkcs11)],

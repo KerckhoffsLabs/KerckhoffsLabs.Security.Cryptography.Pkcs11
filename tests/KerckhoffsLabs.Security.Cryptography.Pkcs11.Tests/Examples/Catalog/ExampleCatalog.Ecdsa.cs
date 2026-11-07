@@ -12,12 +12,17 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.SignP256)), [typeof(ECDsaPkcs11)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
-            {
-                (byte[] signature, ECParameters publicKey) = EcdsaExamples.SignP256(s, Message);
-                Assert.True(EcdsaExamples.VerifyWithBcl(Message, signature, publicKey));
-                Assert.False(EcdsaExamples.VerifyWithBcl([.. Message, 0], signature, publicKey));
-            })),
+            b => WithProvisionedKey(b,
+                (s, label) => s.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, label, persistOnToken: b.SupportsTokenObjects),
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    (byte[] signature, ECParameters publicKey) = EcdsaExamples.SignP256(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                    Assert.True(EcdsaExamples.VerifyWithBcl(Message, signature, publicKey));
+                    Assert.False(EcdsaExamples.VerifyWithBcl([.. Message, 0], signature, publicKey));
+                }),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.BclSignP256)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

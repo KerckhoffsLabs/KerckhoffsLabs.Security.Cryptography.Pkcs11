@@ -12,7 +12,15 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.AesCcmEncryptDecrypt)), [typeof(AesCcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CCM], ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(s, Message, Header)))),
+            b => WithProvisionedKey(b,
+                (s, label) => s.GenerateAesKey(256, label, persistOnToken: b.SupportsTokenObjects),
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
+                }),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.BclAesCcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

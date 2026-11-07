@@ -13,7 +13,8 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.MlKemReceiveAesKey)), [typeof(MLKemPkcs11)],
             [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
-            AssertMlKemReceiveAesKey, Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b)),
+            AssertMlKemReceiveAesKey, NeedsUserLogin: true,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b) ?? ExampleGates.SecondModuleInstance(b)),
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.BclMlKemReceive)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {
@@ -28,18 +29,10 @@ internal static partial class ExampleCatalog
     {
         if (!backend.SupportsMlKem) Assert.Skip("The backend cannot operate ML-KEM.");
         if (!MLKem.IsSupported) Assert.Skip("ML-KEM is not supported by this platform's BCL (the sender side).");
-        using Pkcs11Session session = backend.OpenSession();
-        (Pkcs11Key tokenKey, byte[] senderKey) = MlKemExamples.MlKemReceiveAesKey(session);
-        using (tokenKey)
-        {
-            // The sender encrypts with its copy of the shared secret; the token decrypts with its own.
-            using var atSender = new AesGcm(senderKey, 16);
-            byte[] nonce = RandomNumberGenerator.GetBytes(12), ciphertext = new byte[Message.Length], tag = new byte[16];
-            atSender.Encrypt(nonce, Message, ciphertext, tag);
-            using var onToken = new AesGcmPkcs11(tokenKey, 16);
-            byte[] decrypted = new byte[ciphertext.Length];
-            onToken.Decrypt(nonce, ciphertext, tag, decrypted);
-            Assert.Equal(Message, decrypted);
-        }
+        // The sender encrypts with its copy of the shared secret, and the token decrypts with its own: the
+        // message comes back only if both hold the same secret.
+        using (SecurePin pin = UserPin(backend))
+            Assert.Equal(Message, MlKemExamples.MlKemReceiveAesKey(backend.LibraryPath, backend.TokenLabel, pin, Message));
+        AssertFixtureLibraryStillWorks(backend);
     }
 }

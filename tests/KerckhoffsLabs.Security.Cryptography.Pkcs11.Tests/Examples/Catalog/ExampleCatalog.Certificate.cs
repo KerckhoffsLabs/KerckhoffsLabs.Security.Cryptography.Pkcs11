@@ -3,6 +3,8 @@ using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Examples;
 
@@ -13,25 +15,31 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.IssueSelfSignedCertificate)), [typeof(Pkcs11CertificateExtensions)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
+            b => WithIssuedCertificate(b, label =>
             {
-                string label = $"example-{Guid.NewGuid():N}";
-                using Pkcs11Certificate stored = CertificateExamples.IssueSelfSignedCertificate(s, label);
-                Assert.Equal("CN=Example Signing", stored.Certificate.Subject);
-                Assert.False(stored.Certificate.HasPrivateKey);
-                Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(stored.Certificate));
-            })),
+                // The certificate and its key outlived the example's session: token objects, linked by CKA_ID.
+                using Pkcs11Session s = b.OpenSession();
+                using Pkcs11Certificate stored = s.OpenCertificate(label);
+                using ECDsa? privateKey = stored.GetECDsaPrivateKey();
+                Assert.NotNull(privateKey);
+            }),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.SignWithCertificateKey)), [typeof(Pkcs11CertificateExtensions)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
+            // The issuing example provisions the certificate and its key on the token; this one opens them.
+            b => WithIssuedCertificate(b, label =>
             {
-                string label = $"example-{Guid.NewGuid():N}";
-                using (CertificateExamples.IssueSelfSignedCertificate(s, label)) { }
-                (byte[] signature, X509Certificate2 certificate) = CertificateExamples.SignWithCertificateKey(s, label, Message);
+                byte[] signature;
+                X509Certificate2 certificate;
+                using (SecurePin pin = UserPin(b))
+                    (signature, certificate) = CertificateExamples.SignWithCertificateKey(b.LibraryPath, b.TokenLabel, pin, label, Message);
                 using (certificate)
                 using (ECDsa verifier = certificate.GetECDsaPublicKey()!)
                     Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
-            })),
+            }),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.IssueRsaPssCertificate)), [typeof(RSAPkcs11)],
             [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithSession(b, s =>
@@ -111,4 +119,38 @@ internal static partial class ExampleCatalog
                 Assert.False(CertificateExamples.VerifySelfSignatureWithBcl(forged));
             }),
     ];
+
+    // Runs the issuing example, which stores the certificate and its key pair on the token as token objects,
+    // checks the certificate it returns, runs body with the label, then destroys the three objects.
+    private static void WithIssuedCertificate(IPkcs11Backend backend, Action<string> body)
+    {
+        string label = NewLabel();
+        try
+        {
+            using (SecurePin pin = UserPin(backend))
+            using (X509Certificate2 certificate = CertificateExamples.IssueSelfSignedCertificate(backend.LibraryPath, backend.TokenLabel, pin, label))
+            {
+                Assert.Equal("CN=Example Signing", certificate.Subject);
+                Assert.False(certificate.HasPrivateKey);
+                Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(certificate));
+            }
+            body(label);
+        }
+        finally
+        {
+            using Pkcs11Session session = backend.OpenSession();
+            if (session.TryOpenCertificate(label, out Pkcs11Certificate? stored))
+            {
+                using (stored)
+                {
+                    // The key pair and the certificate share the id; FindObjects, unlike FindKeys, takes any class.
+                    using ObjectTemplate byId = ObjectTemplate.Empty().Id(stored.Id).Build();
+                    using ReadOnlyDisposableList<Pkcs11Object> objects = session.FindObjects(byId);
+                    foreach (Pkcs11Object found in objects)
+                        found.Destroy();
+                }
+            }
+        }
+        AssertFixtureLibraryStillWorks(backend);
+    }
 }

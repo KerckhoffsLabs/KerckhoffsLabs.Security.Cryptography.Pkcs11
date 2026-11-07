@@ -13,23 +13,39 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(HmacExamples), nameof(HmacExamples.GenerateHmacKey)), [typeof(HMACPkcs11)],
             [CKM.CKM_GENERIC_SECRET_KEY_GEN, CKM.CKM_SHA256_HMAC], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
-            {
-                using Pkcs11Key key = HmacExamples.GenerateHmacKey(s);
-                byte[] tag = HmacExamples.HmacSha256(key, Message);
-                Assert.Equal(32, tag.Length);
-                Assert.Equal(tag, HmacExamples.HmacSha256(key, Message));
-            })),
+            // The provisioning example: the key it generates is a token object, which the HMAC example then
+            // opens by its label.
+            b => WithProvisionedKey(b, HmacExamples.GenerateHmacKey,
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    byte[] tag = HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                    Assert.Equal(32, tag.Length);
+                    Assert.Equal(tag, HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message));
+                }),
+            NeedsUserLogin: true,
+            Unsupported: b => b.SupportsTokenObjects ? ExampleGates.SecondModuleInstance(b) : "the token keeps no token objects"),
         new(Name(nameof(HmacExamples), nameof(HmacExamples.HmacSha256)), [typeof(HMACPkcs11)], [CKM.CKM_SHA256_HMAC],
             ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
+            b =>
             {
-                // A known key, imported, so the token's HMAC can be compared with the BCL's.
+                // A known key, imported under a label, so the token's HMAC can be compared with the BCL's.
                 byte[] raw = RandomNumberGenerator.GetBytes(32);
-                using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(raw).Sign().Verify().Build();
-                using Pkcs11Key key = s.ImportKey(template);
-                Assert.Equal(HmacExamples.BclHmacSha256(raw, Message), HmacExamples.HmacSha256(key, Message));
-            })),
+                WithProvisionedKey(b,
+                    (s, label) =>
+                    {
+                        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+                            .Label(label).OnToken(b.SupportsTokenObjects).Value(raw).Sign().Verify().Build();
+                        return s.ImportKey(template);
+                    },
+                    label =>
+                    {
+                        using SecurePin pin = UserPin(b);
+                        Assert.Equal(HmacExamples.BclHmacSha256(raw, Message), HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message));
+                    });
+            },
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(HmacExamples), nameof(HmacExamples.BclHmacSha256)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

@@ -33,7 +33,9 @@ The BCL's `CertificateRequest` builds the certificate; the token key signs it:
 ## Other key types: RSA, ML-DSA and SLH-DSA
 
 The steps are the same for every signing key: a key pair and a certificate sharing a `CKA_ID`, the
-adapter passed to `CertificateRequest`, and the matching `X509SignatureGenerator`.
+adapter passed to `CertificateRequest`, and the matching `X509SignatureGenerator`. The snippets below
+start from the logged-in session of the example above, and leave the key pair and the certificate as
+session objects; to keep them, add `.OnToken()` to both templates and pass `persistOnToken: true`, as it does.
 
 | Key | Adapter | `CertificateRequest` | Signature generator |
 |---|---|---|---|

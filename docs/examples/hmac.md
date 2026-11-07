@@ -1,11 +1,12 @@
 # HMAC — `HMACPkcs11`
 
-An HMAC key is a secret, and that is where a token helps: the key never enters your process. Generate a
-generic-secret key that may only compute and verify MACs:
+An HMAC key is a secret, and that is where a token helps: the key never enters your process. Once, when
+you provision the token, generate a generic-secret key that may only compute and verify MACs, as a token
+object under a label:
 
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Hashes/HmacExamples.cs#GenerateHmacKey)]
 
-Then use it as the BCL's `HMAC`:
+Then, in the application, open it by that label and use it as the BCL's `HMAC`:
 
 # [PKCS#11](#tab/pkcs11)
 

@@ -13,8 +13,15 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(TripleDesExamples), nameof(TripleDesExamples.TripleDesDecryptLegacyArchive)), [typeof(TripleDESPkcs11)],
             [CKM.CKM_DES3_CBC_PAD], ExampleBackend.SoftHsm2,
-            b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_DES3, 24, 8, TripleDES.Create, TripleDesExamples.TripleDesDecryptLegacyArchive,
-                key => new TripleDESPkcs11(key)))),
+            b => AssertLegacyCbc(b, CKK.CKK_DES3, 24, 8, TripleDES.Create,
+                (label, iv, ciphertext) =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    return TripleDesExamples.TripleDesDecryptLegacyArchive(b.LibraryPath, b.TokenLabel, pin, label, iv, ciphertext);
+                },
+                key => new TripleDESPkcs11(key)),
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(TripleDesExamples), nameof(TripleDesExamples.BclTripleDesDecryptLegacyArchive)), [], [], ExampleBackend.SoftHsm2,
             _ => AssertBclLegacyCbc(24, TripleDES.Create, TripleDesExamples.BclTripleDesDecryptLegacyArchive)),
     ];

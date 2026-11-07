@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -122,22 +121,98 @@ internal static partial class ExampleCatalog
         body(session);
     }
 
-    // A known secret imported as a derive-only generic secret, so a token KDF can be compared with the BCL's.
-    private static Pkcs11Key ImportDeriveKey(Pkcs11Session session, byte[] raw)
+    // The full-flow examples load the module themselves (a second instance of it in this process), log in
+    // with the user PIN, and open a key by label. The test provisions that key under a unique label.
+    private static string NewLabel() => $"example-{Guid.NewGuid():N}";
+
+    // A copy of the fixture's user PIN, as the caller of an example would read it from its secret store.
+    private static SecurePin UserPin(IPkcs11Backend backend) => new(backend.UserPin.Span);
+
+    // Provisions a key under a fresh label, runs the example against the label, runs thenWithKey (if any) on
+    // the key opened again by label, destroys every object with the label, and checks that the example, by
+    // disposing its own instance of the module, did not finalize the module under the fixture.
+    //
+    // Where the backend keeps token objects, the key is one, and the provisioning session is closed before the
+    // example runs: the login state belongs to the application, not the session, so a session of this process
+    // still logged in would make the example's C_Login fail with CKR_USER_ALREADY_LOGGED_IN; and a token
+    // object, unlike a session object, outlives the session that made it, as a key provisioned long ago does.
+    // A backend without token objects (NSS's write-protected crypto token) gets a session object instead, kept
+    // alive by keeping its session open; that token takes no login, so nothing conflicts.
+    private static void WithProvisionedKey(
+        IPkcs11Backend backend, Func<Pkcs11Session, string, Pkcs11Key> provision, Action<string> example,
+        Action<Pkcs11Key>? thenWithKey = null)
     {
-        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(raw).Derive().Build();
+        string label = NewLabel();
+        Pkcs11Session? keeper = null;
+        try
+        {
+            Pkcs11Session provisioning = backend.OpenSession();
+            using (provision(provisioning, label)) { }
+            if (backend.SupportsTokenObjects)
+                provisioning.Dispose();
+            else
+                keeper = provisioning;
+
+            example(label);
+
+            if (thenWithKey is not null)
+                WithSessionOrKeeper(backend, keeper, s =>
+                {
+                    using Pkcs11Key key = s.OpenKey(label);
+                    thenWithKey(key);
+                });
+        }
+        finally
+        {
+            WithSessionOrKeeper(backend, keeper, s => DestroyObjectsLabelled(s, label));
+            keeper?.Dispose();
+        }
+        AssertFixtureLibraryStillWorks(backend);
+    }
+
+    private static void WithSessionOrKeeper(IPkcs11Backend backend, Pkcs11Session? keeper, Action<Pkcs11Session> body)
+    {
+        if (keeper is not null)
+        {
+            body(keeper);
+            return;
+        }
+        using Pkcs11Session session = backend.OpenSession();
+        body(session);
+    }
+
+    // Destroys every object (both halves of a key pair, a certificate) that carries the label.
+    private static void DestroyObjectsLabelled(Pkcs11Session session, string label)
+    {
+        using ObjectTemplate filter = ObjectTemplate.Empty().Label(label).Build();
+        using ReadOnlyDisposableList<Pkcs11Object> objects = session.FindObjects(filter);
+        foreach (Pkcs11Object found in objects)
+            found.Destroy();
+    }
+
+    // After an example that loaded and disposed its own instance of the module: the fixture's still works.
+    private static void AssertFixtureLibraryStillWorks(IPkcs11Backend backend)
+    {
+        using Pkcs11Session session = backend.OpenSession();
+        Assert.Equal(16, session.GenerateRandom(16).Length);
+    }
+
+    // A known secret imported under a label as a derive-only generic secret, so a token KDF can be compared
+    // with the BCL's.
+    private static Pkcs11Key ImportDeriveKey(IPkcs11Backend backend, Pkcs11Session session, string label, byte[] raw)
+    {
+        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label(label).OnToken(backend.SupportsTokenObjects).Value(raw).Derive().Build();
         return session.ImportKey(template);
     }
 
-    // The token key and the BCL's key bytes are the same key when what one encrypts, the other decrypts.
-    private static void AssertSameAesKey(Pkcs11Key tokenKey, byte[] bclKey)
+    // What an example encrypted with AES-GCM under a key it derived on the token, the BCL decrypts with the
+    // key bytes it derived itself: the two are the same key.
+    private static void AssertDecryptsWith(byte[] bclKey, (byte[] Nonce, byte[] Ciphertext, byte[] Tag) sealedMessage)
     {
-        using var onToken = new AesGcmPkcs11(tokenKey, 16);
-        byte[] nonce = RandomNumberGenerator.GetBytes(12), ciphertext = new byte[Message.Length], tag = new byte[16];
-        onToken.Encrypt(nonce, Message, ciphertext, tag);
         using var inSoftware = new AesGcm(bclKey, 16);
-        byte[] decrypted = new byte[ciphertext.Length];
-        inSoftware.Decrypt(nonce, ciphertext, tag, decrypted);
+        byte[] decrypted = new byte[sealedMessage.Ciphertext.Length];
+        inSoftware.Decrypt(sealedMessage.Nonce, sealedMessage.Ciphertext, sealedMessage.Tag, decrypted);
         Assert.Equal(Message, decrypted);
     }
 
@@ -150,27 +225,33 @@ internal static partial class ExampleCatalog
         Assert.Equal(Message, example(raw, iv, software.EncryptCbc(Message, iv, PaddingMode.PKCS7)));
     }
 
-    // The legacy data is made by the BCL with a known key, which the test imports onto the token (under
-    // AllowInsecure: the default policy refuses a legacy key); the example must read it back, and the same
-    // decryption without the example's lease must be refused. Shared by the 3DES, DES and RC2 cases.
+    // The legacy data is made by the BCL with a known key, which the test provisions on the token under a
+    // label (under AllowInsecure: the default policy refuses a legacy key); the example, given the label,
+    // must read it back, and the same decryption without the example's lease must be refused. Shared by the
+    // 3DES, DES and RC2 cases; example(label, iv, ciphertext) runs the whole flow.
     private static void AssertLegacyCbc(
-        Pkcs11Session session, CKK keyType, int keyBytes, int blockBytes, Func<SymmetricAlgorithm> bcl,
-        Func<Pkcs11Session, Pkcs11Key, byte[], byte[], byte[]> example, Func<Pkcs11Key, SymmetricAlgorithm> adapter)
+        IPkcs11Backend backend, CKK keyType, int keyBytes, int blockBytes, Func<SymmetricAlgorithm> bcl,
+        Func<string, byte[], byte[], byte[]> example, Func<Pkcs11Key, SymmetricAlgorithm> adapter)
     {
         byte[] raw = RandomNumberGenerator.GetBytes(keyBytes), iv = RandomNumberGenerator.GetBytes(blockBytes);
         using SymmetricAlgorithm software = bcl();
         software.Key = raw;
         byte[] ciphertext = software.EncryptCbc(Message, iv, PaddingMode.PKCS7);
 
-        Pkcs11Key key;
-        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-        using (ObjectTemplate template = ObjectTemplate.ForSecretKey(keyType).Value(raw).Decrypt().Build())
-            key = session.ImportKey(template);
-        using (key)
-        {
-            Assert.Equal(Message, example(session, key, iv, ciphertext));
-            using SymmetricAlgorithm unleased = adapter(key);
-            Assert.Throws<CryptoPolicyViolationException>(() => unleased.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7));
-        }
+        WithProvisionedKey(
+            backend,
+            (session, label) =>
+            {
+                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+                using (ObjectTemplate template = ObjectTemplate.ForSecretKey(keyType)
+                    .Label(label).OnToken(backend.SupportsTokenObjects).Value(raw).Decrypt().Build())
+                    return session.ImportKey(template);
+            },
+            label => Assert.Equal(Message, example(label, iv, ciphertext)),
+            key =>
+            {
+                using SymmetricAlgorithm unleased = adapter(key);
+                Assert.Throws<CryptoPolicyViolationException>(() => unleased.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7));
+            });
     }
 }

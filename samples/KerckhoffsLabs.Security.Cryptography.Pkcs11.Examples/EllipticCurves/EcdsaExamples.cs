@@ -1,20 +1,33 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 
 /// <summary>docs/examples/ecdsa.md: ECDSA signatures with a token key.</summary>
 public static class EcdsaExamples
 {
-    public static (byte[] Signature, ECParameters PublicKey) SignP256(Pkcs11Session session, byte[] data)
+    public static (byte[] Signature, ECParameters PublicKey) SignP256(
+        string modulePath, string tokenLabel, SecurePin pin, string keyLabel, byte[] data)
     {
         #region SignP256
-        using Pkcs11Key key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, label: "api-signing");
+        // 1. Load the module and log in. The module path and token label come from configuration; the
+        //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 2. Open the P-256 signing key pair that is already on the token, by its CKA_LABEL
+        //    (OpenKey(id) finds it by CKA_ID instead): for example one
+        //    GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256, label, persistOnToken: true) made.
+        using Pkcs11Key key = session.OpenKey(keyLabel);
         using var ecdsa = new ECDsaPkcs11(key);                 // an ECDsa: SignData, VerifyData, ...
 
-        // IEEE P1363 (r || s), the BCL's default format; pass DSASignatureFormat.Rfc3279DerSequence for DER.
+        // 3. Sign on the token. IEEE P1363 (r || s), the BCL's default format; pass
+        //    DSASignatureFormat.Rfc3279DerSequence for DER.
         byte[] signature = ecdsa.SignData(data, HashAlgorithmName.SHA256);
         ECParameters publicKey = ecdsa.ExportParameters(includePrivateParameters: false);
+        // 4. The using declarations dispose the adapter, the key handle (the key itself stays on the
+        //    token), the session and the library, in reverse order.
         #endregion
         return (signature, publicKey);
     }

@@ -13,14 +13,19 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.SlhDsaSign)), [typeof(SlhDsaPkcs11)],
             [CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA], ExampleBackend.BouncyHsm,
-            b => WithSession(b, s =>
+            b =>
             {
                 if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
-                (byte[] signature, byte[] publicKey) = SlhDsaExamples.SlhDsaSign(s, Message);
+                byte[] signature, publicKey;
+                using (SecurePin pin = UserPin(b))
+                    (signature, publicKey) = SlhDsaExamples.SlhDsaSign(b.LibraryPath, b.TokenLabel, pin, Message);
+                AssertFixtureLibraryStillWorks(b);
                 // A standard FIPS 205 signature: the BCL verifies it from the exported public key.
                 if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL; the token side ran.");
                 AssertSlhDsaVerifies(signature, publicKey);
-            })),
+            },
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.BclSlhDsaSign)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

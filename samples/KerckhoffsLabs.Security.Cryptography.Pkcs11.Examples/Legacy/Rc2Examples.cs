@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
@@ -13,9 +14,30 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 public static class Rc2Examples
 {
     [SuppressMessage("Security", "S5547:Use a strong cipher algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/rc2.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
-    public static byte[] Rc2DecryptLegacyRecord(Pkcs11Session session, Pkcs11Key legacyKey, byte[] iv, byte[] ciphertext)
+    public static byte[] Rc2DecryptLegacyRecord(
+        string modulePath, string tokenLabel, SecurePin? pin, string keyLabel, byte[] iv, byte[] ciphertext,
+        Pkcs11LibraryOptions? options = null)
     {
         #region Rc2DecryptLegacyRecord
+        // A record encrypted with RC2-CBC, under a key that is still on the token. Few modules still
+        // implement RC2; NSS's softoken does, and it needs module parameters to load and takes no login
+        // on its crypto token. So here the options are optional, and so is the PIN.
+
+        // 1. Load the module, with the options it needs (for NSS, Pkcs11LibraryOptions.ModuleParameters).
+        //    The module path, token label and options come from configuration.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath, options);
+
+        // 2. Open a session: logged in with the PIN from your secret store (see ReadPinFromEnvironment
+        //    in Getting started, and never write it in code), or without a login on a token that takes none.
+        using Pkcs11Session session = pin is null
+            ? library.OpenSessionWithoutLogin(tokenLabel)
+            : library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 3. Open the RC2 key that is already on the token, by its CKA_LABEL (OpenKey(id) finds it by
+        //    CKA_ID instead). It throws if no key, or more than one, matches.
+        using Pkcs11Key legacyKey = session.OpenKey(keyLabel);
+
+        // 4. Decrypt, with the policy lifted for this block only.
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
 #pragma warning disable KLPKCS11005 // RC2Pkcs11: reading a legacy RC2 record
@@ -23,6 +45,8 @@ public static class Rc2Examples
 #pragma warning restore KLPKCS11005
             return rc2.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7);
         }
+        // 5. The using declarations dispose the key handle (the key itself stays on the token), the
+        //    session and the library, in reverse order.
         #endregion
     }
 

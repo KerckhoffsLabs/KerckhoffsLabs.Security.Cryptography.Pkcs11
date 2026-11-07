@@ -1,6 +1,7 @@
 # ECDSA — `ECDsaPkcs11`
 
-Sign on the token, with a key pair from `GenerateEcSigningKeyPair` (see [Elliptic curves](elliptic-curves.md)):
+Sign on the token, with a key pair already on it, opened by its label (one that `GenerateEcSigningKeyPair`
+made, for example; see [Elliptic curves](elliptic-curves.md)):
 
 # [PKCS#11](#tab/pkcs11)
 
@@ -19,7 +20,7 @@ Verify anywhere, with the public key and the plain BCL:
 **What differs from `ECDsa`:**
 
 - The key pair is generated on the token (`session.GenerateEcSigningKeyPair`, a pair that can only sign
-  and verify) instead of by `ECDsa.Create`.
+  and verify) instead of by `ECDsa.Create`, and opened from there by label (`session.OpenKey`).
 - `ExportParameters(includePrivateParameters: true)` and the private-key export methods throw; export the
   public half with `ExportParameters(false)` or `ExportSubjectPublicKeyInfo()`.
 - Signatures use the same formats as the BCL: IEEE P1363 (`r || s`) by default, DER with

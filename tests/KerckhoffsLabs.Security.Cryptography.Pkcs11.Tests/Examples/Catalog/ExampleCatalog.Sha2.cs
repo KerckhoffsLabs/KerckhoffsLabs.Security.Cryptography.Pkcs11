@@ -11,7 +11,12 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(Sha2Examples), nameof(Sha2Examples.Sha2OnToken)), [typeof(SHA256Pkcs11), typeof(SHA384Pkcs11), typeof(SHA512Pkcs11)],
             [CKM.CKM_SHA256, CKM.CKM_SHA384, CKM.CKM_SHA512], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(Sha2Examples.BclSha2(Message), Sha2Examples.Sha2OnToken(s, Message)))),
+            b =>
+            {
+                Assert.Equal(Sha2Examples.BclSha2(Message), Sha2Examples.Sha2OnToken(b.LibraryPath, b.TokenLabel, Message));
+                AssertFixtureLibraryStillWorks(b);
+            },
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(Sha2Examples), nameof(Sha2Examples.BclSha2)), [], [], ExampleBackend.SoftHsm2,
             _ =>
             {

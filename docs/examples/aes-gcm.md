@@ -29,7 +29,8 @@ AES-GCM is the default choice for [authenticated encryption](aead.md).
 
 A failed authentication usually throws `AuthenticationTagMismatchException`, as the BCL does. Some tokens
 report a bad tag with a generic error code, which the library cannot tell apart from a real fault, so it
-surfaces as a `Pkcs11Exception`. Both are `CryptographicException`s; catch that:
+surfaces as a `Pkcs11Exception`. Both are `CryptographicException`s; catch that. Here `aesGcm`, `nonce`,
+`ciphertext` and `tag` come from an encryption as in the example above:
 
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Aead/AesGcmExamples.cs#AesGcmDetectsTampering)]
 

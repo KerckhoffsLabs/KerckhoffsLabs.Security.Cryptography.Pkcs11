@@ -12,7 +12,14 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(ChaCha20Poly1305Examples), nameof(ChaCha20Poly1305Examples.ChaCha20Poly1305EncryptDecrypt)),
             [typeof(ChaCha20Poly1305Pkcs11)], [CKM.CKM_CHACHA20_KEY_GEN, CKM.CKM_CHACHA20_POLY1305], ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(Message, ChaCha20Poly1305Examples.ChaCha20Poly1305EncryptDecrypt(s, Message, Header)))),
+            b =>
+            {
+                using (SecurePin pin = UserPin(b))
+                    Assert.Equal(Message, ChaCha20Poly1305Examples.ChaCha20Poly1305EncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, Message, Header));
+                AssertFixtureLibraryStillWorks(b);
+            },
+            NeedsUserLogin: true,
+            Unsupported: ExampleGates.SecondModuleInstance),
         new(Name(nameof(ChaCha20Poly1305Examples), nameof(ChaCha20Poly1305Examples.BclChaCha20Poly1305EncryptDecrypt)), [], [],
             ExampleBackend.SoftHsm2,
             _ =>

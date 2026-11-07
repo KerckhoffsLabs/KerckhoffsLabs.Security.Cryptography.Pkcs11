@@ -12,14 +12,20 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(Sp800108Examples), nameof(Sp800108Examples.Sp800108DeriveAesKey)), [typeof(SP800108HmacCounterKdfPkcs11)],
             [CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SHA256_HMAC, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
+            b =>
             {
                 byte[] kdk = RandomNumberGenerator.GetBytes(32);
-                using Pkcs11Key kdkKey = ImportDeriveKey(s, kdk);
-                using Pkcs11Key derived = Sp800108Examples.Sp800108DeriveAesKey(kdkKey, "orders"u8.ToArray(), "tenant-42"u8.ToArray());
-                AssertSameAesKey(derived, Sp800108Examples.BclSp800108(kdk, "orders"u8.ToArray(), "tenant-42"u8.ToArray()));
-            }),
-            Unsupported: ExampleGates.ClassicAesGcm),
+                WithProvisionedKey(b, (s, label) => ImportDeriveKey(b, s, label, kdk),
+                    label =>
+                    {
+                        using SecurePin pin = UserPin(b);
+                        AssertDecryptsWith(Sp800108Examples.BclSp800108(kdk, "orders"u8.ToArray(), "tenant-42"u8.ToArray()),
+                            Sp800108Examples.Sp800108DeriveAesKey(
+                                b.LibraryPath, b.TokenLabel, pin, label, "orders"u8.ToArray(), "tenant-42"u8.ToArray(), Message));
+                    });
+            },
+            NeedsUserLogin: true,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
         new(Name(nameof(Sp800108Examples), nameof(Sp800108Examples.BclSp800108)), [], [], ExampleBackend.SoftHsm2,
             _ => Assert.Equal(32, Sp800108Examples.BclSp800108(new byte[32], [1], [2]).Length)),
     ];
