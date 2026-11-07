@@ -141,6 +141,15 @@ internal static partial class ExampleCatalog
         Assert.Equal(Message, decrypted);
     }
 
+    // The BCL counterpart of a legacy CBC example: what the BCL encrypts with a key, the example decrypts with it.
+    private static void AssertBclLegacyCbc(int keyBytes, Func<SymmetricAlgorithm> bcl, Func<byte[], byte[], byte[], byte[]> example)
+    {
+        byte[] raw = RandomNumberGenerator.GetBytes(keyBytes), iv = RandomNumberGenerator.GetBytes(8);
+        using SymmetricAlgorithm software = bcl();
+        software.Key = raw;
+        Assert.Equal(Message, example(raw, iv, software.EncryptCbc(Message, iv, PaddingMode.PKCS7)));
+    }
+
     // The legacy data is made by the BCL with a known key, which the test imports onto the token (under
     // AllowInsecure: the default policy refuses a legacy key); the example must read it back, and the same
     // decryption without the example's lease must be refused. Shared by the 3DES, DES and RC2 cases.

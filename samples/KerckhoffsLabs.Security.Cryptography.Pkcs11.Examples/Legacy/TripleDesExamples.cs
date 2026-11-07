@@ -27,4 +27,16 @@ public static class TripleDesExamples
         }
         #endregion
     }
+
+    [SuppressMessage("Security", "S5547:Use a strong cipher algorithm", Justification = "The software counterpart of the legacy decryption the token example runs (docs/examples/triple-des.md).")]
+    public static byte[] BclTripleDesDecryptLegacyArchive(byte[] key, byte[] iv, byte[] ciphertext)
+    {
+        #region BclTripleDesDecryptLegacyArchive
+        // The same decryption in software. The key is in your process here, which is what a token avoids:
+        // use this only where the 3DES key already lives in software.
+        using TripleDES des3 = TripleDES.Create();
+        des3.Key = key;
+        return des3.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7);
+        #endregion
+    }
 }

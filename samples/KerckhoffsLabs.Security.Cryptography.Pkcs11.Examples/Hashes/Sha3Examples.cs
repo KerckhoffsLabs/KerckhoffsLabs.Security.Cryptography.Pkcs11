@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
@@ -14,5 +15,14 @@ public static class Sha3Examples
         byte[][] digests = [sha3_256.ComputeHash(data), sha3_384.ComputeHash(data), sha3_512.ComputeHash(data)];
         #endregion
         return digests;
+    }
+
+    public static byte[]? BclSha3_256(byte[] data)
+    {
+        #region BclSha3_256
+        // In software, SHA-3 needs platform support (OpenSSL 1.1.1 or later, or a recent Windows): check first.
+        byte[]? digest = SHA3_256.IsSupported ? SHA3_256.HashData(data) : null;
+        #endregion
+        return digest;
     }
 }

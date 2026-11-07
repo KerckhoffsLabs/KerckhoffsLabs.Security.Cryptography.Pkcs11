@@ -17,6 +17,14 @@ internal static partial class ExampleCatalog
                 byte[][] onToken = Sha3Examples.Sha3OnToken(s, Message);
                 if (!SHA3_256.IsSupported) Assert.Skip("SHA-3 is not supported by this platform's BCL; the token side ran.");
                 Assert.Equal([SHA3_256.HashData(Message), SHA3_384.HashData(Message), SHA3_512.HashData(Message)], onToken);
+                Assert.Equal(Sha3Examples.BclSha3_256(Message), onToken[0]);
             })),
+        new(Name(nameof(Sha3Examples), nameof(Sha3Examples.BclSha3_256)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                byte[]? digest = Sha3Examples.BclSha3_256("abc"u8.ToArray());
+                if (digest is null) Assert.Skip("SHA-3 is not supported by this platform's BCL.");
+                Assert.Equal(Convert.FromHexString("3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532"), digest); // FIPS 202 "abc"
+            }),
     ];
 }

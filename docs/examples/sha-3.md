@@ -1,7 +1,12 @@
 # SHA-3 — `SHA3_256Pkcs11`, `SHA3_384Pkcs11`, `SHA3_512Pkcs11`
 
-Use the token's hash when the token must do it (see [Hashes and HMAC](hashes.md)); otherwise the BCL's
-`SHA3_256.HashData` and its siblings are faster. Each adapter is a `HashAlgorithm` over a session:
+A hash takes no key, so hashing public data on a token gains nothing in secrecy, and the BCL is faster
+where the platform has SHA-3:
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Hashes/Sha3Examples.cs#BclSha3_256)]
+
+Use the token's hash when the token must do it (see [Hashes and HMAC](hashes.md)). Each adapter is a
+`HashAlgorithm` over a session, and its digests are the BCL's (`SHA3_256.HashData` and its siblings):
 
 [!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/Hashes/Sha3Examples.cs#Sha3OnToken)]
 

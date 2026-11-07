@@ -25,4 +25,16 @@ public static class Rc2Examples
         }
         #endregion
     }
+
+    [SuppressMessage("Security", "S5547:Use a strong cipher algorithm", Justification = "The software counterpart of the legacy decryption the token example runs (docs/examples/rc2.md).")]
+    public static byte[] BclRc2DecryptLegacyRecord(byte[] key, byte[] iv, byte[] ciphertext)
+    {
+        #region BclRc2DecryptLegacyRecord
+        // The same decryption in software. The key is in your process here, which is what a token avoids:
+        // use this only where the RC2 key already lives in software.
+        using RC2 rc2 = RC2.Create();
+        rc2.Key = key;
+        return rc2.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7);
+        #endregion
+    }
 }

@@ -25,4 +25,16 @@ public static class DesExamples
         }
         #endregion
     }
+
+    [SuppressMessage("Security", "S5547:Use a strong cipher algorithm", Justification = "The software counterpart of the legacy decryption the token example runs (docs/examples/des.md).")]
+    public static byte[] BclDesDecryptLegacyRecord(byte[] key, byte[] iv, byte[] ciphertext)
+    {
+        #region BclDesDecryptLegacyRecord
+        // The same decryption in software. The key is in your process here, which is what a token avoids:
+        // use this only where the DES key already lives in software.
+        using DES des = DES.Create();
+        des.Key = key;
+        return des.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7);
+        #endregion
+    }
 }

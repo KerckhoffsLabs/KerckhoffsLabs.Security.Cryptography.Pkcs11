@@ -15,6 +15,8 @@ internal static partial class ExampleCatalog
             ExampleBackend.Nss,
             b => WithSession(b, s => AssertLegacyCbc(s, CKK.CKK_RC2, 16, 8, RC2.Create, Rc2Examples.Rc2DecryptLegacyRecord,
                 key => new RC2Pkcs11(key)))),
+        new(Name(nameof(Rc2Examples), nameof(Rc2Examples.BclRc2DecryptLegacyRecord)), [], [], ExampleBackend.Nss,
+            _ => AssertBclLegacyCbc(16, RC2.Create, Rc2Examples.BclRc2DecryptLegacyRecord)),
     ];
 #pragma warning restore KLPKCS11005
 }

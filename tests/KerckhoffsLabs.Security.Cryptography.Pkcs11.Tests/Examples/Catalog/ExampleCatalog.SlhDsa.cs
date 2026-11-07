@@ -18,9 +18,16 @@ internal static partial class ExampleCatalog
                 if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
                 (byte[] signature, byte[] publicKey) = SlhDsaExamples.SlhDsaSign(s, Message);
                 if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL; the token side ran.");
-                using SlhDsa verifier = SlhDsa.ImportSlhDsaPublicKey(SlhDsaAlgorithm.SlhDsaSha2_128s, publicKey);
-                Assert.True(verifier.VerifyData(Message, signature));
+                Assert.True(SlhDsaExamples.SlhDsaVerifyWithBcl(Message, signature, publicKey));
+                Assert.False(SlhDsaExamples.SlhDsaVerifyWithBcl([.. Message, 0], signature, publicKey));
             })),
+        new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.SlhDsaVerifyWithBcl)), [], [], ExampleBackend.SoftHsm2,
+            _ =>
+            {
+                if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL.");
+                using SlhDsa bcl = SlhDsa.GenerateKey(SlhDsaAlgorithm.SlhDsaSha2_128s);
+                Assert.True(SlhDsaExamples.SlhDsaVerifyWithBcl(Message, bcl.SignData(Message), bcl.ExportSlhDsaPublicKey()));
+            }),
     ];
 #pragma warning restore SYSLIB5006
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 
@@ -23,5 +24,15 @@ public static class Sha1Examples
             return sha1.ComputeHash(data);
         }
         #endregion
+    }
+
+    [SuppressMessage("Security", "S4790:Use a stronger hashing algorithm", Justification = "The software counterpart of the legacy identifier the token example computes (docs/examples/sha-1.md).")]
+    public static byte[] BclSha1(byte[] data)
+    {
+        #region BclSha1
+        // The same identifier in software: no token, no policy lease. Hashing public data on a token gains nothing.
+        byte[] digest = SHA1.HashData(data);
+        #endregion
+        return digest;
     }
 }
