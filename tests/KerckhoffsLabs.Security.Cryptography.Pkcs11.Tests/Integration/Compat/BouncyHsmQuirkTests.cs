@@ -60,16 +60,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void Sp800108DoublePipeline_QuirkStillPresent()
-    {
-        byte[] actual = Sp800108ChainedKdfTestCases.DeriveDoublePipeline(_backend);
-
-        Assert.False(actual.AsSpan().SequenceEqual(Sp800108ChainedKdfTestCases.ReferenceDoublePipeline()),
-            "CKM_SP800_108_DOUBLE_PIPELINE_KDF now matches SP 800-108 §5.3: set " +
-            "BouncyHsmBackendFixture.BouncyHsmDoublePipelineMatchesSp800108 to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Sp800108AdditionalKey_QuirkStillPresent()
     {
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Sp800108ChainedKdfTestCases.Assert_Counter_AdditionalDerivedKey_TakesTheNextBytes(_backend));
@@ -449,37 +439,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void AesCtrParams_QuirkStillPresent()
-    {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        ObjectHandle key = TestKeys.CreateAes256Key(session, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        CKR rv;
-        try
-        {
-            // CK_AES_CTR_PARAMS: ulCounterBits = 128, then a 16-byte counter block.
-            byte[] parameter = new byte[System.Runtime.CompilerServices.Unsafe.SizeOf<NativeCULong>() + 16];
-            parameter[0] = 128;
-            System.Security.Cryptography.RandomNumberGenerator.Fill(parameter.AsSpan(parameter.Length - 16));
-            using var scope = new MechanismParameterScope();
-#pragma warning disable KLPKCS11009 // CKM_AES_CTR through the raw dispatch.
-            CK_MECHANISM mech = new Mechanism(CKM.CKM_AES_CTR, parameter).Marshal(scope, out _);
-#pragma warning restore KLPKCS11009
-            rv = _backend.Library.LowLevelLibrary!.C_EncryptInit((NativeCULong)session.SessionId, in mech, (NativeCULong)key.ObjectId);
-            if (rv == CKR.CKR_OK)
-                _backend.Library.LowLevelLibrary!.C_SessionCancel((NativeCULong)session.SessionId, (NativeCULong)CKF.CKF_ENCRYPT);
-        }
-        finally
-        {
-            session.DestroyObject(key);
-            TestKeys.LogoutIfRequired(_backend, session);
-        }
-
-        Assert.True(rv == CKR.CKR_GENERAL_ERROR,
-            $"C_EncryptInit(CKM_AES_CTR) with a CK_AES_CTR_PARAMS no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmTakesAesCtrParams to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void EmptyCbcPadCiphertext_QuirkStillPresent()
     {
         using var session = TestKeys.OpenLoggedInSession(_backend);
@@ -777,5 +736,26 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         Assert.True(rv == CKR.CKR_GENERAL_ERROR,
             $"C_DeriveKey(CKM_ECDH1_DERIVE) of a 13-byte AES key no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AesCtrCounterBitsRange_QuirkStillPresent()
+    {
+        foreach (ulong counterBits in (ulong[])[0, 129])
+        {
+            Exception? ex = Record.Exception(() => Integration.Mechanisms.MechanismParameterTestCases.Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(_backend, counterBits));
+            Assert.True(ex is not null && ex.Message.Contains("returned CKR_OK", StringComparison.Ordinal),
+                $"C_EncryptInit(CKM_AES_CTR) with ulCounterBits {counterBits} is no longer accepted ({ex?.Message ?? "the case passes"}): " +
+                "if it answers CKR_MECHANISM_PARAM_INVALID, set BouncyHsmBackendFixture.BouncyHsmRefusesOutOfRangeAesCtrCounterBits to true and delete this test.");
+        }
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AesCtrCounterOverflow_QuirkStillPresent()
+    {
+        Exception? ex = Record.Exception(() => Integration.Mechanisms.MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend));
+        Assert.True(ex is not null && ex.Message.Contains("returned CKR_OK", StringComparison.Ordinal),
+            $"A CKM_AES_CTR message past the end of its counter is no longer encrypted ({ex?.Message ?? "the case passes"}): " +
+            "if it answers CKR_DATA_LEN_RANGE, set BouncyHsmBackendFixture.BouncyHsmRefusesAesCtrCounterOverflow to true and delete this test.");
     }
 }

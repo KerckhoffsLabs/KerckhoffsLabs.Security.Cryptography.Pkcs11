@@ -22,12 +22,22 @@ public sealed class MechanismParameterTests_BouncyHsm(BouncyHsmBackendFixture ba
         MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
     }
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.AesCtrParamsAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm takes a bare counter block, not CK_AES_CTR_PARAMS")]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.AesCtrCounterBitsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
-    public void AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(ulong counterBits) => MechanismParameterTestCases.Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(_backend, counterBits);
+    public void AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(ulong counterBits)
+    {
+        if (!BouncyHsmBackendFixture.BouncyHsmRefusesOutOfRangeAesCtrCounterBits)
+            Assert.Skip("BouncyHsm accepts an AES-CTR ulCounterBits of 0 or above 128");
+        MechanismParameterTestCases.Assert_AesCtr_CounterBitsOutOfRange_IsMechanismParamInvalid(_backend, counterBits);
+    }
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.AesCtrParamsAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm takes a bare counter block, not CK_AES_CTR_PARAMS")]
-    public void AesCtr_CounterOverflow_IsDataLenRange() => MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AesCtr_CounterOverflow_IsDataLenRange()
+    {
+        if (!BouncyHsmBackendFixture.BouncyHsmRefusesAesCtrCounterOverflow)
+            Assert.Skip("BouncyHsm encrypts an AES-CTR message past the end of its counter instead of refusing it");
+        MechanismParameterTestCases.Assert_AesCtr_CounterOverflow_IsDataLenRange(_backend);
+    }
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.MacGeneralLengthsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
