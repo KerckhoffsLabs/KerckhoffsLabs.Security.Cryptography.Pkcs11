@@ -217,12 +217,18 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// throws. The only place a policy verdict becomes an exception.
     /// </summary>
     /// <exception cref="CryptoPolicyViolationException">The policy refused the request.</exception>
-    internal void Enforce(PolicyRequest request)
+    internal void Enforce(PolicyRequest request) => EnforceUnder(request);
+
+    /// <summary><see cref="Enforce(PolicyRequest)"/>, returning the policy that allowed the request.</summary>
+    /// <exception cref="CryptoPolicyViolationException">The policy refused the request.</exception>
+    private ICryptoPolicy EnforceUnder(PolicyRequest request)
     {
         ICryptoPolicy policy = _effectivePolicy;
-        PolicyDecision decision = policy.Evaluate(request);
+        PolicyDecision decision;
+        using (CallOutScope.Enter())
+            decision = policy.Evaluate(request);
         if (decision.IsAllowed)
-            return;
+            return policy;
 
         Log.PolicyDenied(_logger, (ulong)_sessionId, policy.Name, request.Describe());
         throw new CryptoPolicyViolationException(policy.Name, request, decision.Reason!);
@@ -239,7 +245,8 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     internal bool IsPermitted(PolicyRequest request)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _effectivePolicy.Evaluate(request).IsAllowed;
+        using (CallOutScope.Enter())
+            return _effectivePolicy.Evaluate(request).IsAllowed;
     }
 
     private void Enforce(Mechanism mechanism, CryptoOperation operation, IReadOnlyList<Objects.ObjectAttribute>? resultTemplate = null)
@@ -249,11 +256,14 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         // The KDF an ECDH derivation or KEM applies to the shared secret is judged here, on every call
         // carrying CK_ECDH1_DERIVE_PARAMS, whichever public entry point it came through. Whether the
         // result is derivation-only is read off the template the token will receive, so a caller cannot
-        // claim it.
+        // claim it. The read-back tag comes only from an open ReadBackGrant (DeriveRawSecret's), which the
+        // policy allowed the matching KeyMaterialExportRequest for; no caller can set it.
         if (mechanism.Parameters is CkmEcdh1DeriveParams ecdh)
             Enforce(new KeyAgreementKdfRequest(mechanism.Type, ecdh.Kdf)
             {
                 ResultIsDerivationOnlySecret = resultTemplate is not null && IsDerivationOnlySecret(resultTemplate),
+                ReadBackFor = ReadBackRequest?.Kind,
+                ReadBackExport = ReadBackRequest,
             });
     }
 
@@ -489,7 +499,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
                 throw new ArgumentException("Invalid handle specified", nameof(sessionHandle));
 
             // Both run consumer code (the factory, the logger), which may throw.
-            _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11SessionCore>();
+            // Fenced: a sink runs inside session operations, read-backs included, and must not be able to
+            // call back into a session as if it were the library (see CallOutScope).
+            _logger = new CallOutFencedLogger((loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11SessionCore>());
             Log.SessionTrace(_logger, (ulong)sessionHandle.SessionId, "ctor");
 
             _basePolicy = policy ?? CryptoPolicy.Recommended;

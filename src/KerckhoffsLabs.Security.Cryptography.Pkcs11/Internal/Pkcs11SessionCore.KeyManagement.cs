@@ -328,12 +328,14 @@ internal sealed partial class Pkcs11SessionCore
     /// <summary>
     /// Submits a creation template to the policy. <paramref name="objectClass"/> is the class the
     /// creating path knows for certain; paths that take an arbitrary template pass null rather than
-    /// parse the caller's CKA_CLASS.
+    /// parse the caller's CKA_CLASS. Inside an open <see cref="ReadBackGrant"/> the template is tagged as
+    /// its read-back (see <see cref="KeyTemplateRequest.ReadBackFor"/>); nowhere else.
     /// </summary>
     private void EnforceKeyTemplate(List<ObjectAttribute>? attributes, CKO? objectClass)
     {
         if (attributes is null) return;
-        Enforce(new KeyTemplateRequest(objectClass, attributes));
+        KeyMaterialExportRequest? readBack = ReadBackRequest;
+        Enforce(new KeyTemplateRequest(objectClass, attributes) { ReadBackFor = readBack?.Kind, ReadBackExport = readBack });
     }
 
     /// <summary>

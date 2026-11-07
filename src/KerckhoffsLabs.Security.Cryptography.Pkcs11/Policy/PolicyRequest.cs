@@ -59,7 +59,34 @@ public sealed record EcKeyGenerationRequest(Pkcs11ECCurve Curve) : PolicyRequest
 /// <param name="Attributes">The caller's attributes. Policies must not log their values.</param>
 public sealed record KeyTemplateRequest(CKO? ObjectClass, IReadOnlyList<ObjectAttribute> Attributes) : PolicyRequest
 {
-    internal override string Describe() => ObjectClass is { } cls ? $"key template ({cls})" : "key template";
+    /// <summary>
+    /// The kind of secret the library is about to read off the token through the key this template
+    /// creates, when the template is one of the library's own read-back paths (the byte-returning KDF
+    /// overloads, <c>Pkcs11Key.DeriveRawSecret</c>, <c>MLKemPkcs11</c>); otherwise <see langword="null"/>.
+    /// Set by the library, never by the caller.
+    /// </summary>
+    /// <remarks>
+    /// Such a template is extractable and non-sensitive by necessity, and the session has already
+    /// asked for the matching <see cref="KeyMaterialExportRequest"/> before it is submitted: the tag is
+    /// set only inside the read-back the policy allowed, never anywhere else. A built-in policy judges a
+    /// tagged template with its key-material export rule for that kind and then with its key-template
+    /// rule, minus <c>CKA_SENSITIVE</c> and <c>CKA_EXTRACTABLE</c>: an explicit export opt-in exempts its
+    /// own read-back from exactly those two attributes and nothing more. The same template from a caller
+    /// is untagged and judged as before.
+    /// </remarks>
+    public KeyMaterialExportKind? ReadBackFor { get; internal init; }
+
+    /// <summary>
+    /// The export request the open read-back was allowed for (its <see cref="KeyMaterialExportRequest.Kind"/> is
+    /// <see cref="ReadBackFor"/>), key info included, so the built-in policies judge the tag against the same scope.
+    /// </summary>
+    internal KeyMaterialExportRequest? ReadBackExport { get; init; }
+
+    internal override string Describe()
+    {
+        string described = ObjectClass is { } cls ? $"key template ({cls})" : "key template";
+        return ReadBackFor is { } kind ? $"{described} (read-back for {kind})" : described;
+    }
 }
 
 /// <summary>The KDF applied to a key-agreement shared secret.</summary>
@@ -81,8 +108,36 @@ public sealed record KeyAgreementKdfRequest(CKM Mechanism, CKD Kdf) : PolicyRequ
     /// </remarks>
     public bool ResultIsDerivationOnlySecret { get; internal init; }
 
+    /// <summary>
+    /// The kind of secret the library is about to read off the token through the key this derivation
+    /// creates, when the derivation is one of the library's own read-back paths
+    /// (<c>Pkcs11Key.DeriveRawSecret</c>); otherwise <see langword="null"/>. Set by the session, never by
+    /// the caller.
+    /// </summary>
+    /// <remarks>
+    /// A built-in policy judges a <see cref="CKD.CKD_NULL"/> request tagged
+    /// <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> with its key-material export rule for that kind
+    /// instead of its KDF allow-list, so an explicit <see cref="KeyMaterialExportKind.EcdhSharedSecret"/>
+    /// opt-in covers the derivation its read-back needs. A tagged request naming any other KDF, or tagged
+    /// with any other kind, is judged as if untagged: only the ECDH shared-secret export may approve a
+    /// derivation that returns Z, and it approves nothing else. A caller's own
+    /// <see cref="CKD.CKD_NULL"/> derivation is untagged and judged as before.
+    /// </remarks>
+    public KeyMaterialExportKind? ReadBackFor { get; internal init; }
+
+    /// <summary>
+    /// The export request the open read-back was allowed for (its <see cref="KeyMaterialExportRequest.Kind"/> is
+    /// <see cref="ReadBackFor"/>), key info included, so the built-in policies judge the tag against the same scope.
+    /// </summary>
+    internal KeyMaterialExportRequest? ReadBackExport { get; init; }
+
     internal override string Describe()
-        => ResultIsDerivationOnlySecret ? $"{Mechanism} with {Kdf} into a derivation-only secret" : $"{Mechanism} with {Kdf}";
+    {
+        string described = ResultIsDerivationOnlySecret
+            ? $"{Mechanism} with {Kdf} into a derivation-only secret"
+            : $"{Mechanism} with {Kdf}";
+        return ReadBackFor is { } kind ? $"{described} (read-back for {kind})" : described;
+    }
     internal override CKM? MechanismType => Mechanism;
 }
 
@@ -99,7 +154,37 @@ public sealed record KeyAgreementKeyRequest(CKM Mechanism, CKK KeyType) : Policy
 /// <param name="Kind">What is being read.</param>
 public sealed record KeyMaterialExportRequest(KeyMaterialExportKind Kind) : PolicyRequest
 {
-    internal override string Describe() => $"export of {Kind}";
+    /// <summary>
+    /// For <see cref="KeyMaterialExportKind.KdfOutput"/>, what the library read off the KDF's base key; otherwise, and for
+    /// a KDF with no base key (PBKDF2, over a password), <see langword="null"/>. Set by the library, never by the caller.
+    /// </summary>
+    /// <remarks>
+    /// A built-in policy's <see cref="KeyMaterialExportRule"/> checks it against its <see cref="KdfBaseKeyScope"/>. A custom
+    /// policy that allows <see cref="KeyMaterialExportKind.KdfOutput"/> should judge it too: KDF output over a base key the
+    /// token has always protected reproduces every key derived from that base.
+    /// </remarks>
+    public ExportKeyInfo? KdfBaseKey { get; internal init; }
+
+    /// <summary>
+    /// For <see cref="KeyMaterialExportKind.EcdhSharedSecret"/>, and for a <see cref="KeyMaterialExportKind.KemSharedSecret"/>
+    /// read by decapsulation, what the library read off the private key; otherwise, and for an encapsulation (which uses no
+    /// private key), <see langword="null"/>. Set by the library, never by the caller.
+    /// </summary>
+    /// <remarks>
+    /// A built-in policy's <see cref="KeyMaterialExportRule"/> checks it against its <see cref="PrivateKeyScope"/>. A custom
+    /// policy that allows either kind should judge it too: the secret over a long-lived private key reproduces what earlier
+    /// agreements and decapsulations with it kept on the token.
+    /// </remarks>
+    public ExportKeyInfo? PrivateKey { get; internal init; }
+
+    internal override string Describe()
+    {
+        if (KdfBaseKey is { } baseKey)
+            return $"export of {Kind} over a {baseKey.Describe("base key")}";
+        if (PrivateKey is { } privateKey)
+            return $"export of {Kind} over a {privateKey.Describe("private key")}";
+        return $"export of {Kind}";
+    }
 }
 
 /// <summary>The kind of secret a <see cref="KeyMaterialExportRequest"/> reads off the token.</summary>
@@ -110,5 +195,11 @@ public enum KeyMaterialExportKind
     /// <summary>A KEM shared secret (ML-KEM encapsulate/decapsulate through the BCL adapter).</summary>
     KemSharedSecret,
     /// <summary>Output bytes of an on-token KDF.</summary>
+    /// <remarks>
+    /// The broadest of the three, which is why an opt-in to it is scoped by base key
+    /// (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>, <see cref="KdfBaseKeyScope"/>): the bytes are those of any key
+    /// the token derives from the same base with the same mechanism, sensitive or not, so over the agreed secret of
+    /// <c>Pkcs11Key.DeriveSecretAgreement</c> or an on-token master key they would reproduce every key derived from it.
+    /// </remarks>
     KdfOutput,
 }

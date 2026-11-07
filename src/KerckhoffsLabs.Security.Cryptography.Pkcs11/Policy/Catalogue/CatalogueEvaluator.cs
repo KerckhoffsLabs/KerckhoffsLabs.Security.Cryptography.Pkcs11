@@ -32,16 +32,44 @@ internal static class CatalogueEvaluator
             HashUseRequest r => EvaluateHash(catalogue, policyName, r.Hash, r.Operation),
             RsaKeyGenerationRequest r => EvaluateRsaKeyGeneration(catalogue, policyName, r),
             EcKeyGenerationRequest r => EvaluateCurve(catalogue, policyName, r.Curve),
+            KeyTemplateRequest { ReadBackFor: { } kind } r => EvaluateReadBackTemplate(catalogue, r, r.ReadBackExport ?? new(kind)),
             KeyTemplateRequest r => catalogue.KeyTemplate.Evaluate(r),
             // CKD_NULL keeps Z as is. Refused into a working key (SP 800-56A forbids using Z directly),
             // allowed into a derivation-only secret: Z stays in the module and only an approved KDF
             // (the catalogue's CKM_HKDF_DERIVE / CKM_SP800_108_*_KDF) can turn it into keys.
             KeyAgreementKdfRequest { Kdf: CKD.CKD_NULL, ResultIsDerivationOnlySecret: true } => PolicyDecision.Allow,
+            // DeriveRawSecret's CKD_NULL derivation, tagged by the session: judged as the export it serves.
+            // A caller's CKD_NULL derivation is untagged. Only CKD_NULL tagged EcdhSharedSecret qualifies: that
+            // is the derivation returning Z, which is that export and no other. A tagged request naming another
+            // KDF still goes through the KDF allow-list (so a read-back can never route around the SHA-1 KDF
+            // refusal), and a request tagged with another kind is judged as if untagged, so a KdfOutput (or KEM)
+            // opt-in can never approve a CKD_NULL derivation that would return Z.
+            // The export is judged as the session asked it, private key included, so the key's scope applies here too.
+            KeyAgreementKdfRequest { Kdf: CKD.CKD_NULL, ReadBackFor: KeyMaterialExportKind.EcdhSharedSecret } r =>
+                catalogue.KeyMaterialExport.Evaluate(
+                    r.ReadBackExport ?? new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret)),
             KeyAgreementKdfRequest r => EvaluateKdf(catalogue, policyName, r.Kdf),
             KeyAgreementKeyRequest r => EvaluateKeyAgreementKeyType(catalogue, policyName, r.KeyType),
             KeyMaterialExportRequest r => catalogue.KeyMaterialExport.Evaluate(r),
             _ => PolicyDecision.Deny($"{policyName} has no rule for {request.GetType().Name}."),
         };
+    }
+
+    // A library read-back's template (see KeyTemplateRequest.ReadBackFor). The session opened the read-back
+    // only once the policy allowed its KeyMaterialExportRequest; the export rule is asked again here, with the
+    // same request (key scopes included), so the verdict stands even under a policy swapped in meanwhile. The opt-in exempts the template from exactly
+    // what the read-back needs, CKA_SENSITIVE=false and CKA_EXTRACTABLE=true, and nothing else: the template
+    // rule still judges every other attribute (CKA_TOKEN, CKA_VALUE_LEN, ...), with those two removed.
+    private static PolicyDecision EvaluateReadBackTemplate(PolicyCatalogue c, KeyTemplateRequest request, KeyMaterialExportRequest export)
+    {
+        PolicyDecision verdict = c.KeyMaterialExport.Evaluate(export);
+        if (!verdict.IsAllowed)
+            return verdict;
+
+        return c.KeyTemplate.Evaluate(request with
+        {
+            Attributes = [.. request.Attributes.Where(a => a.Type is not (CKA.CKA_SENSITIVE or CKA.CKA_EXTRACTABLE))],
+        });
     }
 
     private static PolicyDecision EvaluateMechanism(PolicyCatalogue c, string name, Mechanism mechanism, CryptoOperation operation)

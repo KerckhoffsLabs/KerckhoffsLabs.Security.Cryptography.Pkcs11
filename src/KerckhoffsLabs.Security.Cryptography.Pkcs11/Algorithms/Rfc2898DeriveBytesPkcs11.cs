@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
@@ -32,11 +33,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// library has no PKCS#11 equivalent for.
 /// </para>
 /// <para>
-/// <b>Requires a policy that permits reading key material off the token, e.g.
-/// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every derivation here returns
-/// <c>byte[]</c> (or fills a caller-supplied buffer), so the value must be read back off the token —
-/// the library's single secure-defaults gate declines to create the extractable, non-sensitive key
-/// that read-back needs. Scope the policy override to one operation. To use the result as a key, call
+/// <b>Requires a policy that allows
+/// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind.KdfOutput"/>.</b> Every derivation here returns
+/// <c>byte[]</c> (or fills a caller-supplied buffer), so the value must be read back off the token.
+/// Every built-in policy refuses it; opt in with
+/// <c>WithKeyMaterialExportRule(KeyMaterialExportRule.Allow([KeyMaterialExportKind.KdfOutput], "reason", kdfBaseKeys: KdfBaseKeyScope.NeverProtected))</c>
+/// (reported as KLPKCS11012; the scope says which keys the secret may come from, see
+/// <see cref="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Allow"/>), applied as a scoped
+/// <c>Pkcs11Session.UsePolicy</c> lease around the call or on a session of its own, not as a session\'s base policy.
+/// A <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> lease also allows it, but lifts every other rule and is refused on <c>NistApproved</c> sessions. To use the result as a key, call
 /// <see cref="Pbkdf2Key(Pkcs11Session, SecurePassword, ReadOnlySpan{byte}, int, HashAlgorithmName, ObjectTemplate)"/> instead: it keeps the derived key on the token (sensitive and
 /// non-extractable by default) and needs no override.
 /// </para>
@@ -405,9 +410,12 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
 
     private static byte[] DeriveExtractable(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, int length)
     {
-        session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
-
-        return DeriveAndRead(session, new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), length);
+        // The export check comes first: it is what a policy that allows extractable templates but not
+        // plaintext KDF output (a FIPS-style policy) relies on.
+        using SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
+        var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf));
+        using var template = DerivedKeyMaterial.ExtractableSecretTemplate(length);
+        return readBack.Read(() => session.GenerateKey(mechanism, template), length, ReadBackFailures.KdfOutput);
     }
 
     private static void DeriveInto(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, Span<byte> destination)
@@ -420,54 +428,6 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         finally
         {
             CryptographicOperations.ZeroMemory(derived);
-        }
-    }
-
-    private static byte[] DeriveAndRead(Pkcs11Session session, Mechanism mechanism, int length)
-    {
-        // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
-        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .ValueLen(length)
-            .Extractable()
-            .Sensitive(false)
-            .Build();
-
-        // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so the policy also judges it as a key template; the export
-        // check above is what a policy that allows such templates but not plaintext KDF output
-        // (a FIPS-style policy) relies on.
-        Pkcs11Key derived = session.GenerateKey(mechanism, template);
-        bool operationFailed = true;
-        try
-        {
-            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                throw new InvalidOperationException(
-                    "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
-            byte[] derivedKey = attrs[0].GetValueAsByteArray();
-            operationFailed = false;
-            return derivedKey;
-        }
-        finally
-        {
-            DestroyEphemeral(derived, operationFailed);
-        }
-    }
-
-    // See DerivedKeyMaterial.DestroyEphemeral for why the destroy failure is swallowed only
-    // when it would otherwise replace the real, in-flight exception.
-    private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
-    {
-        using (derived)
-        {
-            try
-            {
-                derived.Destroy();
-            }
-            catch (Pkcs11Exception) when (operationFailed)
-            {
-                // Deliberately swallowed: see the remarks. The primary exception is the useful one.
-            }
         }
     }
 

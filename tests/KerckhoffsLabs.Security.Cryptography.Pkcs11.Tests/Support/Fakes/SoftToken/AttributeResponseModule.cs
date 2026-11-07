@@ -11,14 +11,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 /// into returning for a well-formed key object's required attributes. A <c>respondFor</c> responder, given
 /// the object's handle too, takes the place of <c>respond</c>. Every other function is absent,
 /// so the library sees <c>CKR_FUNCTION_NOT_SUPPORTED</c> for it, except <c>C_Decrypt</c> when a <c>decrypt</c>
-/// answer is given; <c>C_Initialize</c>/<c>C_Finalize</c>
+/// answer is given and <c>C_DestroyObject</c> when <c>allowDestroy</c> is set; <c>C_Initialize</c>/<c>C_Finalize</c>
 /// succeed, and disposing the library from <see cref="FakeModule.Load(Pkcs11LibraryOptions?)"/> releases the module. See
 /// <see cref="FakeKeys.Create"/>.
 /// </summary>
 internal sealed class AttributeResponseModule(
     Func<CKA, (CKR Rv, byte[]? Value)> respond,
     Func<byte[], byte[]>? decrypt = null,
-    Func<ulong, CKA, (CKR Rv, byte[]? Value)>? respondFor = null) : FakeModule
+    Func<ulong, CKA, (CKR Rv, byte[]? Value)>? respondFor = null,
+    bool allowDestroy = false) : FakeModule
 {
     protected override bool ReleasedByFinalize => true;
 
@@ -43,6 +44,10 @@ internal sealed class AttributeResponseModule(
         }
         return CKR.CKR_OK;
     }
+
+    // C_DestroyObject succeeds only when asked to; otherwise it is unsupported, as when absent.
+    protected override CKR C_DestroyObject(NativeCULong session, NativeCULong objectId)
+        => allowDestroy ? CKR.CKR_OK : CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     // With a decrypt answer, C_DecryptInit accepts any mechanism and C_Decrypt answers CKR_OK with whatever
     // it returns, as a token that checks nothing would. Without one, both are unsupported, as when absent.

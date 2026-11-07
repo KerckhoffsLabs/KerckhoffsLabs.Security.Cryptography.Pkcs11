@@ -148,6 +148,8 @@ internal sealed partial class ManagedSoftToken : FakeModule
             return CKR.CKR_ATTRIBUTE_VALUE_INVALID;
 
         attrs[(ulong)CKA.CKA_VALUE] = RandomNumberGenerator.GetBytes(len);
+        attrs.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
+        RecordProtectionHistory(attrs, generated: true);
         key = (NativeCULong)Store(attrs);
         return CKR.CKR_OK;
     }
@@ -162,6 +164,7 @@ internal sealed partial class ManagedSoftToken : FakeModule
             && !(attrs.TryGetValue((ulong)CKA.CKA_KEY_TYPE, out var type) && (CKK)ToUlong(type) is CKK.CKK_DES or CKK.CKK_DES2 or CKK.CKK_DES3)
             && attrs.TryGetValue((ulong)CKA.CKA_VALUE, out var value) && !attrs.ContainsKey((ulong)CKA.CKA_VALUE_LEN))
             attrs[(ulong)CKA.CKA_VALUE_LEN] = UlongAttr((ulong)value.Length);
+        RecordProtectionHistory(attrs, generated: false);
         ulong handle = Store(attrs);
         RegisterImportedAsymKey(handle, attrs); // reconstructs a live BCL DSA for CKK_DSA imports
         objectId = (NativeCULong)handle;
@@ -179,6 +182,11 @@ internal sealed partial class ManagedSoftToken : FakeModule
         return _objects.Remove((ulong)objectId) ? CKR.CKR_OK : CKR.CKR_OBJECT_HANDLE_INVALID;
     }
 
+    /// <summary>When non-zero, <c>C_GetAttributeValue</c> reports every <c>CKA_VALUE</c> this many bytes
+    /// longer (zero-padded) or shorter (truncated) than stored, as a token that ignores
+    /// <c>CKA_VALUE_LEN</c> would. Lets tests exercise the library's read-back length checks.</summary>
+    public int ValueLengthSkew { get; set; }
+
     protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
     {
         if (!_objects.TryGetValue((ulong)objectId, out var obj)) return CKR.CKR_OBJECT_HANDLE_INVALID;
@@ -194,6 +202,13 @@ internal sealed partial class ManagedSoftToken : FakeModule
                 template[i].valueLen = AttrUnavailable;
                 rv = CKR.CKR_ATTRIBUTE_TYPE_INVALID; // non-fatal in the caller's two-pass read
                 continue;
+            }
+
+            if (ValueLengthSkew != 0 && type == (ulong)CKA.CKA_VALUE)
+            {
+                byte[] skewed = new byte[Math.Max(0, val.Length + ValueLengthSkew)];
+                val.AsSpan(0, Math.Min(val.Length, skewed.Length)).CopyTo(skewed);
+                val = skewed;
             }
 
             // Pass 1 (value == NULL): report the size. Pass 2: copy into the caller's buffer.
@@ -242,6 +257,23 @@ internal sealed partial class ManagedSoftToken : FakeModule
     // (Symmetric encrypt/decrypt — block ciphers + AEAD — lives in ManagedSoftToken.Symmetric.cs.)
 
     // === Helpers =========================================================
+
+    // CKA_ALWAYS_SENSITIVE / CKA_NEVER_EXTRACTABLE as PKCS#11 has the token keep them on a secret or private
+    // key: false for a key it was handed the value of (C_CreateObject); from the key's own CKA_SENSITIVE /
+    // CKA_EXTRACTABLE when it generated it; and, when it derived it, only while the base key's are still true.
+    private static void RecordProtectionHistory(Dictionary<ulong, byte[]> attrs, bool generated, Dictionary<ulong, byte[]>? baseKey = null)
+    {
+        if (!(attrs.TryGetValue((ulong)CKA.CKA_CLASS, out var cls) && (CKO)ToUlong(cls) is CKO.CKO_SECRET_KEY or CKO.CKO_PRIVATE_KEY))
+            return;
+        static bool Bool(Dictionary<ulong, byte[]>? a, CKA type) => a is not null && a.TryGetValue((ulong)type, out var v) && v.Length > 0 && v[0] != 0;
+        bool sensitive = Bool(attrs, CKA.CKA_SENSITIVE), extractable = Bool(attrs, CKA.CKA_EXTRACTABLE);
+        bool alwaysSensitive = generated && sensitive && (baseKey is null || Bool(baseKey, CKA.CKA_ALWAYS_SENSITIVE));
+        bool neverExtractable = generated && !extractable && (baseKey is null || Bool(baseKey, CKA.CKA_NEVER_EXTRACTABLE));
+        attrs[(ulong)CKA.CKA_ALWAYS_SENSITIVE] = [alwaysSensitive ? (byte)1 : (byte)0];
+        attrs[(ulong)CKA.CKA_NEVER_EXTRACTABLE] = [neverExtractable ? (byte)1 : (byte)0];
+        // A token always reports CKA_TOKEN; a key created without it is a session object (PKCS#11 default).
+        attrs.TryAdd((ulong)CKA.CKA_TOKEN, [0]);
+    }
 
     private ulong Store(Dictionary<ulong, byte[]> attrs)
     {

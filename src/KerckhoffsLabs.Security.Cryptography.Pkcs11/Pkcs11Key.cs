@@ -250,6 +250,47 @@ public sealed partial class Pkcs11Key : IDisposable
     }
 
     /// <summary>
+    /// What an export policy judges about this key as the source of a secret read off the token: a KDF's base key
+    /// (<see cref="KeyMaterialExportRequest.KdfBaseKey"/>) or an agreement's or decapsulation's private key
+    /// (<see cref="KeyMaterialExportRequest.PrivateKey"/>), read off the secret or private object in one
+    /// <c>C_GetAttributeValue</c>, never off a public companion. An attribute the token does not report, or a key with
+    /// no secret or private object, reads as protected and persistent (<see cref="ExportKeyInfo.Unread"/>), so an
+    /// unknown key never passes for an unprotected or ephemeral one.
+    /// </summary>
+    internal ExportKeyInfo ReadExportKeyInfo()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectHandle handle = PrivateHandle;
+        if (handle.IsInvalid)
+            return ExportKeyInfo.Unread;
+
+        using var attrs = _session.Core.GetAttributeValue(handle,
+            [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_TOKEN, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE]);
+        return new ExportKeyInfo(
+            KeyType: Decode(attrs[0], static a => (CKK?)(CKK)a.GetValueAsUlong(), null),
+            Id: Decode(attrs[1], static a => (ReadOnlyMemory<byte>)a.GetValueAsByteArray(), ReadOnlyMemory<byte>.Empty),
+            Label: Decode(attrs[2], static a => a.GetValueAsString(), null),
+            Token: Decode(attrs[3], static a => a.GetValueAsBool(), true),
+            AlwaysSensitive: Decode(attrs[4], static a => a.GetValueAsBool(), true),
+            NeverExtractable: Decode(attrs[5], static a => a.GetValueAsBool(), true));
+    }
+
+    // An attribute the token does not report, or reports in a form that does not decode (a module that stops filling
+    // the template at its first invalid attribute leaves the rest zero-length), reads as the fail-closed fallback.
+    private static T Decode<T>(ObjectAttribute attribute, Func<ObjectAttribute, T> decode, T fallback)
+    {
+        if (attribute.CannotBeRead) return fallback;
+        try
+        {
+            return decode(attribute);
+        }
+        catch (Pkcs11AttributeException)
+        {
+            return fallback;
+        }
+    }
+
+    /// <summary>
     /// Opens this key's X.509 certificate: the certificate object with the same <c>CKA_ID</c>. Returns
     /// <see langword="null"/> when the key has no <c>CKA_ID</c> or no certificate has it. The caller owns
     /// the returned certificate.
@@ -894,7 +935,9 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <summary>
     /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
     /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
-    /// non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
+    /// non-sensitive key requires a policy that permits it: a scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>
+    /// lease (which lifts every other rule and is refused on <c>NistApproved</c> sessions). Reading derived bytes back is a separate
+    /// opt-in: see <see cref="DeriveBytes"/> and <see cref="Policy.KeyMaterialExportKind.KdfOutput"/>. Symmetric
     /// uses the single handle; asymmetric uses the private handle (e.g. ECDH derives from the
     /// local private key — the peer's public point travels as a mechanism parameter, not a handle).
     /// </summary>
@@ -904,6 +947,94 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
         => DeriveCore(mechanism, template);
+
+    /// <summary>
+    /// Runs an on-token KDF with this key as its input and returns <paramref name="length"/> bytes of its
+    /// output: the PKCS#11 counterpart of <see cref="System.Security.Cryptography.HKDF"/> and
+    /// <see cref="System.Security.Cryptography.SP800108HmacCounterKdf"/> for any HKDF or SP 800-108 layout
+    /// the token supports. Reading the output off the token is an export of
+    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/>, so the session's policy must allow it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Prefer <see cref="Derive(Mechanism, ObjectTemplate)"/> where the output is a key: it stays on the
+    /// token, sensitive and non-extractable. Use this where the output must leave the token, e.g. a
+    /// value a protocol sends or compares.
+    /// </para>
+    /// <para>
+    /// Only KDF mechanisms with their own parameters are accepted: <c>CKM_HKDF_DERIVE</c> with
+    /// <see cref="CkmHkdfParams"/>, and <c>CKM_SP800_108_COUNTER_KDF</c>,
+    /// <c>CKM_SP800_108_FEEDBACK_KDF</c> and <c>CKM_SP800_108_DOUBLE_PIPELINE_KDF</c> with
+    /// <see cref="CkmSp800108KdfParams"/> of the same mode and no additional derived keys. Anything else,
+    /// a key-agreement mechanism above all, is refused before the policy or the token is consulted: the
+    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in never returns the raw shared secret of an
+    /// ECDH derivation (use <see cref="DeriveRawSecret"/>, which the
+    /// <see cref="Policy.KeyMaterialExportKind.EcdhSharedSecret"/> opt-in governs).
+    /// </para>
+    /// <para>
+    /// It returns the KDF's output over <em>this</em> key, and those bytes are the value of any key the token derives
+    /// from this key with the same mechanism, sensitive or not: <c>DeriveBytes(hkdf, 32)</c> on the agreed secret of
+    /// <see cref="DeriveSecretAgreement"/> is the AES key <c>Derive(hkdf, aes256Template)</c> makes from it. The
+    /// policy therefore judges this key too (<see cref="Policy.KeyMaterialExportRequest.KdfBaseKey"/>): by default a
+    /// <see cref="Policy.KeyMaterialExportKind.KdfOutput"/> opt-in covers only base keys the token has not always
+    /// protected (<see cref="Policy.KdfBaseKeyScope.NeverProtected"/>), so a <c>CKA_ALWAYS_SENSITIVE</c> agreed
+    /// secret or master key is refused unless the policy names a wider <see cref="Policy.KdfBaseKeyScope"/>.
+    /// </para>
+    /// <para>
+    /// <c>CKM_HKDF_DATA</c> is refused: PKCS#11 has it make a data object, which the secret-key read-back
+    /// cannot ask for. <c>CKM_HKDF_DERIVE</c> with the same parameters gives the same bytes.
+    /// </para>
+    /// <para>
+    /// The output is derived into an extractable, non-sensitive session generic secret, read and
+    /// destroyed. The caller owns the returned array and should zero it
+    /// (<see cref="System.Security.Cryptography.CryptographicOperations.ZeroMemory(Span{byte})"/>) once done.
+    /// </para>
+    /// </remarks>
+    /// <param name="mechanism">The KDF and its parameters.</param>
+    /// <param name="length">The number of bytes to derive.</param>
+    /// <returns>The KDF output.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="mechanism"/> is not one of the KDFs above with its own parameters, or requests additional derived keys.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="length"/> is zero or negative.</exception>
+    /// <exception cref="CryptoPolicyViolationException">
+    /// Thrown unless the session's <see cref="Pkcs11Session.Policy"/> permits reading KDF output off the
+    /// token (<see cref="Policy.KeyMaterialExportKind.KdfOutput"/>) and the mechanism and its PRF.
+    /// </exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key has no private or secret handle; otherwise propagated from <c>C_DeriveKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the token does not expose the derived value.</exception>
+    public byte[] DeriveBytes(Mechanism mechanism, int length)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
+        RequireKdfOutputMechanism(mechanism);
+
+        return Algorithms.DerivedKeyMaterial.DeriveAndRead(this, mechanism, length);
+    }
+
+    // DeriveBytes' allow-list. The parameters must be the KDF's own: the session raises a key-agreement KDF
+    // request for anything carrying CkmEcdh1DeriveParams, whatever the mechanism, and a parameter block of
+    // another layout is not one the token should be handed. SP 800-108 siblings would be keys this method
+    // neither returns nor destroys, created from a template the read-back tag does not cover.
+    private static void RequireKdfOutputMechanism(Mechanism mechanism)
+    {
+        bool fits = mechanism.Type switch
+        {
+            CKM.CKM_HKDF_DERIVE => mechanism.Parameters is CkmHkdfParams,
+            CKM.CKM_SP800_108_COUNTER_KDF or CKM.CKM_SP800_108_FEEDBACK_KDF or CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF =>
+                mechanism.Parameters is CkmSp800108KdfParams sp800108 && sp800108.IsFor(mechanism.Type),
+            _ => false,
+        };
+        if (!fits)
+            throw new ArgumentException(
+                $"Pkcs11Key.DeriveBytes takes CKM_HKDF_DERIVE with CkmHkdfParams, or a CKM_SP800_108_*_KDF with CkmSp800108KdfParams of the same mode; got {mechanism.Type}.",
+                nameof(mechanism));
+        if (mechanism.Parameters is CkmSp800108KdfParams { RequestsAdditionalDerivedKeys: true })
+            throw new ArgumentException(
+                "Pkcs11Key.DeriveBytes returns one output; SP 800-108 additional derived keys are not supported. Use Derive for them.",
+                nameof(mechanism));
+    }
 
     private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template)
     {

@@ -4,6 +4,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11AmbiguousObjectExce
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11ObjectNotFoundException
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions.Pkcs11ObjectNotFoundException.Pkcs11ObjectNotFoundException(string! method, string? message) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.GetPrivateKey() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveBytes(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, int length) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveRawSecret(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DeriveSecretAgreement(System.ReadOnlySpan<byte> peerSubjectPublicKeyInfo) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Export(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11KeyBlobFormat format) -> byte[]!
@@ -29,7 +30,9 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(KerckhoffsL
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(System.ReadOnlySpan<byte> id, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key? key) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenKey(string! label, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key? key) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.TryOpenObject(KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! filter, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Object? obj) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyAgreementKdfRequest.ReadBackFor.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyAgreementKdfRequest.ResultIsDerivationOnlySecret.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyTemplateRequest.ReadBackFor.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind?
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.VendorMechanismParameters.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams.Pkcs11ParameterWriter! writer) -> void
 abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest!
 const KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CK.CK_CERTIFICATE_CATEGORY_AUTHORITY = 2 -> ulong
@@ -2171,3 +2174,39 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.operator ==(K
 [SYSLIB5006]static KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.Pkcs11CertificateExtensions.GetMLDsaPrivateKey(this KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate! certificate) -> System.Security.Cryptography.MLDsa?
 [SYSLIB5006]static KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.Pkcs11CertificateExtensions.GetMLKemPrivateKey(this KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate! certificate) -> System.Security.Cryptography.MLKem?
 [SYSLIB5006]static KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.Pkcs11CertificateExtensions.GetSlhDsaPrivateKey(this KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate! certificate) -> System.Security.Cryptography.SlhDsa?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.AlwaysSensitive.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.AlwaysSensitive.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo? other) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Id.get -> System.ReadOnlyMemory<byte>
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Id.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.KeyType.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.KeyType.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Label.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Label.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.NeverExtractable.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.NeverExtractable.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope.Description.get -> string!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRequest.KdfBaseKey.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo?
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Equals(object? obj) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.GetHashCode() -> int
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.ToString() -> string!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.operator !=(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo? right) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.operator ==(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo? right) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope.Any.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope.NeverProtected.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope.Where(System.Func<KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo!, bool>! predicate, string! description) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Deconstruct(out KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK? KeyType, out System.ReadOnlyMemory<byte> Id, out string? Label, out bool Token, out bool AlwaysSensitive, out bool NeverExtractable) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.ExportKeyInfo(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK? KeyType, System.ReadOnlyMemory<byte> Id, string? Label, bool Token, bool AlwaysSensitive, bool NeverExtractable) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Token.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo.Token.init -> void
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule.Allow(System.Collections.Generic.IEnumerable<KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportKind>! kinds, string! rationale, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KdfBaseKeyScope? kdfBaseKeys = null, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope? privateKeys = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRule!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyMaterialExportRequest.PrivateKey.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.Description.get -> string!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.Any.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.None.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.SessionObjects.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.Where(System.Func<KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ExportKeyInfo!, bool>! predicate, string! description) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope!
