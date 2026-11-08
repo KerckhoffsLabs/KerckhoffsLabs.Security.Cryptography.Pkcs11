@@ -8,13 +8,13 @@ public sealed class HkdfTests_BouncyHsm(BouncyHsmBackendFixture backend)
 {
     private readonly BouncyHsmBackendFixture _backend = backend;
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfReadbackAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives an HKDF-derived key the base key's CKA_SENSITIVE and CKA_EXTRACTABLE")]
     public void ExtractAndExpand_MatchesBcl() => HkdfTestCases.Assert_ExtractAndExpand_MatchesBcl(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfReadbackAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives an HKDF-derived key the base key's CKA_SENSITIVE and CKA_EXTRACTABLE")]
     public void ExpandOnly_MatchesBcl() => HkdfTestCases.Assert_ExpandOnly_MatchesBcl(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfReadbackAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives an HKDF-derived key the base key's CKA_SENSITIVE and CKA_EXTRACTABLE")]
     public void ExtractOnly_MatchesBcl() => HkdfTestCases.Assert_ExtractOnly_MatchesBcl(_backend);
 
     // Sign-probe variants: same derivations, verified without reading CKA_VALUE — see

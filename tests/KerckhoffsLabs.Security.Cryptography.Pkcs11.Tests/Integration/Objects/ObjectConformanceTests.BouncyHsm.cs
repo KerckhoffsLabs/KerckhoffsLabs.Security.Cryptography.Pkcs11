@@ -36,8 +36,8 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ProvenanceAttributes_TellGeneratedFromImported()
     {
-        // BouncyHsm reports an imported key as CKA_NEVER_EXTRACTABLE, with CKM_AES_KEY_GEN as its CKA_KEY_GEN_MECHANISM.
-        ObjectConformanceTestCases.Assert_ProvenanceAttributes_TellGeneratedFromImported(_backend, importedNeverExtractable: true, importedKeyGenMechanism: (ulong)CKM.CKM_AES_KEY_GEN);
+        // BouncyHsm reports CKM_AES_KEY_GEN as the CKA_KEY_GEN_MECHANISM of an imported key.
+        ObjectConformanceTestCases.Assert_ProvenanceAttributes_TellGeneratedFromImported(_backend, importedKeyGenMechanism: (ulong)CKM.CKM_AES_KEY_GEN);
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -56,8 +56,8 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     [MemberData(nameof(ObjectConformanceTestCases.ReadOnlyKeyAttributes), MemberType = typeof(ObjectConformanceTestCases))]
     public void SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(CKA attribute)
     {
-        if (attribute is CKA.CKA_PRIVATE or CKA.CKA_MODIFIABLE && !BouncyHsmBackendFixture.BouncyHsmFixesThePrivateAndModifiableFlags)
-            Assert.Skip("BouncyHsm lets C_SetAttributeValue change CKA_PRIVATE and CKA_MODIFIABLE.");
+        if (attribute is CKA.CKA_MODIFIABLE && !BouncyHsmBackendFixture.BouncyHsmFixesTheModifiableFlag)
+            Assert.Skip("BouncyHsm lets C_SetAttributeValue change CKA_MODIFIABLE.");
         ObjectConformanceTestCases.Assert_SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(_backend, attribute);
     }
 
@@ -81,8 +81,6 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
     public void SensitivePrivateKey_HidesItsSecretParts(string keyType)
     {
-        if (keyType is "ML-DSA" or "ML-KEM" && !BouncyHsmBackendFixture.BouncyHsmHidesSensitivePqcPrivateKeys)
-            Assert.Skip("BouncyHsm reveals the CKA_VALUE of a sensitive ML-DSA or ML-KEM private key");
         ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
     }
 
@@ -108,18 +106,23 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
         ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
     }
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.UniqueIdAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives a copy the original's CKA_UNIQUE_ID")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.UniqueIdReadOnlyAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm lets C_SetAttributeValue change CKA_UNIQUE_ID")]
     public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.KeyMaterialFixedAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm lets C_SetAttributeValue and C_CopyObject change a key's material")]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.KeyComponents), MemberType = typeof(ObjectConformanceTestCases))]
-    public void KeyComponent_IsReadOnly(string component) => ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+    public void KeyComponent_IsReadOnly(string component)
+    {
+        if (component is "RSA CKA_PUBLIC_EXPONENT" or "EC CKA_EC_POINT" && !BouncyHsmBackendFixture.BouncyHsmFixesPublicKeyComponents)
+            Assert.Skip("BouncyHsm lets C_SetAttributeValue change an RSA public exponent or an EC point.");
+        ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
+    }
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.MalformedAttributeRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm refuses malformed attribute values with CKR_GENERAL_ERROR or CKR_DEVICE_ERROR")]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
     public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
     {
@@ -134,7 +137,7 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void CopyObject_KeepsADataObjectsFields() => ObjectConformanceTestCases.Assert_CopyObject_KeepsADataObjectsFields(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.CopyableOneWayAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm lets C_SetAttributeValue make an uncopyable object copyable")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void UncopyableObject_StaysUncopyable() => ObjectConformanceTestCases.Assert_UncopyableObject_StaysUncopyable(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]

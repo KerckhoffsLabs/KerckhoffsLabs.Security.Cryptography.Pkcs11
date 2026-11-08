@@ -19,7 +19,7 @@ public sealed class AlgorithmLawTests_BouncyHsm(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ChaCha20Poly1305_OpensWhatItSeals_RejectsAnyBitFlip() => AlgorithmLawTestCases.Assert_ChaCha20Poly1305_OpensWhatItSeals_RejectsAnyBitFlip(_backend);
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfReadbackAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives an HKDF-derived key the base key's CKA_SENSITIVE and CKA_EXTRACTABLE")]
     [MemberData(nameof(PropertyTestSupport.Hashes), MemberType = typeof(PropertyTestSupport))]
     public void Hkdf_ShorterOutputIsAPrefix(string hashName) => AlgorithmLawTestCases.Assert_Hkdf_ShorterOutputIsAPrefix(_backend, hashName);
 
