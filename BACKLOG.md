@@ -1129,3 +1129,13 @@ Positive findings worth preserving. Items marked **(re-verified 2026-08-11)** we
 - **Proposed action:** Report it upstream as a follow-up to #141. After a `vendor/bouncyhsm` bump with the fix, `BouncyHsmQuirkTests.HkdfDerivedKeySensitivity_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
+
+### [BL-184] Decide how the library supports HSS (CKM_HSS_KEY_PAIR_GEN, CKM_HSS)
+- **Area:** API
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Policy` (the Recommended allow-list); `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Objects/ObjectTemplateBuilderBase.cs`; `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Sign/HssTestCases.cs`
+- **Problem:** `HssTestCases` (run on BouncyHsm since the bump to development ebfefd60) shows three gaps. The Recommended policy does not list `CKM_HSS_KEY_PAIR_GEN` or `CKM_HSS` ("not reviewed"), so the cases opt in with their own policy. The template builder takes no `CK_ULONG` array, so `CKA_HSS_LMS_TYPES` and `CKA_HSS_LMOTS_TYPES` need the internal `ObjectTemplate` constructor and `ObjectAttribute(CKA, IReadOnlyList<ulong>)`. And the RFC 8554 `CK_LMS_TYPE` / `CK_LMOTS_TYPE` codes have no names. `Pkcs11Key` treating `CKK_HSS`, `CKK_XMSS` and `CKK_XMSSMT` as secret keys (verifying with the private handle), which the cases also found, was fixed in #357.
+- **Proposed action:** Review HSS for the Recommended policy (stateful: one-time keys must never be reused, so a key must not be copied, backed up or restored; SP 800-208 requires generation and signing in hardware cryptographic modules). If it is admitted, add a `CK_ULONG`-array `Attribute` overload (or HSS-specific builder methods) and named LMS / LM-OTS type constants, and move the test cases onto them.
+- **Breaks public API?** No (additions only)
+- **Raised by:** HSS tests
