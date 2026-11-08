@@ -54,13 +54,13 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
         BuiltLibraryPath() is not null;
 
     /// <summary>
-    /// False while <c>C_Logout</c> leaves the application's private session objects in place and readable: with
-    /// nobody logged in, <c>C_GetAttributeValue</c> on one answers <c>CKR_OK</c>, and so does <c>C_EncryptInit</c>
-    /// with the handle of a private token key, though <c>C_GetAttributeValue</c> on that handle answers
-    /// <c>CKR_OBJECT_HANDLE_INVALID</c>. PKCS#11 v3.2 §5.6.10 destroys private session objects on <c>C_Logout</c>
-    /// and makes every handle to a private object invalid.
+    /// False while <c>CKA_PRIVATE</c> is set by object class, whatever the template says: TRUE for every object but
+    /// a public key or a certificate, so a data object made with <c>CKA_PRIVATE = FALSE</c> reads TRUE, and from
+    /// 2.6.1 <c>C_Logout</c> destroys it as a private session object. PKCS#11 v3.2 §4.4: <c>CKA_PRIVATE</c> is
+    /// specified by the template. Up to 2.6.0 <c>C_Logout</c> destroyed no session object and left the handles to
+    /// private objects working; 2.6.1 does what §5.6.10 says, for the objects it counts as private.
     /// </summary>
-    public const bool FreeHsmDestroysPrivateSessionObjectsOnLogout = false;
+    public const bool FreeHsmKeepsTheCkaPrivateAsked = false;
 
     /// <summary>
     /// False while the SO can make a private object: with the SO logged in, <c>C_CreateObject</c> with
@@ -93,15 +93,13 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// False while a session opened after <c>C_Logout</c>, with nobody logged in, finds the token's private objects
     /// and reads their <c>CKA_VALUE</c>, as it finds the public ones. PKCS#11 v3.2 §4.4: a private object is visible
     /// only to a session logged in as the normal user. Before 2.6.0 every search without a login answered
-    /// <c>CKR_USER_NOT_LOGGED_IN</c>, so the case could not run.
+    /// <c>CKR_USER_NOT_LOGGED_IN</c>, so the case could not run. Still so in 2.6.1, whose <c>C_Logout</c> gives the
+    /// private token objects new handles, which the search returns.
     /// </summary>
     public const bool FreeHsmHidesPrivateTokenObjectsAfterLogout = false;
 
     /// <summary>Gate for the visibility case: see <see cref="FreeHsmHidesPrivateTokenObjectsAfterLogout"/>.</summary>
     public static bool PrivateObjectHidingAvailable => FreeHsmAvailable && FreeHsmHidesPrivateTokenObjectsAfterLogout;
-
-    /// <summary>Gate for the C_Logout handle case: see <see cref="FreeHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
-    public static bool LogoutInvalidationAvailable => FreeHsmAvailable && FreeHsmDestroysPrivateSessionObjectsOnLogout;
 
     /// <summary>
     /// False while a key pair can be generated without the attribute that sizes it: <c>C_GenerateKeyPair</c> with

@@ -76,6 +76,12 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
         ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
     }
 
+    // Before 2.6.1 FreeHSM gave an RSA, EC, Edwards or Montgomery public key a CKA_VALUE: the SubjectPublicKeyInfo it stores.
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.PublicKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
+    public void PublicKey_HasCkaValueOnlyWhereItsTypeDefinesIt(string keyType) =>
+        ObjectConformanceTestCases.Assert_PublicKey_HasCkaValueOnlyWhereItsTypeDefinesIt(_backend, keyType);
+
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
     public void IncompleteTemplate_IsTemplateIncomplete(string incomplete)

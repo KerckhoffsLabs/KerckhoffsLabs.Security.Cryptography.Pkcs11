@@ -263,6 +263,87 @@ internal static class WrapUnwrapKeyTestCases
         }
     }
 
+    /// <summary>How the key under test came to be unextractable, one row per way.</summary>
+    public static TheoryData<string> UnextractableKeys => ["NotSensitive", "Sensitive", "SetAttributeValue", "CopyObject"];
+
+    /// <summary>
+    /// <c>C_WrapKey</c> refuses every secret key whose <c>CKA_EXTRACTABLE</c> is FALSE with
+    /// <c>CKR_KEY_UNEXTRACTABLE</c>, sensitive or not, the size query included (PKCS#11 v3.2 §5.18.5: the key to be
+    /// wrapped MUST have <c>CKA_EXTRACTABLE=TRUE</c>). The key is created so (<c>NotSensitive</c>, <c>Sensitive</c>),
+    /// cleared to FALSE by <c>C_SetAttributeValue</c>, or a <c>C_CopyObject</c> copy made unextractable.
+    /// </summary>
+    /// <remarks>
+    /// FreeHSM up to 2.6.0 refused only a key both sensitive and unextractable, so every row but <c>Sensitive</c>
+    /// left the token wrapped under a key the caller held (GHSA-m5m7-4gmc-qmv5, fixed in 2.6.1). An extractable key
+    /// with the same value wraps first, so a refusal is the token's rule and not a broken wrap. The library sends the
+    /// call to the token as it is: <see cref="Pkcs11SessionCore.WrapKey"/> checks no attribute of the key, and its
+    /// first call is the size query.
+    /// </remarks>
+    internal static void Assert_WrapKey_RefusesEveryUnextractableKey(IPkcs11Backend backend, CKM wrapMechanism, string how)
+    {
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        // Non-sensitive keys are a deliberately weakened template.
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        try
+        {
+            ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
+            byte[] raw = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle Create(bool sensitive, bool extractable)
+            {
+                using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                using var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+                using var t = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var s = new ObjectAttribute(CKA.CKA_SENSITIVE, sensitive);
+                using var x = new ObjectAttribute(CKA.CKA_EXTRACTABLE, extractable);
+                using var e = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+                using var v = new ObjectAttribute(CKA.CKA_VALUE, raw);
+                return session.CreateObject([c, k, t, s, x, e, v]);
+            }
+
+            var wrapMech = new Mechanism(wrapMechanism);
+            ObjectHandle control = Create(sensitive: false, extractable: true);
+            ObjectHandle? key = null;
+            try
+            {
+                Assert.NotEmpty(session.WrapKey(wrapMech, kek, control));
+
+                using var unextractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+                ObjectHandle target = how switch
+                {
+                    "NotSensitive" => Create(sensitive: false, extractable: false),
+                    "Sensitive" => Create(sensitive: true, extractable: false),
+                    "SetAttributeValue" => Create(sensitive: false, extractable: true),
+                    "CopyObject" => session.CopyObject(control, [unextractable]),
+                    _ => throw new ArgumentOutOfRangeException(nameof(how), how, null),
+                };
+                key = target;
+                if (how == "SetAttributeValue")
+                    session.SetAttributeValue(target, [unextractable]);
+
+                using (var read = session.GetAttributeValue(target, [CKA.CKA_EXTRACTABLE]))
+                    Assert.False(read[0].GetValueAsBool(), $"{how}: the key is CKA_EXTRACTABLE.");
+
+                var refused = Assert.ThrowsAny<Pkcs11Exception>(() => session.WrapKey(wrapMech, kek, target));
+                Assert.Equal(CKR.CKR_KEY_UNEXTRACTABLE, refused.ReturnValue);
+
+                // A copy leaves its source as it was.
+                if (how == "CopyObject")
+                    Assert.NotEmpty(session.WrapKey(wrapMech, kek, control));
+            }
+            finally
+            {
+                if (key is { } k)
+                    session.DestroyObject(k);
+                session.DestroyObject(control);
+                session.DestroyObject(kek);
+            }
+        }
+        finally
+        {
+            TestKeys.LogoutIfRequired(backend, session);
+        }
+    }
+
     /// <summary>
     /// <c>CKM_AES_KEY_WRAP</c> wraps and unwraps a key longer than 256 bytes: a 320-byte HMAC key comes back
     /// with the same value, which an HMAC computed on the token with the unwrapped key shows.

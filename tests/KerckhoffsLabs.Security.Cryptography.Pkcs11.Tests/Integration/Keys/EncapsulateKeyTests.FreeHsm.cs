@@ -27,4 +27,8 @@ public sealed class EncapsulateKeyTests_FreeHsm(FreeHsmBackendFixture backend)
     [MemberData(nameof(EncapsulateKeyTestCases.MlKemParameterSets), MemberType = typeof(EncapsulateKeyTestCases))]
     public void MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(CkpMlKem parameterSet) =>
         EncapsulateKeyTestCases.Assert_MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, parameterSet);
+
+    // Before 2.6.1 FreeHSM reported a sensitive, unextractable shared key as CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void EncapsulatedKeys_HaveNoProtectedHistory() => EncapsulateKeyTestCases.Assert_EncapsulatedKeys_HaveNoProtectedHistory(_backend);
 }
