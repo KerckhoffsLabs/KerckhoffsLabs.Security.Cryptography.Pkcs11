@@ -106,6 +106,9 @@ public sealed class Pkcs11KeyAsymmetricTests
     [InlineData(CKK.CKK_ML_KEM)]
     [InlineData(CKK.CKK_ML_DSA)]
     [InlineData(CKK.CKK_SLH_DSA)]
+    [InlineData(CKK.CKK_HSS)]
+    [InlineData(CKK.CKK_XMSS)]
+    [InlineData(CKK.CKK_XMSSMT)]
     public void GetAttributeValue_KeyPair_ReadsThePublicHalf(CKK keyType)
     {
         using var pair = PairOf(keyType);
