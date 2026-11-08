@@ -15,10 +15,8 @@ internal static partial class ExampleCatalog
             b =>
             {
                 if (!b.SupportsMlDsa) Assert.Skip("The backend cannot operate ML-DSA.");
-                (byte[] signature, byte[] publicKey, byte[] generatedPublicKey) = GenerateAndSignWithPair(b, MlDsaExamples.GenerateMlDsaKey, MlDsaExamples.MlDsaSign, checkAttributes: true);
-                Assert.Equal(generatedPublicKey, publicKey);
-                if (!MLDsa.IsSupported) Assert.Skip("ML-DSA is not supported by this platform's BCL; the token side ran.");
-                Assert.True(MlDsaExamples.MlDsaVerifyWithBcl(Message, signature, generatedPublicKey));
+                byte[] publicKey = AssertGenerationExample(b, MlDsaExamples.GenerateMlDsaKey, [CKA.CKA_SIGN], [CKA.CKA_VERIFY]);
+                Assert.Equal(1952, publicKey.Length); // an ML-DSA-65 public key (FIPS 204, Table 2)
             },
             NeedsUserLogin: true,
             LoadsModule: true),
@@ -27,7 +25,7 @@ internal static partial class ExampleCatalog
             b =>
             {
                 if (!b.SupportsMlDsa) Assert.Skip("The backend cannot operate ML-DSA.");
-                (byte[] signature, byte[] publicKey, _) = GenerateAndSignWithPair(b, MlDsaExamples.GenerateMlDsaKey, MlDsaExamples.MlDsaSign, checkAttributes: false);
+                (byte[] signature, byte[] publicKey) = GenerateAndSignWithPair(b, MlDsaExamples.GenerateMlDsaKey, MlDsaExamples.MlDsaSign);
                 if (!MLDsa.IsSupported) Assert.Skip("ML-DSA is not supported by this platform's BCL; the token side ran.");
                 Assert.True(MlDsaExamples.MlDsaVerifyWithBcl(Message, signature, publicKey));
                 Assert.False(MlDsaExamples.MlDsaVerifyWithBcl([.. Message, 0], signature, publicKey));

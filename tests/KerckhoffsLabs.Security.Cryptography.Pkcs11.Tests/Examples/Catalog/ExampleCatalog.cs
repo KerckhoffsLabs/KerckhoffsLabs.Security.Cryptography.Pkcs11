@@ -151,31 +151,29 @@ internal static partial class ExampleCatalog
         string label = NewLabel();
         using (Pkcs11Session? keeper = backend.SupportsTokenObjects ? null : backend.OpenSession())
         {
-            try
-            {
-                if (keeper is null)
+            RunThenCleanUp(
+                () =>
                 {
-                    using Pkcs11Session provisioning = backend.OpenSession();
-                    using (provision(provisioning, label)) { }
-                }
-                else
-                {
-                    using (provision(keeper, label)) { }
-                }
-
-                example(label);
-
-                if (thenWithKey is not null)
-                    WithSessionOrKeeper(backend, keeper, s =>
+                    if (keeper is null)
                     {
-                        using Pkcs11Key key = s.OpenKey(label);
-                        thenWithKey(key);
-                    });
-            }
-            finally
-            {
-                WithSessionOrKeeper(backend, keeper, s => DestroyObjectsLabelled(s, label));
-            }
+                        using Pkcs11Session provisioning = backend.OpenSession();
+                        using (provision(provisioning, label)) { }
+                    }
+                    else
+                    {
+                        using (provision(keeper, label)) { }
+                    }
+
+                    example(label);
+
+                    if (thenWithKey is not null)
+                        WithSessionOrKeeper(backend, keeper, s =>
+                        {
+                            using Pkcs11Key key = s.OpenKey(label);
+                            thenWithKey(key);
+                        });
+                },
+                () => WithSessionOrKeeper(backend, keeper, s => DestroyObjectsLabelled(s, label)));
         }
         AssertFixtureLibraryStillWorks(backend);
     }
@@ -205,15 +203,32 @@ internal static partial class ExampleCatalog
     private static void WithGeneratedKey(IPkcs11Backend backend, Action<string> body)
     {
         string label = NewLabel();
+        RunThenCleanUp(() => body(label), () => WithSessionOrKeeper(backend, null, s => DestroyObjectsLabelled(s, label)));
+        AssertFixtureLibraryStillWorks(backend);
+    }
+
+    // Runs body, then cleanup, which also runs when body fails. A cleanup that fails after body failed (on
+    // opencryptoki, the cleanup's own login, say) does not replace body's exception: that one is the failure
+    // to report, and the one ExampleRunner judges for a login retry.
+    private static void RunThenCleanUp(Action body, Action cleanup)
+    {
         try
         {
-            body(label);
+            body();
         }
-        finally
+        catch
         {
-            WithSessionOrKeeper(backend, null, s => DestroyObjectsLabelled(s, label));
+            try
+            {
+                cleanup();
+            }
+            catch
+            {
+                // Keep body's exception; the next run's fresh label does not depend on this cleanup.
+            }
+            throw;
         }
-        AssertFixtureLibraryStillWorks(backend);
+        cleanup();
     }
 
     private static readonly CKA[] KeyRoles =
@@ -252,28 +267,41 @@ internal static partial class ExampleCatalog
         Assert.False(IsTrue(CKA.CKA_EXTRACTABLE), $"The {keyClass} is extractable.");
     }
 
-    // A signature scheme's two examples in turn: the generation example provisions the key pair under a fresh
-    // label (checkAttributes: and the test checks each half), then the signing example opens it by that label
-    // and signs Message. Returns the signature, the public key the signing example exported, and the one the
-    // generation example exported.
-    private static (byte[] Signature, byte[] PublicKey, byte[] GeneratedPublicKey) GenerateAndSignWithPair(
+    // A generation case: runs the page's generation example under a fresh label, checks each half of the pair
+    // it made on the token, checks that a second run under the same label is refused, and returns what it
+    // exported. The page's use example runs in its own case.
+    private static byte[] AssertGenerationExample(
+        IPkcs11Backend backend, Func<string, string, SecurePin, string, byte[]> generate, CKA[] privateRoles, CKA[] publicRoles)
+    {
+        byte[] exported = [];
+        WithGeneratedKey(backend, label =>
+        {
+            using SecurePin pin = UserPin(backend);
+            exported = generate(backend.LibraryPath, backend.TokenLabel, pin, label);
+            AssertGeneratedKey(backend, label, CKO.CKO_PRIVATE_KEY, privateRoles);
+            AssertGeneratedKey(backend, label, CKO.CKO_PUBLIC_KEY, publicRoles);
+            // Run again under the same label, the example refuses rather than make a second pair.
+            Assert.Throws<InvalidOperationException>(() => generate(backend.LibraryPath, backend.TokenLabel, pin, label));
+        });
+        return exported;
+    }
+
+    // A signing case: the generation example provisions the key pair under a fresh label, then the signing
+    // example opens it by that label and signs Message. Returns the signature and the public key the signing
+    // example exported, after checking it is the one the generation example exported.
+    private static (byte[] Signature, byte[] PublicKey) GenerateAndSignWithPair(
         IPkcs11Backend backend,
         Func<string, string, SecurePin, string, byte[]> generate,
-        Func<string, string, SecurePin, string, byte[], (byte[] Signature, byte[] PublicKey)> sign,
-        bool checkAttributes)
+        Func<string, string, SecurePin, string, byte[], (byte[] Signature, byte[] PublicKey)> sign)
     {
-        (byte[], byte[], byte[]) result = default;
+        (byte[], byte[]) result = default;
         WithGeneratedKey(backend, label =>
         {
             using SecurePin pin = UserPin(backend);
             byte[] generated = generate(backend.LibraryPath, backend.TokenLabel, pin, label);
-            if (checkAttributes)
-            {
-                AssertGeneratedKey(backend, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_SIGN);
-                AssertGeneratedKey(backend, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_VERIFY);
-            }
             (byte[] signature, byte[] publicKey) = sign(backend.LibraryPath, backend.TokenLabel, pin, label, Message);
-            result = (signature, publicKey, generated);
+            Assert.Equal(generated, publicKey);
+            result = (signature, publicKey);
         });
         return result;
     }

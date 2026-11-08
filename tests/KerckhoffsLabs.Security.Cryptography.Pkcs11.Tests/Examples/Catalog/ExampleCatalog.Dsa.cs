@@ -50,9 +50,17 @@ internal static partial class ExampleCatalog
                 {
 #pragma warning disable KLPKCS11009, KLPKCS11006 // DSA key generation and signing are the set-up
                     Pkcs11Key key = session.GenerateKeyPair(new Mechanism(CKM.CKM_DSA_KEY_PAIR_GEN), publicTemplate, privateTemplate);
-                    using var signer = new DSAPkcs11(key);
-                    signature = signer.SignData(Message, HashAlgorithmName.SHA256);
-                    return key;
+                    try
+                    {
+                        using var signer = new DSAPkcs11(key);
+                        signature = signer.SignData(Message, HashAlgorithmName.SHA256);
+                        return key;
+                    }
+                    catch
+                    {
+                        key.Dispose(); // WithProvisionedKey disposes only a key it is handed
+                        throw;
+                    }
                 }
             },
             label =>

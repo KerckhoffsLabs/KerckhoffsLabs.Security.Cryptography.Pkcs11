@@ -15,6 +15,12 @@ public static class EcdhExamples
         //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(keyLabel, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{keyLabel}' is already on the token.");
+        }
 
         // 2. Generate a P-256 key-agreement key pair on the token. The private key is sensitive
         //    (CKA_SENSITIVE: never revealed) and non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped
@@ -66,21 +72,35 @@ public static class EcdhExamples
             .Build();
         using Pkcs11Key tokenKey = HkdfPkcs11.DeriveKey(HashAlgorithmName.SHA256, sharedSecret, aesKey, salt, info);
 
-        // 4. The peer computes the same Z and runs the same HKDF, in software.
-        byte[] z = peer.DeriveRawSecretAgreement(ourEcdh.PublicKey);
-        byte[] peerKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, z, outputLength: 32, salt, info);
-        CryptographicOperations.ZeroMemory(z);
-
-        // 5. Both hold the same key: what the token encrypts with it, the peer decrypts.
+        // 4. The token encrypts a message with its key.
         using var aesGcm = new AesGcmPkcs11(tokenKey, tagSizeInBytes: 16);
         byte[] nonce = session.GenerateRandom(12);
         byte[] ciphertext = new byte[message.Length], tag = new byte[16];
         aesGcm.Encrypt(nonce, message, ciphertext, tag);
 
-        using var peerAesGcm = new AesGcm(peerKey, tagSizeInBytes: 16);
+        // 5. The peer computes the same Z and runs the same HKDF, in software, so it holds the same key and
+        //    decrypts. Z and the peer's key are bytes in its process: zero them, also when a step fails.
+        byte[] z = peer.DeriveRawSecretAgreement(ourEcdh.PublicKey);
+        byte[] peerKey;
+        try
+        {
+            peerKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, z, outputLength: 32, salt, info);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(z);
+        }
+
         byte[] received = new byte[ciphertext.Length];
-        peerAesGcm.Decrypt(nonce, ciphertext, tag, received);
-        CryptographicOperations.ZeroMemory(peerKey); // the peer's copy is bytes in its process: zero it after use
+        try
+        {
+            using var peerAesGcm = new AesGcm(peerKey, tagSizeInBytes: 16);
+            peerAesGcm.Decrypt(nonce, ciphertext, tag, received);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(peerKey);
+        }
         // 6. The using declarations dispose the adapters, the derived keys, the key-pair handle (the pair
         //    stays on the token), the session and the library, in reverse order.
         #endregion

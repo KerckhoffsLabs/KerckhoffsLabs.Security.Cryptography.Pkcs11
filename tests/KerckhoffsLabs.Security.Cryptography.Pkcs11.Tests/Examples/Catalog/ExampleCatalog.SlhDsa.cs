@@ -16,10 +16,8 @@ internal static partial class ExampleCatalog
             b =>
             {
                 if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
-                (byte[] signature, byte[] publicKey, byte[] generatedPublicKey) = GenerateAndSignWithPair(b, SlhDsaExamples.GenerateSlhDsaKey, SlhDsaExamples.SlhDsaSign, checkAttributes: true);
-                Assert.Equal(generatedPublicKey, publicKey);
-                if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL; the token side ran.");
-                AssertSlhDsaVerifies(signature, generatedPublicKey);
+                byte[] publicKey = AssertGenerationExample(b, SlhDsaExamples.GenerateSlhDsaKey, [CKA.CKA_SIGN], [CKA.CKA_VERIFY]);
+                Assert.Equal(32, publicKey.Length); // an SLH-DSA-SHA2-128s public key (FIPS 205, Table 2)
             },
             NeedsUserLogin: true,
             LoadsModule: true),
@@ -28,7 +26,7 @@ internal static partial class ExampleCatalog
             b =>
             {
                 if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
-                (byte[] signature, byte[] publicKey, _) = GenerateAndSignWithPair(b, SlhDsaExamples.GenerateSlhDsaKey, SlhDsaExamples.SlhDsaSign, checkAttributes: false);
+                (byte[] signature, byte[] publicKey) = GenerateAndSignWithPair(b, SlhDsaExamples.GenerateSlhDsaKey, SlhDsaExamples.SlhDsaSign);
                 // A standard FIPS 205 signature: the BCL verifies it from the exported public key.
                 if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL; the token side ran.");
                 AssertSlhDsaVerifies(signature, publicKey);

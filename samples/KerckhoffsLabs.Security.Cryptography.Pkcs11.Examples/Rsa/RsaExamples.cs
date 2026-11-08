@@ -15,6 +15,12 @@ public static class RsaExamples
         //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(keyLabel, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{keyLabel}' is already on the token.");
+        }
 
         // 2. Generate a 3072-bit RSA signing key pair on the token. The private key is sensitive
         //    (CKA_SENSITIVE: never revealed) and non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped
@@ -113,6 +119,12 @@ public static class RsaExamples
         //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(keyLabel, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{keyLabel}' is already on the token.");
+        }
 
         // 2. Generate a 3072-bit RSA key-transport key pair on the token. The private key is sensitive
         //    (CKA_SENSITIVE: never revealed) and non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped

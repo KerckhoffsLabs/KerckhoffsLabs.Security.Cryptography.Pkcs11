@@ -15,6 +15,12 @@ public static class MlDsaExamples
         //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(keyLabel, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{keyLabel}' is already on the token.");
+        }
 
         // 2. Generate an ML-DSA-65 key pair on the token. No helper generates one, so the templates name the
         //    parameter set and give each half one role: verify for the public half, sign for the private one.

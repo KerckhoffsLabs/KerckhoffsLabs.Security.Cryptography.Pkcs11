@@ -54,6 +54,16 @@ What each step does:
 5. **Disposal** releases everything in reverse order. Dispose sessions and keys deterministically
    (`using`), rather than leaving them to the garbage collector.
 
+### In an application: load and log in once
+
+The example runs the whole flow in one method so you can read it in one place. An application doesn't
+load the module and log in for every operation. In PKCS#11 the login belongs to the application, not to
+the session: while one session is logged in, a second `OpenSessionWithPin` to the same token fails with
+`CKR_USER_ALREADY_LOGGED_IN`, which the library raises as `Pkcs11AuthenticationException`. Load the module
+and log in once at startup, keep the library and the session for the application's lifetime, and give the
+session to the code that opens keys and uses them. The example pages show the same full flow per method,
+for the same reason.
+
 ## Handling errors
 
 Every exception the library throws derives from `System.Security.Cryptography.CryptographicException`, so

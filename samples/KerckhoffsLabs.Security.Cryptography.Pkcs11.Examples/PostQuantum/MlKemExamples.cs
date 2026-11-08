@@ -15,6 +15,12 @@ public static class MlKemExamples
         //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(keyLabel, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{keyLabel}' is already on the token.");
+        }
 
         // 2. Generate an ML-KEM-768 key pair on the token. No helper generates one, so the templates name the
         //    parameter set and give each half one role: encapsulate for the public half, decapsulate for the
@@ -70,9 +76,15 @@ public static class MlKemExamples
         sender.Encapsulate(out byte[] kemCiphertext, out byte[] senderSecret);
         byte[] nonce = RandomNumberGenerator.GetBytes(12);
         byte[] ciphertext = new byte[message.Length], tag = new byte[16];
-        using (var senderAesGcm = new AesGcm(senderSecret, tagSizeInBytes: 16))
+        try
+        {
+            using var senderAesGcm = new AesGcm(senderSecret, tagSizeInBytes: 16);
             senderAesGcm.Encrypt(nonce, message, ciphertext, tag);
-        CryptographicOperations.ZeroMemory(senderSecret); // the sender's secret is bytes in its process
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(senderSecret); // the sender's secret is bytes in its process
+        }
 
         // 4. The receiver decapsulates on the token, straight into an AES-256 key (a session object): the
         //    shared secret never leaves the token. Then it decrypts the message with that key.

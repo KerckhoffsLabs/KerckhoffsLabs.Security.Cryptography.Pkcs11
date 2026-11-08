@@ -17,6 +17,12 @@ public static class CertificateExamples
         //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(label, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{label}' is already on the token.");
+        }
 
         // 2. A P-256 key pair, kept on the token (OnToken: CKA_TOKEN, so it outlives the session) under the
         //    certificate's label. A certificate finds its private key by CKA_ID, so the key pair and the
@@ -41,28 +47,30 @@ public static class CertificateExamples
 
         // 3. The BCL builds the certificate; the token signs it. X509SignatureGenerator signs with the
         //    ECDsa without trying to copy its private key into the certificate, which a token key refuses.
-        var request = new CertificateRequest("CN=Example Signing", ecdsa, HashAlgorithmName.SHA256);
-        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, critical: true));
-        X509Certificate2 certificate = request.Create(
-            request.SubjectName,
-            X509SignatureGenerator.CreateForECDsa(ecdsa),
-            notBefore: DateTimeOffset.UtcNow,
-            notAfter: DateTimeOffset.UtcNow.AddYears(1),
-            serialNumber: RandomNumberGenerator.GetBytes(16));
-
-        // 4. Store it on the token next to its key, as a token object (persistOnToken), under the label
-        //    SignWithCertificateKey below opens it by.
-        //    The certificate is returned, so it is not in a using: dispose it here if storing it fails.
+        //    Then store it on the token next to its key, as a token object (persistOnToken), under the
+        //    label SignWithCertificateKey below opens it by. If either step fails, destroy the key pair just
+        //    generated, so a retry starts from an empty label; and dispose the certificate, which is returned
+        //    on success and so is not in a using.
+        X509Certificate2? certificate = null;
         try
         {
+            var request = new CertificateRequest("CN=Example Signing", ecdsa, HashAlgorithmName.SHA256);
+            request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, critical: true));
+            certificate = request.Create(
+                request.SubjectName,
+                X509SignatureGenerator.CreateForECDsa(ecdsa),
+                notBefore: DateTimeOffset.UtcNow,
+                notAfter: DateTimeOffset.UtcNow.AddYears(1),
+                serialNumber: RandomNumberGenerator.GetBytes(16));
             using (session.ImportCertificate(certificate, label, id, persistOnToken: true)) { }
         }
         catch
         {
-            certificate.Dispose();
+            certificate?.Dispose();
+            key.Destroy();
             throw;
         }
-        // 5. The using declarations dispose the adapter, the key handle, the session and the library;
+        // 4. The using declarations dispose the adapter, the key handle, the session and the library;
         //    the key pair and the certificate stay on the token.
         #endregion
         return certificate;

@@ -51,7 +51,9 @@ internal static class ExampleRunner
     // opencryptoki's soft token now and then fails a C_Login with CKR_GENERAL_ERROR under CI load, which
     // OpenCryptokiBackendFixture.OpenSession retries for the fixture's own sessions. An example that loads
     // the module logs in itself, so it gets the same retry here. Running it again is safe: each run uses a
-    // fresh label and destroys what it made. Any other failure, or a third failed login, propagates.
+    // fresh label and destroys what it made. Any other failure, or a third failed login, propagates. The
+    // cleanup's session comes from the fixture, which retries its own login; when the cleanup fails after the
+    // example did, the example's exception is the one kept (ExampleCatalog.RunThenCleanUp).
     private static void RunRetryingLogin(IPkcs11Backend backend, ExampleCase example)
     {
         const int maxAttempts = 3;

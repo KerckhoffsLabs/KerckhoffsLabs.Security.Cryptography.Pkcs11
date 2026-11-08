@@ -14,7 +14,13 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(EcdhExamples), nameof(EcdhExamples.GenerateEcdhKey)), [],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_HKDF_DERIVE, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
-            b => GenerateAndUseEcdhKey(b, checkAttributes: true),
+            b =>
+            {
+                byte[] spki = AssertGenerationExample(b, EcdhExamples.GenerateEcdhKey, [CKA.CKA_DERIVE], []);
+                using ECDiffieHellman imported = ECDiffieHellman.Create();
+                imported.ImportSubjectPublicKeyInfo(spki, out _);
+                Assert.Equal(256, imported.KeySize);
+            },
             NeedsUserLogin: true,
             Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
         new(Name(nameof(EcdhExamples), nameof(EcdhExamples.AgreeAesKeyWithBclPeer)), [typeof(ECDiffieHellmanPkcs11)],
@@ -25,7 +31,7 @@ internal static partial class ExampleCatalog
                 // The example agrees on a key with the peer, encrypts on the token, and the peer decrypts:
                 // the message comes back only if both sides hold the same key.
                 // The generation example provisions our key pair; this one opens it by label.
-                GenerateAndUseEcdhKey(b, checkAttributes: false);
+                GenerateAndUseEcdhKey(b);
 
                 // The BCL-shaped DeriveKey* methods return the shared secret into the process, which
                 // the default policy refuses.
@@ -48,19 +54,11 @@ internal static partial class ExampleCatalog
 
     // The example agrees on a key with the peer, encrypts on the token, and the peer decrypts: the message
     // comes back only if both sides hold the same key.
-    private static void GenerateAndUseEcdhKey(IPkcs11Backend backend, bool checkAttributes) =>
+    private static void GenerateAndUseEcdhKey(IPkcs11Backend backend) =>
         WithGeneratedKey(backend, label =>
         {
             using SecurePin pin = UserPin(backend);
-            byte[] spki = EcdhExamples.GenerateEcdhKey(backend.LibraryPath, backend.TokenLabel, pin, label);
-            if (checkAttributes)
-            {
-                AssertGeneratedKey(backend, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_DERIVE);
-                AssertGeneratedKey(backend, label, CKO.CKO_PUBLIC_KEY);
-                using ECDiffieHellman imported = ECDiffieHellman.Create();
-                imported.ImportSubjectPublicKeyInfo(spki, out _);
-                Assert.Equal(256, imported.KeySize);
-            }
+            EcdhExamples.GenerateEcdhKey(backend.LibraryPath, backend.TokenLabel, pin, label);
             Assert.Equal(Message, EcdhExamples.AgreeAesKeyWithBclPeer(backend.LibraryPath, backend.TokenLabel, pin, label, Message));
         });
 }

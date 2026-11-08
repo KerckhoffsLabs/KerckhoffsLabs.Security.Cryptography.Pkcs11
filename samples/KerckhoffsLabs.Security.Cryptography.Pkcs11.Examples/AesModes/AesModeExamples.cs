@@ -28,6 +28,12 @@ public static class AesModeExamples
         //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
         using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(keyLabel, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{keyLabel}' is already on the token.");
+        }
 
         // 2. Generate an AES-256 key on the token. The helper makes it sensitive (CKA_SENSITIVE: its value is
         //    never revealed) and non-extractable (CKA_EXTRACTABLE false: it cannot be wrapped off the token),

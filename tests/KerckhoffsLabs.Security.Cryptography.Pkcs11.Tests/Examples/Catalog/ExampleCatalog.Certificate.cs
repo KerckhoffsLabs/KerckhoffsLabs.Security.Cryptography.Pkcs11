@@ -122,12 +122,10 @@ internal static partial class ExampleCatalog
             }),
     ];
 
-    // Runs the issuing example, which stores the certificate and its key pair on the token as token objects,
-    // checks the certificate it returns, runs body with the label, then destroys every object with the label.
-    private static void WithIssuedCertificate(IPkcs11Backend backend, Action<string> body)
-    {
-        string label = NewLabel();
-        try
+    // Runs the issuing example under a fresh label (WithGeneratedKey destroys every object with it afterwards),
+    // checks the certificate it returns, then runs body with the label.
+    private static void WithIssuedCertificate(IPkcs11Backend backend, Action<string> body) =>
+        WithGeneratedKey(backend, label =>
         {
             using (SecurePin pin = UserPin(backend))
             using (X509Certificate2 certificate = CertificateExamples.IssueSelfSignedCertificate(backend.LibraryPath, backend.TokenLabel, pin, label))
@@ -137,14 +135,5 @@ internal static partial class ExampleCatalog
                 Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(certificate));
             }
             body(label);
-        }
-        finally
-        {
-            // By label, not by the certificate: the key pair carries the label too, and stays on the token
-            // if issuing or storing the certificate fails after the pair was generated.
-            using Pkcs11Session session = backend.OpenSession();
-            DestroyObjectsLabelled(session, label);
-        }
-        AssertFixtureLibraryStillWorks(backend);
-    }
+        });
 }
