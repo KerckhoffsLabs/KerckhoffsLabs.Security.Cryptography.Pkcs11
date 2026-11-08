@@ -13,11 +13,19 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 public static class Md5Examples
 {
     [SuppressMessage("Security", "S4790:Use a stronger hashing algorithm", Justification = "Reads or verifies existing legacy data, which is the point of this example (docs/examples/md5.md); under a scoped AllowInsecure lease, with the [Obsolete] diagnostic suppressed at the line.")]
-    public static byte[] Md5ChecksumForLegacyProtocol(Pkcs11Session session, byte[] data)
+    public static byte[] Md5ChecksumForLegacyProtocol(string modulePath, string tokenLabel, byte[] data)
     {
         #region Md5ChecksumForLegacyProtocol
         // A protocol that still names its records by MD5. Never rely on MD5 for integrity: collisions
         // are practical.
+
+        // 1. Load the module (its path from configuration) and open a session on the token. Hashing
+        //    uses no key, so no login: a public session will do. Where a token wants a login for every
+        //    operation, open it with OpenSessionWithPin, as on the key pages.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithoutLogin(tokenLabel);
+
+        // 2. Hash, with the policy lifted for this block only.
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
 #pragma warning disable KLPKCS11001 // MD5Pkcs11: a non-security checksum a legacy protocol requires
@@ -25,6 +33,7 @@ public static class Md5Examples
 #pragma warning restore KLPKCS11001
             return md5.ComputeHash(data);
         }
+        // 3. The using declarations close the session, then the library.
         #endregion
     }
 

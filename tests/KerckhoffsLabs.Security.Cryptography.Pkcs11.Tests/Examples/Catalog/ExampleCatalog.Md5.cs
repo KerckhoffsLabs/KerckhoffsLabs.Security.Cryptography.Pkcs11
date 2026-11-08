@@ -13,13 +13,18 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(Md5Examples), nameof(Md5Examples.Md5ChecksumForLegacyProtocol)), [typeof(MD5Pkcs11)], [CKM.CKM_MD5],
             ExampleBackend.SoftHsm2,
-            b => WithSession(b, s =>
+            b =>
             {
-                Assert.Equal(Md5Examples.BclMd5(Message), Md5Examples.Md5ChecksumForLegacyProtocol(s, Message));
+                Assert.Equal(Md5Examples.BclMd5(Message), Md5Examples.Md5ChecksumForLegacyProtocol(b.LibraryPath, b.TokenLabel, Message));
+                AssertFixtureLibraryStillWorks(b);
+
+                // Without the example's lease, the default policy refuses the same hash.
+                using Pkcs11Session s = b.OpenSession();
                 using var md5 = new MD5Pkcs11(s);
                 Assert.Throws<CryptoPolicyViolationException>(() => md5.ComputeHash(Message));
-            })),
-        new(Name(nameof(Md5Examples), nameof(Md5Examples.BclMd5)), [], [], ExampleBackend.SoftHsm2,
+            },
+            LoadsModule: true),
+        new(Name(nameof(Md5Examples), nameof(Md5Examples.BclMd5)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(Convert.FromHexString("900150983cd24fb0d6963f7d28e17f72"), Md5Examples.BclMd5("abc"u8.ToArray()))), // RFC 1321
     ];
 #pragma warning restore KLPKCS11001

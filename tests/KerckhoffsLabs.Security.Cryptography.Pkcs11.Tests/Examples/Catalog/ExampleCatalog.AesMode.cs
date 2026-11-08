@@ -12,22 +12,38 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] AesModeCases() =>
     [
+        new(Name(nameof(AesModeExamples), nameof(AesModeExamples.GenerateArchiveKey)), [],
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                AesModeExamples.GenerateArchiveKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_SECRET_KEY, CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT);
+                Assert.Equal(Message, AesModeExamples.CbcPadUnderReviewedPolicy(b.LibraryPath, b.TokenLabel, pin, label, Message));
+            }),
+            NeedsUserLogin: true,
+            LoadsModule: true),
         new(Name(nameof(AesModeExamples), nameof(AesModeExamples.CbcPadUnderReviewedPolicy)), [typeof(AesPkcs11)],
-            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2,
-            AssertCbcPadUnderReviewedPolicy, NeedsUserLogin: true),
-        new(Name(nameof(AesModeExamples), nameof(AesModeExamples.BclCbcPad)), [], [], ExampleBackend.SoftHsm2,
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            AssertCbcPadUnderReviewedPolicy, NeedsUserLogin: true, LoadsModule: true),
+        new(Name(nameof(AesModeExamples), nameof(AesModeExamples.BclCbcPad)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(Message, AesModeExamples.BclCbcPad(Message))),
     ];
 
     private static void AssertCbcPadUnderReviewedPolicy(IPkcs11Backend backend)
     {
-        using (var pin = new SecurePin(backend.UserPin.Span))
-            Assert.Equal(Message, AesModeExamples.CbcPadUnderReviewedPolicy(backend.Library, backend.TokenLabel, pin, Message));
-
-        // Without the example's policy step, the default Recommended policy refuses the same call.
-        using Pkcs11Session session = backend.OpenSession();
-        using Pkcs11Key key = session.GenerateAesKey();
-        using var aes = new AesPkcs11(key);
-        Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(Message, new byte[16], PaddingMode.PKCS7));
+        WithProvisionedKey(backend,
+            (s, label) => s.GenerateAesKey(256, label, persistOnToken: backend.SupportsTokenObjects),
+            label =>
+            {
+                using SecurePin pin = UserPin(backend);
+                Assert.Equal(Message, AesModeExamples.CbcPadUnderReviewedPolicy(backend.LibraryPath, backend.TokenLabel, pin, label, Message));
+            },
+            key =>
+            {
+                // Without the example's policy step, the default Recommended policy refuses the same call.
+                using var aes = new AesPkcs11(key);
+                Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(Message, new byte[16], PaddingMode.PKCS7));
+            });
     }
 }

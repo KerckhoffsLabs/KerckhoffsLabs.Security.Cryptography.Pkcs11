@@ -3,9 +3,22 @@
 FIPS 203 key establishment; see [Post-quantum cryptography](post-quantum.md) for what the token and the
 platform need.
 
+## Generating a key pair
+
+Once, when you provision the token, generate the receiver's ML-KEM-768 key pair on it, as token objects under a label. Both halves
+stay on the token after the session closes; the private key is sensitive and non-extractable, and each
+half may do only its one job. The example exports the encapsulation key, to publish to senders.
+
+[!code-csharp[](../../samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples/PostQuantum/MlKemExamples.cs#GenerateMlKemKey)]
+
+The BCL has nothing like this to store: `MLKem.GenerateKey(MLKemAlgorithm.MLKem768)` makes the key pair in your process, as on the BCL tab below, and keeping the private key is up to you.
+
+## Receiving a key
+
 The receiver publishes an encapsulation key; a sender uses it to produce a shared secret and a
 ciphertext; the receiver recovers the same secret from the ciphertext. On the PKCS#11 tab the receiver
-is the token and the secret becomes an AES key on it:
+is the token: it opens its key pair by label, and the secret becomes an AES key on the token, which
+decrypts the sender's message:
 
 # [PKCS#11](#tab/pkcs11)
 

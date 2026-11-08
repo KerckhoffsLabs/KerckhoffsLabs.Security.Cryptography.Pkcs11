@@ -10,10 +10,29 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] AesCcmCases() =>
     [
+        new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.GenerateAesCcmKey)), [],
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CCM], ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                AesCcmExamples.GenerateAesCcmKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_SECRET_KEY, CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT);
+                Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
+            }),
+            NeedsUserLogin: true,
+            LoadsModule: true),
         new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.AesCcmEncryptDecrypt)), [typeof(AesCcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CCM], ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(s, Message, Header)))),
-        new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.BclAesCcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
+            b => WithProvisionedKey(b,
+                (s, label) => s.GenerateAesKey(256, label, persistOnToken: b.SupportsTokenObjects),
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
+                }),
+            NeedsUserLogin: true,
+            LoadsModule: true),
+        new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.BclAesCcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 if (!AesCcm.IsSupported) Assert.Skip("AES-CCM is not supported on this platform.");

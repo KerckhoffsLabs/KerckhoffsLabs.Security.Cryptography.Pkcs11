@@ -11,15 +11,51 @@ internal static partial class ExampleCatalog
 {
     private static ExampleCase[] RsaCases() =>
     [
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.GenerateRsaSigningKey)), [],
+            [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                byte[] spki = RsaExamples.GenerateRsaSigningKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_SIGN);
+                AssertGeneratedKey(b, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_VERIFY);
+                (byte[] signature, _) = RsaExamples.SignPss(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                // The exported public key verifies what the opened pair signed: they are the same pair.
+                using RSA verifier = RSA.Create();
+                verifier.ImportSubjectPublicKeyInfo(spki, out _);
+                Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+            }),
+            NeedsUserLogin: true,
+            LoadsModule: true),
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.GenerateRsaKeyTransportKey)), [],
+            [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            b => WithGeneratedKey(b, label =>
+            {
+                using SecurePin pin = UserPin(b);
+                byte[] spki = RsaExamples.GenerateRsaKeyTransportKey(b.LibraryPath, b.TokenLabel, pin, label);
+                AssertGeneratedKey(b, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_DECRYPT);
+                AssertGeneratedKey(b, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_ENCRYPT);
+                Assert.Equal(3072 / 8, RsaKeySize(spki));
+                Assert.Equal(Message, RsaExamples.OaepEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message));
+            }),
+            NeedsUserLogin: true,
+            Unsupported: b => b is SoftHsmBackendFixture && SoftHsmBackendFixture.IsV240Leg
+                ? "SoftHSM 2.5 implements RSA-OAEP with SHA-1 only"
+                : null, LoadsModule: true),
         new(Name(nameof(RsaExamples), nameof(RsaExamples.SignPss)), [typeof(RSAPkcs11)],
             [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
-            {
-                (byte[] signature, RSAParameters publicKey) = RsaExamples.SignPss(s, Message);
-                Assert.True(RsaExamples.VerifyPssWithBcl(Message, signature, publicKey));
-                Assert.False(RsaExamples.VerifyPssWithBcl([.. Message, 0], signature, publicKey));
-            })),
-        new(Name(nameof(RsaExamples), nameof(RsaExamples.VerifyPssWithBcl)), [], [], ExampleBackend.SoftHsm2,
+            b => WithProvisionedKey(b,
+                (s, label) => s.GenerateRsaSigningKeyPair(3072, label, persistOnToken: b.SupportsTokenObjects),
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    (byte[] signature, RSAParameters publicKey) = RsaExamples.SignPss(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                    Assert.True(RsaExamples.VerifyPssWithBcl(Message, signature, publicKey));
+                    Assert.False(RsaExamples.VerifyPssWithBcl([.. Message, 0], signature, publicKey));
+                }),
+            NeedsUserLogin: true,
+            LoadsModule: true),
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.VerifyPssWithBcl)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 using RSA bcl = RSA.Create(3072);
@@ -28,32 +64,52 @@ internal static partial class ExampleCatalog
             }),
         new(Name(nameof(RsaExamples), nameof(RsaExamples.SignPkcs1v15)), [typeof(RSAPkcs11)],
             [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s =>
-            {
-                (byte[] signature, RSAParameters publicKey) = RsaExamples.SignPkcs1v15(s, Message);
-                using RSA bcl = RSA.Create(publicKey);
-                Assert.True(bcl.VerifyData(Message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
-            })),
+            b => WithProvisionedKey(b,
+                (s, label) => s.GenerateRsaSigningKeyPair(3072, label, persistOnToken: b.SupportsTokenObjects),
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    (byte[] signature, RSAParameters publicKey) = RsaExamples.SignPkcs1v15(b.LibraryPath, b.TokenLabel, pin, label, Message);
+                    using RSA bcl = RSA.Create(publicKey);
+                    Assert.True(bcl.VerifyData(Message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+                    Assert.False(bcl.VerifyData((byte[])[.. Message, 0], signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+                }),
+            NeedsUserLogin: true,
+            LoadsModule: true),
         new(Name(nameof(RsaExamples), nameof(RsaExamples.OaepEncryptDecrypt)), [typeof(RSAPkcs11)],
             [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS_OAEP], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
-            b => WithSession(b, s => Assert.Equal(Message, RsaExamples.OaepEncryptDecrypt(s, Message))),
+            b => WithProvisionedKey(b,
+                (s, label) => s.GenerateRsaKeyTransportKeyPair(3072, label, persistOnToken: b.SupportsTokenObjects),
+                label =>
+                {
+                    using SecurePin pin = UserPin(b);
+                    Assert.Equal(Message, RsaExamples.OaepEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message));
+                }),
+            NeedsUserLogin: true,
             Unsupported: b => b is SoftHsmBackendFixture && SoftHsmBackendFixture.IsV240Leg
                 ? "SoftHSM 2.5 implements RSA-OAEP with SHA-1 only"
-                : null),
-        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclSignPss)), [], [], ExampleBackend.SoftHsm2,
+                : null, LoadsModule: true),
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclSignPss)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 (byte[] signature, RSAParameters publicKey) = RsaExamples.BclSignPss(Message);
                 Assert.True(RsaExamples.VerifyPssWithBcl(Message, signature, publicKey));
             }),
-        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclSignPkcs1v15)), [], [], ExampleBackend.SoftHsm2,
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclSignPkcs1v15)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 (byte[] signature, RSAParameters publicKey) = RsaExamples.BclSignPkcs1v15(Message);
                 using RSA verifier = RSA.Create(publicKey);
                 Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
             }),
-        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclOaepEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
+        new(Name(nameof(RsaExamples), nameof(RsaExamples.BclOaepEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(Message, RsaExamples.BclOaepEncryptDecrypt(Message))),
     ];
+
+    private static int RsaKeySize(byte[] subjectPublicKeyInfo)
+    {
+        using RSA rsa = RSA.Create();
+        rsa.ImportSubjectPublicKeyInfo(subjectPublicKeyInfo, out _);
+        return rsa.KeySize / 8;
+    }
 }

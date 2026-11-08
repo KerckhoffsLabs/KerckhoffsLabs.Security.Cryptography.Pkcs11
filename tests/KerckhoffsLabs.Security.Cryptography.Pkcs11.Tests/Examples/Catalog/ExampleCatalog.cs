@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -33,6 +34,9 @@ internal enum ExampleBackend
 /// <param name="Unsupported">Why this backend cannot run the example although it advertises the
 /// mechanisms (a known capability gap of that module or version), or <see langword="null"/> when it can.
 /// Judged by the same skip-or-fail rule as <paramref name="Requires"/>.</param>
+/// <param name="LoadsModule">The example loads the module itself (<c>Pkcs11Library.Load</c>), a second
+/// instance next to the fixture's, so <see cref="ExampleRunner"/> applies
+/// <see cref="ExampleGates.SecondModuleInstance"/> to it.</param>
 internal sealed record ExampleCase(
     string Name,
     Type[] Covers,
@@ -40,7 +44,8 @@ internal sealed record ExampleCase(
     ExampleBackend MustRunOn,
     Action<IPkcs11Backend> Run,
     bool NeedsUserLogin = false,
-    Func<IPkcs11Backend, string?>? Unsupported = null);
+    Func<IPkcs11Backend, string?>? Unsupported = null,
+    bool LoadsModule = false);
 
 /// <summary>Known capability gaps the catalogue's <see cref="ExampleCase.Unsupported"/> gates reuse.</summary>
 internal static class ExampleGates
@@ -122,22 +127,221 @@ internal static partial class ExampleCatalog
         body(session);
     }
 
-    // A known secret imported as a derive-only generic secret, so a token KDF can be compared with the BCL's.
-    private static Pkcs11Key ImportDeriveKey(Pkcs11Session session, byte[] raw)
+    // The full-flow examples load the module themselves (a second instance of it in this process), log in
+    // with the user PIN, and open a key by label. The test provisions that key under a unique label.
+    private static string NewLabel() => $"example-{Guid.NewGuid():N}";
+
+    // A copy of the fixture's user PIN, as the caller of an example would read it from its secret store.
+    private static SecurePin UserPin(IPkcs11Backend backend) => new(backend.UserPin.Span);
+
+    // Provisions a key under a fresh label, runs the example against the label, runs thenWithKey (if any) on
+    // the key opened again by label, destroys every object with the label, and checks that the example, by
+    // disposing its own instance of the module, did not finalize the module under the fixture.
+    //
+    // Where the backend keeps token objects, the key is one, and the provisioning session is closed before the
+    // example runs: the login state belongs to the application, not the session, so a session of this process
+    // still logged in would make the example's C_Login fail with CKR_USER_ALREADY_LOGGED_IN; and a token
+    // object, unlike a session object, outlives the session that made it, as a key provisioned long ago does.
+    // A backend without token objects (NSS's write-protected crypto token) gets a session object instead, kept
+    // alive by keeping its session open; that token takes no login, so nothing conflicts.
+    private static void WithProvisionedKey(
+        IPkcs11Backend backend, Func<Pkcs11Session, string, Pkcs11Key> provision, Action<string> example,
+        Action<Pkcs11Key>? thenWithKey = null)
     {
-        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(raw).Derive().Build();
+        string label = NewLabel();
+        using (Pkcs11Session? keeper = backend.SupportsTokenObjects ? null : backend.OpenSession())
+        {
+            RunThenCleanUp(
+                () =>
+                {
+                    if (keeper is null)
+                    {
+                        using Pkcs11Session provisioning = backend.OpenSession();
+                        using (provision(provisioning, label)) { }
+                    }
+                    else
+                    {
+                        using (provision(keeper, label)) { }
+                    }
+
+                    example(label);
+
+                    if (thenWithKey is not null)
+                        WithSessionOrKeeper(backend, keeper, s =>
+                        {
+                            using Pkcs11Key key = s.OpenKey(label);
+                            thenWithKey(key);
+                        });
+                },
+                () => WithSessionOrKeeper(backend, keeper, s => DestroyObjectsLabelled(s, label)));
+        }
+        AssertFixtureLibraryStillWorks(backend);
+    }
+
+    private static void WithSessionOrKeeper(IPkcs11Backend backend, Pkcs11Session? keeper, Action<Pkcs11Session> body)
+    {
+        if (keeper is not null)
+        {
+            body(keeper);
+            return;
+        }
+        using Pkcs11Session session = backend.OpenSession();
+        body(session);
+    }
+
+    // Destroys every object (both halves of a key pair, a certificate) that carries the label.
+    private static void DestroyObjectsLabelled(Pkcs11Session session, string label)
+    {
+        using ObjectTemplate filter = ObjectTemplate.Empty().Label(label).Build();
+        using ReadOnlyDisposableList<Pkcs11Object> objects = session.FindObjects(filter);
+        foreach (Pkcs11Object found in objects)
+            found.Destroy();
+    }
+
+    // Runs a key-generation example, and the page's example that uses the key, under a fresh label; then
+    // destroys every object with the label and checks the fixture's library still works.
+    private static void WithGeneratedKey(IPkcs11Backend backend, Action<string> body)
+    {
+        string label = NewLabel();
+        RunThenCleanUp(() => body(label), () => WithSessionOrKeeper(backend, null, s => DestroyObjectsLabelled(s, label)));
+        AssertFixtureLibraryStillWorks(backend);
+    }
+
+    // Runs body, then cleanup, which also runs when body fails. A token error from a cleanup after body failed
+    // (on opencryptoki, the cleanup's own login, say) does not replace body's exception: that one is the failure
+    // to report, and the one ExampleRunner judges for a login retry.
+    private static void RunThenCleanUp(Action body, Action cleanup)
+    {
+        try
+        {
+            body();
+        }
+        catch
+        {
+            try
+            {
+                cleanup();
+            }
+            catch (Pkcs11Exception)
+            {
+                // Keep body's exception; the next run's fresh label does not depend on this cleanup.
+            }
+            throw;
+        }
+        cleanup();
+    }
+
+    private static readonly CKA[] KeyRoles =
+    [
+        CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_SIGN, CKA.CKA_VERIFY, CKA.CKA_WRAP, CKA.CKA_UNWRAP,
+        CKA.CKA_DERIVE, CKA.CKA_ENCAPSULATE, CKA.CKA_DECAPSULATE,
+    ];
+
+    // What a generation example promises, checked on the token: the key (or the named half of a pair) is a
+    // token object; a secret or private key is sensitive and non-extractable; and it has exactly the roles
+    // given, every other role being off (or not an attribute that key type has). The half is read on its own
+    // through GetAttributeValue(KeyHandlePart, ...), in one call.
+    private static void AssertGeneratedKey(IPkcs11Backend backend, string label, CKO keyClass, params CKA[] roles)
+    {
+        using Pkcs11Session session = backend.OpenSession();
+        using (ObjectTemplate filter = ObjectTemplate.Empty().Label(label).Attribute(CKA.CKA_CLASS, (ulong)keyClass).Build())
+        using (ReadOnlyDisposableList<Pkcs11Object> found = session.FindObjects(filter))
+            Assert.True(found.Count == 1, $"Expected one {keyClass} labelled {label}.");
+
+        using Pkcs11Key key = session.OpenKey(label);
+        KeyHandlePart part = keyClass is CKO.CKO_PUBLIC_KEY ? KeyHandlePart.Public : KeyHandlePart.Private;
+        using ReadOnlyDisposableList<ObjectAttribute> attributes =
+            key.GetAttributeValue(part, [CKA.CKA_CLASS, CKA.CKA_TOKEN, CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE, .. KeyRoles]);
+        bool IsTrue(CKA type) => attributes.Single(a => a.Type == type) is { CannotBeRead: false } a && a.GetValueAsBool();
+
+        Assert.Equal(keyClass, (CKO)attributes.Single(a => a.Type == CKA.CKA_CLASS).GetValueAsUlong());
+        Assert.True(IsTrue(CKA.CKA_TOKEN), $"The {keyClass} is not a token object.");
+        foreach (CKA role in KeyRoles)
+        {
+            bool granted = IsTrue(role);
+            Assert.True(granted == roles.Contains(role), $"The {keyClass} has {role} = {granted}.");
+        }
+
+        if (keyClass is CKO.CKO_PUBLIC_KEY) return;
+        Assert.True(IsTrue(CKA.CKA_SENSITIVE), $"The {keyClass} is not sensitive.");
+        Assert.False(IsTrue(CKA.CKA_EXTRACTABLE), $"The {keyClass} is extractable.");
+    }
+
+    // A generation case: runs the page's generation example under a fresh label, checks each half of the pair
+    // it made on the token, checks that a second run under the same label is refused, and returns what it
+    // exported. The page's use example runs in its own case.
+    private static byte[] AssertGenerationExample(
+        IPkcs11Backend backend, Func<string, string, SecurePin, string, byte[]> generate, CKA[] privateRoles, CKA[] publicRoles)
+    {
+        byte[] exported = [];
+        WithGeneratedKey(backend, label =>
+        {
+            using SecurePin pin = UserPin(backend);
+            exported = generate(backend.LibraryPath, backend.TokenLabel, pin, label);
+            AssertGeneratedKey(backend, label, CKO.CKO_PRIVATE_KEY, privateRoles);
+            AssertGeneratedKey(backend, label, CKO.CKO_PUBLIC_KEY, publicRoles);
+            // Run again under the same label, the example refuses rather than make a second pair.
+            Assert.Throws<InvalidOperationException>(() => generate(backend.LibraryPath, backend.TokenLabel, pin, label));
+        });
+        return exported;
+    }
+
+    // A signing case: the generation example provisions the key pair under a fresh label, then the signing
+    // example opens it by that label and signs Message. Returns the signature and the public key the signing
+    // example exported, after checking it is the one the generation example exported.
+    private static (byte[] Signature, byte[] PublicKey) GenerateAndSignWithPair(
+        IPkcs11Backend backend,
+        Func<string, string, SecurePin, string, byte[]> generate,
+        Func<string, string, SecurePin, string, byte[], (byte[] Signature, byte[] PublicKey)> sign)
+    {
+        (byte[], byte[]) result = default;
+        WithGeneratedKey(backend, label =>
+        {
+            using SecurePin pin = UserPin(backend);
+            byte[] generated = generate(backend.LibraryPath, backend.TokenLabel, pin, label);
+            (byte[] signature, byte[] publicKey) = sign(backend.LibraryPath, backend.TokenLabel, pin, label, Message);
+            Assert.Equal(generated, publicKey);
+            result = (signature, publicKey);
+        });
+        return result;
+    }
+
+    // After an example that loaded and disposed its own instance of the module: the fixture's still works.
+    private static void AssertFixtureLibraryStillWorks(IPkcs11Backend backend)
+    {
+        using Pkcs11Session session = backend.OpenSession();
+        Assert.Equal(16, session.GenerateRandom(16).Length);
+    }
+
+    // A known secret imported under a label as a derive-only generic secret, so a token KDF can be compared
+    // with the BCL's.
+    private static Pkcs11Key ImportDeriveKey(IPkcs11Backend backend, Pkcs11Session session, string label, byte[] raw)
+    {
+        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .Label(label).OnToken(backend.SupportsTokenObjects).Value(raw).Derive().Build();
         return session.ImportKey(template);
     }
 
-    // The token key and the BCL's key bytes are the same key when what one encrypts, the other decrypts.
-    private static void AssertSameAesKey(Pkcs11Key tokenKey, byte[] bclKey)
+    // What an example encrypted with AES-GCM under a key it derived on the token, the BCL decrypts with the
+    // key bytes it derived itself: the two are the same key.
+    private static void AssertDecryptsWith(byte[] bclKey, (byte[] Nonce, byte[] Ciphertext, byte[] Tag) sealedMessage)
     {
-        using var onToken = new AesGcmPkcs11(tokenKey, 16);
-        byte[] nonce = RandomNumberGenerator.GetBytes(12), ciphertext = new byte[Message.Length], tag = new byte[16];
-        onToken.Encrypt(nonce, Message, ciphertext, tag);
         using var inSoftware = new AesGcm(bclKey, 16);
-        byte[] decrypted = new byte[ciphertext.Length];
-        inSoftware.Decrypt(nonce, ciphertext, tag, decrypted);
+        byte[] decrypted = new byte[sealedMessage.Ciphertext.Length];
+        inSoftware.Decrypt(sealedMessage.Nonce, sealedMessage.Ciphertext, sealedMessage.Tag, decrypted);
+        Assert.Equal(Message, decrypted);
+    }
+
+    // What an example encrypted with AES-GCM under a key it derived, the same derivation, run again in a
+    // session of the test, decrypts on the token.
+    private static void AssertDecryptsWithTokenKey(
+        IPkcs11Backend backend, (byte[] Nonce, byte[] Ciphertext, byte[] Tag) sealedMessage, Func<Pkcs11Session, Pkcs11Key> deriveAgain)
+    {
+        using Pkcs11Session session = backend.OpenSession();
+        using Pkcs11Key key = deriveAgain(session);
+        using var aesGcm = new AesGcmPkcs11(key, 16);
+        byte[] decrypted = new byte[sealedMessage.Ciphertext.Length];
+        aesGcm.Decrypt(sealedMessage.Nonce, sealedMessage.Ciphertext, sealedMessage.Tag, decrypted);
         Assert.Equal(Message, decrypted);
     }
 
@@ -150,27 +354,33 @@ internal static partial class ExampleCatalog
         Assert.Equal(Message, example(raw, iv, software.EncryptCbc(Message, iv, PaddingMode.PKCS7)));
     }
 
-    // The legacy data is made by the BCL with a known key, which the test imports onto the token (under
-    // AllowInsecure: the default policy refuses a legacy key); the example must read it back, and the same
-    // decryption without the example's lease must be refused. Shared by the 3DES, DES and RC2 cases.
+    // The legacy data is made by the BCL with a known key, which the test provisions on the token under a
+    // label (under AllowInsecure: the default policy refuses a legacy key); the example, given the label,
+    // must read it back, and the same decryption without the example's lease must be refused. Shared by the
+    // 3DES, DES and RC2 cases; example(label, iv, ciphertext) runs the whole flow.
     private static void AssertLegacyCbc(
-        Pkcs11Session session, CKK keyType, int keyBytes, int blockBytes, Func<SymmetricAlgorithm> bcl,
-        Func<Pkcs11Session, Pkcs11Key, byte[], byte[], byte[]> example, Func<Pkcs11Key, SymmetricAlgorithm> adapter)
+        IPkcs11Backend backend, CKK keyType, int keyBytes, int blockBytes, Func<SymmetricAlgorithm> bcl,
+        Func<string, byte[], byte[], byte[]> example, Func<Pkcs11Key, SymmetricAlgorithm> adapter)
     {
         byte[] raw = RandomNumberGenerator.GetBytes(keyBytes), iv = RandomNumberGenerator.GetBytes(blockBytes);
         using SymmetricAlgorithm software = bcl();
         software.Key = raw;
         byte[] ciphertext = software.EncryptCbc(Message, iv, PaddingMode.PKCS7);
 
-        Pkcs11Key key;
-        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-        using (ObjectTemplate template = ObjectTemplate.ForSecretKey(keyType).Value(raw).Decrypt().Build())
-            key = session.ImportKey(template);
-        using (key)
-        {
-            Assert.Equal(Message, example(session, key, iv, ciphertext));
-            using SymmetricAlgorithm unleased = adapter(key);
-            Assert.Throws<CryptoPolicyViolationException>(() => unleased.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7));
-        }
+        WithProvisionedKey(
+            backend,
+            (session, label) =>
+            {
+                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+                using (ObjectTemplate template = ObjectTemplate.ForSecretKey(keyType)
+                    .Label(label).OnToken(backend.SupportsTokenObjects).Value(raw).Decrypt().Build())
+                    return session.ImportKey(template);
+            },
+            label => Assert.Equal(Message, example(label, iv, ciphertext)),
+            key =>
+            {
+                using SymmetricAlgorithm unleased = adapter(key);
+                Assert.Throws<CryptoPolicyViolationException>(() => unleased.DecryptCbc(ciphertext, iv, PaddingMode.PKCS7));
+            });
     }
 }

@@ -11,17 +11,29 @@ internal static partial class ExampleCatalog
 #pragma warning disable SYSLIB5006 // SlhDsa and SlhDsaPkcs11 are [Experimental] in .NET 10
     private static ExampleCase[] SlhDsaCases() =>
     [
-        new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.SlhDsaSign)), [typeof(SlhDsaPkcs11)],
-            [CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA], ExampleBackend.BouncyHsm,
-            b => WithSession(b, s =>
+        new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.GenerateSlhDsaKey)), [],
+            [CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA], ExampleBackend.BouncyHsm | ExampleBackend.Kryoptic,
+            b =>
             {
                 if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
-                (byte[] signature, byte[] publicKey) = SlhDsaExamples.SlhDsaSign(s, Message);
+                byte[] publicKey = AssertGenerationExample(b, SlhDsaExamples.GenerateSlhDsaKey, [CKA.CKA_SIGN], [CKA.CKA_VERIFY]);
+                Assert.Equal(32, publicKey.Length); // an SLH-DSA-SHA2-128s public key (FIPS 205, Table 2)
+            },
+            NeedsUserLogin: true,
+            LoadsModule: true),
+        new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.SlhDsaSign)), [typeof(SlhDsaPkcs11)],
+            [CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA], ExampleBackend.BouncyHsm | ExampleBackend.Kryoptic,
+            b =>
+            {
+                if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
+                (byte[] signature, byte[] publicKey) = GenerateAndSignWithPair(b, SlhDsaExamples.GenerateSlhDsaKey, SlhDsaExamples.SlhDsaSign);
                 // A standard FIPS 205 signature: the BCL verifies it from the exported public key.
                 if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL; the token side ran.");
                 AssertSlhDsaVerifies(signature, publicKey);
-            })),
-        new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.BclSlhDsaSign)), [], [], ExampleBackend.SoftHsm2,
+            },
+            NeedsUserLogin: true,
+            LoadsModule: true),
+        new(Name(nameof(SlhDsaExamples), nameof(SlhDsaExamples.BclSlhDsaSign)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 if (!SlhDsa.IsSupported) Assert.Skip("SLH-DSA is not supported by this platform's BCL.");

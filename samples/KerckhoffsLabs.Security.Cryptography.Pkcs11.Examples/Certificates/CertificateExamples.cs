@@ -10,38 +10,70 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 /// <summary>docs/examples/certificates.md: certificates on the token, and the private key behind one.</summary>
 public static class CertificateExamples
 {
-    public static Pkcs11Certificate IssueSelfSignedCertificate(Pkcs11Session session, string label)
+    public static X509Certificate2 IssueSelfSignedCertificate(string modulePath, string tokenLabel, SecurePin pin, string label)
     {
         #region IssueSelfSignedCertificate
-        // A certificate finds its private key by CKA_ID, so the key pair and the certificate share an id.
+        // 1. Load the module and log in. The module path and token label come from configuration; the
+        //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
+        if (session.TryOpenKey(label, out Pkcs11Key? existing))
+        {
+            existing.Dispose();
+            throw new InvalidOperationException($"A key labelled '{label}' is already on the token.");
+        }
+
+        // 2. A P-256 key pair, kept on the token (OnToken: CKA_TOKEN, so it outlives the session) under the
+        //    certificate's label. A certificate finds its private key by CKA_ID, so the key pair and the
+        //    certificate share an id. ForPrivateKey starts sensitive and non-extractable, with every role
+        //    off: the private key may sign, the public key verify, nothing else.
         byte[] id = RandomNumberGenerator.GetBytes(16);
         using ObjectTemplate publicTemplate = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .Label(label)
             .Id(id)
+            .OnToken()
             .EcParams(Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams())
             .Verify()
             .Build();
         using ObjectTemplate privateTemplate = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
+            .Label(label)
             .Id(id)
+            .OnToken()
             .Sign()
             .Build();
         using Pkcs11Key key = session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), publicTemplate, privateTemplate);
         using var ecdsa = new ECDsaPkcs11(key);
 
-        // The BCL builds the certificate; the token signs it. X509SignatureGenerator signs with the
-        // ECDsa without trying to copy its private key into the certificate, which a token key refuses.
-        var request = new CertificateRequest("CN=Example Signing", ecdsa, HashAlgorithmName.SHA256);
-        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, critical: true));
-        using X509Certificate2 certificate = request.Create(
-            request.SubjectName,
-            X509SignatureGenerator.CreateForECDsa(ecdsa),
-            notBefore: DateTimeOffset.UtcNow,
-            notAfter: DateTimeOffset.UtcNow.AddYears(1),
-            serialNumber: RandomNumberGenerator.GetBytes(16));
-
-        // Store it on the token next to its key. persistOnToken: true to keep it after the session.
-        Pkcs11Certificate stored = session.ImportCertificate(certificate, label, id);
+        // 3. The BCL builds the certificate; the token signs it. X509SignatureGenerator signs with the
+        //    ECDsa without trying to copy its private key into the certificate, which a token key refuses.
+        //    Then store it on the token next to its key, as a token object (persistOnToken), under the
+        //    label SignWithCertificateKey below opens it by. If either step fails, destroy the key pair just
+        //    generated, so a retry starts from an empty label; and dispose the certificate, which is returned
+        //    on success and so is not in a using.
+        X509Certificate2? certificate = null;
+        try
+        {
+            var request = new CertificateRequest("CN=Example Signing", ecdsa, HashAlgorithmName.SHA256);
+            request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, critical: true));
+            certificate = request.Create(
+                request.SubjectName,
+                X509SignatureGenerator.CreateForECDsa(ecdsa),
+                notBefore: DateTimeOffset.UtcNow,
+                notAfter: DateTimeOffset.UtcNow.AddYears(1),
+                serialNumber: RandomNumberGenerator.GetBytes(16));
+            using (session.ImportCertificate(certificate, label, id, persistOnToken: true)) { }
+        }
+        catch
+        {
+            certificate?.Dispose();
+            key.Destroy();
+            throw;
+        }
+        // 4. The using declarations dispose the adapter, the key handle, the session and the library;
+        //    the key pair and the certificate stay on the token.
         #endregion
-        return stored;
+        return certificate;
     }
 
     public static X509Certificate2 BclIssueSelfSignedCertificate()
@@ -192,17 +224,26 @@ public static class CertificateExamples
         #endregion
     }
 
-    public static (byte[] Signature, X509Certificate2 Certificate) SignWithCertificateKey(Pkcs11Session session, string label, byte[] data)
+    public static (byte[] Signature, X509Certificate2 Certificate) SignWithCertificateKey(
+        string modulePath, string tokenLabel, SecurePin pin, string label, byte[] data)
     {
         #region SignWithCertificateKey
-        // Find the certificate by label, then its private key, as X509Certificate2.GetECDsaPrivateKey()
-        // would for a certificate with a software key. The returned ECDsa signs on the token.
+        // 1. Load the module and log in. The module path and token label come from configuration; the
+        //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 2. Find the certificate by label, then its private key, as X509Certificate2.GetECDsaPrivateKey()
+        //    would for a certificate with a software key. The returned ECDsa signs on the token.
         using Pkcs11Certificate stored = session.OpenCertificate(label);
         using ECDsa privateKey = stored.GetECDsaPrivateKey()
             ?? throw new InvalidOperationException($"No EC signing key on the token for certificate '{label}'.");
 
+        // 3. Sign on the token.
         byte[] signature = privateKey.SignData(data, HashAlgorithmName.SHA256);
-        X509Certificate2 certificate = new(stored.Certificate);  // a copy that outlives the token object
+        X509Certificate2 certificate = new(stored.Certificate);  // a copy that outlives the session
+        // 4. The using declarations dispose the key, the certificate handle, the session and the
+        //    library, in reverse order; both objects stay on the token.
         #endregion
         return (signature, certificate);
     }

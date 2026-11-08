@@ -4,9 +4,21 @@ Every algorithm the library offers, each shown next to its `System.Security.Cryp
 Every snippet on these pages is compiled and run against real PKCS#11 tokens in CI, so what you read is
 what works.
 
-The examples keep keys on the token: they generate or derive keys there, mark them sensitive and
-non-extractable, and give each key only the roles it needs. Start with
-[Getting started](../guide/getting-started.md) if you have not opened a session yet.
+Each page's first PKCS#11 example is a complete flow: it loads the module, opens a session and logs in
+with a PIN read from your secret store, opens the key that is already on the token by its label (or
+generates one, where generating it is the point), uses it, and disposes everything. Two kinds of page
+skip the login: the hash pages (SHA-2, SHA-3, SHA-1, MD5), whose examples use no key, and RC2, written for
+NSS's crypto token, which takes no login. Later snippets on a page start from that session or key. The
+module path, the token label and the key labels are parameters, to come from your configuration; see
+[Getting started](../guide/getting-started.md) for each step.
+
+Each example runs the whole flow in one method so you can read it in one place. In an application, load
+the module and log in once at startup and keep the session: the login belongs to the application, so a
+second login to the same token while a session is logged in fails. See
+[In an application: load and log in once](../guide/getting-started.md#in-an-application-load-and-log-in-once).
+
+The examples keep keys on the token: keys are generated or derived there, sensitive and non-extractable,
+with only the roles they need.
 
 ## Encryption
 
