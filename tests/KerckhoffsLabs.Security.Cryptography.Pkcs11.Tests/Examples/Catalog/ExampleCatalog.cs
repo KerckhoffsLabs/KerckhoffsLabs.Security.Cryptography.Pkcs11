@@ -207,8 +207,8 @@ internal static partial class ExampleCatalog
         AssertFixtureLibraryStillWorks(backend);
     }
 
-    // Runs body, then cleanup, which also runs when body fails. A cleanup that fails after body failed (on
-    // opencryptoki, the cleanup's own login, say) does not replace body's exception: that one is the failure
+    // Runs body, then cleanup, which also runs when body fails. A token error from a cleanup after body failed
+    // (on opencryptoki, the cleanup's own login, say) does not replace body's exception: that one is the failure
     // to report, and the one ExampleRunner judges for a login retry.
     private static void RunThenCleanUp(Action body, Action cleanup)
     {
@@ -222,7 +222,7 @@ internal static partial class ExampleCatalog
             {
                 cleanup();
             }
-            catch
+            catch (Pkcs11Exception)
             {
                 // Keep body's exception; the next run's fresh label does not depend on this cleanup.
             }
