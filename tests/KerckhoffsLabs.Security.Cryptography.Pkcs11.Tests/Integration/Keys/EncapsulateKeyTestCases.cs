@@ -177,6 +177,70 @@ internal static class EncapsulateKeyTestCases
         }
     }
 
+    // The keys C_EncapsulateKey and C_DecapsulateKey make have no protected history: PKCS#11 v3.2 §5.18.8 and
+    // §5.18.9 set CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE to FALSE on them, as on an unwrapped key, since the
+    // shared secret's bytes exist outside the token, however the template protects it. The template's usage flags
+    // are kept: CKA_ENCRYPT and CKA_DECRYPT read TRUE. ML-KEM-768. Skips a token that does not report both history
+    // attributes.
+    internal static void Assert_EncapsulatedKeys_HaveNoProtectedHistory(IPkcs11Backend backend)
+    {
+        backend.RequireMlKemParameterSet(MLKemAlgorithm.MLKem768.EncapsulationKeySizeInBytes);
+        using var session = OpenSession(backend);
+
+        string label = $"encap-history-{Guid.NewGuid():N}";
+        byte[] id = TestKeys.IdFor(label);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
+            .Label(label).Id(id)
+            .Attribute(CKA.CKA_ENCAPSULATE, true)
+            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
+            .Label(label).Id(id)
+            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
+
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        try
+        {
+            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+            using var encTemplate = AesSharedKeyTemplate(32, valueLen: true);
+            var (ciphertext, encKey) = key.EncapsulateKey(mechanism, encTemplate, MLKemAlgorithm.MLKem768.CiphertextSizeInBytes);
+            try
+            {
+                using Pkcs11Key decKey = DecapsulateAesKey(key, mechanism, ciphertext, 32);
+                try
+                {
+                    AssertNoProtectedHistory(encKey, "encapsulated");
+                    AssertNoProtectedHistory(decKey, "decapsulated");
+                    AssertStaysOnToken(encKey, tokenKeepsSensitive: true);
+                    AssertStaysOnToken(decKey, tokenKeepsSensitive: true);
+                }
+                finally
+                {
+                    decKey.Destroy();
+                }
+            }
+            finally
+            {
+                using (encKey) { encKey.Destroy(); }
+            }
+        }
+        finally
+        {
+            key.Destroy();
+        }
+    }
+
+    private static void AssertNoProtectedHistory(Pkcs11Key sharedKey, string side)
+    {
+        using var attrs = sharedKey.GetAttributeValue(
+            CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE, CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            Assert.Skip("The backend does not report CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE.");
+        Assert.False(attrs[0].GetValueAsBool(), $"The {side} key is CKA_ALWAYS_SENSITIVE.");
+        Assert.False(attrs[1].GetValueAsBool(), $"The {side} key is CKA_NEVER_EXTRACTABLE.");
+        Assert.True(attrs[2].GetValueAsBool(), $"The {side} key lost the template's CKA_ENCRYPT.");
+        Assert.True(attrs[3].GetValueAsBool(), $"The {side} key lost the template's CKA_DECRYPT.");
+    }
+
     public static TheoryData<string> MontgomeryCurves => ["X25519", "X448"];
 
     // The same on-token round trip as ML-KEM's, with CKM_ECDH1_DERIVE on a Montgomery key pair: the token

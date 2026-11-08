@@ -562,6 +562,79 @@ internal static class ObjectConformanceTestCases
         });
     }
 
+    public static TheoryData<string> PublicKeyTypes => ["RSA", "EC", "Edwards", "Montgomery", "ML-DSA"];
+
+    // An RSA, EC, Edwards or Montgomery public key has no CKA_VALUE: the RSA, EC, Edwards and Montgomery public
+    // key tables (§6.1.2, §6.3.3, §6.3.5, §6.3.7) define none, so C_GetAttributeValue of it, through the raw call
+    // so that the module's own answer is seen, is CKR_ATTRIBUTE_TYPE_INVALID with ulValueLen
+    // CK_UNAVAILABLE_INFORMATION (§5.7.5, case 2). The key is held in the attributes the tables do define,
+    // CKA_MODULUS and CKA_PUBLIC_EXPONENT or CKA_EC_PARAMS and CKA_EC_POINT, which read. The control, ML-DSA, is a
+    // key type whose public key is its CKA_VALUE (§6.67.2): the FIPS 204 encoding, 1312 bytes for ML-DSA-44.
+    internal static void Assert_PublicKey_HasCkaValueOnlyWhereItsTypeDefinesIt(IPkcs11Backend backend, string keyType)
+    {
+        (CKM generation, CKK type, byte[]? curve, CKA[] material) = keyType switch
+        {
+            "RSA" => (CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKK.CKK_RSA, null, [CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT]),
+            "EC" => (CKM.CKM_EC_KEY_PAIR_GEN, CKK.CKK_EC, TestKeys.EcP256Oid, [CKA.CKA_EC_PARAMS, CKA.CKA_EC_POINT]),
+            "Edwards" => (CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CKK.CKK_EC_EDWARDS, (byte[])[0x06, 0x03, 0x2B, 0x65, 0x70], (CKA[])[CKA.CKA_EC_PARAMS, CKA.CKA_EC_POINT]),
+            "Montgomery" => (CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN, CKK.CKK_EC_MONTGOMERY, (byte[])[0x06, 0x03, 0x2B, 0x65, 0x6E], (CKA[])[CKA.CKA_EC_PARAMS, CKA.CKA_EC_POINT]),
+            _ => (CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKK.CKK_ML_DSA, null, (CKA[])[CKA.CKA_VALUE]),
+        };
+        backend.RequireMechanism(generation);
+
+        WithSession(backend, session =>
+        {
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrPublicUse = new ObjectAttribute(keyType == "Montgomery" ? CKA.CKA_DERIVE : CKA.CKA_VERIFY, true);
+            using var attrPrivateUse = new ObjectAttribute(keyType == "Montgomery" ? CKA.CKA_DERIVE : CKA.CKA_SIGN, true);
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+            using ObjectAttribute attrKeyParameter = keyType switch
+            {
+                "RSA" => new(CKA.CKA_MODULUS_BITS, 2048UL),
+                "ML-DSA" => new(CKA.CKA_PARAMETER_SET, (ulong)CkpMlDsa.CKP_ML_DSA_44),
+                _ => new(CKA.CKA_EC_PARAMS, curve!),
+            };
+            using var attrExponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
+            List<ObjectAttribute> publicTemplate = keyType == "RSA"
+                ? [attrToken, attrPublicUse, attrKeyParameter, attrExponent]
+                : [attrToken, attrPublicUse, attrKeyParameter];
+            session.GenerateKeyPair(new Mechanism(generation), publicTemplate,
+                [attrToken, attrPrivateUse, attrSensitive], out ObjectHandle publicKey, out ObjectHandle privateKey);
+            try
+            {
+                Assert.Equal((ulong)type, ReadUlong(session, publicKey, CKA.CKA_KEY_TYPE));
+                foreach (CKA attribute in material)
+                    Assert.NotEmpty(Read(session, publicKey, attribute));
+
+                CK_ATTRIBUTE[] value = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_VALUE }];
+                CKR rv = backend.Library.LowLevelLibrary!.C_GetAttributeValue(
+                    (NativeCULong)session.SessionId, (NativeCULong)publicKey.ObjectId, value);
+                if (keyType == "ML-DSA")
+                {
+                    Assert.Equal(CKR.CKR_OK, rv);
+                    Assert.Equal(1312UL, (ulong)value[0].valueLen);
+                }
+                else
+                {
+                    Assert.True(rv == CKR.CKR_ATTRIBUTE_TYPE_INVALID, $"{keyType} public key's CKA_VALUE: C_GetAttributeValue returned {rv}.");
+                    Assert.True((ulong)value[0].valueLen == CK.CK_UNAVAILABLE_INFORMATION,
+                        $"{keyType} public key's CKA_VALUE: ulValueLen is {(ulong)value[0].valueLen}, not CK_UNAVAILABLE_INFORMATION.");
+                }
+            }
+            finally
+            {
+                session.DestroyObject(privateKey);
+                session.DestroyObject(publicKey);
+            }
+        });
+    }
+
+    private static ulong ReadUlong(Pkcs11SessionCore session, ObjectHandle handle, CKA attribute)
+    {
+        using var read = session.GetAttributeValue(handle, [attribute]);
+        return read[0].GetValueAsUlong();
+    }
+
     public static TheoryData<int> DataValueLengths => [0, 1, 4096, 65_536, 1 << 20];
 
     // A data object's CKA_VALUE of any length, empty to 1 MiB, reads back byte for byte.

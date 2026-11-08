@@ -53,4 +53,10 @@ public sealed class WrapUnwrapKeyTests_FreeHsm(FreeHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void AesKeyWrap_KeyOver256Bytes_RoundTrips() => WrapUnwrapKeyTestCases.Assert_AesKeyWrap_KeyOver256Bytes_RoundTrips(_backend);
+
+    // FreeHSM wrapped an unextractable key that was not also sensitive until 2.6.1 (GHSA-m5m7-4gmc-qmv5).
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(WrapUnwrapKeyTestCases.UnextractableKeys), MemberType = typeof(WrapUnwrapKeyTestCases))]
+    public void WrapKey_RefusesEveryUnextractableKey(string how) =>
+        WrapUnwrapKeyTestCases.Assert_WrapKey_RefusesEveryUnextractableKey(_backend, CKM.CKM_AES_KEY_WRAP, how);
 }

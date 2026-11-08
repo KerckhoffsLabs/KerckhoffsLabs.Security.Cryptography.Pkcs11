@@ -1102,7 +1102,12 @@ internal static class SessionConformanceTestCases
     // CKR_OBJECT_HANDLE_INVALID: the handle is an object handle §5.6.10 made invalid, and the spec says no more
     // about which of the two handle codes a key handle gets then.
     // tokenKeyEncryptInit records a backend's own answer to C_EncryptInit (null: the ones above).
-    internal static void Assert_Logout_InvalidatesPrivateHandles(IPkcs11Backend backend, CKR? tokenKeyEncryptInit = null)
+    // dataObjectsArePrivate pins a backend that sets CKA_PRIVATE by object class, TRUE for all but public keys and
+    // certificates, whatever the template says (FreeHSM): the data object made with CKA_PRIVATE = FALSE reads TRUE, so
+    // C_Logout destroys it with the private one. The case then checks that, and that no data object is left to a
+    // search; it fails once the backend keeps the CKA_PRIVATE asked, and the pin can go.
+    internal static void Assert_Logout_InvalidatesPrivateHandles(IPkcs11Backend backend, CKR? tokenKeyEncryptInit = null,
+        bool dataObjectsArePrivate = false)
     {
         if (!backend.RequiresUserLogin)
             Assert.Skip("The backend has no login.");
@@ -1133,6 +1138,11 @@ internal static class SessionConformanceTestCases
                 : null;
             ObjectHandle privateSessionObject = session.CreateObject([attrData, attrSession, attrPrivate, attrLabel]);
             ObjectHandle publicSessionObject = session.CreateObject([attrData, attrSession, attrPublic, attrLabel]);
+            if (dataObjectsArePrivate)
+            {
+                using var read = session.GetAttributeValue(publicSessionObject, [CKA.CKA_PRIVATE]);
+                Assert.True(read[0].GetValueAsBool(), "The data object reads the CKA_PRIVATE = FALSE it was made with: drop the pin.");
+            }
 
             session.Logout();
             loggedIn = false;
@@ -1155,8 +1165,16 @@ internal static class SessionConformanceTestCases
                 }
             }
             AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, privateSessionObject), "C_GetAttributeValue on a private session object after C_Logout");
-            AssertRv(CKR.CKR_OK, ClassOf(lowLevel, sid, publicSessionObject), "C_GetAttributeValue on a public session object after C_Logout");
-            Assert.Equal([publicSessionObject.ObjectId], session.FindAllObjects([attrLabel]).Select(h => h.ObjectId));
+            if (dataObjectsArePrivate)
+            {
+                AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, publicSessionObject), "C_GetAttributeValue on a data session object, private by its class, after C_Logout");
+                Assert.Empty(session.FindAllObjects([attrData, attrLabel]));
+            }
+            else
+            {
+                AssertRv(CKR.CKR_OK, ClassOf(lowLevel, sid, publicSessionObject), "C_GetAttributeValue on a public session object after C_Logout");
+                Assert.Equal([publicSessionObject.ObjectId], session.FindAllObjects([attrLabel]).Select(h => h.ObjectId));
+            }
 
             session.Login(CKU.CKU_USER, pin);
             loggedIn = true;

@@ -836,7 +836,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** QA C
 
 ### [BL-155] ⚠️ PARTIALLY RESOLVED — Vendored submodules are pinned to untagged upstream commits, with no in-tree record of why and no review gate on bumps
-- **Status:** Partially resolved 2026-10-29 (#211, #128, #242, #243, #261, the FreeHSM v2.5.1 and v2.6.0 bumps, the opencryptoki v3.28.0 bump, and the NSS 3.133 bump). `.github/CODEOWNERS` assigns every path to the maintainer, and the main ruleset requires a code owner's review (#211, 2026-10-19). The `ci.yml` comment described the opencryptoki pin correctly as master after v3.27.0 (#128). NSS, Kryoptic, BouncyHsm, pkcs11-mock, FreeHSM and opencryptoki are pinned to release tags (`NSS_3_133_RTM`, `v1.5.4`, `v2.3.4`, `v2.0.0`, `v2.6.0`, `v3.28.0`; #242, #243, #261 and the FreeHSM, opencryptoki and NSS bumps).
+- **Status:** Partially resolved 2026-10-29 (#211, #128, #242, #243, #261, the FreeHSM v2.5.1, v2.6.0 and v2.6.1 bumps, the opencryptoki v3.28.0 bump, and the NSS 3.133 bump). `.github/CODEOWNERS` assigns every path to the maintainer, and the main ruleset requires a code owner's review (#211, 2026-10-19). The `ci.yml` comment described the opencryptoki pin correctly as master after v3.27.0 (#128). NSS, Kryoptic, BouncyHsm, pkcs11-mock, FreeHSM and opencryptoki are pinned to release tags (`NSS_3_133_RTM`, `v1.5.4`, `v2.3.4`, `v2.0.0`, `v2.6.1`, `v3.28.0`; #242, #243, #261 and the FreeHSM, opencryptoki and NSS bumps).
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S
