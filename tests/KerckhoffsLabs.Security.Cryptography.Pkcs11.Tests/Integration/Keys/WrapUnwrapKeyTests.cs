@@ -308,29 +308,22 @@ internal static class WrapUnwrapKeyTestCases
                 Assert.NotEmpty(session.WrapKey(wrapMech, kek, control));
 
                 using var unextractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
-                switch (how)
+                ObjectHandle target = how switch
                 {
-                    case "NotSensitive":
-                        key = Create(sensitive: false, extractable: false);
-                        break;
-                    case "Sensitive":
-                        key = Create(sensitive: true, extractable: false);
-                        break;
-                    case "SetAttributeValue":
-                        key = Create(sensitive: false, extractable: true);
-                        session.SetAttributeValue(key.Value, [unextractable]);
-                        break;
-                    case "CopyObject":
-                        key = session.CopyObject(control, [unextractable]);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(how), how, null);
-                }
+                    "NotSensitive" => Create(sensitive: false, extractable: false),
+                    "Sensitive" => Create(sensitive: true, extractable: false),
+                    "SetAttributeValue" => Create(sensitive: false, extractable: true),
+                    "CopyObject" => session.CopyObject(control, [unextractable]),
+                    _ => throw new ArgumentOutOfRangeException(nameof(how), how, null),
+                };
+                key = target;
+                if (how == "SetAttributeValue")
+                    session.SetAttributeValue(target, [unextractable]);
 
-                using (var read = session.GetAttributeValue(key.Value, [CKA.CKA_EXTRACTABLE]))
+                using (var read = session.GetAttributeValue(target, [CKA.CKA_EXTRACTABLE]))
                     Assert.False(read[0].GetValueAsBool(), $"{how}: the key is CKA_EXTRACTABLE.");
 
-                var refused = Assert.ThrowsAny<Pkcs11Exception>(() => session.WrapKey(wrapMech, kek, key.Value));
+                var refused = Assert.ThrowsAny<Pkcs11Exception>(() => session.WrapKey(wrapMech, kek, target));
                 Assert.Equal(CKR.CKR_KEY_UNEXTRACTABLE, refused.ReturnValue);
 
                 // A copy leaves its source as it was.
