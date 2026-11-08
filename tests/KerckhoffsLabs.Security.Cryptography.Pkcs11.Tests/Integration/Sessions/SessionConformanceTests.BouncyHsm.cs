@@ -56,6 +56,21 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCalls), MemberType = typeof(SessionConformanceTestCases))]
+    public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall)
+    {
+        if (whoAndCall.StartsWith("SO;", StringComparison.Ordinal) && !BouncyHsmBackendFixture.SoPrivateObjectRefusalAvailable)
+            Assert.Skip("BouncyHsm lets the SO make a private object.");
+        SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void WrongPin_ThenTheRightOne_ResetsTheRetryCounter() => SessionConformanceTestCases.Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(_backend);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
 

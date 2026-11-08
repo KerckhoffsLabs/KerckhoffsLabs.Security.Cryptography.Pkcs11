@@ -90,6 +90,16 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool PrivateObjectLoginCheckAvailable => CratonHsmAvailable && CratonHsmRefusesPrivateObjectsWithoutALogin;
 
     /// <summary>
+    /// False while <c>C_CopyObject</c> changes <c>CKA_ALLOWED_MECHANISMS</c>, wider or narrower, with <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §4.1.3: <c>CKA_ALLOWED_MECHANISMS</c> has no footnote 8, so a copy cannot change it. Not yet reported upstream.
+    /// CratonHsmQuirkTests.AllowedMechanismsCopy_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmKeepsAllowedMechanismsOnACopy = false;
+
+    /// <summary>Gate for the copy cases that change <c>CKA_ALLOWED_MECHANISMS</c>: see <see cref="CratonHsmKeepsAllowedMechanismsOnACopy"/>.</summary>
+    public static bool AllowedMechanismsCopyAvailable => CratonHsmAvailable && CratonHsmKeepsAllowedMechanismsOnACopy;
+
+    /// <summary>
     /// False while <c>C_Logout</c> leaves the application's private session objects in place: a new login finds
     /// them again under their old handles, where PKCS#11 v3.2 §5.6.10 destroys them. While nobody is logged in,
     /// the handle of a private object (session or token) answers <c>C_GetAttributeValue</c> with

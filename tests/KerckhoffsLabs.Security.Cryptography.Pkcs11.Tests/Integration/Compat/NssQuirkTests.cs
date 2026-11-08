@@ -3,6 +3,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
+using Xunit.Sdk;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 
 /// <summary>
@@ -49,5 +52,14 @@ public sealed class NssQuirkTests(NssBackendFixture backend)
         Assert.False(attributes[0].GetValueAsBool(),
             "A key NSS generates now reports CKA_LOCAL true: set NssBackendFixture.SupportsLocalOnGeneratedKeys " +
             "to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void SecondKeyExtractable_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, "CONCATENATE_BASE_AND_KEY, protected second key; unextractable only"));
+        Assert.True(failure is XunitException and not SkipException,
+            "NSS now takes the second key's CKA_EXTRACTABLE in CKM_CONCATENATE_BASE_AND_KEY: make " +
+            "NssBackendFixture.TakesTheSecondKeysExtractability true and delete this test.");
     }
 }

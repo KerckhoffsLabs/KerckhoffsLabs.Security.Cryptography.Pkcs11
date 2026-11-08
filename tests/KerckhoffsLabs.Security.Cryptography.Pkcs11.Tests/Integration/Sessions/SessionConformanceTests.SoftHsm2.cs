@@ -57,6 +57,16 @@ public sealed class SessionConformanceTests_SoftHsm(SoftHsmBackendFixture backen
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCalls), MemberType = typeof(SessionConformanceTestCases))]
+    public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall) => SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void WrongPin_ThenTheRightOne_ResetsTheRetryCounter() => SessionConformanceTestCases.Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
 

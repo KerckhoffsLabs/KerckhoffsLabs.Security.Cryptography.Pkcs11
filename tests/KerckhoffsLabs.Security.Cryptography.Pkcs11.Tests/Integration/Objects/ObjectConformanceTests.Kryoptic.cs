@@ -26,6 +26,15 @@ public sealed class ObjectConformanceTests_Kryoptic(KryopticBackendFixture backe
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void CopyObject_KeepsTheProtection() => ObjectConformanceTestCases.Assert_CopyObject_KeepsTheProtection(_backend);
 
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.CopyChangesNotAllowed), MemberType = typeof(ObjectConformanceTestCases))]
+    public void CopyObject_CannotMakeThatChange(string change)
+    {
+        if (change.StartsWith("CKA_ALLOWED_MECHANISMS", StringComparison.Ordinal) && !KryopticBackendFixture.AllowedMechanismsCopyAvailable)
+            Assert.Skip("Kryoptic lets a copy change CKA_ALLOWED_MECHANISMS (fixed upstream by latchset/kryoptic#552).");
+        ObjectConformanceTestCases.Assert_CopyObject_CannotMakeThatChange(_backend, change);
+    }
+
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ProvenanceAttributes_TellGeneratedFromImported() => ObjectConformanceTestCases.Assert_ProvenanceAttributes_TellGeneratedFromImported(_backend);
 

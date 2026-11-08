@@ -11,6 +11,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
+using Xunit.Sdk;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 
 /// <summary>
@@ -757,5 +761,23 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         Assert.True(ex is not null && ex.Message.Contains("returned CKR_OK", StringComparison.Ordinal),
             $"A CKM_AES_CTR message past the end of its counter is no longer encrypted ({ex?.Message ?? "the case passes"}): " +
             "if it answers CKR_DATA_LEN_RANGE, set BouncyHsmBackendFixture.BouncyHsmRefusesAesCtrCounterOverflow to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void BaseKeyProtection_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, "XOR_BASE_AND_DATA; sensitive and unextractable"));
+        Assert.True(failure is XunitException and not SkipException,
+            "BouncyHsm now gives a key derived from a protected key the base key's protection (harrison314/BouncyHsm#141): set " +
+            "BouncyHsmBackendFixture.BouncyHsmKeepsABaseKeysProtection to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AllowedMechanismsCopy_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => ObjectConformanceTestCases.Assert_CopyObject_CannotMakeThatChange(_backend, "CKA_ALLOWED_MECHANISMS, wider"));
+        Assert.True(failure is XunitException and not SkipException,
+            "BouncyHsm no longer lets a copy change CKA_ALLOWED_MECHANISMS: set " +
+            "BouncyHsmBackendFixture.BouncyHsmKeepsAllowedMechanismsOnACopy to true and delete this test.");
     }
 }

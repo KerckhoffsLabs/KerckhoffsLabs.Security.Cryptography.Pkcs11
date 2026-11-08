@@ -12,9 +12,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
 /// The derive mechanisms that put a base key's bytes in the key they make (<c>CKM_CONCATENATE_BASE_AND_DATA</c>,
-/// <c>CKM_CONCATENATE_DATA_AND_BASE</c>, <c>CKM_XOR_BASE_AND_DATA</c> and <c>CKM_CONCATENATE_BASE_AND_KEY</c>)
-/// must not give back a protected key's bytes in a key that can be read. PKCS#11 v3.2 §6.43 makes the derived
-/// key sensitive when a base key is, and not extractable when a base key is not, whatever the template asks.
+/// <c>CKM_CONCATENATE_DATA_AND_BASE</c>, <c>CKM_XOR_BASE_AND_DATA</c>, <c>CKM_EXTRACT_KEY_FROM_KEY</c> and
+/// <c>CKM_CONCATENATE_BASE_AND_KEY</c>) must not give back a protected key's bytes in a key that can be read.
+/// PKCS#11 v3.2 §6.43 makes the derived key sensitive when a base key is, and not extractable when a base key is
+/// not, whatever the template asks. The two rules are checked apart: a base key that is only sensitive, one that
+/// is only unextractable, and one that is both.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,17 +32,34 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// mechanism defines. That shows the parameters are right, so a refusal of the protected derivation is the
 /// token's rule at work, which the case accepts: no key is made, so none can be read.
 /// </para>
+/// <para>
+/// The extraction and the one-rule-at-a-time protections follow pkcs11-check's byte-operation inheritance cases
+/// (https://github.com/mingulov/pkcs11-check, <c>test_misc_kdf.py</c>, 0.3.0). HKDF is left out: its output is not
+/// the base key's bytes, and §6.43's rule does not cover it.
+/// </para>
 /// </remarks>
 internal static class BaseKeyProtectionTestCases
 {
-    public static TheoryData<string> Derivations =>
+    private static readonly string[] Mechanisms =
     [
         "CONCATENATE_BASE_AND_DATA",
         "CONCATENATE_DATA_AND_BASE",
         "XOR_BASE_AND_DATA",
+        "EXTRACT_KEY_FROM_KEY",
         "CONCATENATE_BASE_AND_KEY, protected base",
         "CONCATENATE_BASE_AND_KEY, protected second key",
     ];
+
+    private const string Both = "sensitive and unextractable";
+    private const string SensitiveOnly = "sensitive only";
+    private const string UnextractableOnly = "unextractable only";
+
+    /// <summary>Each derivation, with the protected key sensitive, unextractable, or both: "<c>mechanism; protection</c>".</summary>
+    public static TheoryData<string> Derivations =>
+        [.. from mechanism in Mechanisms from protection in (string[])[Both, SensitiveOnly, UnextractableOnly] select $"{mechanism}; {protection}"];
+
+    // CKM_EXTRACT_KEY_FROM_KEY takes this many bytes from bit 0 of the base key (§6.43.8).
+    private const int ExtractedLength = 8;
 
     private static readonly byte[] BaseValue = Convert.FromHexString("00112233445566778899aabbccddeeff");
     private static readonly byte[] SecondValue = Convert.FromHexString("0f0e0d0c0b0a09080706050403020100");
@@ -50,15 +69,18 @@ internal static class BaseKeyProtectionTestCases
 
     internal static void Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(IPkcs11Backend backend, string derivation)
     {
-        CKM mechanism = derivation switch
+        string[] parts = derivation.Split("; ");
+        CKM mechanism = parts[0] switch
         {
             "CONCATENATE_BASE_AND_DATA" => CKM.CKM_CONCATENATE_BASE_AND_DATA,
             "CONCATENATE_DATA_AND_BASE" => CKM.CKM_CONCATENATE_DATA_AND_BASE,
             "XOR_BASE_AND_DATA" => CKM.CKM_XOR_BASE_AND_DATA,
+            "EXTRACT_KEY_FROM_KEY" => CKM.CKM_EXTRACT_KEY_FROM_KEY,
             _ => CKM.CKM_CONCATENATE_BASE_AND_KEY,
         };
+        var protection = new Protection(Sensitive: parts[1] != UnextractableOnly, Unextractable: parts[1] != SensitiveOnly);
         backend.RequireMechanism(mechanism);
-        bool protectSecond = derivation.EndsWith("protected second key", StringComparison.Ordinal);
+        bool protectSecond = parts[0].EndsWith("protected second key", StringComparison.Ordinal);
 
         using Pkcs11SessionCore session = TestKeys.OpenLoggedInSession(backend);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
@@ -68,7 +90,10 @@ internal static class BaseKeyProtectionTestCases
         using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
         using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var attrValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)ExtractedLength);
         List<ObjectAttribute> readable = [attrClass, attrType, attrToken, attrSensitive, attrExtractable];
+        if (mechanism == CKM.CKM_EXTRACT_KEY_FROM_KEY)
+            readable.Add(attrValueLen); // the length the extraction takes; the other mechanisms set their own
         var made = new List<ObjectHandle>();
         IntPtr data = Marshal.AllocHGlobal(Data.Length);
         try
@@ -76,15 +101,24 @@ internal static class BaseKeyProtectionTestCases
             Marshal.Copy(Data, 0, data, Data.Length);
 
             // The control: every key in the clear, so the derived value can be read and checked.
-            ObjectHandle clearBase = Import(session, made, BaseValue, isProtected: false);
-            ObjectHandle clearSecond = Import(session, made, SecondValue, isProtected: false);
-            ObjectHandle control = session.DeriveKey(Parameters(mechanism, data, clearSecond), clearBase, readable);
+            ObjectHandle clearBase = Import(session, made, BaseValue, Protection.None);
+            ObjectHandle clearSecond = Import(session, made, SecondValue, Protection.None);
+            ObjectHandle control;
+            try
+            {
+                control = session.DeriveKey(Parameters(mechanism, data, clearSecond), clearBase, readable);
+            }
+            catch (Pkcs11Exception ex)
+            {
+                Assert.Skip($"{derivation}: the module refuses the derivation from keys in the clear ({ex.ReturnValue}), so a refusal of the protected one shows nothing.");
+                return;
+            }
             made.Add(control);
             using (var value = session.GetAttributeValue(control, [CKA.CKA_VALUE]))
                 Assert.Equal(Convert.ToHexString(Expected(mechanism)), Convert.ToHexString(value[0].GetValueAsByteArray()));
 
-            ObjectHandle baseKey = protectSecond ? clearBase : Import(session, made, BaseValue, isProtected: true);
-            ObjectHandle second = protectSecond ? Import(session, made, SecondValue, isProtected: true) : clearSecond;
+            ObjectHandle baseKey = protectSecond ? clearBase : Import(session, made, BaseValue, protection);
+            ObjectHandle second = protectSecond ? Import(session, made, SecondValue, protection) : clearSecond;
             ObjectHandle derived;
             try
             {
@@ -97,9 +131,11 @@ internal static class BaseKeyProtectionTestCases
             made.Add(derived);
 
             using var read = session.GetAttributeValue(derived, [CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE, CKA.CKA_VALUE]);
-            Assert.True(read[2].CannotBeRead, $"{derivation}: the key made from a sensitive, unextractable key can be read.");
-            Assert.True(read[0].GetValueAsBool(), $"{derivation}: the key made from a sensitive key is not CKA_SENSITIVE.");
-            Assert.False(read[1].GetValueAsBool(), $"{derivation}: the key made from an unextractable key is CKA_EXTRACTABLE.");
+            Assert.True(read[2].CannotBeRead, $"{derivation}: the key made from a protected key can be read.");
+            if (protection.Sensitive)
+                Assert.True(read[0].GetValueAsBool(), $"{derivation}: the key made from a sensitive key is not CKA_SENSITIVE.");
+            if (protection.Unextractable)
+                Assert.False(read[1].GetValueAsBool(), $"{derivation}: the key made from an unextractable key is CKA_EXTRACTABLE.");
         }
         finally
         {
@@ -110,14 +146,20 @@ internal static class BaseKeyProtectionTestCases
         }
     }
 
-    // A generic secret that may derive; protected is sensitive and unextractable, the clear one neither.
-    private static ObjectHandle Import(Pkcs11SessionCore session, List<ObjectHandle> made, byte[] value, bool isProtected)
+    // How a key is protected: sensitive (CKA_SENSITIVE), unextractable (CKA_EXTRACTABLE false), both, or neither.
+    private readonly record struct Protection(bool Sensitive, bool Unextractable)
+    {
+        public static Protection None => new(false, false);
+    }
+
+    // A generic secret that may derive, with the protection given.
+    private static ObjectHandle Import(Pkcs11SessionCore session, List<ObjectHandle> made, byte[] value, Protection protection)
     {
         using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var attrType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
         using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, isProtected);
-        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, !isProtected);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, protection.Sensitive);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, !protection.Unextractable);
         using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
         using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
         ObjectHandle handle = session.CreateObject([attrClass, attrType, attrToken, attrSensitive, attrExtractable, attrDerive, attrValue]);
@@ -125,19 +167,15 @@ internal static class BaseKeyProtectionTestCases
         return handle;
     }
 
-    // CKM_CONCATENATE_BASE_AND_KEY takes the second key's handle; the others a CK_KEY_DERIVATION_STRING_DATA,
-    // whose pointer the caller keeps valid until the call returns.
+    // CKM_CONCATENATE_BASE_AND_KEY takes the second key's handle, and CKM_EXTRACT_KEY_FROM_KEY the bit to start
+    // from (a CK_EXTRACT_PARAMS, here 0); the others a CK_KEY_DERIVATION_STRING_DATA, whose pointer the caller
+    // keeps valid until the call returns.
     private static Mechanism Parameters(CKM mechanism, IntPtr data, ObjectHandle second)
     {
         if (mechanism == CKM.CKM_CONCATENATE_BASE_AND_KEY)
-        {
-            byte[] handle = new byte[UnmanagedMemory.NativeULongSize];
-            if (handle.Length == sizeof(ulong))
-                BitConverter.TryWriteBytes(handle, second.ObjectId);
-            else
-                BitConverter.TryWriteBytes(handle, checked((uint)second.ObjectId));
-            return new Mechanism(mechanism, handle);
-        }
+            return new Mechanism(mechanism, NativeULong(second.ObjectId));
+        if (mechanism == CKM.CKM_EXTRACT_KEY_FROM_KEY)
+            return new Mechanism(mechanism, NativeULong(0));
 
         var parameter = new CK_KEY_DERIVATION_STRING_DATA { Data = data, Len = (NativeCULong)(ulong)Data.Length };
         int size = Pkcs11Marshal.SizeOf<CK_KEY_DERIVATION_STRING_DATA>();
@@ -152,12 +190,24 @@ internal static class BaseKeyProtectionTestCases
         finally { Marshal.FreeHGlobal(block); }
     }
 
-    // §6.43: the base key's bytes then the data, the data then the base, their XOR, or the base then the second key.
+    private static byte[] NativeULong(ulong value)
+    {
+        byte[] bytes = new byte[UnmanagedMemory.NativeULongSize];
+        if (bytes.Length == sizeof(ulong))
+            BitConverter.TryWriteBytes(bytes, value);
+        else
+            BitConverter.TryWriteBytes(bytes, checked((uint)value));
+        return bytes;
+    }
+
+    // §6.43: the base key's bytes then the data, the data then the base, their XOR, the base's first bytes, or the
+    // base then the second key.
     private static byte[] Expected(CKM mechanism) => mechanism switch
     {
         CKM.CKM_CONCATENATE_BASE_AND_DATA => [.. BaseValue, .. Data],
         CKM.CKM_CONCATENATE_DATA_AND_BASE => [.. Data, .. BaseValue],
         CKM.CKM_XOR_BASE_AND_DATA => [.. BaseValue.Zip(Data, (b, d) => (byte)(b ^ d))],
+        CKM.CKM_EXTRACT_KEY_FROM_KEY => BaseValue[..ExtractedLength],
         _ => [.. BaseValue, .. SecondValue],
     };
 }

@@ -481,6 +481,65 @@ internal static class ECDsaPkcs11TestCases
         });
     }
 
+    // r and s are numbers below the order, so about one P-256 signature in 128 has one of them a byte or more
+    // shorter than the order. The r‖s form pads it with zeros to 32 bytes and DER encodes it in its fewest bytes; both
+    // must verify on the token. And a signature the token makes comes back at the full width whatever its r and s:
+    // the case signs until one of them is short, checking every signature's length and that the BCL verifies it.
+    // After pkcs11-check's fixed-vector width cases (https://github.com/mingulov/pkcs11-check, ckr/test_ckr_verify.py,
+    // 0.3.0); the short signatures here are found at run time, by the BCL and by the token.
+    internal static void Assert_SignatureWithAShortRorS_VerifiesAndComesBackAtFullWidth(IPkcs11Backend backend)
+    {
+        const int Width = 32;
+        const int Attempts = 4096; // the chance of no short r or s in 4096 signatures is about 1e-14
+        byte[] hash = SHA256.HashData("kl short r or s"u8);
+        static bool HasAShortHalf(byte[] ieee) => ieee[0] == 0 || ieee[Width] == 0;
+
+        // The BCL signs until r or s is short; the token verifies that signature in both forms.
+        using (ECDsa bcl = ECDsa.Create(BclECCurve.NamedCurves.nistP256))
+        {
+            byte[] ieee = Enumerable.Range(0, Attempts).Select(_ => bcl.SignHash(hash)).FirstOrDefault(HasAShortHalf)
+                ?? throw new InvalidOperationException($"No BCL signature with a short r or s in {Attempts}.");
+            byte[] der = ToDer(ieee, Width);
+            ECParameters pub = bcl.ExportParameters(includePrivateParameters: false);
+            var vector = new WycheproofVector("nistP256", Convert.ToHexString(pub.Q.X!), Convert.ToHexString(pub.Q.Y!), "", "");
+            WithVectorKey(backend, vector, ec =>
+            {
+                Assert.True(ec.VerifyHash(hash, ieee), "The token refuses an r‖s signature with a short r or s.");
+                Assert.True(ec.VerifyHash(hash, der, DSASignatureFormat.Rfc3279DerSequence), "The token refuses a DER signature with a short r or s.");
+                byte[] tampered = [.. ieee];
+                tampered[^1] ^= 0x01;
+                Assert.False(ec.VerifyHash(hash, tampered));
+            });
+        }
+
+        // The token signs until r or s is short; every signature is full width and verifies under the BCL.
+        WithEcDsa(backend, "P-256", ec =>
+        {
+            using ECDsa verifier = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+            for (int i = 0; i < Attempts; i++)
+            {
+                byte[] signature = ec.SignHash(hash);
+                Assert.Equal(2 * Width, signature.Length);
+                Assert.True(verifier.VerifyHash(hash, signature), "The BCL refuses a signature the token made.");
+                if (HasAShortHalf(signature))
+                    return;
+            }
+            Assert.Fail($"No token signature with a short r or s in {Attempts}.");
+        });
+    }
+
+    // The DER SEQUENCE of two INTEGERs for an r‖s signature, each integer in its fewest bytes.
+    private static byte[] ToDer(byte[] ieee, int width)
+    {
+        var writer = new System.Formats.Asn1.AsnWriter(System.Formats.Asn1.AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteInteger(new System.Numerics.BigInteger(ieee.AsSpan(0, width), isUnsigned: true, isBigEndian: true));
+            writer.WriteInteger(new System.Numerics.BigInteger(ieee.AsSpan(width), isUnsigned: true, isBigEndian: true));
+        }
+        return writer.Encode();
+    }
+
     // An r‖s signature's length is checked against the order's, not KeySize's: the vector's signature, 2 * 29
     // bytes on secp224k1 and 2 * 21 on secp160r1, verifies through every IEEE P1363 entry point, and one
     // of twice the field's length, or one byte off, does not.

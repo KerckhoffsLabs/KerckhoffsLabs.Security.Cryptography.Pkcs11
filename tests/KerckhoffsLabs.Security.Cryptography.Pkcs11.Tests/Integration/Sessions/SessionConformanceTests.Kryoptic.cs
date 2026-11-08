@@ -58,6 +58,21 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCalls), MemberType = typeof(SessionConformanceTestCases))]
+    public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall)
+    {
+        if (!KryopticBackendFixture.PrivateObjectLoginCheckAvailable)
+            Assert.Skip("Kryoptic lets the SO, or nobody, make a private object.");
+        SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
+    }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void WrongPin_ThenTheRightOne_ResetsTheRetryCounter() => SessionConformanceTestCases.Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call)
     {
