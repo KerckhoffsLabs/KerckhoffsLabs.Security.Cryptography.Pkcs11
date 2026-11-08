@@ -412,6 +412,181 @@ internal static class SessionConformanceTestCases
         finally { user.Logout(); }
     }
 
+    /// <summary>Who makes the object, and by which call: "<c>SO|public; generate|derive|unwrap|copy</c>".</summary>
+    public static TheoryData<string> PrivateObjectCalls =>
+        [.. from who in (string[])["SO", "public"] from call in (string[])["generate", "derive", "unwrap", "copy"] select $"{who}; {call}"];
+
+    // "Only public objects can be created unless the normal user is logged in" (§5.7.1) holds for every call that
+    // makes an object, not C_CreateObject alone: with the SO logged in, or nobody, C_GenerateKey, C_DeriveKey,
+    // C_UnwrapKey and C_CopyObject make no object with CKA_PRIVATE = TRUE. PKCS#11 names CKR_USER_NOT_LOGGED_IN
+    // (§5.1.6); any refusal passes, and the code is in the message when the call succeeds instead. The same call
+    // making a public object then succeeds in that session, so the refusal is the rule at work and not the call
+    // failing for another reason; where it does not, the case skips. Every input is a public session object made in that session. After pkcs11-check's
+    // public-session and SO private-creation cases (https://github.com/mingulov/pkcs11-check,
+    // test_public_session_private_creation.py, 0.3.0).
+    internal static void Assert_WithoutTheUser_NoCallMakesAPrivateObject(IPkcs11Backend backend, string whoAndCall)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        string[] parts = whoAndCall.Split("; ");
+        bool asSo = parts[0] == "SO";
+        string call = parts[1];
+        switch (call)
+        {
+            case "generate": backend.RequireMechanism(CKM.CKM_AES_KEY_GEN); break;
+            case "derive": backend.RequireMechanism(CKM.CKM_HKDF_DERIVE); break;
+            case "unwrap":
+                backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
+                if (!AesKeyWraps.Any(backend.Supports))
+                    Assert.Skip($"Backend advertises none of {string.Join(", ", AesKeyWraps)}.");
+                break;
+        }
+        if (asSo && Slot(backend).GetTokenInfo().TokenFlags.SoPinToBeChanged)
+            Assert.Skip("The token's SO PIN is to be changed (CKF_SO_PIN_TO_BE_CHANGED), so an SO session answers CKR_PIN_EXPIRED.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"kl-private-{Guid.NewGuid():N}");
+        using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+        using var attrPublic = new ObjectAttribute(CKA.CKA_PRIVATE, false);
+        using var attrData = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+        using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrLen32 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrValue32 = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+
+        using var session = Slot(backend).OpenSessionCore();
+        var sid = (NativeCULong)session.SessionId;
+        if (asSo)
+            AssertRv(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO");
+        try
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // the inputs are readable session keys
+            // The call, making a private object, then a public one. Its inputs are public session objects; a module
+            // that makes no object at all without the user (FreeHSM) leaves nothing to compare, and the case skips.
+            Func<ObjectAttribute, ObjectHandle> make;
+            try
+            {
+                switch (call)
+                {
+                    case "generate":
+                        {
+                            var generate = new Mechanism(CKM.CKM_AES_KEY_GEN);
+                            make = privacy => session.GenerateKey(generate, [attrSecret, attrAes, attrLen32, attrSession, privacy, attrEncrypt, attrLabel]);
+                            break;
+                        }
+                    case "derive":
+                        {
+                            ObjectHandle baseKey = session.CreateObject([attrSecret, attrGeneric, attrSession, attrPublic, attrDerive, attrLabel, attrValue32]);
+                            var derive = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
+                            make = privacy => session.DeriveKey(derive, baseKey, [attrSecret, attrGeneric, attrLen32, attrSession, privacy, attrSign, attrLabel]);
+                            break;
+                        }
+                    case "unwrap":
+                        {
+                            ObjectHandle kek = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrSecret, attrAes, attrLen32, attrSession, attrPublic, attrWrap, attrUnwrap, attrLabel]);
+                            ObjectHandle target = session.CreateObject([attrSecret, attrAes, attrSession, attrPublic, attrExtractable, attrEncrypt, attrLabel, attrValue32]);
+                            var wrap = new Mechanism(AesKeyWraps.First(backend.Supports));
+                            byte[] wrapped = session.WrapKey(wrap, kek, target);
+                            make = privacy => session.UnwrapKey(wrap, kek, wrapped, [attrSecret, attrAes, attrSession, privacy, attrEncrypt, attrLabel]);
+                            break;
+                        }
+                    default: // copy
+                        {
+                            ObjectHandle original = session.CreateObject([attrData, attrSession, attrPublic, attrLabel]);
+                            make = privacy => session.CopyObject(original, [privacy, attrLabel]);
+                            break;
+                        }
+                }
+            }
+            catch (Pkcs11Exception setup)
+            {
+                Assert.Skip($"The module makes no public input for {call} in this session ({setup.ReturnValue}).");
+                return;
+            }
+
+            Exception? ex = Record.Exception(() => make(attrPrivate));
+            Assert.True(ex is Pkcs11Exception,
+                $"With {(asSo ? "the SO logged in" : "nobody logged in")}, {call} made a private object" +
+                (ex is null ? " (CKR_OK)." : $": it threw {ex.GetType().Name} instead of a refusal."));
+            try
+            {
+                make(attrPublic);
+            }
+            catch (Pkcs11Exception control)
+            {
+                Assert.Skip($"The module refuses {call} of a public object too ({control.ReturnValue}), so the refusal shows nothing.");
+            }
+        }
+        finally
+        {
+            if (asSo)
+                lowLevel.C_Logout(sid);
+        }
+    }
+
+    // The login belongs to the application, not to a session (PKCS#11 v3.2 §5.6): while one Pkcs11Session is logged
+    // in, a second OpenSessionWithPin to the token is refused with CKR_USER_ALREADY_LOGGED_IN, raised as
+    // Pkcs11AuthenticationException, and the refusal leaves the first session logged in. Once the first session is
+    // disposed, a new login succeeds. Getting started's "load and log in once" section rests on this.
+    internal static void Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        using (var pin = new SecurePin(backend.UserPin.Span))
+        using (Pkcs11Session first = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin))
+        {
+            using var again = new SecurePin(backend.UserPin.Span);
+            var refused = Assert.ThrowsAny<Pkcs11AuthenticationException>(
+                () => backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, again));
+            Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, refused.ReturnValue);
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, first.GetSessionInfo().State);
+        }
+
+        using var next = new SecurePin(backend.UserPin.Span);
+        using Pkcs11Session second = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, next);
+        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, second.GetSessionInfo().State);
+    }
+
+    // CKF_USER_PIN_COUNT_LOW means "an incorrect user login PIN has been entered at least once since the last
+    // successful authentication" (CK_TOKEN_INFO's flags): after a wrong PIN and then the right one, it is clear again,
+    // and the token is at neither its final try nor locked. Whether a module sets the flag after the wrong PIN is not
+    // required, so it is not checked. One wrong attempt, followed at once by a success, as in the case below. After
+    // pkcs11-check's user_success_resets_counter (https://github.com/mingulov/pkcs11-check, test_pin.py, 0.3.0).
+    internal static void Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(IPkcs11Backend backend)
+    {
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        byte[] wrong = [.. backend.UserPin.Span];
+        wrong[^1] ^= 0x01;
+        NativeCULong session = OpenRawSession(lowLevel, backend.SlotId);
+        try
+        {
+            AssertRv(CKR.CKR_PIN_INCORRECT, lowLevel.C_Login(session, CKU.CKU_USER, wrong), "C_Login with a wrong PIN");
+            Assert.False(Slot(backend).GetTokenInfo().TokenFlags.UserPinLocked, "One wrong PIN locked the user PIN.");
+            AssertRv(CKR.CKR_OK, lowLevel.C_Login(session, CKU.CKU_USER, backend.UserPin.Span), "C_Login with the right PIN");
+            AssertRv(CKR.CKR_OK, lowLevel.C_Logout(session), "C_Logout");
+        }
+        finally { lowLevel.C_CloseSession(session); }
+
+        TokenFlags flags = Slot(backend).GetTokenInfo().TokenFlags;
+        Assert.False(flags.UserPinCountLow, "CKF_USER_PIN_COUNT_LOW is still set after a successful login.");
+        Assert.False(flags.UserPinFinalTry, "CKF_USER_PIN_FINAL_TRY is set after a successful login.");
+        Assert.False(flags.UserPinLocked, "CKF_USER_PIN_LOCKED is set after a successful login.");
+    }
+
     // A wrong PIN is CKR_PIN_INCORRECT and logs nobody in; the right PIN right after it does. Tried once, and
     // followed at once by a successful login, so no token's retry counter is left lowered. The exception the
     // library raises for it does not carry the PIN.

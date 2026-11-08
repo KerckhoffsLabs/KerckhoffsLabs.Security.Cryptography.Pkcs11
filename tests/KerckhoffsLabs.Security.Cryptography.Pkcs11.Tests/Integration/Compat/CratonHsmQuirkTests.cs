@@ -5,6 +5,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
+using Xunit.Sdk;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 
 /// <summary>
@@ -101,5 +104,14 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
             "Craton HSM no longer refuses a session object in a read-only session with CKR_SESSION_READ_ONLY " +
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
             "CratonHsmBackendFixture.CratonHsmMakesSessionObjectsInReadOnlySessions to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void AllowedMechanismsCopy_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => ObjectConformanceTestCases.Assert_CopyObject_CannotMakeThatChange(_backend, "CKA_ALLOWED_MECHANISMS, wider"));
+        Assert.True(failure is XunitException and not SkipException,
+            "Craton HSM no longer lets a copy change CKA_ALLOWED_MECHANISMS: set " +
+            "CratonHsmBackendFixture.CratonHsmKeepsAllowedMechanismsOnACopy to true and delete this test.");
     }
 }

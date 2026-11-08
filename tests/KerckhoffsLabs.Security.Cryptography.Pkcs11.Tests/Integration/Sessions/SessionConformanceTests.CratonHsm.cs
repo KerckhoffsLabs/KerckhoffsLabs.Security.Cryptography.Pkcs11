@@ -55,6 +55,18 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.PrivateObjectLoginCheckAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM lets the SO make a private object")]
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCalls), MemberType = typeof(SessionConformanceTestCases))]
+    public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall)
+    {
+        if (!CratonHsmBackendFixture.PrivateObjectLoginCheckAvailable)
+            Assert.Skip("Craton HSM lets the SO, or nobody, make a private object.");
+        SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
+    }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
+
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.ReadOnlySessionObjectsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM refuses a session object in a read-only session")]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);

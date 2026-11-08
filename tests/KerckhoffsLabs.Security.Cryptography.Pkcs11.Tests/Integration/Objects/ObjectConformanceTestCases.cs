@@ -267,6 +267,96 @@ internal static class ObjectConformanceTestCases
         });
     }
 
+    /// <summary>The changes a copy may not make: "<c>CKA_ALLOWED_MECHANISMS, wider|narrower</c>", "<c>CKA_SENSITIVE to false</c>".</summary>
+    public static TheoryData<string> CopyChangesNotAllowed =>
+        ["CKA_ALLOWED_MECHANISMS, wider", "CKA_ALLOWED_MECHANISMS, narrower", "CKA_SENSITIVE to false"];
+
+    // A copy cannot loosen what a key may do. Only the attributes Table 13 footnote 8 marks may differ in a copy
+    // (§4.1.3, §5.7.2): CKA_ALLOWED_MECHANISMS has no such footnote, so it cannot change, wider or narrower; and
+    // CKA_SENSITIVE may be set but not cleared (footnote 11). The module refuses the template (any
+    // Pkcs11Exception), or makes a copy that kept the original's value. A module that refuses
+    // CKA_ALLOWED_MECHANISMS on the original skips those cases. After pkcs11-check's copy mutability table
+    // (https://github.com/mingulov/pkcs11-check, _copy_mutability.py, 0.3.0). The key's value is
+    // Assert_KeyComponent_IsReadOnly ("AES CKA_VALUE in a copy"); what a copy keeps, and a copy that would make the
+    // key extractable again, are Assert_CopyObject_KeepsTheProtection.
+    internal static void Assert_CopyObject_CannotMakeThatChange(IPkcs11Backend backend, string change)
+    {
+        byte[] value = RandomNumberGenerator.GetBytes(16);
+        CKM[] narrow = [CKM.CKM_AES_GCM];
+        CKM[] wide = [CKM.CKM_AES_GCM, CKM.CKM_AES_CBC_PAD];
+        bool sensitive = change == "CKA_SENSITIVE to false";
+        CKM[]? allowed = change switch
+        {
+            "CKA_ALLOWED_MECHANISMS, wider" => narrow,
+            "CKA_ALLOWED_MECHANISMS, narrower" => wide,
+            _ => null,
+        };
+        using ObjectAttribute changed = change switch
+        {
+            "CKA_ALLOWED_MECHANISMS, wider" => new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, wide),
+            "CKA_ALLOWED_MECHANISMS, narrower" => new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, narrow),
+            _ => new ObjectAttribute(CKA.CKA_SENSITIVE, false),
+        };
+
+        WithSession(backend, session =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // a key whose value can be read
+            using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
+            using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, sensitive);
+            using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+            List<ObjectAttribute> template = [attrClass, attrKeyType, attrToken, attrValue, attrEncrypt, attrSensitive, attrExtractable];
+            using var attrAllowed = new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, allowed ?? []);
+            if (allowed is not null)
+                template.Add(attrAllowed);
+
+            ObjectHandle original;
+            try
+            {
+                original = session.CreateObject(template);
+            }
+            catch (Pkcs11Exception ex) when (allowed is not null)
+            {
+                Assert.Skip($"The module refuses CKA_ALLOWED_MECHANISMS on a key ({ex.ReturnValue}).");
+                return;
+            }
+
+            ObjectHandle? copy = null;
+            try
+            {
+                try
+                {
+                    copy = session.CopyObject(original, [changed]);
+                }
+                catch (Pkcs11Exception)
+                {
+                    return; // refused, as the spec allows
+                }
+
+                using var read = session.GetAttributeValue(copy.Value, [CKA.CKA_VALUE, CKA.CKA_ALLOWED_MECHANISMS, CKA.CKA_SENSITIVE]);
+                if (allowed is null)
+                {
+                    Assert.True(read[2].GetValueAsBool(), "A copy made a sensitive key not sensitive.");
+                    Assert.True(read[0].CannotBeRead, "A copy of a sensitive key gives its value.");
+                }
+                else
+                {
+                    Assert.True(read[1].GetValueAsCkmArray().SequenceEqual(allowed),
+                        $"A copy changed CKA_ALLOWED_MECHANISMS to {string.Join(", ", read[1].GetValueAsCkmArray())}.");
+                }
+            }
+            finally
+            {
+                if (copy is { } made)
+                    session.DestroyObject(made);
+                session.DestroyObject(original);
+            }
+        });
+    }
+
     // === Provenance ============================================================
 
     // A module derives CKA_ALWAYS_SENSITIVE, CKA_NEVER_EXTRACTABLE and CKA_KEY_GEN_MECHANISM (§4.7): a key it

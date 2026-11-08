@@ -24,6 +24,10 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void CopyObject_KeepsTheProtection() => ObjectConformanceTestCases.Assert_CopyObject_KeepsTheProtection(_backend);
 
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.CopyChangesNotAllowed), MemberType = typeof(ObjectConformanceTestCases))]
+    public void CopyObject_CannotMakeThatChange(string change) => ObjectConformanceTestCases.Assert_CopyObject_CannotMakeThatChange(_backend, change);
+
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void ProvenanceAttributes_TellGeneratedFromImported()
     {

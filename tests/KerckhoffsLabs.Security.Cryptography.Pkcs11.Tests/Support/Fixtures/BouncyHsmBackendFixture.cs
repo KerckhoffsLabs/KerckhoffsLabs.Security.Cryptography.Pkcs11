@@ -203,6 +203,28 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool KeyMaterialFixedAvailable => BouncyHsmAvailable && BouncyHsmFixesKeyMaterial;
 
     /// <summary>
+    /// False while <c>C_DeriveKey</c> gives the derived key the template's <c>CKA_SENSITIVE</c> and
+    /// <c>CKA_EXTRACTABLE</c>, not the base key's, for <c>CKM_CONCATENATE_BASE_AND_DATA</c>,
+    /// <c>CKM_CONCATENATE_DATA_AND_BASE</c>, <c>CKM_XOR_BASE_AND_DATA</c> and <c>CKM_CONCATENATE_BASE_AND_KEY</c>: a
+    /// sensitive or unextractable key can be read through a key derived from it. PKCS#11 v3.2 §6.43. Reported upstream
+    /// as harrison314/BouncyHsm#141. BouncyHsmQuirkTests.BaseKeyProtection_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmKeepsABaseKeysProtection = false;
+
+    /// <summary>Gate for the byte-operation derivations: see <see cref="BouncyHsmKeepsABaseKeysProtection"/>.</summary>
+    public static bool BaseKeyProtectionAvailable => BouncyHsmAvailable && BouncyHsmKeepsABaseKeysProtection;
+
+    /// <summary>
+    /// False while <c>C_CopyObject</c> changes <c>CKA_ALLOWED_MECHANISMS</c>, wider or narrower, with <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §4.1.3: <c>CKA_ALLOWED_MECHANISMS</c> has no footnote 8, so a copy cannot change it. Not yet reported upstream.
+    /// BouncyHsmQuirkTests.AllowedMechanismsCopy_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmKeepsAllowedMechanismsOnACopy = false;
+
+    /// <summary>Gate for the copy cases that change <c>CKA_ALLOWED_MECHANISMS</c>: see <see cref="BouncyHsmKeepsAllowedMechanismsOnACopy"/>.</summary>
+    public static bool AllowedMechanismsCopyAvailable => BouncyHsmAvailable && BouncyHsmKeepsAllowedMechanismsOnACopy;
+
+    /// <summary>
     /// False while <c>C_CreateObject</c> with <c>CKA_TOKEN</c> given as <c>{NULL, 1}</c> (a NULL <c>pValue</c> with a
     /// length) crashes the process (SIGSEGV): the native client reads the CK_BBOOL without checking the pointer.
     /// PKCS#11 v3.2 §4.1.1 point 2 (<c>CKR_ATTRIBUTE_VALUE_INVALID</c>), or <c>CKR_ARGUMENTS_BAD</c>. Not yet

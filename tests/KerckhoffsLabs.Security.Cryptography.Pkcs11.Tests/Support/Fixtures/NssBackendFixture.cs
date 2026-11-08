@@ -143,6 +143,18 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for KDF cases that read the derived key's value back to compare against the BCL.</summary>
     public static bool ExtractableDeriveAvailable => NssAvailable && SupportsExtractableDerive;
 
+    /// <summary>
+    /// False while <c>CKM_CONCATENATE_BASE_AND_KEY</c> ignores the second key's <c>CKA_EXTRACTABLE</c>: with a second key
+    /// that is unextractable but not sensitive, the derived key is extractable and its value can be read. Bug 1871630
+    /// (NSS 3.97) made the derived key take the second key's <c>CKA_SENSITIVE</c>, not its <c>CKA_EXTRACTABLE</c>.
+    /// PKCS#11 v3.2 §6.43. Not yet reported upstream. NssQuirkTests.SecondKeyExtractable_QuirkStillPresent fails once it
+    /// is fixed.
+    /// </summary>
+    public static bool TakesTheSecondKeysExtractability => false;
+
+    /// <summary>Gate for the CONCATENATE_BASE_AND_KEY case with an unextractable second key: see <see cref="TakesTheSecondKeysExtractability"/>.</summary>
+    public static bool SecondKeyExtractabilityAvailable => NssAvailable && TakesTheSecondKeysExtractability;
+
     /// <summary>True when <see cref="CKM.CKM_RC2_ECB"/> accepts the spec's <c>CK_RC2_PARAMS</c> (a bare
     /// effective-bits value). NSS softoken routes RC2-ECB and RC2-CBC through one code path that
     /// size-checks both against <c>CK_RC2_CBC_PARAMS</c>, so it rejects the spec-correct ECB params the

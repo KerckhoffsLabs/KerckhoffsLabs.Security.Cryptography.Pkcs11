@@ -24,6 +24,15 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void CopyObject_KeepsTheProtection() => ObjectConformanceTestCases.Assert_CopyObject_KeepsTheProtection(_backend);
 
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.CopyChangesNotAllowed), MemberType = typeof(ObjectConformanceTestCases))]
+    public void CopyObject_CannotMakeThatChange(string change)
+    {
+        if (change.StartsWith("CKA_ALLOWED_MECHANISMS", StringComparison.Ordinal) && !BouncyHsmBackendFixture.AllowedMechanismsCopyAvailable)
+            Assert.Skip("BouncyHsm lets a copy change CKA_ALLOWED_MECHANISMS.");
+        ObjectConformanceTestCases.Assert_CopyObject_CannotMakeThatChange(_backend, change);
+    }
+
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ProvenanceAttributes_TellGeneratedFromImported()
     {

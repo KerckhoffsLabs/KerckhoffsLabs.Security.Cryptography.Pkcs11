@@ -83,6 +83,27 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     public static bool PrivateObjectLoginCheckAvailable => KryopticAvailable && KryopticRefusesPrivateObjectsWithoutALogin;
 
     /// <summary>
+    /// False while <c>CKM_CONCATENATE_BASE_AND_DATA</c>, <c>CKM_CONCATENATE_DATA_AND_BASE</c>, <c>CKM_XOR_BASE_AND_DATA</c>
+    /// and <c>CKM_EXTRACT_KEY_FROM_KEY</c> give the derived key the template's <c>CKA_SENSITIVE</c> and
+    /// <c>CKA_EXTRACTABLE</c>, not the base key's (<c>derive</c> in <c>src/native/simplekdf.rs</c>): a sensitive or
+    /// unextractable key can be read through a key derived from it. <c>CKM_CONCATENATE_BASE_AND_KEY</c> is right.
+    /// PKCS#11 v3.2 §6.43. Reported upstream as latchset/kryoptic#577 (the extraction confirmed here).
+    /// </summary>
+    public const bool KryopticKeepsABaseKeysProtection = false;
+
+    /// <summary>Gate for the byte-operation derivations other than <c>CKM_CONCATENATE_BASE_AND_KEY</c>: see <see cref="KryopticKeepsABaseKeysProtection"/>.</summary>
+    public static bool BaseKeyProtectionAvailable => KryopticAvailable && KryopticKeepsABaseKeysProtection;
+
+    /// <summary>
+    /// False while <c>C_CopyObject</c> changes <c>CKA_ALLOWED_MECHANISMS</c>, wider or narrower, with <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §4.1.3: <c>CKA_ALLOWED_MECHANISMS</c> has no footnote 8, so a copy cannot change it. Fixed upstream by latchset/kryoptic#552, which marks it unchangeable, after the pinned commit.
+    /// </summary>
+    public const bool KryopticKeepsAllowedMechanismsOnACopy = false;
+
+    /// <summary>Gate for the copy cases that change <c>CKA_ALLOWED_MECHANISMS</c>: see <see cref="KryopticKeepsAllowedMechanismsOnACopy"/>.</summary>
+    public static bool AllowedMechanismsCopyAvailable => KryopticAvailable && KryopticKeepsAllowedMechanismsOnACopy;
+
+    /// <summary>
     /// False while <c>C_EncryptInit</c> with the handle of a private token key after <c>C_Logout</c> answers
     /// <c>CKR_GENERAL_ERROR</c>, a code that says the token failed rather than that the key may not be used.
     /// PKCS#11 v3.2 §5.6.10 makes every handle to a private object invalid on <c>C_Logout</c>; §5.8.1 refuses it
