@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 using Xunit.Sdk;
 
@@ -24,7 +25,8 @@ internal static class ExampleRunner
         string? reason =
             missing.Length > 0 ? $"{which} does not advertise {string.Join(", ", missing)}"
             : example.NeedsUserLogin && !backend.RequiresUserLogin ? $"{which}'s token takes no user login"
-            : example.Unsupported?.Invoke(backend);
+            : example.Unsupported?.Invoke(backend)
+                ?? (example.LoadsModule ? ExampleGates.SecondModuleInstance(backend) : null);
 
         bool required = coverageRequired && example.MustRunOn.HasFlag(which);
         if (reason is not null)
@@ -36,13 +38,37 @@ internal static class ExampleRunner
 
         try
         {
-            example.Run(backend);
+            RunRetryingLogin(backend, example);
         }
         catch (SkipException skip) when (required)
         {
             // A skip from inside the example (a platform that lacks the BCL side, say) is still a skip on
             // a backend the example must run on: on the full CI leg it fails like any other.
             throw new XunitException($"Example {example.Name} must run on {which}, but it skipped: {skip.Message}");
+        }
+    }
+
+    // opencryptoki's soft token now and then fails a C_Login with CKR_GENERAL_ERROR under CI load, which
+    // OpenCryptokiBackendFixture.OpenSession retries for the fixture's own sessions. An example that loads
+    // the module logs in itself, so it gets the same retry here. Running it again is safe: each run uses a
+    // fresh label and destroys what it made. Any other failure, or a third failed login, propagates.
+    private static void RunRetryingLogin(IPkcs11Backend backend, ExampleCase example)
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                example.Run(backend);
+                return;
+            }
+            catch (Pkcs11Exception ex) when (backend is OpenCryptokiBackendFixture
+                && ex.ReturnValue == CKR.CKR_GENERAL_ERROR
+                && ex.Method.StartsWith("C_Login", StringComparison.Ordinal)
+                && attempt < maxAttempts)
+            {
+                Thread.Sleep(TimeSpan.FromMilliseconds(200 * attempt));
+            }
         }
     }
 }

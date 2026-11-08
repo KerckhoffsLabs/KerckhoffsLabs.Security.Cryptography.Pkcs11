@@ -52,7 +52,16 @@ public static class CertificateExamples
 
         // 4. Store it on the token next to its key, as a token object (persistOnToken), under the label
         //    SignWithCertificateKey below opens it by.
-        using (session.ImportCertificate(certificate, label, id, persistOnToken: true)) { }
+        //    The certificate is returned, so it is not in a using: dispose it here if storing it fails.
+        try
+        {
+            using (session.ImportCertificate(certificate, label, id, persistOnToken: true)) { }
+        }
+        catch
+        {
+            certificate.Dispose();
+            throw;
+        }
         // 5. The using declarations dispose the adapter, the key handle, the session and the library;
         //    the key pair and the certificate stay on the token.
         #endregion

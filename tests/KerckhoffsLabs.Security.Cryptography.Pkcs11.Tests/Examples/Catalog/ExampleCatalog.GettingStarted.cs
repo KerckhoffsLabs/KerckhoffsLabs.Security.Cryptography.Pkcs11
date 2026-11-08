@@ -24,7 +24,7 @@ internal static partial class ExampleCatalog
             ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             AssertEncryptAndDecryptWithTokenKey,
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
     ];
 
     private static void AssertReadPinFromEnvironment(IPkcs11Backend backend)

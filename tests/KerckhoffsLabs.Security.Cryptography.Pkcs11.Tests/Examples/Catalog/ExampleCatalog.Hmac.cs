@@ -24,7 +24,7 @@ internal static partial class ExampleCatalog
                 Assert.Equal(tag, HmacExamples.HmacSha256(b.LibraryPath, b.TokenLabel, pin, label, Message));
             }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(HmacExamples), nameof(HmacExamples.HmacSha256)), [typeof(HMACPkcs11)], [CKM.CKM_SHA256_HMAC],
             ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b =>
@@ -45,8 +45,8 @@ internal static partial class ExampleCatalog
                     });
             },
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(HmacExamples), nameof(HmacExamples.BclHmacSha256)), [], [], ExampleBackend.SoftHsm2,
+            LoadsModule: true),
+        new(Name(nameof(HmacExamples), nameof(HmacExamples.BclHmacSha256)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 byte[] raw = RandomNumberGenerator.GetBytes(32);

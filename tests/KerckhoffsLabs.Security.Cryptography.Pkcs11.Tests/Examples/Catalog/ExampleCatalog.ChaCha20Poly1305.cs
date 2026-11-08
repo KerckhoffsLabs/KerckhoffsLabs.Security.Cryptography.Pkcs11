@@ -15,15 +15,15 @@ internal static partial class ExampleCatalog
             [CKM.CKM_CHACHA20_KEY_GEN, CKM.CKM_CHACHA20_POLY1305], ExampleBackend.Kryoptic,
             b => GenerateAndUseChaCha20Key(b, checkAttributes: true),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(ChaCha20Poly1305Examples), nameof(ChaCha20Poly1305Examples.ChaCha20Poly1305EncryptDecrypt)),
             [typeof(ChaCha20Poly1305Pkcs11)], [CKM.CKM_CHACHA20_KEY_GEN, CKM.CKM_CHACHA20_POLY1305], ExampleBackend.Kryoptic,
             // The generation example provisions the key; this one opens it by label.
             b => GenerateAndUseChaCha20Key(b, checkAttributes: false),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(ChaCha20Poly1305Examples), nameof(ChaCha20Poly1305Examples.BclChaCha20Poly1305EncryptDecrypt)), [], [],
-            ExampleBackend.SoftHsm2,
+            ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 if (!ChaCha20Poly1305.IsSupported) Assert.Skip("ChaCha20-Poly1305 is not supported on this platform.");

@@ -26,8 +26,8 @@ internal static partial class ExampleCatalog
             NeedsUserLogin: true,
             Unsupported: b => b is SoftHsmBackendFixture
                 ? "SoftHSM advertises single DES, but its OpenSSL needs the legacy provider to run it"
-                : ExampleGates.SecondModuleInstance(b)),
-        new(Name(nameof(DesExamples), nameof(DesExamples.BclDesDecryptLegacyRecord)), [], [], ExampleBackend.Nss,
+                : null, LoadsModule: true),
+        new(Name(nameof(DesExamples), nameof(DesExamples.BclDesDecryptLegacyRecord)), [], [], ExampleBackend.Nss | ExampleBackend.Kryoptic,
             _ => AssertBclLegacyCbc(8, DES.Create, DesExamples.BclDesDecryptLegacyRecord)),
     ];
 #pragma warning restore KLPKCS11003

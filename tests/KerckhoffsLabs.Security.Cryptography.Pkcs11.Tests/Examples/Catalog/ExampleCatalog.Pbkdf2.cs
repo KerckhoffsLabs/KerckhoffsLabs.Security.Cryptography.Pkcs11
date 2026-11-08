@@ -24,8 +24,8 @@ internal static partial class ExampleCatalog
                 AssertFixtureLibraryStillWorks(b);
             },
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
-        new(Name(nameof(Pbkdf2Examples), nameof(Pbkdf2Examples.BclPbkdf2)), [], [], ExampleBackend.SoftHsm2,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
+        new(Name(nameof(Pbkdf2Examples), nameof(Pbkdf2Examples.BclPbkdf2)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(
                 Rfc2898DeriveBytes.Pbkdf2("pw"u8, new byte[16], 600_000, HashAlgorithmName.SHA256, 32),
                 Pbkdf2Examples.BclPbkdf2("pw"u8.ToArray(), new byte[16]))),

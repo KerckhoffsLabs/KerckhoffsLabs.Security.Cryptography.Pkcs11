@@ -21,8 +21,8 @@ internal static partial class ExampleCatalog
                 },
                 key => new TripleDESPkcs11(key)),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(TripleDesExamples), nameof(TripleDesExamples.BclTripleDesDecryptLegacyArchive)), [], [], ExampleBackend.SoftHsm2,
+            LoadsModule: true),
+        new(Name(nameof(TripleDesExamples), nameof(TripleDesExamples.BclTripleDesDecryptLegacyArchive)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => AssertBclLegacyCbc(24, TripleDES.Create, TripleDesExamples.BclTripleDesDecryptLegacyArchive)),
     ];
 #pragma warning restore KLPKCS11004

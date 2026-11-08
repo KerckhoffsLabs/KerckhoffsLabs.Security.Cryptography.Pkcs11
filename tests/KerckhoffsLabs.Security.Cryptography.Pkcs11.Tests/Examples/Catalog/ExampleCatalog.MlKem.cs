@@ -14,12 +14,12 @@ internal static partial class ExampleCatalog
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.GenerateMlKemKey)), [],
             [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
             b => AssertMlKemReceiveAesKey(b, checkAttributes: true), NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b) ?? ExampleGates.SecondModuleInstance(b)),
+            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b), LoadsModule: true),
         new(Name(nameof(MlKemExamples), nameof(MlKemExamples.MlKemReceiveAesKey)), [typeof(MLKemPkcs11)],
             [CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_KEM, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
             b => AssertMlKemReceiveAesKey(b, checkAttributes: false), NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b) ?? ExampleGates.SecondModuleInstance(b)),
-        new(Name(nameof(MlKemExamples), nameof(MlKemExamples.BclMlKemReceive)), [], [], ExampleBackend.SoftHsm2,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.DecapsulationNeedsValueLen(b), LoadsModule: true),
+        new(Name(nameof(MlKemExamples), nameof(MlKemExamples.BclMlKemReceive)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 if (!MLKem.IsSupported) Assert.Skip("ML-KEM is not supported by this platform's BCL.");

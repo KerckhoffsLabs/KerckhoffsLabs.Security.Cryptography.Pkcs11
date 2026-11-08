@@ -37,9 +37,6 @@ public static class EcdhExamples
 
     public static byte[] AgreeAesKeyWithBclPeer(string modulePath, string tokenLabel, SecurePin pin, string keyLabel, byte[] message)
     {
-        byte[] salt = RandomNumberGenerator.GetBytes(32);      // sent along with the public keys
-        byte[] info = "example.com/v1 session key"u8.ToArray(); // binds the key to its purpose
-
         #region AgreeAesKeyWithBclPeer
         // 1. Load the module and log in. The module path and token label come from configuration; the
         //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
@@ -53,6 +50,10 @@ public static class EcdhExamples
         using var ourEcdh = new ECDiffieHellmanPkcs11(ours);
         using ECDiffieHellman peer = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
         byte[] peerPublicKey = peer.PublicKey.ExportSubjectPublicKeyInfo();
+        //    They also agree on HKDF's inputs: a random salt, sent along with the public keys, and an info
+        //    string that binds the key to its purpose.
+        byte[] salt = RandomNumberGenerator.GetBytes(32);
+        byte[] info = "example.com/v1 session key"u8.ToArray();
 
         // 3. On the token: the shared secret Z stays a token object (it can only feed a KDF), and HKDF
         //    turns it into an AES-256 key that never leaves the token either. Both are session objects,
@@ -79,6 +80,7 @@ public static class EcdhExamples
         using var peerAesGcm = new AesGcm(peerKey, tagSizeInBytes: 16);
         byte[] received = new byte[ciphertext.Length];
         peerAesGcm.Decrypt(nonce, ciphertext, tag, received);
+        CryptographicOperations.ZeroMemory(peerKey); // the peer's copy is bytes in its process: zero it after use
         // 6. The using declarations dispose the adapters, the derived keys, the key-pair handle (the pair
         //    stays on the token), the session and the library, in reverse order.
         #endregion
@@ -87,11 +89,11 @@ public static class EcdhExamples
 
     public static (byte[] OurKey, byte[] PeerKey) BclAgreeAesKey()
     {
-        byte[] salt = RandomNumberGenerator.GetBytes(32);      // sent along with the public keys
-        byte[] info = "example.com/v1 session key"u8.ToArray(); // binds the key to its purpose
-
         #region BclAgreeAesKey
-        // Both sides in software. The two exchange public keys.
+        // Both sides in software. The two exchange public keys, and agree on HKDF's inputs: a random salt,
+        // sent along with the public keys, and an info string that binds the key to its purpose.
+        byte[] salt = RandomNumberGenerator.GetBytes(32);
+        byte[] info = "example.com/v1 session key"u8.ToArray();
         using ECDiffieHellman ours = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
         using ECDiffieHellman peer = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
 

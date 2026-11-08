@@ -34,6 +34,9 @@ internal enum ExampleBackend
 /// <param name="Unsupported">Why this backend cannot run the example although it advertises the
 /// mechanisms (a known capability gap of that module or version), or <see langword="null"/> when it can.
 /// Judged by the same skip-or-fail rule as <paramref name="Requires"/>.</param>
+/// <param name="LoadsModule">The example loads the module itself (<c>Pkcs11Library.Load</c>), a second
+/// instance next to the fixture's, so <see cref="ExampleRunner"/> applies
+/// <see cref="ExampleGates.SecondModuleInstance"/> to it.</param>
 internal sealed record ExampleCase(
     string Name,
     Type[] Covers,
@@ -41,7 +44,8 @@ internal sealed record ExampleCase(
     ExampleBackend MustRunOn,
     Action<IPkcs11Backend> Run,
     bool NeedsUserLogin = false,
-    Func<IPkcs11Backend, string?>? Unsupported = null);
+    Func<IPkcs11Backend, string?>? Unsupported = null,
+    bool LoadsModule = false);
 
 /// <summary>Known capability gaps the catalogue's <see cref="ExampleCase.Unsupported"/> gates reuse.</summary>
 internal static class ExampleGates
@@ -246,6 +250,32 @@ internal static partial class ExampleCatalog
         if (keyClass is CKO.CKO_PUBLIC_KEY) return;
         Assert.True(IsTrue(CKA.CKA_SENSITIVE), $"The {keyClass} is not sensitive.");
         Assert.False(IsTrue(CKA.CKA_EXTRACTABLE), $"The {keyClass} is extractable.");
+    }
+
+    // A signature scheme's two examples in turn: the generation example provisions the key pair under a fresh
+    // label (checkAttributes: and the test checks each half), then the signing example opens it by that label
+    // and signs Message. Returns the signature, the public key the signing example exported, and the one the
+    // generation example exported.
+    private static (byte[] Signature, byte[] PublicKey, byte[] GeneratedPublicKey) GenerateAndSignWithPair(
+        IPkcs11Backend backend,
+        Func<string, string, SecurePin, string, byte[]> generate,
+        Func<string, string, SecurePin, string, byte[], (byte[] Signature, byte[] PublicKey)> sign,
+        bool checkAttributes)
+    {
+        (byte[], byte[], byte[]) result = default;
+        WithGeneratedKey(backend, label =>
+        {
+            using SecurePin pin = UserPin(backend);
+            byte[] generated = generate(backend.LibraryPath, backend.TokenLabel, pin, label);
+            if (checkAttributes)
+            {
+                AssertGeneratedKey(backend, label, CKO.CKO_PRIVATE_KEY, CKA.CKA_SIGN);
+                AssertGeneratedKey(backend, label, CKO.CKO_PUBLIC_KEY, CKA.CKA_VERIFY);
+            }
+            (byte[] signature, byte[] publicKey) = sign(backend.LibraryPath, backend.TokenLabel, pin, label, Message);
+            result = (signature, publicKey, generated);
+        });
+        return result;
     }
 
     // After an example that loaded and disposed its own instance of the module: the fixture's still works.

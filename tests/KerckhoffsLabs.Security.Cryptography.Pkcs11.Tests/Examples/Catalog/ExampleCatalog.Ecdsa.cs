@@ -25,7 +25,7 @@ internal static partial class ExampleCatalog
                 Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
             }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.SignP256)), [typeof(ECDsaPkcs11)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithProvisionedKey(b,
@@ -38,15 +38,15 @@ internal static partial class ExampleCatalog
                     Assert.False(EcdsaExamples.VerifyWithBcl([.. Message, 0], signature, publicKey));
                 }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.BclSignP256)), [], [], ExampleBackend.SoftHsm2,
+            LoadsModule: true),
+        new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.BclSignP256)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 (byte[] signature, ECParameters publicKey) = EcdsaExamples.BclSignP256(Message);
                 Assert.True(EcdsaExamples.VerifyWithBcl(Message, signature, publicKey));
                 Assert.False(EcdsaExamples.VerifyWithBcl([.. Message, 0], signature, publicKey));
             }),
-        new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.VerifyWithBcl)), [], [], ExampleBackend.SoftHsm2,
+        new(Name(nameof(EcdsaExamples), nameof(EcdsaExamples.VerifyWithBcl)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 using ECDsa bcl = ECDsa.Create(ECCurve.NamedCurves.nistP256);

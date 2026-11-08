@@ -13,21 +13,21 @@ internal static partial class ExampleCatalog
     private static ExampleCase[] Rc2Cases() =>
     [
         new(Name(nameof(Rc2Examples), nameof(Rc2Examples.Rc2DecryptLegacyRecord)), [typeof(RC2Pkcs11)], [CKM.CKM_RC2_CBC_PAD],
-            // NSS is the only CI backend that runs RC2. It loads with module parameters and its crypto token
-            // takes no login, so the example takes both as optional, and the test passes them NSS's way.
+            // NSS is the only CI backend that runs RC2. It loads with module parameters, and its crypto token
+            // takes no login: the example is written for that token.
             ExampleBackend.Nss,
             b => AssertLegacyCbc(b, CKK.CKK_RC2, 16, 8, RC2.Create,
                 (label, iv, ciphertext) =>
                 {
-                    using SecurePin? pin = b.RequiresUserLogin ? UserPin(b) : null;
                     Pkcs11LibraryOptions? options = b is NssBackendFixture
                         ? new Pkcs11LibraryOptions { ModuleParameters = Settings.NssModuleParameters }
                         : null;
-                    return Rc2Examples.Rc2DecryptLegacyRecord(b.LibraryPath, b.TokenLabel, pin, label, iv, ciphertext, options);
+                    return Rc2Examples.Rc2DecryptLegacyRecord(b.LibraryPath, b.TokenLabel, label, iv, ciphertext, options);
                 },
                 key => new RC2Pkcs11(key)),
-            Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(Rc2Examples), nameof(Rc2Examples.BclRc2DecryptLegacyRecord)), [], [], ExampleBackend.Nss,
+            Unsupported: b => b.RequiresUserLogin ? "the example is written for a token that takes no login" : null,
+            LoadsModule: true),
+        new(Name(nameof(Rc2Examples), nameof(Rc2Examples.BclRc2DecryptLegacyRecord)), [], [], ExampleBackend.Nss | ExampleBackend.Kryoptic,
             _ => AssertBclLegacyCbc(16, RC2.Create, Rc2Examples.BclRc2DecryptLegacyRecord)),
     ];
 #pragma warning restore KLPKCS11005

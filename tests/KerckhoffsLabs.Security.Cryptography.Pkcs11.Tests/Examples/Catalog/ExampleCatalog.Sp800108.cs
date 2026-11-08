@@ -34,7 +34,7 @@ internal static partial class ExampleCatalog
                 });
             }),
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
         new(Name(nameof(Sp800108Examples), nameof(Sp800108Examples.Sp800108DeriveAesKey)), [typeof(SP800108HmacCounterKdfPkcs11)],
             [CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SHA256_HMAC, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
             b =>
@@ -50,8 +50,8 @@ internal static partial class ExampleCatalog
                     });
             },
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
-        new(Name(nameof(Sp800108Examples), nameof(Sp800108Examples.BclSp800108)), [], [], ExampleBackend.SoftHsm2,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
+        new(Name(nameof(Sp800108Examples), nameof(Sp800108Examples.BclSp800108)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(32, Sp800108Examples.BclSp800108(new byte[32], [1], [2]).Length)),
     ];
 }

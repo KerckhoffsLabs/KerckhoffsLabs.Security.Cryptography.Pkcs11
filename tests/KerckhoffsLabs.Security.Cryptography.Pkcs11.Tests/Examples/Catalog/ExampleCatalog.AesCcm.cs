@@ -20,7 +20,7 @@ internal static partial class ExampleCatalog
                 Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
             }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.AesCcmEncryptDecrypt)), [typeof(AesCcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CCM], ExampleBackend.Kryoptic,
             b => WithProvisionedKey(b,
@@ -31,8 +31,8 @@ internal static partial class ExampleCatalog
                     Assert.Equal(Message, AesCcmExamples.AesCcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
                 }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.BclAesCcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
+            LoadsModule: true),
+        new(Name(nameof(AesCcmExamples), nameof(AesCcmExamples.BclAesCcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 if (!AesCcm.IsSupported) Assert.Skip("AES-CCM is not supported on this platform.");

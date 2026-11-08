@@ -3,7 +3,6 @@ using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Examples;
@@ -27,7 +26,7 @@ internal static partial class ExampleCatalog
                 Assert.NotNull(privateKey);
             }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.SignWithCertificateKey)), [typeof(Pkcs11CertificateExtensions)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             // The issuing example provisions the certificate and its key on the token; this one opens them.
@@ -42,7 +41,7 @@ internal static partial class ExampleCatalog
                     Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
             }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.IssueRsaPssCertificate)), [typeof(RSAPkcs11)],
             [CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithSession(b, s =>
@@ -70,7 +69,7 @@ internal static partial class ExampleCatalog
                 Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(stored.Certificate));
             })),
         new(Name(nameof(CertificateExamples), nameof(CertificateExamples.IssueSlhDsaCertificate)), [typeof(SlhDsaPkcs11)],
-            [CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA], ExampleBackend.BouncyHsm,
+            [CKM.CKM_SLH_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA], ExampleBackend.BouncyHsm | ExampleBackend.Kryoptic,
             b => WithSession(b, s =>
             {
                 if (!b.SupportsSlhDsa) Assert.Skip("The backend cannot operate SLH-DSA.");
@@ -83,7 +82,7 @@ internal static partial class ExampleCatalog
                 Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(stored.Certificate));
             })),
 #pragma warning restore SYSLIB5006
-        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.BclIssueSelfSignedCertificate)), [], [], ExampleBackend.SoftHsm2,
+        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.BclIssueSelfSignedCertificate)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 using X509Certificate2 certificate = CertificateExamples.BclIssueSelfSignedCertificate();
@@ -91,7 +90,7 @@ internal static partial class ExampleCatalog
                 Assert.True(certificate.HasPrivateKey);
                 Assert.True(CertificateExamples.VerifySelfSignatureWithBcl(certificate));
             }),
-        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.BclSignWithCertificateKey)), [], [], ExampleBackend.SoftHsm2,
+        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.BclSignWithCertificateKey)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 using X509Certificate2 certificate = CertificateExamples.BclIssueSelfSignedCertificate();
@@ -99,7 +98,7 @@ internal static partial class ExampleCatalog
                 using ECDsa verifier = certificate.GetECDsaPublicKey()!;
                 Assert.True(verifier.VerifyData(Message, signature, HashAlgorithmName.SHA256));
             }),
-        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.VerifySelfSignatureWithBcl)), [], [], ExampleBackend.SoftHsm2,
+        new(Name(nameof(CertificateExamples), nameof(CertificateExamples.VerifySelfSignatureWithBcl)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 using RSA rsa = RSA.Create(3072);
@@ -124,7 +123,7 @@ internal static partial class ExampleCatalog
     ];
 
     // Runs the issuing example, which stores the certificate and its key pair on the token as token objects,
-    // checks the certificate it returns, runs body with the label, then destroys the three objects.
+    // checks the certificate it returns, runs body with the label, then destroys every object with the label.
     private static void WithIssuedCertificate(IPkcs11Backend backend, Action<string> body)
     {
         string label = NewLabel();
@@ -141,18 +140,10 @@ internal static partial class ExampleCatalog
         }
         finally
         {
+            // By label, not by the certificate: the key pair carries the label too, and stays on the token
+            // if issuing or storing the certificate fails after the pair was generated.
             using Pkcs11Session session = backend.OpenSession();
-            if (session.TryOpenCertificate(label, out Pkcs11Certificate? stored))
-            {
-                using (stored)
-                {
-                    // The key pair and the certificate share the id; FindObjects, unlike FindKeys, takes any class.
-                    using ObjectTemplate byId = ObjectTemplate.Empty().Id(stored.Id).Build();
-                    using ReadOnlyDisposableList<Pkcs11Object> objects = session.FindObjects(byId);
-                    foreach (Pkcs11Object found in objects)
-                        found.Destroy();
-                }
-            }
+            DestroyObjectsLabelled(session, label);
         }
         AssertFixtureLibraryStillWorks(backend);
     }

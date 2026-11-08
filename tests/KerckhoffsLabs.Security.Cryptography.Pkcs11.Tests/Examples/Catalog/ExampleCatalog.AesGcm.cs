@@ -19,7 +19,7 @@ internal static partial class ExampleCatalog
                 Assert.Equal(Message, AesGcmExamples.AesGcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
             }),
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
         new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.AesGcmEncryptDecrypt)), [typeof(AesGcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithProvisionedKey(b,
@@ -30,8 +30,8 @@ internal static partial class ExampleCatalog
                     Assert.Equal(Message, AesGcmExamples.AesGcmEncryptDecrypt(b.LibraryPath, b.TokenLabel, pin, label, Message, Header));
                 }),
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
-        new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.BclAesGcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
+        new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.BclAesGcmEncryptDecrypt)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(Message, AesGcmExamples.BclAesGcmEncryptDecrypt(Message, Header))),
         new(Name(nameof(AesGcmExamples), nameof(AesGcmExamples.AesGcmDetectsTampering)), [typeof(AesGcmPkcs11)],
             [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_GCM], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,

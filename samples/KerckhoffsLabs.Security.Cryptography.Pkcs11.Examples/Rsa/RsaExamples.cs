@@ -80,15 +80,30 @@ public static class RsaExamples
         return (signature, publicKey);
     }
 
-    public static (byte[] Signature, RSAParameters PublicKey) SignPkcs1v15(Pkcs11Key key, byte[] data)
+    public static (byte[] Signature, RSAParameters PublicKey) SignPkcs1v15(
+        string modulePath, string tokenLabel, SecurePin pin, string keyLabel, byte[] data)
     {
         #region SignPkcs1v15
-        // RSASSA-PKCS1-v1_5 with SHA-256, for JWT RS256, X.509 and other formats that require it. The
-        // signing key is opened as in the RSA-PSS example above; only the padding changes.
+        // RSASSA-PKCS1-v1_5 with SHA-256, for JWT RS256, X.509 and other formats that require it. The flow
+        // is the RSA-PSS one above; only the padding changes.
+
+        // 1. Load the module and log in. The module path and token label come from configuration; the
+        //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+
+        // 2. Open the signing key pair that is already on the token (generated as above), by its
+        //    CKA_LABEL; OpenKey(id) finds it by CKA_ID instead.
+        using Pkcs11Key key = session.OpenKey(keyLabel);
         using var rsa = new RSAPkcs11(key);
+
+        // 3. Sign on the token, and export the public key for verifiers.
         byte[] signature = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        RSAParameters publicKey = rsa.ExportParameters(includePrivateParameters: false);
+        // 4. The using declarations dispose the adapter, the key handle (the key itself stays on the
+        //    token), the session and the library, in reverse order.
         #endregion
-        return (signature, rsa.ExportParameters(includePrivateParameters: false));
+        return (signature, publicKey);
     }
 
     public static byte[] GenerateRsaKeyTransportKey(string modulePath, string tokenLabel, SecurePin pin, string keyLabel)

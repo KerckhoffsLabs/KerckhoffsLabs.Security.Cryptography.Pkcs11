@@ -13,7 +13,7 @@ internal static partial class ExampleCatalog
     private static ExampleCase[] AesModeCases() =>
     [
         new(Name(nameof(AesModeExamples), nameof(AesModeExamples.GenerateArchiveKey)), [],
-            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2,
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             b => WithGeneratedKey(b, label =>
             {
                 using SecurePin pin = UserPin(b);
@@ -22,11 +22,11 @@ internal static partial class ExampleCatalog
                 Assert.Equal(Message, AesModeExamples.CbcPadUnderReviewedPolicy(b.LibraryPath, b.TokenLabel, pin, label, Message));
             }),
             NeedsUserLogin: true,
-            Unsupported: ExampleGates.SecondModuleInstance),
+            LoadsModule: true),
         new(Name(nameof(AesModeExamples), nameof(AesModeExamples.CbcPadUnderReviewedPolicy)), [typeof(AesPkcs11)],
-            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2,
-            AssertCbcPadUnderReviewedPolicy, NeedsUserLogin: true, Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(AesModeExamples), nameof(AesModeExamples.BclCbcPad)), [], [], ExampleBackend.SoftHsm2,
+            [CKM.CKM_AES_KEY_GEN, CKM.CKM_AES_CBC_PAD], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
+            AssertCbcPadUnderReviewedPolicy, NeedsUserLogin: true, LoadsModule: true),
+        new(Name(nameof(AesModeExamples), nameof(AesModeExamples.BclCbcPad)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(Message, AesModeExamples.BclCbcPad(Message))),
     ];
 

@@ -16,7 +16,7 @@ internal static partial class ExampleCatalog
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_HKDF_DERIVE, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
             b => GenerateAndUseEcdhKey(b, checkAttributes: true),
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
         new(Name(nameof(EcdhExamples), nameof(EcdhExamples.AgreeAesKeyWithBclPeer)), [typeof(ECDiffieHellmanPkcs11)],
             [CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE, CKM.CKM_HKDF_DERIVE, CKM.CKM_AES_GCM],
             ExampleBackend.Kryoptic,
@@ -36,8 +36,8 @@ internal static partial class ExampleCatalog
                 Assert.Throws<CryptoPolicyViolationException>(() => ecdh.DeriveKeyFromHash(other.PublicKey, HashAlgorithmName.SHA256));
             },
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
-        new(Name(nameof(EcdhExamples), nameof(EcdhExamples.BclAgreeAesKey)), [], [], ExampleBackend.SoftHsm2,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
+        new(Name(nameof(EcdhExamples), nameof(EcdhExamples.BclAgreeAesKey)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 (byte[] ourKey, byte[] peerKey) = EcdhExamples.BclAgreeAesKey();

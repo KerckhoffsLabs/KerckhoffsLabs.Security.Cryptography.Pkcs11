@@ -32,7 +32,7 @@ internal static partial class ExampleCatalog
                 });
             }),
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
         new(Name(nameof(HkdfExamples), nameof(HkdfExamples.HkdfDeriveAesKey)), [typeof(HkdfPkcs11)],
             [CKM.CKM_HKDF_DERIVE, CKM.CKM_AES_GCM], ExampleBackend.Kryoptic,
             b =>
@@ -47,8 +47,8 @@ internal static partial class ExampleCatalog
                     });
             },
             NeedsUserLogin: true,
-            Unsupported: b => ExampleGates.ClassicAesGcm(b) ?? ExampleGates.SecondModuleInstance(b)),
-        new(Name(nameof(HkdfExamples), nameof(HkdfExamples.BclHkdf)), [], [], ExampleBackend.SoftHsm2,
+            Unsupported: b => ExampleGates.ClassicAesGcm(b), LoadsModule: true),
+        new(Name(nameof(HkdfExamples), nameof(HkdfExamples.BclHkdf)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ => Assert.Equal(32, HkdfExamples.BclHkdf(new byte[32], new byte[16], []).Length)),
     ];
 }

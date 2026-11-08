@@ -16,8 +16,8 @@ internal static partial class ExampleCatalog
                 Assert.Equal(Sha2Examples.BclSha2(Message), Sha2Examples.Sha2OnToken(b.LibraryPath, b.TokenLabel, Message));
                 AssertFixtureLibraryStillWorks(b);
             },
-            Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(Sha2Examples), nameof(Sha2Examples.BclSha2)), [], [], ExampleBackend.SoftHsm2,
+            LoadsModule: true),
+        new(Name(nameof(Sha2Examples), nameof(Sha2Examples.BclSha2)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 byte[][] digests = Sha2Examples.BclSha2("abc"u8.ToArray());

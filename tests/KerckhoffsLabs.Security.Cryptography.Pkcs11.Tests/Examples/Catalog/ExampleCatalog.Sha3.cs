@@ -19,8 +19,8 @@ internal static partial class ExampleCatalog
                 if (!SHA3_256.IsSupported) Assert.Skip("SHA-3 is not supported by this platform's BCL; the token side ran.");
                 Assert.Equal(Sha3Examples.BclSha3(Message), onToken);
             },
-            Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(Sha3Examples), nameof(Sha3Examples.BclSha3)), [], [], ExampleBackend.SoftHsm2,
+            LoadsModule: true),
+        new(Name(nameof(Sha3Examples), nameof(Sha3Examples.BclSha3)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 if (Sha3Examples.BclSha3("abc"u8.ToArray()) is not { } digests)

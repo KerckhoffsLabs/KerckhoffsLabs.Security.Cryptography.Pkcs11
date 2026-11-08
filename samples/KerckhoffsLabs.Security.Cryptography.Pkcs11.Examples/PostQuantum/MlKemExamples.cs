@@ -72,6 +72,7 @@ public static class MlKemExamples
         byte[] ciphertext = new byte[message.Length], tag = new byte[16];
         using (var senderAesGcm = new AesGcm(senderSecret, tagSizeInBytes: 16))
             senderAesGcm.Encrypt(nonce, message, ciphertext, tag);
+        CryptographicOperations.ZeroMemory(senderSecret); // the sender's secret is bytes in its process
 
         // 4. The receiver decapsulates on the token, straight into an AES-256 key (a session object): the
         //    shared secret never leaves the token. Then it decrypts the message with that key.

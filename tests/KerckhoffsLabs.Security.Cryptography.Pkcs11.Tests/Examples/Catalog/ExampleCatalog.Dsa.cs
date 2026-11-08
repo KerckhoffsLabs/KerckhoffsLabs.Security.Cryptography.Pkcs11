@@ -16,8 +16,8 @@ internal static partial class ExampleCatalog
     [
         new(Name(nameof(DsaExamples), nameof(DsaExamples.DsaVerifyLegacySignature)), [typeof(DSAPkcs11)],
             [CKM.CKM_DSA_KEY_PAIR_GEN, CKM.CKM_DSA_SHA256], ExampleBackend.SoftHsm2, AssertDsaVerifyLegacySignature,
-            NeedsUserLogin: true, Unsupported: ExampleGates.SecondModuleInstance),
-        new(Name(nameof(DsaExamples), nameof(DsaExamples.BclDsaVerifyLegacySignature)), [], [], ExampleBackend.SoftHsm2,
+            NeedsUserLogin: true, LoadsModule: true),
+        new(Name(nameof(DsaExamples), nameof(DsaExamples.BclDsaVerifyLegacySignature)), [], [], ExampleBackend.SoftHsm2 | ExampleBackend.Kryoptic,
             _ =>
             {
                 if (OperatingSystem.IsMacOS()) Assert.Skip("macOS's DSA takes only 1024-bit keys.");
