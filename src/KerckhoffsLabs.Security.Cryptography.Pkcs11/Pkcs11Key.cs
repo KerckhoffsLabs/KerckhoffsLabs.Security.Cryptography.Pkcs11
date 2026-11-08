@@ -1113,7 +1113,8 @@ public sealed partial class Pkcs11Key : IDisposable
     {
         CKK.CKK_RSA or CKK.CKK_DSA or CKK.CKK_DH or CKK.CKK_X9_42_DH
             or CKK.CKK_EC or CKK.CKK_EC_EDWARDS or CKK.CKK_EC_MONTGOMERY
-            or CKK.CKK_ML_KEM or CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA => true,
+            or CKK.CKK_ML_KEM or CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA
+            or CKK.CKK_HSS or CKK.CKK_XMSS or CKK.CKK_XMSSMT => true,
         _ => false,
     };
 
