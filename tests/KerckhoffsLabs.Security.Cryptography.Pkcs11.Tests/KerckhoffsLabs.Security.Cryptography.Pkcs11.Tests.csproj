@@ -60,7 +60,7 @@
     <!-- Property-based testing for BclDifferentialTestCases: generates inputs for the Algorithms adapters
          and the BCL alike, and on a failure shrinks them to a minimal case and reports the seed that
          reproduces it. -->
-    <PackageReference Include="CsCheck" Version="5.0.0" />
+    <PackageReference Include="CsCheck" Version="5.0.1" />
     <!-- Property-based testing for AlgorithmLawTestCases: laws the adapters keep without an oracle (round
          trips, tamper rejection, agreement, prefix relations). The core package rather than
          FsCheck.Xunit.v3: [Property] reports an Assert.Skip from the test body as a failure, and these
