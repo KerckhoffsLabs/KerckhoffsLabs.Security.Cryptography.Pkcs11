@@ -188,7 +188,9 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKA_ALLOWED_MECHANISMS</c> tpm2-pkcs11 needs to use it: every later operation on it answers
     /// <c>CKR_GENERAL_ERROR</c> ("Expected object to have: CKA_ALLOWED_MECHANISMS"), <c>C_DestroyObject</c>
     /// on it can answer <c>CKR_FUNCTION_FAILED</c>, and a 16-byte AES key reports a <c>CKA_VALUE_LEN</c> of
-    /// 32. Related upstream: tpm2-software/tpm2-pkcs11#182 and #688 (open); this behaviour isn't reported.
+    /// 32. It also hides key-usage enforcement: a key with <c>CKA_ENCRYPT = false</c> is refused with that
+    /// <c>CKR_GENERAL_ERROR</c>, not <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>. Reported as
+    /// tpm2-software/tpm2-pkcs11#956 (open); related: #182 and #688 (open).
     /// </summary>
     public const bool Tpm2Pkcs11UsesImportedSecretKeys = false;
 
