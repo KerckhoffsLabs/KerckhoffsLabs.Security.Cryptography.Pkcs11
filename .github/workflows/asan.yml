@@ -53,7 +53,7 @@ jobs:
         run: git submodule update --init --recursive --depth 1 vendor/pkcs11-mock vendor/softhsmv2 vendor/pkcs11 vendor/opencryptoki vendor/kryoptic vendor/nss vendor/wolfssl vendor/wolfpkcs11
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v6.0.0
+        uses: actions/setup-dotnet@v6.1.0
         with:
           global-json-file: global.json # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
