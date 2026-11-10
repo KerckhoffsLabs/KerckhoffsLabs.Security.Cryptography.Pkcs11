@@ -666,7 +666,15 @@ jobs:
 
       # The test assembly is mounted read-only and run with the image's .NET runtime, as its unprivileged
       # user. fwtpm-v185 is fwTPM's TPM 2.0 v1.85 build, which PKCS11_TEST_FWTPM selects.
+      #
+      # The fwTPM legs may fail without failing the job: at the vendored wolfTPM (c3c0621) fwTPM's
+      # TPM2_TestParms answers an unsupported curve with a bare TPM_RC_CURVE, not TPM_RC_CURVE + RC_P + RC_1,
+      # so tpm2-pkcs11's curve probe (tpm_find_ecc_keysizes) returns CKR_GENERAL_ERROR and C_Initialize fails.
+      # Fixed upstream by wolfSSL/wolfTPM#656 (wolfSSL/wolfTPM#653); drop this once vendor/wolftpm is past it.
+      # The step after this one still reports the failure as a warning, so it stays visible.
       - name: Test (tpm2-pkcs11 over ${{ matrix.tpm }}, ${{ matrix.backend }} store)
+        id: test
+        continue-on-error: ${{ startsWith(matrix.tpm, 'fwtpm') }}
         env:
           TPM: ${{ matrix.tpm }}
           BACKEND: ${{ matrix.backend }}
@@ -682,3 +690,10 @@ jobs:
             "${extra[@]}" \
             kerckhoffslabs/tpm2-pkcs11:ci \
             dotnet /tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.dll -noColor -filter '/*/*/*Tpm2Pkcs11*/*'
+
+      - name: Report a tolerated fwTPM failure
+        if: steps.test.outcome == 'failure' && startsWith(matrix.tpm, 'fwtpm')
+        env:
+          TPM: ${{ matrix.tpm }}
+          BACKEND: ${{ matrix.backend }}
+        run: echo "::warning title=tpm2-pkcs11 over $TPM ($BACKEND) failed::Tolerated until vendor/wolftpm includes wolfSSL/wolfTPM#656 (wolfSSL/wolfTPM#653). See the Test step's log."
