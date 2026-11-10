@@ -1,0 +1,62 @@
+diff --git a/src/fwtpm/fwtpm_command.c b/src/fwtpm/fwtpm_command.c
+index 9260839..a052b78 100644
+--- a/src/fwtpm/fwtpm_command.c
++++ b/src/fwtpm/fwtpm_command.c
+@@ -229,17 +229,33 @@ static int FwGetPcrBankIndex(UINT16 hashAlg)
+  * (TPM 2.0 Part 1 "Symmetric Encrypt" - the encrypt key keeps the authorized
+  * entity's authValue even when bound). authHandle is the handle the session
+  * authorizes (0 for a secondary encrypt-only session). */
+-static int FwBuildParamEncKey(FWTPM_Session* sess, TPM_HANDLE authHandle,
+-    byte* keyBuf, int keyBufMax, int* keyBufSz)
++static void FwLookupEntityAuth(FWTPM_CTX* ctx, TPM_HANDLE handle,
++    const byte** authVal, int* authValSz);
++
++static int FwBuildParamEncKey(FWTPM_CTX* ctx, FWTPM_Session* sess,
++    TPM_HANDLE authHandle, byte* keyBuf, int keyBufMax, int* keyBufSz)
+ {
++    const byte* authVal = NULL;
++    int authValSz = 0;
+     int sz = sess->sessionKey.size;
+     if (sz < 0 || sz > keyBufMax)
+         return TPM_RC_FAILURE;
+     XMEMCPY(keyBuf, sess->sessionKey.buffer, sz);
+-    if (sess->bindHandle != 0 && sess->bindHandle == authHandle &&
+-            sess->bindAuth.size > 0 && sz + sess->bindAuth.size <= keyBufMax) {
+-        XMEMCPY(keyBuf + sz, sess->bindAuth.buffer, sess->bindAuth.size);
+-        sz += sess->bindAuth.size;
++    /* The authValue of the entity the session authorizes: the bind authValue
++     * when that entity is the bind entity, else the entity's own (an unbound
++     * session, or one bound to another entity, as tpm2-tss computes it). */
++    if (authHandle != 0) {
++        if (sess->bindHandle != 0 && sess->bindHandle == authHandle) {
++            authVal = sess->bindAuth.buffer;
++            authValSz = sess->bindAuth.size;
++        }
++        else {
++            FwLookupEntityAuth(ctx, authHandle, &authVal, &authValSz);
++        }
++    }
++    if (authVal != NULL && authValSz > 0 && sz + authValSz <= keyBufMax) {
++        XMEMCPY(keyBuf + sz, authVal, authValSz);
++        sz += authValSz;
+     }
+     *keyBufSz = sz;
+     return 0;
+@@ -253,7 +269,7 @@ static int FwParamDecryptCmd(FWTPM_CTX* ctx, FWTPM_Session* sess,
+     byte keyBuf[TPM_MAX_DIGEST_SIZE * 2];
+     int keyBufSz = 0;
+ 
+-    rc = FwBuildParamEncKey(sess, authHandle, keyBuf, (int)sizeof(keyBuf),
++    rc = FwBuildParamEncKey(ctx, sess, authHandle, keyBuf, (int)sizeof(keyBuf),
+         &keyBufSz);
+     if (rc != 0)
+         return rc;
+@@ -289,7 +305,7 @@ static int FwParamEncryptRsp(FWTPM_CTX* ctx, FWTPM_Session* sess,
+     byte keyBuf[TPM_MAX_DIGEST_SIZE * 2];
+     int keyBufSz = 0;
+ 
+-    rc = FwBuildParamEncKey(sess, authHandle, keyBuf, (int)sizeof(keyBuf),
++    rc = FwBuildParamEncKey(ctx, sess, authHandle, keyBuf, (int)sizeof(keyBuf),
+         &keyBufSz);
+     if (rc != 0)
+         return rc;
