@@ -651,7 +651,7 @@ jobs:
         run: docker load -i "$RUNNER_TEMP/tpm2-pkcs11-image.tar"
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v6.0.0
+        uses: actions/setup-dotnet@v6.1.0
         with:
           global-json-file: global.json # exact SDK: the lock files record its ILLink and ILCompiler packages (see the library's .csproj)
 
