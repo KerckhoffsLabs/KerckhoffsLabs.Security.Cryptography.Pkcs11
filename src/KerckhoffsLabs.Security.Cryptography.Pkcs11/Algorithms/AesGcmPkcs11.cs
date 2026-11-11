@@ -116,12 +116,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         // v2.40 fallback: ciphertext || tag concatenated.
         var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
             new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
-        byte[] result = _key.Encrypt(legacyMech, plaintext);
-        if (result.Length != plaintext.Length + tag.Length)
-            throw new InvalidOperationException(
-                $"AES-GCM encrypt returned {result.Length} bytes; expected {plaintext.Length + tag.Length}.");
-        result.AsSpan(0, plaintext.Length).CopyTo(ciphertext);
-        result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
+        AeadEncryption.EncryptConcatenated(_key, legacyMech, plaintext, ciphertext, tag, "AES-GCM encrypt");
     }
 
     /// <summary>
@@ -175,20 +170,6 @@ public sealed class AesGcmPkcs11 : IDisposable
         // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
         var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
             new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
-        byte[] combined = new byte[ciphertext.Length + tag.Length];
-        ciphertext.CopyTo(combined);
-        tag.CopyTo(combined.AsSpan(ciphertext.Length));
-        byte[] result = AeadDecryption.Decrypt(_key, legacyMech, combined, plaintext);
-        try
-        {
-            if (result.Length != plaintext.Length)
-                throw new InvalidOperationException(
-                    $"AES-GCM decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
-            result.CopyTo(plaintext);
-        }
-        finally
-        {
-            System.Security.Cryptography.CryptographicOperations.ZeroMemory(result);
-        }
+        AeadDecryption.DecryptConcatenated(_key, legacyMech, ciphertext, tag, plaintext, "AES-GCM decrypt");
     }
 }
