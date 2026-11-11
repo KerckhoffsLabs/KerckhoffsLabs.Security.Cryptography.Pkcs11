@@ -126,7 +126,7 @@ internal sealed partial class Pkcs11SessionCore
         // the template holds raw copies of their pValue pointers.
         GC.KeepAlive(sharedKeyTemplate);
         GC.KeepAlive(secureDefaults);
-        return (ct, new ObjectHandle((ulong)sharedHandle));
+        return (ct, ObjectHandle.FromModule(sharedHandle, OpEncapsulateKey));
     }
 
     /// <summary>
@@ -177,7 +177,7 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)sharedHandle);
+        return ObjectHandle.FromModule(sharedHandle, OpDecapsulateKey);
     }
 
     // === Authenticated wrap ================================================
@@ -271,7 +271,7 @@ internal sealed partial class Pkcs11SessionCore
 
         mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)newKey);
+        return ObjectHandle.FromModule(newKey, OpUnwrapKeyAuthenticated);
     }
 
     // === Signature-only verify (init binds the signature, data feeds in) ====
