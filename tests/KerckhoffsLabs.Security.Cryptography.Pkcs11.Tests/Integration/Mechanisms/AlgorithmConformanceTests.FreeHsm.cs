@@ -109,17 +109,17 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault)
+    public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault) => AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
+
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
     {
-        if (fault == "hashAlg SHA-384" && !FreeHsmBackendFixture.FreeHsmRefusesAMismatchedPssHash)
-            Assert.Skip("FreeHSM signs CKM_SHA256_RSA_PKCS_PSS with SHA-256 whatever hashAlg says");
-        AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
+        if (fault is "a 1 KiB peer value" or "a DER length that lies" && !FreeHsmBackendFixture.FreeHsmRefusesABadEcdhPeerAsAParameter)
+            Assert.Skip("FreeHSM refuses a peer value that is no point with CKR_ATTRIBUTE_VALUE_INVALID");
+        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
     }
 
-    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.EcdhParameterRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM takes CKD_NULL shared data and a CKA_VALUE_LEN above the secret, and refuses a malformed peer as an attribute")]
-    [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void Ecdh_ParameterOutOfRange_IsRefused(string fault) => AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
-
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.AesKeyLengthRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM derives a 13-byte AES key")]
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
 }

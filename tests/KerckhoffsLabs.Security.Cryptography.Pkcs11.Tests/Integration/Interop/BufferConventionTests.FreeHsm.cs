@@ -59,12 +59,7 @@ public sealed class BufferConventionTests_FreeHsm(FreeHsmBackendFixture backend)
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(BufferConventionTestCases.ShortBufferAttributes), MemberType = typeof(BufferConventionTestCases))]
-    public void GetAttributeValue_ShortBuffer_WritesNothingPastIt(string attribute)
-    {
-        if (!attribute.StartsWith("CKA_LABEL", StringComparison.Ordinal) && !FreeHsmBackendFixture.FreeHsmReportsAShortBufferForKeyAttributes)
-            Assert.Skip("FreeHSM answers a public key attribute read into a buffer too small with CKR_OK");
-        BufferConventionTestCases.Assert_GetAttributeValue_ShortBuffer_WritesNothingPastIt(_backend, attribute);
-    }
+    public void GetAttributeValue_ShortBuffer_WritesNothingPastIt(string attribute) => BufferConventionTestCases.Assert_GetAttributeValue_ShortBuffer_WritesNothingPastIt(_backend, attribute);
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(BufferConventionTestCases.LargeBufferAttributes), MemberType = typeof(BufferConventionTestCases))]

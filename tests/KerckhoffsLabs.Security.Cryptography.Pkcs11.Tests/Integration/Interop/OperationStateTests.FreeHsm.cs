@@ -33,11 +33,7 @@ public sealed class OperationStateTests_FreeHsm(FreeHsmBackendFixture backend)
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.UsesOfADestroyedKey), MemberType = typeof(OperationStateTestCases))]
-    public void DestroyedKey_IsRefused(string use)
-    {
-        // FreeHSM answers C_DestroyObject on a destroyed key with CKR_KEY_HANDLE_INVALID.
-        OperationStateTestCases.Assert_DestroyedKey_IsRefused(_backend, use, use == "C_DestroyObject" ? CKR.CKR_KEY_HANDLE_INVALID : null);
-    }
+    public void DestroyedKey_IsRefused(string use) => OperationStateTestCases.Assert_DestroyedKey_IsRefused(_backend, use);
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.PartialBlockEncryptions), MemberType = typeof(OperationStateTestCases))]
