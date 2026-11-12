@@ -833,8 +833,9 @@ internal static class SessionConformanceTestCases
     }
 
     // An input of Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn must outlive the C_Logout, so it is made
-    // public; a token that makes it private anyway (FreeHSM stores every secret key as private) hides it once nobody
-    // is logged in, and the call would then be refused for its input rather than for the object it makes.
+    // public. A token that makes it private anyway (FreeHSM stores every secret key as private,
+    // afchine1337/freehsm#37 K1) hides it once nobody is logged in, and the call would then be refused for its input
+    // rather than for the object it makes.
     private static void SkipIfMadePrivate(Pkcs11SessionCore session, ObjectHandle input, string what)
     {
         using var read = session.GetAttributeValue(input, [CKA.CKA_PRIVATE]);

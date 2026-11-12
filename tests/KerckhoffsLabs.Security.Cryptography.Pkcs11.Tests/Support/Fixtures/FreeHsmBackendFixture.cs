@@ -42,7 +42,7 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <inheritdoc/>
     // Multi-part AES-GCM encryption works, but C_DecryptUpdate/C_DecryptFinal never hand the tag (the last
     // ulTagBits/8 bytes of the ciphertext) to the cipher, so C_DecryptFinal refuses every ciphertext with
-    // CKR_ENCRYPTED_DATA_INVALID. Single-part AES-GCM is unaffected.
+    // CKR_ENCRYPTED_DATA_INVALID. Single-part AES-GCM is unaffected. afchine1337/freehsm#35.
     public bool SupportsMultipartAesGcm => false;
 
     private const int SlotNumber = 0;
@@ -99,16 +99,17 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// length that lies) with <c>CKR_ATTRIBUTE_VALUE_INVALID</c>: the peer value is a mechanism parameter, so PKCS#11
     /// v3.2 §6.3.16 and §5.1.6 make it <c>CKR_MECHANISM_PARAM_INVALID</c>. No key is made. v2.7.0 refuses
     /// <c>CKD_NULL</c> with shared data and a <c>CKA_VALUE_LEN</c> above the secret as specified.
+    /// afchine1337/freehsm#37 (E1).
     /// </summary>
     public const bool FreeHsmRefusesABadEcdhPeerAsAParameter = false;
 
     /// <summary>
-    /// False while <c>C_UnwrapKey</c> gives an unwrapped private key the usage its class allows, whatever its key type,
-    /// when the template does not name it: an Edwards key unwrapped with <c>CKA_SIGN</c> alone reports
-    /// <c>CKA_DERIVE = TRUE</c>, and a Montgomery key unwrapped with <c>CKA_DERIVE</c> alone reports
-    /// <c>CKA_SIGN = TRUE</c> (<c>fhsm_compute_usage</c> in <c>src/fhsm_pkcs11.c</c> sets decrypt, sign, unwrap and
-    /// derive for every <c>CKO_PRIVATE_KEY</c>). PKCS#11 v3.2 Table 25: <c>CKA_DERIVE</c> defaults to FALSE.
-    /// <c>C_GenerateKeyPair</c> narrows the flags by key type; the unwrap path does not.
+    /// False while a private key gets every usage of its class that the template does not turn off: an Edwards key
+    /// unwrapped with <c>CKA_SIGN</c> alone reports <c>CKA_DERIVE = TRUE</c>, and a Montgomery key unwrapped with
+    /// <c>CKA_DERIVE</c> alone reports <c>CKA_SIGN = TRUE</c> (<c>fhsm_compute_usage</c> in <c>src/fhsm_pkcs11.c</c>
+    /// starts every <c>CKO_PRIVATE_KEY</c> from decrypt, sign, unwrap and derive). PKCS#11 v3.2 defaults
+    /// <c>CKA_DERIVE</c> to FALSE. <c>C_GenerateKeyPair</c> clears it for Edwards keys only, so a generated P-256 or
+    /// X25519 key has the same extra usage; the unwrap path clears nothing. afchine1337/freehsm#34.
     /// </summary>
     public const bool FreeHsmGrantsAnUnwrappedKeyOnlyTheUsageAsked = false;
 

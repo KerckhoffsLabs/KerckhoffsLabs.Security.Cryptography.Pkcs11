@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 /// (<c>CKR_USER_NOT_LOGGED_IN</c>) and then verifies the old PIN through its login path, which answers
 /// <c>CKR_USER_ALREADY_LOGGED_IN</c> for the session's own user before it looks at the PIN. So no call can
 /// change a PIN. PKCS#11 allows <c>C_SetPIN</c> in a logged-in R/W session. When a fix upstream makes the
-/// change succeed, this fails and the round trip the other backends run can take over.
+/// change succeed, this fails and the round trip the other backends run can take over (afchine1337/freehsm#36).
 /// </summary>
 [Collection("FreeHsm")]
 public sealed class PinManagementTests_FreeHsm(FreeHsmBackendFixture f)
