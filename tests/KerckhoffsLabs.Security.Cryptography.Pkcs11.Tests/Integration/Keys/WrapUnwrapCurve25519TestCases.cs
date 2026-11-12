@@ -85,7 +85,7 @@ internal static class WrapUnwrapCurve25519TestCases
 
     private static readonly byte[] Message = "wrapped Curve25519 key"u8.ToArray();
 
-    internal static void Assert_Unwrap_Rfc8410Ed25519Key_SignsTheRfc8032Signature(IPkcs11Backend backend)
+    internal static void Assert_Unwrap_Rfc8410Ed25519Key_SignsTheRfc8032Signature(IPkcs11Backend backend, bool grantsUnaskedUsage = false)
     {
         RequireEd25519(backend);
         RunInSession(backend, session =>
@@ -95,7 +95,7 @@ internal static class WrapUnwrapCurve25519TestCases
 
             ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_EDWARDS, CKA.CKA_SIGN);
 
-            AssertUsage(session, key, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
+            AssertUsage(session, key, CKK.CKK_EC_EDWARDS, sign: true, derive: false, grantsUnaskedUsage);
             AssertWrapsTheKey(kek.Wrap(key), Ed25519Oid, Rfc8032Test2Secret, Rfc8032Test2Public);
             Assert.Equal(Rfc8032Test2Signature, session.Sign(new Mechanism(CKM.CKM_EDDSA), key, Rfc8032Test2Message));
         });
@@ -105,7 +105,7 @@ internal static class WrapUnwrapCurve25519TestCases
     // version 1, a [0] friendlyName attribute and the [1] public key. Both fields are optional, and a token
     // must take them on unwrap (Kryoptic refused both with CKR_WRAPPED_KEY_INVALID until 1.5.4,
     // latchset/kryoptic#532).
-    internal static void Assert_Unwrap_Rfc5958Ed25519KeyWithOptionalFields_SignsTheRfc8032Signature(IPkcs11Backend backend)
+    internal static void Assert_Unwrap_Rfc5958Ed25519KeyWithOptionalFields_SignsTheRfc8032Signature(IPkcs11Backend backend, bool grantsUnaskedUsage = false)
     {
         RequireEd25519(backend);
         RunInSession(backend, session =>
@@ -115,13 +115,13 @@ internal static class WrapUnwrapCurve25519TestCases
 
             ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_EDWARDS, CKA.CKA_SIGN);
 
-            AssertUsage(session, key, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
+            AssertUsage(session, key, CKK.CKK_EC_EDWARDS, sign: true, derive: false, grantsUnaskedUsage);
             AssertWrapsTheKey(kek.Wrap(key), Ed25519Oid, Rfc8032Test2Secret, Rfc8032Test2Public);
             Assert.Equal(Rfc8032Test2Signature, session.Sign(new Mechanism(CKM.CKM_EDDSA), key, Rfc8032Test2Message));
         });
     }
 
-    internal static void Assert_Unwrap_Rfc8410X25519Key_AgreesTheRfc7748Secret(IPkcs11Backend backend)
+    internal static void Assert_Unwrap_Rfc8410X25519Key_AgreesTheRfc7748Secret(IPkcs11Backend backend, bool grantsUnaskedUsage = false)
     {
         RequireMontgomery(backend);
         RunInSession(backend, session =>
@@ -131,7 +131,7 @@ internal static class WrapUnwrapCurve25519TestCases
 
             ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
 
-            AssertUsage(session, key, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
+            AssertUsage(session, key, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true, grantsUnaskedUsage);
             AssertWrapsTheKey(kek.Wrap(key), X25519Oid, Rfc7748AlicePrivate, Rfc7748AlicePublic);
             // NSS derives only non-extractable keys, so the secret is compared through an HMAC under it.
             Assert.Equal(HMACSHA256.HashData(Rfc7748SharedSecret, Message),
@@ -139,7 +139,7 @@ internal static class WrapUnwrapCurve25519TestCases
         });
     }
 
-    internal static void Assert_Unwrap_Rfc8410X448Key_AgreesTheRfc7748Secret(IPkcs11Backend backend)
+    internal static void Assert_Unwrap_Rfc8410X448Key_AgreesTheRfc7748Secret(IPkcs11Backend backend, bool grantsUnaskedUsage = false)
     {
         RequireMontgomery(backend);
         RunInSession(backend, session =>
@@ -149,14 +149,14 @@ internal static class WrapUnwrapCurve25519TestCases
 
             ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
 
-            AssertUsage(session, key, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
+            AssertUsage(session, key, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true, grantsUnaskedUsage);
             AssertWrapsTheKey(kek.Wrap(key), X448Oid, Rfc7748X448AlicePrivate, Rfc7748X448AlicePublic);
             Assert.Equal(HMACSHA256.HashData(Rfc7748X448SharedSecret, Message),
                          HmacUnderSharedSecret(session, key, Rfc7748X448BobPublic, 56));
         });
     }
 
-    internal static void Assert_WrapUnwrap_Ed25519PrivateKey_KeepsTheKey(IPkcs11Backend backend)
+    internal static void Assert_WrapUnwrap_Ed25519PrivateKey_KeepsTheKey(IPkcs11Backend backend, bool grantsUnaskedUsage = false)
     {
         RequireEd25519(backend);
         RunInSession(backend, session =>
@@ -168,7 +168,7 @@ internal static class WrapUnwrapCurve25519TestCases
             var (privateKey, publicKey) = ReadCurvePrivateKey(pkcs8, Ed25519Oid);
             ObjectHandle copy = kek.Unwrap(pkcs8, CKK.CKK_EC_EDWARDS, CKA.CKA_SIGN);
 
-            AssertUsage(session, copy, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
+            AssertUsage(session, copy, CKK.CKK_EC_EDWARDS, sign: true, derive: false, grantsUnaskedUsage);
             AssertWrapsTheKey(kek.Wrap(copy), Ed25519Oid, privateKey, publicKey);
             // Ed25519 is deterministic, so the same key signs a message to the same signature.
             var eddsa = new Mechanism(CKM.CKM_EDDSA);
@@ -176,7 +176,7 @@ internal static class WrapUnwrapCurve25519TestCases
         });
     }
 
-    internal static void Assert_WrapUnwrap_X25519PrivateKey_AgreesLikeTheOriginal(IPkcs11Backend backend)
+    internal static void Assert_WrapUnwrap_X25519PrivateKey_AgreesLikeTheOriginal(IPkcs11Backend backend, bool grantsUnaskedUsage = false)
     {
         RequireMontgomery(backend);
         RunInSession(backend, session =>
@@ -188,14 +188,14 @@ internal static class WrapUnwrapCurve25519TestCases
             var (privateKey, publicKey) = ReadCurvePrivateKey(pkcs8, X25519Oid);
             ObjectHandle copy = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
 
-            AssertUsage(session, copy, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
+            AssertUsage(session, copy, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true, grantsUnaskedUsage);
             AssertWrapsTheKey(kek.Wrap(copy), X25519Oid, privateKey, publicKey);
             Assert.Equal(HmacUnderSharedSecret(session, original, Rfc7748BobPublic),
                          HmacUnderSharedSecret(session, copy, Rfc7748BobPublic));
         });
     }
 
-    internal static void Assert_WrapUnwrap_X448PrivateKey_AgreesLikeTheOriginal(IPkcs11Backend backend)
+    internal static void Assert_WrapUnwrap_X448PrivateKey_AgreesLikeTheOriginal(IPkcs11Backend backend, bool grantsUnaskedUsage = false)
     {
         RequireMontgomery(backend);
         RunInSession(backend, session =>
@@ -207,7 +207,7 @@ internal static class WrapUnwrapCurve25519TestCases
             var (privateKey, publicKey) = ReadCurvePrivateKey(pkcs8, X448Oid);
             ObjectHandle copy = kek.Unwrap(pkcs8, CKK.CKK_EC_MONTGOMERY, CKA.CKA_DERIVE);
 
-            AssertUsage(session, copy, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true);
+            AssertUsage(session, copy, CKK.CKK_EC_MONTGOMERY, sign: false, derive: true, grantsUnaskedUsage);
             AssertWrapsTheKey(kek.Wrap(copy), X448Oid, privateKey, publicKey);
             Assert.Equal(HmacUnderSharedSecret(session, original, Rfc7748X448BobPublic, 56),
                          HmacUnderSharedSecret(session, copy, Rfc7748X448BobPublic, 56));
@@ -388,12 +388,17 @@ internal static class WrapUnwrapCurve25519TestCases
         return priv;
     }
 
-    private static void AssertUsage(Pkcs11SessionCore session, ObjectHandle key, CKK keyType, bool sign, bool derive)
+    // The unwrap template names one usage, so the key has it and not the other (CKA_DERIVE defaults to FALSE, and an
+    // Edwards key cannot agree nor a Montgomery key sign). grantsUnaskedUsage records a backend that sets the usage
+    // the template left out: then only the asked one is checked.
+    private static void AssertUsage(Pkcs11SessionCore session, ObjectHandle key, CKK keyType, bool sign, bool derive, bool grantsUnaskedUsage)
     {
         using var attrs = session.GetAttributeValue(key, [CKA.CKA_KEY_TYPE, CKA.CKA_SIGN, CKA.CKA_DERIVE]);
         Assert.Equal((ulong)keyType, attrs[0].GetValueAsUlong());
-        Assert.Equal(sign, attrs[1].GetValueAsBool());
-        Assert.Equal(derive, attrs[2].GetValueAsBool());
+        if (sign || !grantsUnaskedUsage)
+            Assert.True(sign == attrs[1].GetValueAsBool(), $"CKA_SIGN is {attrs[1].GetValueAsBool()}, the template {(sign ? "asked for it" : "did not ask for it")}.");
+        if (derive || !grantsUnaskedUsage)
+            Assert.True(derive == attrs[2].GetValueAsBool(), $"CKA_DERIVE is {attrs[2].GetValueAsBool()}, the template {(derive ? "asked for it" : "did not ask for it")}.");
     }
 
     // Agrees a raw (CKD_NULL) secret of secretLength bytes (32, or 56 for X448) with peerPublic as a generic

@@ -54,107 +54,40 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
         BuiltLibraryPath() is not null;
 
     /// <summary>
-    /// False while <c>CKA_PRIVATE</c> is set by object class, whatever the template says: TRUE for every object but
-    /// a public key or a certificate, so a data object made with <c>CKA_PRIVATE = FALSE</c> reads TRUE, and from
-    /// 2.6.1 <c>C_Logout</c> destroys it as a private session object. PKCS#11 v3.2 §4.4: <c>CKA_PRIVATE</c> is
-    /// specified by the template. Up to 2.6.0 <c>C_Logout</c> destroyed no session object and left the handles to
-    /// private objects working; 2.6.1 does what §5.6.10 says, for the objects it counts as private.
+    /// False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against each other on key-pair
+    /// generation and import: <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or
+    /// <c>CKO_PRIVATE_KEY</c> for the public one, and <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type
+    /// <c>CKK_EC</c> or a <c>CKO_PRIVATE_KEY</c> of type <c>CKK_AES</c>, answer <c>CKR_OK</c>. PKCS#11 v3.2 §5.18.2 and
+    /// §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c>. v2.7.0 refuses the <c>C_GenerateKey</c> and
+    /// <c>C_DeriveKey</c> rows.
     /// </summary>
-    public const bool FreeHsmKeepsTheCkaPrivateAsked = false;
+    public const bool FreeHsmChecksKeyPairAndImportTemplates = false;
+
+    /// <summary>The rows of the inconsistent-template case that <see cref="FreeHsmChecksKeyPairAndImportTemplates"/> covers.</summary>
+    internal static bool IsKeyPairOrImportTemplateRow(string inconsistent) =>
+        inconsistent is "EC key pair with an RSA private key" or "EC key pair with a private-key class for the public key"
+            or "secret key of type CKK_EC" or "private key of type CKK_AES";
 
     /// <summary>
-    /// False while the SO can make a private object: with the SO logged in, <c>C_CreateObject</c> with
-    /// <c>CKA_PRIVATE = TRUE</c> succeeds, where PKCS#11 v3.2 §5.7.1 allows only public objects unless the normal
-    /// user is logged in (<c>CKR_USER_NOT_LOGGED_IN</c>, §5.1.6).
+    /// False while <c>C_CreateObject</c> of an EC private key without <c>CKA_EC_PARAMS</c> answers
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c>, where PKCS#11 v3.2 §6.3.4 says the attribute must be given (§4.1.1 point 4:
+    /// <c>CKR_TEMPLATE_INCOMPLETE</c>). Nothing is created. v2.7.0 answers <c>CKR_TEMPLATE_INCOMPLETE</c> for key-pair
+    /// generation without <c>CKA_MODULUS_BITS</c> or <c>CKA_EC_PARAMS</c>.
     /// </summary>
-    public const bool FreeHsmRefusesPrivateObjectsToTheSo = false;
+    public const bool FreeHsmReportsAnEcPrivateKeyWithoutParamsAsIncomplete = false;
 
     /// <summary>
-    /// False while <c>C_CopyObject</c> in a read-only session copies a token object (template not naming
-    /// <c>CKA_TOKEN</c>) into a new token object and answers <c>CKR_OK</c>. PKCS#11 v3.2 §5.7.2: only session
-    /// objects can be created in a read-only session (<c>CKR_SESSION_READ_ONLY</c>).
+    /// False while <c>C_CopyObject</c> of an AES key with a new <c>CKA_VALUE</c> is refused with
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c>. PKCS#11 v3.2 §4.1.3 and §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>. The
+    /// value is not changed, and <c>C_SetAttributeValue</c> of key material answers <c>CKR_ATTRIBUTE_READ_ONLY</c>.
     /// </summary>
-    public const bool FreeHsmRefusesTokenObjectCopiesInReadOnlySessions = false;
+    public const bool FreeHsmRefusesNewKeyMaterialInACopyAsReadOnly = false;
 
     /// <summary>
-    /// False while a sensitive RSA private key answers <c>C_GetAttributeValue</c> of <c>CKA_PRIVATE_EXPONENT</c>,
-    /// <c>CKA_PRIME_1</c>, <c>CKA_PRIME_2</c>, <c>CKA_EXPONENT_1</c>, <c>CKA_EXPONENT_2</c> and <c>CKA_COEFFICIENT</c>
-    /// with <c>CKR_ATTRIBUTE_TYPE_INVALID</c>, as if the key had no such attribute, where PKCS#11 v3.2 §5.7.5 has
-    /// <c>CKR_ATTRIBUTE_SENSITIVE</c> for a value the key holds but may not reveal (§6.1.3, footnote 7). The
-    /// value is not revealed: <c>ulValueLen</c> is <c>CK_UNAVAILABLE_INFORMATION</c>. A sensitive EC key's
-    /// <c>CKA_VALUE</c> answers <c>CKR_ATTRIBUTE_SENSITIVE</c>.
-    /// </summary>
-    public const bool FreeHsmReportsRsaPrivatePartsAsSensitive = false;
-
-    /// <summary>Gate for the SO private-object case: see <see cref="FreeHsmRefusesPrivateObjectsToTheSo"/>.</summary>
-    public static bool SoPrivateObjectRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesPrivateObjectsToTheSo;
-
-    /// <summary>
-    /// False while a session opened after <c>C_Logout</c>, with nobody logged in, finds the token's private objects
-    /// and reads their <c>CKA_VALUE</c>, as it finds the public ones. PKCS#11 v3.2 §4.4: a private object is visible
-    /// only to a session logged in as the normal user. Before 2.6.0 every search without a login answered
-    /// <c>CKR_USER_NOT_LOGGED_IN</c>, so the case could not run. Still so in 2.6.1, whose <c>C_Logout</c> gives the
-    /// private token objects new handles, which the search returns.
-    /// </summary>
-    public const bool FreeHsmHidesPrivateTokenObjectsAfterLogout = false;
-
-    /// <summary>Gate for the visibility case: see <see cref="FreeHsmHidesPrivateTokenObjectsAfterLogout"/>.</summary>
-    public static bool PrivateObjectHidingAvailable => FreeHsmAvailable && FreeHsmHidesPrivateTokenObjectsAfterLogout;
-
-    /// <summary>
-    /// False while a key pair can be generated without the attribute that sizes it: <c>C_GenerateKeyPair</c> with
-    /// <c>CKM_RSA_PKCS_KEY_PAIR_GEN</c> and no <c>CKA_MODULUS_BITS</c>, or <c>CKM_EC_KEY_PAIR_GEN</c> and no
-    /// <c>CKA_EC_PARAMS</c>, answers <c>CKR_OK</c>, where PKCS#11 v3.2 §6.1.2 and §6.3.3 (footnote 3) say they
-    /// must be given (§4.1.1 point 4: <c>CKR_TEMPLATE_INCOMPLETE</c>); and <c>C_CreateObject</c> of an EC private
-    /// key without <c>CKA_EC_PARAMS</c> answers <c>CKR_TEMPLATE_INCONSISTENT</c>.
-    /// </summary>
-    public const bool FreeHsmRequiresTheKeyAttributes = false;
-
-    /// <summary>
-    /// False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against the mechanism or
-    /// each other: <c>C_GenerateKey(CKM_AES_KEY_GEN)</c> with <c>CKK_GENERIC_SECRET</c> or <c>CKO_DATA</c>,
-    /// <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or
-    /// <c>CKO_PRIVATE_KEY</c> for the public one, <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type
-    /// <c>CKK_EC</c> or a <c>CKO_PRIVATE_KEY</c> of type <c>CKK_AES</c>, and <c>C_DeriveKey(CKM_HKDF_DERIVE)</c>
-    /// with <c>CKO_DATA</c> all answer <c>CKR_OK</c>. PKCS#11 v3.2 §5.18.1, §5.18.2, §4.1.1 point 5 and §6.62.3:
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c>.
-    /// </summary>
-    public const bool FreeHsmChecksTheTemplatesClassAndKeyType = false;
-
-    /// <summary>Gate for the inconsistent-template case: see <see cref="FreeHsmChecksTheTemplatesClassAndKeyType"/>.</summary>
-    public static bool InconsistentTemplateRefusalAvailable => FreeHsmAvailable && FreeHsmChecksTheTemplatesClassAndKeyType;
-
-    /// <summary>
-    /// False while a change to a public key's material is refused with other codes than
-    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>: <c>C_SetAttributeValue</c> of <c>CKA_MODULUS</c> or
-    /// <c>CKA_PUBLIC_EXPONENT</c> on an RSA public key and of <c>CKA_EC_POINT</c> on an EC public key answers
-    /// <c>CKR_ATTRIBUTE_TYPE_INVALID</c>, and <c>C_CopyObject</c> with a new <c>CKA_VALUE</c>
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c>. PKCS#11 v3.2 §4.1.2, §4.1.3 and §4.1.1 point 3. The value is not changed.
-    /// </summary>
-    public const bool FreeHsmReportsKeyMaterialAsReadOnly = false;
-
-    /// <summary>
-    /// False while <c>CKA_ALWAYS_SENSITIVE</c> and <c>CKA_NEVER_EXTRACTABLE</c> in the template of
-    /// <c>C_CreateObject</c> or <c>C_GenerateKey</c> are taken with <c>CKR_OK</c>. PKCS#11 v3.2 §4.11 footnotes 2
-    /// and 4 (MUST NOT be specified) and §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>.
-    /// </summary>
-    public const bool FreeHsmRefusesProvenanceAttributesInATemplate = false;
-
-    /// <summary>Gate for the provenance-in-a-template case: see <see cref="FreeHsmRefusesProvenanceAttributesInATemplate"/>.</summary>
-    public static bool ProvenanceTemplateRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesProvenanceAttributesInATemplate;
-
-    /// <summary>
-    /// False while <c>C_FindObjectsInit</c> with a 4-byte <c>CKA_TOKEN</c> of zeros starts a search that finds a
-    /// session object, whose <c>CKA_TOKEN</c> is a 1-byte CK_BBOOL. PKCS#11 v3.2 §5.7.7: a search matches only
-    /// objects whose attributes match every attribute of the template. <c>C_CreateObject</c> refuses it.
-    /// </summary>
-    public const bool FreeHsmMatchesAWrongLengthBoolean = false;
-
-    /// <summary>
-    /// False while a data object's <c>CKA_OBJECT_ID</c> is taken by <c>C_CreateObject</c> and then not reported:
-    /// <c>C_GetAttributeValue</c> marks it unavailable on the object and on a copy. PKCS#11 v3.2 Table 20 gives
-    /// every data object a <c>CKA_OBJECT_ID</c> (default empty). <c>CKA_VALUE</c> and <c>CKA_APPLICATION</c> are
-    /// kept and copied.
+    /// False while a data object's <c>CKA_OBJECT_ID</c> is refused: <c>C_CreateObject</c> with it answers
+    /// <c>CKR_ATTRIBUTE_TYPE_INVALID</c> (v2.7.0; earlier versions took it and dropped it). PKCS#11 v3.2 Table 20 gives
+    /// every data object a <c>CKA_OBJECT_ID</c> (default empty). <c>CKA_VALUE</c> and <c>CKA_APPLICATION</c> are kept
+    /// and copied.
     /// </summary>
     public const bool FreeHsmKeepsCkaObjectId = false;
 
@@ -162,90 +95,22 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool DataObjectIdAvailable => FreeHsmAvailable && FreeHsmKeepsCkaObjectId;
 
     /// <summary>
-    /// False while <c>C_GenerateKeyPair</c> with a <c>CKA_UNIQUE_ID</c> in the private key's template makes the key
-    /// pair, though the token does not report <c>CKA_UNIQUE_ID</c> at all. PKCS#11 v3.2 §4.4.1: a
-    /// <c>CKA_UNIQUE_ID</c> in the template of an operation that creates objects "MUST fail"
-    /// (<c>CKR_ATTRIBUTE_READ_ONLY</c>; a token without the attribute answers <c>CKR_ATTRIBUTE_TYPE_INVALID</c>,
-    /// §4.1.1 point 1), and §5.18.2 makes nothing then.
+    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 refuses a peer value that is no point (1 KiB, or a DER
+    /// length that lies) with <c>CKR_ATTRIBUTE_VALUE_INVALID</c>: the peer value is a mechanism parameter, so PKCS#11
+    /// v3.2 §6.3.16 and §5.1.6 make it <c>CKR_MECHANISM_PARAM_INVALID</c>. No key is made. v2.7.0 refuses
+    /// <c>CKD_NULL</c> with shared data and a <c>CKA_VALUE_LEN</c> above the secret as specified.
     /// </summary>
-    public const bool FreeHsmRefusesAUniqueIdInATemplate = false;
+    public const bool FreeHsmRefusesABadEcdhPeerAsAParameter = false;
 
     /// <summary>
-    /// False while <c>C_GetAttributeValue</c> of a public key's <c>CKA_MODULUS</c>, <c>CKA_EC_POINT</c> or
-    /// <c>CKA_EC_PARAMS</c> into a buffer too small for it answers <c>CKR_OK</c>, with the attribute's
-    /// <c>ulValueLen</c> set to <c>CK_UNAVAILABLE_INFORMATION</c> (<c>extract_pubkey_attr</c>'s failure is not
-    /// passed on, in <c>src/fhsm_pkcs11.c</c>). PKCS#11 v3.2 §5.7.5: <c>CKR_BUFFER_TOO_SMALL</c>. It writes nothing
-    /// past the buffer, and a data object's <c>CKA_LABEL</c> is refused correctly.
+    /// False while <c>C_UnwrapKey</c> gives an unwrapped private key the usage its class allows, whatever its key type,
+    /// when the template does not name it: an Edwards key unwrapped with <c>CKA_SIGN</c> alone reports
+    /// <c>CKA_DERIVE = TRUE</c>, and a Montgomery key unwrapped with <c>CKA_DERIVE</c> alone reports
+    /// <c>CKA_SIGN = TRUE</c> (<c>fhsm_compute_usage</c> in <c>src/fhsm_pkcs11.c</c> sets decrypt, sign, unwrap and
+    /// derive for every <c>CKO_PRIVATE_KEY</c>). PKCS#11 v3.2 Table 25: <c>CKA_DERIVE</c> defaults to FALSE.
+    /// <c>C_GenerateKeyPair</c> narrows the flags by key type; the unwrap path does not.
     /// </summary>
-    public const bool FreeHsmReportsAShortBufferForKeyAttributes = false;
-
-    /// <summary>
-    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_GCM)</c> with <c>ulTagBits</c> above 128 answers
-    /// <c>CKR_ARGUMENTS_BAD</c> (<c>src/fhsm_pkcs11.c</c>, with an IV or AAD over its buffer). PKCS#11 v3.2 §6.13.7: a
-    /// tag of 0 to 128 bits; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>, which it gives for a NULL pointer.
-    /// </summary>
-    public const bool FreeHsmRefusesAnOutOfRangeGcmTagAsInvalid = false;
-
-    /// <summary>
-    /// False while <c>C_Encrypt(CKM_AES_CTR)</c> of four blocks under <c>ulCounterBits</c> 2, the counter bits starting at
-    /// 1, answers <c>CKR_OK</c>: <c>src/fhsm_pkcs11.c</c> checks <c>ulCounterBits</c> for 1..128 and then runs a
-    /// 128-bit counter, which carries into the nonce. PKCS#11 v3.2 §6.11.3: an attempt that "will cause an overflow
-    /// of the counter block's counter bits" is <c>CKR_DATA_LEN_RANGE</c>. The out-of-range <c>ulCounterBits</c> rows pass.
-    /// </summary>
-    public const bool FreeHsmRefusesAnAesCtrCounterOverflow = false;
-
-    /// <summary>Gate for the AES-CTR counter overflow case: see <see cref="FreeHsmRefusesAnAesCtrCounterOverflow"/>.</summary>
-    public static bool AesCtrCounterOverflowAvailable => FreeHsmAvailable && FreeHsmRefusesAnAesCtrCounterOverflow;
-
-    /// <summary>
-    /// False while <c>C_SignInit(CKM_SHA256_RSA_PKCS_PSS)</c> with <c>hashAlg</c> <c>CKM_SHA384</c> answers <c>CKR_OK</c>
-    /// and <c>C_Sign</c> signs as with SHA-256 (a probe's signature verified under SHA-256 and a 32-byte salt):
-    /// <c>hashAlg</c> is not checked against the mechanism. PKCS#11 v3.2 §6.1.9: it "must match the hash algorithm
-    /// indicated by the signature mechanism"; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>. The <c>sLen</c> row passes.
-    /// </summary>
-    public const bool FreeHsmRefusesAMismatchedPssHash = false;
-
-    /// <summary>
-    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 takes, with <c>CKR_OK</c>, <c>CKD_NULL</c> with shared
-    /// data (it ignores it and derives Z: <c>src/fhsm_pkcs11.c</c> marks the field unused) and <c>CKA_VALUE_LEN</c> 33
-    /// (it makes a 32-byte key, <c>CKA_VALUE_LEN</c> 32), and refuses a peer value that is no point (1 KiB, or a DER
-    /// length that lies) with <c>CKR_ATTRIBUTE_VALUE_INVALID</c>. Confirmed by a probe reading the derived keys back.
-    /// PKCS#11 v3.2 §6.3.16 (with <c>CKD_NULL</c>, "pSharedData must be NULL and ulSharedDataLen must be zero"),
-    /// §6.3.17, §4.1 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> for the parameters, and
-    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c> for the length.
-    /// </summary>
-    public const bool FreeHsmChecksTheEcdhParameters = false;
-
-    /// <summary>Gate for the out-of-range ECDH parameter case: see <see cref="FreeHsmChecksTheEcdhParameters"/>.</summary>
-    public static bool EcdhParameterRefusalAvailable => FreeHsmAvailable && FreeHsmChecksTheEcdhParameters;
-
-    /// <summary>
-    /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a <c>CKA_PUBLIC_EXPONENT</c> of 65539
-    /// (01 00 03) or 2^64 + 65537 answers <c>CKR_OK</c> with a key whose exponent is 65537. PKCS#11 v3.2 §6.1.4: the
-    /// exponent "will be copied from the template if supplied", and <c>CKR_TEMPLATE_INCONSISTENT</c> "shall be
-    /// returned if the implementation cannot use the supplied exponent value".
-    /// </summary>
-    public const bool FreeHsmKeepsThePublicExponentAsked = false;
-
-    /// <summary>Gate for the RSA public exponent case: see <see cref="FreeHsmKeepsThePublicExponentAsked"/>.</summary>
-    public static bool PublicExponentAvailable => FreeHsmAvailable && FreeHsmKeepsThePublicExponentAsked;
-
-    /// <summary>
-    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a 9-byte key while reporting ulMaxKeySize 64
-    /// (bits, per PKCS#11 v3.2 §6.8.3): it reports the range in other units or does not enforce it. A length past the
-    /// range is <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
-    /// </summary>
-    public const bool FreeHsmBoundsAGenericSecretByItsMaximum = false;
-
-    /// <summary>
-    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> of a <c>CKK_AES</c> key with <c>CKA_VALUE_LEN</c> 13 answers
-    /// <c>CKR_OK</c>. PKCS#11 v3.2 §6.10.2 (16, 24 or 32 bytes), §4.1, §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
-    /// </summary>
-    public const bool FreeHsmRefusesAnAesKeyOfAnInvalidLength = false;
-
-    /// <summary>Gate for the derived AES key length case: see <see cref="FreeHsmRefusesAnAesKeyOfAnInvalidLength"/>.</summary>
-    public static bool AesKeyLengthRefusalAvailable => FreeHsmAvailable && FreeHsmRefusesAnAesKeyOfAnInvalidLength;
+    public const bool FreeHsmGrantsAnUnwrappedKeyOnlyTheUsageAsked = false;
 
     public FreeHsmBackendFixture()
     {

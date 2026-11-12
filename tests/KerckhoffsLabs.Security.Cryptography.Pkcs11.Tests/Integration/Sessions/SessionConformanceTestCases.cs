@@ -378,7 +378,8 @@ internal static class SessionConformanceTestCases
     // (§5.1.6) and makes nothing. Nobody is logged in afterwards, whatever fails.
     // Whether the SO may see the user's private objects is left out: [PKCS11-UG] gives the "R/W SO Functions"
     // state the public objects only, but the specification itself says no more than that a private object needs
-    // "the user" authenticated (§4.4), and Kryoptic, BouncyHsm, Craton HSM and FreeHSM all show the SO them.
+    // "the user" authenticated (§4.4), and Kryoptic, BouncyHsm and Craton HSM all show the SO them. FreeHSM hides
+    // them since v2.7.0, which Assert_So_ReachesNoneOfTheUsersPrivateObjects checks.
     internal static void Assert_So_CreatesNoPrivateObject(IPkcs11Backend backend)
     {
         if (!backend.RequiresUserLogin)
@@ -736,6 +737,111 @@ internal static class SessionConformanceTestCases
         }
     }
 
+    // The SO reaches none of the user's private objects: a search finds none, and every handle the SO cannot see
+    // answers C_GetAttributeValue, C_WrapKey (under an RSA public key the SO imported with CKA_WRAP), C_DeriveKey
+    // (HKDF, the handle as the base key), C_CopyObject and C_DestroyObject exactly as a handle that does not exist
+    // does, so the answers neither use the object nor tell which handles exist. The user's objects are a private
+    // data object and a private, extractable, derivable generic secret, the two kinds FreeHSM let the SO read through
+    // these calls before v2.7.0 (GHSA-h2r5-32gc-wfx4). The sweep covers handles 1 to 256, or four times the
+    // highest handle the user saw if that is more. Not a PKCS#11 requirement (see Assert_So_CreatesNoPrivateObject),
+    // so only a backend that keeps the SO from private objects runs it.
+    internal static void Assert_So_ReachesNoneOfTheUsersPrivateObjects(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin || !backend.SupportsTokenObjects)
+            Assert.Skip("The backend has no login, or no token objects.");
+        if (Slot(backend).GetTokenInfo().TokenFlags.SoPinToBeChanged)
+            Assert.Skip("The token's SO PIN is to be changed (CKF_SO_PIN_TO_BE_CHANGED), so an SO session answers CKR_PIN_EXPIRED.");
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP, CKM.CKM_HKDF_DERIVE);
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+
+        string label = $"kl-so-reach-{Guid.NewGuid():N}";
+        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+        ulong sweep = 256;
+        using (var user = TestKeys.OpenLoggedInSession(backend))
+        {
+            CreateTokenDataObject(user, label, isPrivate: true);
+            using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrGeneric = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, true);
+            using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
+            using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+            using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+            using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+            user.CreateObject([attrSecret, attrGeneric, attrToken, attrPrivate, attrLabel, attrValue, attrExtractable, attrDerive]);
+            sweep = Math.Max(sweep, 4 * user.FindAllObjects([]).Max(h => h.ObjectId));
+            TestKeys.LogoutIfRequired(backend, user);
+        }
+
+        try
+        {
+            using var so = Slot(backend).OpenSessionCore();
+            var sid = (NativeCULong)so.SessionId;
+            AssertRv(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, backend.SoPin.Span), "C_Login as the SO");
+            try
+            {
+                Assert.Empty(so.FindAllObjects([attrLabel]));
+
+                using RSA rsa = RSA.Create(2048);
+                RSAParameters rsaPublic = rsa.ExportParameters(includePrivateParameters: false);
+                using var attrPublicKey = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+                using var attrRsa = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+                using var attrSession = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+                using var attrModulus = new ObjectAttribute(CKA.CKA_MODULUS, rsaPublic.Modulus!);
+                using var attrExponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, rsaPublic.Exponent!);
+                var wrappingKey = (NativeCULong)so.CreateObject([attrPublicKey, attrRsa, attrSession, attrWrap, attrModulus, attrExponent]).ObjectId;
+
+                using var scope = new MechanismParameterScope();
+                CK_MECHANISM oaep = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)).Marshal(scope, out _);
+                CK_MECHANISM hkdf = new Mechanism(CKM.CKM_HKDF_DERIVE,
+                    CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8)).Marshal(scope, out _);
+                byte[] wrapped = new byte[512];
+
+                (CKR Read, CKR Wrap, CKR Derive, CKR Copy, CKR Destroy) Answers(NativeCULong handle)
+                {
+                    CK_ATTRIBUTE[] cls = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_CLASS }];
+                    return (lowLevel.C_GetAttributeValue(sid, handle, cls),
+                            lowLevel.C_WrapKey(sid, in oaep, wrappingKey, handle, wrapped, lengthOnly: false, out _),
+                            lowLevel.C_DeriveKey(sid, in hkdf, handle, [], out _),
+                            lowLevel.C_CopyObject(sid, handle, [], out _),
+                            lowLevel.C_DestroyObject(sid, handle));
+                }
+
+                var missing = Answers((NativeCULong)0x7FFF_FF00UL);
+                Assert.True(missing.Read == CKR.CKR_OBJECT_HANDLE_INVALID, $"C_GetAttributeValue of a handle that does not exist returned {missing.Read}.");
+                for (ulong h = 1; h <= sweep; h++)
+                {
+                    var handle = (NativeCULong)h;
+                    CK_ATTRIBUTE[] cls = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_CLASS }];
+                    if (h == (ulong)wrappingKey || lowLevel.C_GetAttributeValue(sid, handle, cls) == CKR.CKR_OK)
+                        continue; // an object the SO may see: public, the SO's own, or none of this case's
+                    var answers = Answers(handle);
+                    Assert.True(answers == missing,
+                        $"Handle {h}, hidden from the SO, answered {answers}; a handle that does not exist answers {missing}.");
+                }
+            }
+            finally { lowLevel.C_Logout(sid); }
+        }
+        finally
+        {
+            using var user = TestKeys.OpenLoggedInSession(backend);
+            foreach (ObjectHandle handle in user.FindAllObjects([attrLabel]))
+                user.DestroyObject(handle);
+            TestKeys.LogoutIfRequired(backend, user);
+        }
+    }
+
+    // An input of Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn must outlive the C_Logout, so it is made
+    // public; a token that makes it private anyway (FreeHSM stores every secret key as private) hides it once nobody
+    // is logged in, and the call would then be refused for its input rather than for the object it makes.
+    private static void SkipIfMadePrivate(Pkcs11SessionCore session, ObjectHandle input, string what)
+    {
+        using var read = session.GetAttributeValue(input, [CKA.CKA_PRIVATE]);
+        if (read[0].GetValueAsBool())
+            Assert.Skip($"The token made the {what} private though the template asked for a public one.");
+    }
+
     // The AES key wraps, in order of preference; a 32-byte key needs no padding, so any of them does.
     private static readonly CKM[] AesKeyWraps = [CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_KWP, CKM.CKM_AES_KEY_WRAP_PAD];
 
@@ -828,6 +934,7 @@ internal static class SessionConformanceTestCases
                 case "DeriveKey":
                     {
                         ObjectHandle baseKey = session.CreateObject([attrSecret, attrGeneric, attrSession, attrPublic, attrDerive, attrInput, attrValue32]);
+                        SkipIfMadePrivate(session, baseKey, "HKDF base key");
                         var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
                             CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, "kl"u8));
                         refused = () => session.DeriveKey(mechanism, baseKey,
@@ -838,6 +945,7 @@ internal static class SessionConformanceTestCases
                     {
                         ObjectHandle kek = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
                             [attrSecret, attrAes, attrLen32, attrSession, attrPublic, attrWrap, attrUnwrap, attrInput]);
+                        SkipIfMadePrivate(session, kek, "unwrapping key");
                         ObjectHandle target = session.CreateObject([attrSecret, attrAes, attrSession, attrPublic, attrExtractable, attrEncrypt, attrInput, attrValue32]);
                         var wrap = new Mechanism(AesKeyWraps.First(backend.Supports));
                         byte[] wrapped = session.WrapKey(wrap, kek, target);
@@ -858,11 +966,7 @@ internal static class SessionConformanceTestCases
                             refused = () => session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey, template, expectedCiphertextLen: 1088);
                             break;
                         }
-                        using (var read = session.GetAttributeValue(privateKey, [CKA.CKA_PRIVATE]))
-                        {
-                            if (read[0].GetValueAsBool())
-                                Assert.Skip("The token made the ML-KEM private key private though the template asked for a public one.");
-                        }
+                        SkipIfMadePrivate(session, privateKey, "ML-KEM private key");
                         (byte[] ciphertext, _) = session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey,
                             [attrSecret, attrGeneric, attrLen32, attrSession, attrPublic, attrInput], expectedCiphertextLen: 1088);
                         refused = () => session.DecapsulateKey(new Mechanism(CKM.CKM_ML_KEM), privateKey, ciphertext, template);

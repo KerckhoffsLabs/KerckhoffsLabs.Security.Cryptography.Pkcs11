@@ -69,12 +69,7 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.SensitivePrivateKeyTypes), MemberType = typeof(ObjectConformanceTestCases))]
-    public void SensitivePrivateKey_HidesItsSecretParts(string keyType)
-    {
-        if (keyType == "RSA" && !FreeHsmBackendFixture.FreeHsmReportsRsaPrivatePartsAsSensitive)
-            Assert.Skip("FreeHSM answers a sensitive RSA key's private exponent with CKR_ATTRIBUTE_TYPE_INVALID");
-        ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
-    }
+    public void SensitivePrivateKey_HidesItsSecretParts(string keyType) => ObjectConformanceTestCases.Assert_SensitivePrivateKey_HidesItsSecretParts(_backend, keyType);
 
     // Before 2.6.1 FreeHSM gave an RSA, EC, Edwards or Montgomery public key a CKA_VALUE: the SubjectPublicKeyInfo it stores.
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
@@ -86,15 +81,19 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
     [MemberData(nameof(ObjectConformanceTestCases.IncompleteTemplates), MemberType = typeof(ObjectConformanceTestCases))]
     public void IncompleteTemplate_IsTemplateIncomplete(string incomplete)
     {
-        if (incomplete is "RSA key pair without CKA_MODULUS_BITS" or "EC key pair without CKA_EC_PARAMS" or "EC private key without CKA_EC_PARAMS"
-            && !FreeHsmBackendFixture.FreeHsmRequiresTheKeyAttributes)
-            Assert.Skip("FreeHSM generates a key pair without CKA_MODULUS_BITS or CKA_EC_PARAMS");
+        if (incomplete == "EC private key without CKA_EC_PARAMS" && !FreeHsmBackendFixture.FreeHsmReportsAnEcPrivateKeyWithoutParamsAsIncomplete)
+            Assert.Skip("FreeHSM refuses an EC private key without CKA_EC_PARAMS with CKR_TEMPLATE_INCONSISTENT");
         ObjectConformanceTestCases.Assert_IncompleteTemplate_IsTemplateIncomplete(_backend, incomplete);
     }
 
-    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.InconsistentTemplateRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM makes objects whose class or key type contradicts the mechanism")]
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
-    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent) => ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent)
+    {
+        if (FreeHsmBackendFixture.IsKeyPairOrImportTemplateRow(inconsistent) && !FreeHsmBackendFixture.FreeHsmChecksKeyPairAndImportTemplates)
+            Assert.Skip("FreeHSM generates or imports a key whose class or key type contradicts the template");
+        ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
+    }
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void UniqueId_IsTheTokensAndReadOnly() => ObjectConformanceTestCases.Assert_UniqueId_IsTheTokensAndReadOnly(_backend);
@@ -103,28 +102,23 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
     [MemberData(nameof(ObjectConformanceTestCases.KeyComponents), MemberType = typeof(ObjectConformanceTestCases))]
     public void KeyComponent_IsReadOnly(string component)
     {
-        if (component != "AES CKA_VALUE" && !FreeHsmBackendFixture.FreeHsmReportsKeyMaterialAsReadOnly)
-            Assert.Skip("FreeHSM refuses a change to public key material with CKR_ATTRIBUTE_TYPE_INVALID, a new CKA_VALUE in a copy with CKR_TEMPLATE_INCONSISTENT");
+        if (component == "AES CKA_VALUE in a copy" && !FreeHsmBackendFixture.FreeHsmRefusesNewKeyMaterialInACopyAsReadOnly)
+            Assert.Skip("FreeHSM refuses a new CKA_VALUE in a copy with CKR_TEMPLATE_INCONSISTENT");
         ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component);
     }
 
-    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.ProvenanceTemplateRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM takes CKA_ALWAYS_SENSITIVE and CKA_NEVER_EXTRACTABLE in a template")]
+    [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.ProvenanceInATemplate), MemberType = typeof(ObjectConformanceTestCases))]
     public void ProvenanceAttributeInATemplate_IsReadOnly(string row) => ObjectConformanceTestCases.Assert_ProvenanceAttributeInATemplate_IsReadOnly(_backend, row);
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
-    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
-    {
-        if (malformed == "C_FindObjectsInit with a 4-byte CKA_TOKEN" && !FreeHsmBackendFixture.FreeHsmMatchesAWrongLengthBoolean)
-            Assert.Skip("FreeHSM's search with a 4-byte CKA_TOKEN finds a session object");
-        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
-    }
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed) => ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void CopyObject_KeepsCkaToken() => ObjectConformanceTestCases.Assert_CopyObject_KeepsCkaToken(_backend);
 
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.DataObjectIdAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM does not report a data object's CKA_OBJECT_ID")]
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.DataObjectIdAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM refuses a data object's CKA_OBJECT_ID")]
     public void CopyObject_KeepsADataObjectsFields() => ObjectConformanceTestCases.Assert_CopyObject_KeepsADataObjectsFields(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
@@ -135,10 +129,5 @@ public sealed class ObjectConformanceTests_FreeHsm(FreeHsmBackendFixture backend
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.RefusedKeyPairs), MemberType = typeof(ObjectConformanceTestCases))]
-    public void RefusedKeyPairGeneration_LeavesNothing(string refused)
-    {
-        if (refused == "CKA_UNIQUE_ID in the private key template" && !FreeHsmBackendFixture.FreeHsmRefusesAUniqueIdInATemplate)
-            Assert.Skip("FreeHSM generates a key pair with a CKA_UNIQUE_ID in the private key's template");
-        ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
-    }
+    public void RefusedKeyPairGeneration_LeavesNothing(string refused) => ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
 }

@@ -34,14 +34,12 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
     public void SessionObject_OutlivesNoSessionOfIts() => SessionConformanceTestCases.Assert_SessionObject_OutlivesNoSessionOfIts(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
-    public void SecondLibraryInstance_LeavesTheFirstWorking()
-    {
-        Assert.Skip("FreeHSM refuses a second C_Initialize in one process with CKR_FUNCTION_FAILED, not CKR_CRYPTOKI_ALREADY_INITIALIZED.");
-    }
+    public void SecondLibraryInstance_LeavesTheFirstWorking() => SessionConformanceTestCases.Assert_SecondLibraryInstance_LeavesTheFirstWorking(_backend);
 
     // Searches before a login find the public objects from FreeHSM 2.6.0; earlier versions answered
-    // C_FindObjectsInit with CKR_USER_NOT_LOGGED_IN.
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.PrivateObjectHidingAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM shows its private token objects to a session after C_Logout")]
+    // C_FindObjectsInit with CKR_USER_NOT_LOGGED_IN. Up to 2.6.1 they also found private data objects after a
+    // C_Logout (GHSA-h2r5-32gc-wfx4).
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void PrivateObjects_AreHiddenWithoutALogin() => SessionConformanceTestCases.Assert_PrivateObjects_AreHiddenWithoutALogin(_backend);
 
     // FreeHSM refuses before it checks the SO PIN, from 2.6.0; earlier versions re-initialized the token.
@@ -53,25 +51,24 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
     public void PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(string call) => SessionConformanceTestCases.Assert_PrivateObjectCreation_WithoutALogin_IsUserNotLoggedIn(_backend, call);
 
     // FreeHSM destroys private session objects and invalidates private handles on C_Logout from 2.6.1; earlier
-    // versions kept both. It counts a data object as private whatever its template says.
+    // versions kept both. Up to 2.6.1 it also counted a data object made public as private.
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
-    public void Logout_InvalidatesPrivateHandles() => SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend,
-        dataObjectsArePrivate: !FreeHsmBackendFixture.FreeHsmKeepsTheCkaPrivateAsked);
+    public void Logout_InvalidatesPrivateHandles() => SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void SoAndUser_ExcludeEachOther() => SessionConformanceTestCases.Assert_SoAndUser_ExcludeEachOther(_backend);
 
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.SoPrivateObjectRefusalAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM lets the SO make a private object")]
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
+
+    // FreeHSM keeps the SO from the user's private objects since v2.7.0 (GHSA-h2r5-32gc-wfx4); PKCS#11 does not
+    // require it, so this case runs here only.
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void So_ReachesNoneOfTheUsersPrivateObjects() => SessionConformanceTestCases.Assert_So_ReachesNoneOfTheUsersPrivateObjects(_backend);
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCalls), MemberType = typeof(SessionConformanceTestCases))]
-    public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall)
-    {
-        if (whoAndCall.StartsWith("SO;", StringComparison.Ordinal) && !FreeHsmBackendFixture.SoPrivateObjectRefusalAvailable)
-            Assert.Skip("FreeHSM lets the SO make a private object.");
-        SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
-    }
+    public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall) => SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
@@ -81,12 +78,7 @@ public sealed class SessionConformanceTests_FreeHsm(FreeHsmBackendFixture backen
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
-    public void ReadOnlySession_RefusesTokenObjectWrites(string call)
-    {
-        if (call == "CopyObject" && !FreeHsmBackendFixture.FreeHsmRefusesTokenObjectCopiesInReadOnlySessions)
-            Assert.Skip("FreeHSM copies a token object in a read-only session");
-        SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
-    }
+    public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
