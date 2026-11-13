@@ -12,6 +12,29 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal readonly record struct ObjectIdentity(CKO ObjectClass, CKK KeyType, string Label, byte[] Id, bool IsPrivate);
 
 /// <summary>
+/// What a borrowing session (<c>Pkcs11SessionCore.Borrow</c>) reads of an object it created, when it creates it and
+/// again before its return destroys it, to tell it is still that object: the module may have given a destroyed
+/// object's number to another one meanwhile (PKCS#11 v3.2 allows handle reuse). Each value is <see langword="null"/>
+/// when it cannot be read.
+/// </summary>
+/// <param name="IsToken"><c>CKA_TOKEN</c>.</param>
+/// <param name="ObjectClass"><c>CKA_CLASS</c>.</param>
+/// <param name="Label">
+/// <c>CKA_LABEL</c>, as the module returned it; <see langword="null"/> also when it is longer than
+/// <see cref="ObjectIdentityReader.LabelCapacity"/>. Compared, never logged.
+/// </param>
+internal readonly record struct SessionObjectMark(bool? IsToken, CKO? ObjectClass, byte[]? Label)
+{
+    /// <summary>
+    /// Whether <paramref name="recorded"/>, read when the object was created, still describes this one: the same
+    /// class and label, each unreadable both times or equal.
+    /// </summary>
+    public bool Matches(SessionObjectMark recorded)
+        => ObjectClass == recorded.ObjectClass
+            && (Label is null ? recorded.Label is null : recorded.Label is not null && Label.AsSpan().SequenceEqual(recorded.Label));
+}
+
+/// <summary>
 /// Reads an object's <see cref="ObjectIdentity"/> in one <c>C_GetAttributeValue</c> call, into buffers
 /// on the stack sized for ordinary metadata, instead of the generic reader's length query followed by
 /// a read into allocated buffers. That halves the round trips per found object.
@@ -105,14 +128,54 @@ internal static unsafe class ObjectIdentityReader
     /// <returns>The value, or <see langword="null"/> when the read is not clean (any return value but
     /// <c>CKR_OK</c>, or a length other than one <c>CK_BBOOL</c>); the caller then decides by class.</returns>
     internal static bool? TryReadPrivate(LowLevelPkcs11Library library, NativeCULong session, NativeCULong objectId)
+        => TryReadBool(library, session, objectId, CKA.CKA_PRIVATE);
+
+    /// <summary>
+    /// Reads one <c>CK_BBOOL</c> attribute of <paramref name="objectId"/>; <see langword="null"/> when it cannot be
+    /// read (the object gone, the attribute absent or unreadable, a value not one byte long).
+    /// </summary>
+    internal static bool? TryReadBool(LowLevelPkcs11Library library, NativeCULong session, NativeCULong objectId, CKA attribute)
     {
         byte value = 0;
         Span<CK_ATTRIBUTE> template = stackalloc CK_ATTRIBUTE[1];
-        template[0] = Entry(CKA.CKA_PRIVATE, &value, sizeof(byte));
+        template[0] = Entry(attribute, &value, sizeof(byte));
         if (library.C_GetAttributeValue(session, objectId, template) != CKR.CKR_OK
             || (ulong)template[0].valueLen != sizeof(byte))
             return null;
         return value != 0;
+    }
+
+    /// <summary>
+    /// Reads <c>CKA_TOKEN</c>, <c>CKA_CLASS</c> and <c>CKA_LABEL</c> of <paramref name="objectId"/> in one call, for
+    /// a borrowing session's record of an object it created (<see cref="SessionObjectMark"/>). An attribute the object
+    /// lacks, or will not reveal, leaves only its own value <see langword="null"/>: <c>CKR_ATTRIBUTE_TYPE_INVALID</c>,
+    /// <c>CKR_ATTRIBUTE_SENSITIVE</c> and <c>CKR_BUFFER_TOO_SMALL</c> still answer every other attribute (PKCS#11 v3.2
+    /// C_GetAttributeValue). Any other failure, the object gone included, leaves all three <see langword="null"/>.
+    /// </summary>
+    internal static SessionObjectMark ReadSessionObjectMark(LowLevelPkcs11Library library, NativeCULong session,
+        NativeCULong objectId)
+    {
+        byte isToken = 0;
+        NativeCULong objectClass = default;
+        byte* label = stackalloc byte[LabelCapacity];
+        int ulongSize = sizeof(NativeCULong);
+
+        Span<CK_ATTRIBUTE> template = stackalloc CK_ATTRIBUTE[3];
+        template[0] = Entry(CKA.CKA_TOKEN, &isToken, sizeof(byte));
+        template[1] = Entry(CKA.CKA_CLASS, &objectClass, ulongSize);
+        template[2] = Entry(CKA.CKA_LABEL, label, LabelCapacity);
+
+        CKR rv = library.C_GetAttributeValue(session, objectId, template);
+        if (rv is not (CKR.CKR_OK or CKR.CKR_ATTRIBUTE_TYPE_INVALID or CKR.CKR_ATTRIBUTE_SENSITIVE
+            or CKR.CKR_BUFFER_TOO_SMALL))
+            return default;
+
+        // CK_UNAVAILABLE_INFORMATION is all ones, so it fails every length check below as well.
+        ulong labelLength = (ulong)template[2].valueLen;
+        return new SessionObjectMark(
+            IsToken: (ulong)template[0].valueLen == sizeof(byte) ? isToken != 0 : null,
+            ObjectClass: (ulong)template[1].valueLen == (ulong)ulongSize ? (CKO)(ulong)objectClass : null,
+            Label: labelLength <= LabelCapacity ? new ReadOnlySpan<byte>(label, (int)labelLength).ToArray() : null);
     }
 
     private static CK_ATTRIBUTE Entry(CKA type, void* value, int capacity) => new()

@@ -13,6 +13,8 @@ public sealed class SessionParallelTests_CratonHsm(CratonHsmBackendFixture backe
         SessionParallelTestCases.Assert_ParallelSessions_GenerateFindAndDestroyOwnKeys(_backend);
 
     // Craton keeps session objects past C_CloseSession: see CratonHsmBackendFixture.CratonHsmDestroysSessionObjectsOnCloseSession.
+    // Closing a session never destroys its session objects, concurrent or not.
+    // Reported upstream: https://github.com/craton-co/craton-hsm-core/issues/98
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.SessionCloseCleanupAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM: session objects survive C_CloseSession (a closed session's key is still found)")]
     public void ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind() =>
         SessionParallelTestCases.Assert_ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind(_backend);

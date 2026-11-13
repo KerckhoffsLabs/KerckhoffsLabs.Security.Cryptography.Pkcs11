@@ -27,7 +27,7 @@ internal sealed partial class Pkcs11SessionCore
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_InitPIN</c>.</exception>
     internal void SendInitPin(ReadOnlySpan<byte> pin)
     {
-        using var _ = AcquireExclusive();
+        using var _ = AcquireForRecord();
 
         Log.SessionTrace(_logger, (ulong)_sessionId, pin.IsEmpty ? "InitPin (protected authentication path)" : "InitPin");
 
@@ -142,7 +142,7 @@ internal sealed partial class Pkcs11SessionCore
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_Login</c>.</exception>
     internal void SendLogin(CKU userType, ReadOnlySpan<byte> pin)
     {
-        using var _ = AcquireExclusive();
+        using var _ = AcquireForRecord();
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
@@ -243,12 +243,12 @@ internal sealed partial class Pkcs11SessionCore
     /// <exception cref="Pkcs11Exception">Propagated from C_LoginUser. <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> indicates the loaded library is v2.40 or otherwise does not export C_LoginUser.</exception>
     internal void SendLoginUser(CKU userType, ReadOnlySpan<byte> pin, string username)
     {
-        using var _ = AcquireExclusive();
+        using var _ = AcquireForRecord();
         ArgumentNullException.ThrowIfNull(username);
         if (username.Length == 0)
             throw new ArgumentException("Username must not be empty.", nameof(username));
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "LoginUser");
 

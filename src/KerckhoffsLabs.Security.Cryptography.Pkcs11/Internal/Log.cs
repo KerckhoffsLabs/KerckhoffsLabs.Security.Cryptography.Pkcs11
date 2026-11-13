@@ -109,6 +109,21 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Slot({SlotId}): the module reported the login ended ({Reason}); its holders are no longer logged in")]
     public static partial void TokenLoginEnded(ILogger logger, ulong slotId, CKR reason);
 
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Slot({SlotId}): the token allows this application no further session of the kind asked for, so the login lends its own session {SessionId} as a working session")]
+    public static partial void AnchorLent(ILogger logger, ulong slotId, ulong sessionId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Slot({SlotId}): the login's own session {SessionId} was returned by the session it was lent to")]
+    public static partial void AnchorReturned(ILogger logger, ulong slotId, ulong sessionId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): returning the lent session, C_DestroyObject on its session object {ObjectHandle} returned {Rv}; the object stays until the login's session closes")]
+    public static partial void LentSessionObjectNotDestroyed(ILogger logger, ulong sessionId, ulong objectHandle, CKR rv);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Session({SessionId}): returning the lent session, its session object {ObjectHandle} is gone or no longer the one it created (CKA_TOKEN, CKA_CLASS or CKA_LABEL differ or cannot be read); not destroyed")]
+    public static partial void LentSessionObjectNotTheOneCreated(ILogger logger, ulong sessionId, ulong objectHandle);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): returning the lent session with operations 0x{Operations:X} still active, which the module cannot cancel; the next session it is lent to cannot start operations of those kinds")]
+    public static partial void LentSessionOperationsCarried(ILogger logger, ulong sessionId, ulong operations);
+
     /// <summary>
     /// A user type as a log argument: converts from <see cref="CKU"/> without work, and renders as
     /// <see cref="UserTypeName"/> only when a message is formatted, so a disabled level costs nothing.

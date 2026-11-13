@@ -56,8 +56,8 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         using var session = slot.OpenSessionCore();
         // C_InitPIN requires an SO-authenticated session before it even looks at the PIN
         // pointer, so log in with a real PIN first — only InitPin itself is under test. This is the send
-        // Pkcs11Login.InitUserPinWithPinpad makes on the SO login's anchor; that public path, which would need an
-        // SO login of its own, is covered over LoginTokenModule (Unit/PinManagementTests).
+        // Pkcs11Login.InitUserPinWithPinpad makes on the SO login's anchor; that public path is
+        // LoginInitUserPinWithPinpad_ReachesNativeCallAsNull below.
         using var soPin = new SecurePin(_backend.SoPin.Span);
         session.SendLogin(CKU.CKU_SO, soPin.Pin);
 
@@ -90,5 +90,16 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         using var session = _backend.OpenSession();
 
         AssertArgumentsBad(session.SetPinWithPinpad);
+    }
+
+    // The SO login's own session is the mock's only one; C_InitPIN needs its R/W SO state and answers
+    // CKR_ARGUMENTS_BAD for the NULL PIN.
+    [Fact]
+    public void LoginInitUserPinWithPinpad_ReachesNativeCallAsNull()
+    {
+        using var soPin = new SecurePin(_backend.SoPin.Span);
+        using Pkcs11Login login = _backend.Slot.Login(TokenUser.SecurityOfficer, soPin);
+
+        AssertArgumentsBad(login.InitUserPinWithPinpad);
     }
 }

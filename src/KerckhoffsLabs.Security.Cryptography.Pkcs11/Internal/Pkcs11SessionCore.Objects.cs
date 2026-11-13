@@ -29,6 +29,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, out NativeCULong objectId);
         ThrowIfError(rv, OpCreateObject);
+        RecordCreated(objectId);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -57,6 +58,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, out NativeCULong objectId);
         ThrowIfError(rv, OpCopyObject);
+        RecordCreated(objectId);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -77,6 +79,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId));
         ThrowIfError(rv, OpDestroyObject);
+        ForgetDestroyed((NativeCULong)objectHandle.ObjectId);
     }
 
     /// <summary>

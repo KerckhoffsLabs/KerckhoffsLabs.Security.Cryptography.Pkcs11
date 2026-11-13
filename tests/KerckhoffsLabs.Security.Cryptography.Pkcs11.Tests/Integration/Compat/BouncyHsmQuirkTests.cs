@@ -922,15 +922,19 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 #pragma warning restore KLPKCS11008, KLPKCS11009
 
-    // On the shared token, which is not a qualified-area one: the case puts CKA_ALWAYS_AUTHENTICATE in the template.
+    // The harrison314/BouncyHsm#145 canary. On the shared token, which is not a qualified-area one (so it needs no
+    // QualifiedAreaToken): the case puts CKA_ALWAYS_AUTHENTICATE in the template. A skip from inside the case (the
+    // token lacks the mechanisms or a login) is a skip here too, not the quirk's disappearance.
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void AlwaysAuthenticateInATemplate_QuirkStillPresent()
     {
         Exception? ex = Record.Exception(() => TokenLoginTestCases.Assert_AlwaysAuthenticateKey_SignsWithContextLogin(_backend));
+        if (ex is SkipException skip)
+            Assert.Skip(skip.Message);
 
         Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_ATTRIBUTE_READ_ONLY },
             "C_GenerateKeyPair with CKA_ALWAYS_AUTHENTICATE in the private template no longer gives CKR_ATTRIBUTE_READ_ONLY " +
-            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmTakesAlwaysAuthenticateInATemplate to true and delete this test.");
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): delete " +
+            "this test and BouncyHsmBackendFixture.BouncyHsmTakesAlwaysAuthenticateInATemplate (harrison314/BouncyHsm#145).");
     }
 }

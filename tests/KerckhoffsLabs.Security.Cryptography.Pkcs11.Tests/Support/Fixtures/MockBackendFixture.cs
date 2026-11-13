@@ -23,22 +23,12 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>
     /// <see langword="false"/>: pkcs11-mock allows one open session at a time (<c>C_OpenSession</c> answers
-    /// <c>CKR_SESSION_COUNT</c> for a second), so a login, which keeps a session of its own, leaves no room for the
-    /// session a test works on. The mock runs every crypto operation on a public session and checks a login only
+    /// <c>CKR_SESSION_COUNT</c> for a second), so a login's anchor would take the only session from every other mock
+    /// test, and the fixture keeps none. The mock runs every crypto operation on a public session and checks a login only
     /// for <c>C_InitPIN</c> and <c>C_Logout</c>, so its tests open sessions without one; login behaviour is
     /// tested on <c>LoginTokenModule</c>.
     /// </summary>
     public bool RequiresUserLogin => false;
-
-    /// <summary>
-    /// A capability, not a departure from PKCS#11: false while pkcs11-mock allows one open session at a time. A login
-    /// keeps a session of its own besides the ones it opens, so the first session a login opens is refused there with
-    /// <c>CKR_SESSION_COUNT</c>.
-    /// </summary>
-    public const bool MockAllowsSeveralSessions = false;
-
-    /// <summary>Gate for the cases that log in and open a session: see <see cref="MockAllowsSeveralSessions"/>.</summary>
-    public static bool LoginSessionsAvailable => MockAllowsSeveralSessions;
 
     public MockBackendFixture()
     {

@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
@@ -79,6 +80,26 @@ public sealed class Pkcs11Login : IDisposable
     /// Opens a session with the token that keeps this login while it is open, even once this
     /// <see cref="Pkcs11Login"/> is disposed.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The login keeps a session of its own with the token. On a token that allows this application no more sessions
+    /// (<c>C_OpenSession</c> answers <c>CKR_SESSION_COUNT</c>; the token's advertised limits are not consulted, as they
+    /// are optional and not always right), that session is <b>lent</b> as the session returned: a token that allows
+    /// one session can still be used with a login, one working session at a time. A lent session is used like any
+    /// other, with its own <paramref name="policy"/> and <see cref="Pkcs11Session.ContextAuthentication"/>, and
+    /// <see cref="Pkcs11Session.GetSessionInfo"/> answers for the login's session, the module's truth. Its
+    /// <see cref="Pkcs11Session.Access"/> is the login session's: a read-only request served by a read/write session
+    /// reads <see cref="SessionAccess.ReadWrite"/>. Disposing it hands the session back to the login (see
+    /// <see cref="Pkcs11Session.Dispose"/>), and a later call lends it again. While it is lent, the login's own sends on
+    /// it (another <see cref="Pkcs11Slot.Login"/> of the same user, <see cref="InitUserPinWithPin"/>) wait for the
+    /// operation in flight on it, and its operations wait for them; a pinpad login can so delay it.
+    /// </para>
+    /// <para>
+    /// On a module without <c>C_SessionCancel</c>, an operation a lent session abandoned (a failure partway through
+    /// a sign, say) can make a later <see cref="Pkcs11Slot.Login"/> or <see cref="InitUserPinWithPin"/> answer
+    /// <c>CKR_OPERATION_ACTIVE</c>: dispose the login's sessions and the login, and log in again.
+    /// </para>
+    /// </remarks>
     /// <param name="access">
     /// <see cref="SessionAccess.ReadWrite"/> (the default) or <see cref="SessionAccess.ReadOnly"/>, the only kind
     /// a write-protected token accepts. A Security Officer login allows only read/write sessions.
@@ -86,13 +107,17 @@ public sealed class Pkcs11Login : IDisposable
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
     /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>
-    /// The open session; the caller disposes it. Disposing it closes it and releases its hold: it logs out only when it
-    /// is the login's last holder.
+    /// The open session; the caller disposes it. Disposing it closes it (or, for a lent session, hands it back) and
+    /// releases its hold: it logs out only when it is the login's last holder.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
-    /// <exception cref="Pkcs11SessionException">A read-only session under a Security Officer login
-    /// (<c>CKR_SESSION_READ_WRITE_SO_EXISTS</c>, refused before the module).</exception>
+    /// <exception cref="Pkcs11SessionException">
+    /// A read-only session under a Security Officer login (<c>CKR_SESSION_READ_WRITE_SO_EXISTS</c>, refused before the
+    /// module). Or <c>CKR_SESSION_COUNT</c>, from the module, when the token allows no more sessions and the login's
+    /// own session cannot be lent: it is lent already (dispose that session first), or it is read-only and
+    /// <paramref name="access"/> is read/write (open a <see cref="SessionAccess.ReadOnly"/> one); the message says which.
+    /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
     public Pkcs11Session OpenSession(SessionAccess access = SessionAccess.ReadWrite, ICryptoPolicy? policy = null)
     {
@@ -104,14 +129,29 @@ public sealed class Pkcs11Login : IDisposable
 
         // Taken first, so the login cannot go between the session opening and the session holding it.
         LoginHold share = _hold.Record.Share(_hold, library);
+        Pkcs11SessionCore? core = null;
         try
         {
-            Pkcs11SessionCore core = Slot.OpenSessionCore(access == SessionAccess.ReadWrite, policy);
+            try
+            {
+                core = Slot.OpenSessionCore(access == SessionAccess.ReadWrite, policy);
+            }
+            catch (Pkcs11SessionException ex) when (ex.ReturnValue == CKR.CKR_SESSION_COUNT)
+            {
+                // The module's answer stays as the inner exception of a refusal. The token allows no further session
+                // of the kind asked for: the login lends its own, if it can.
+                core = _hold.Record.TryLend(share, library, access, policy, library.LoggerFactory, out string? refusal)
+                    ?? throw new Pkcs11SessionException(CKR.CKR_SESSION_COUNT, Pkcs11Operations.OpOpenSession,
+                        refusal!, ex);
+            }
+
             core.ContextAuthentication = ContextAuthentication;
-            return new Pkcs11Session(library, Slot, core, access, this, share);
+            SessionAccess actual = core.IsReadWrite ? SessionAccess.ReadWrite : SessionAccess.ReadOnly;
+            return new Pkcs11Session(library, Slot, core, actual, this, share);
         }
         catch
         {
+            core?.Dispose();
             share.Dispose();
             throw;
         }

@@ -16,12 +16,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Module
 /// <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c> for any other; <c>CKR_SESSION_READ_ONLY_EXISTS</c> for an SO
 /// login while a read-only session is open; <c>CKR_SESSION_READ_WRITE_SO_EXISTS</c> for a read-only session
 /// while the SO is logged in; <c>CKR_TOKEN_WRITE_PROTECTED</c> for a read/write session on a
-/// <see cref="WriteProtected"/> token; <c>CKR_SESSION_EXISTS</c> for <c>C_InitToken</c> while a session is
-/// open; and the five <c>CKS_*</c> session states.
+/// <see cref="WriteProtected"/> token; <c>CKR_SESSION_COUNT</c> for a session beyond <see cref="MaxSessions"/> or
+/// a read/write one beyond <see cref="MaxRwSessions"/>; <c>CKR_SESSION_EXISTS</c> for <c>C_InitToken</c> while a
+/// session is open; and the five <c>CKS_*</c> session states.
 /// </para>
 /// <para>
-/// Objects (<see cref="AddObject"/>, <c>C_CreateObject</c>) answer <c>C_FindObjects*</c> and
-/// <c>C_GetAttributeValue</c>. A private object (<c>CKA_PRIVATE</c> true) is visible only while the application
+/// Objects (<see cref="AddObject"/>, <c>C_CreateObject</c>, and the key-creating functions <c>C_GenerateKey</c>,
+/// <c>C_GenerateKeyPair</c>, <c>C_UnwrapKey</c>, <c>C_DeriveKey</c>, <c>C_EncapsulateKey</c> and
+/// <c>C_DecapsulateKey</c>) answer <c>C_FindObjects*</c> and <c>C_GetAttributeValue</c>, and <c>C_DestroyObject</c>
+/// removes them. One made without <c>CKA_TOKEN</c> true is a session object (its <c>CKA_TOKEN</c> reads false): closing the session that created it
+/// destroys it, as <c>C_CloseSession</c> requires. A private object (<c>CKA_PRIVATE</c> true) is visible only while the application
 /// is logged in, and <c>C_Logout</c> invalidates its handle "even if a user is later logged back into the token":
 /// it is given a new handle, so the old one answers <c>CKR_OBJECT_HANDLE_INVALID</c> for good.
 /// </para>
@@ -32,7 +36,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Module
 /// <para>
 /// Sign and decrypt operations are tracked per session, as PKCS#11 v3.2 requires: a second <c>C_SignInit</c> or
 /// <c>C_DecryptInit</c> while one is active answers <c>CKR_OPERATION_ACTIVE</c>, and <c>C_SessionCancel</c> ends
-/// them. A private key with <c>CKA_ALWAYS_AUTHENTICATE</c> true (private_key_objects.md) needs a
+/// them (unless <see cref="SupportsSessionCancel"/> is false). A private key with <c>CKA_ALWAYS_AUTHENTICATE</c> true (private_key_objects.md) needs a
 /// <c>C_Login(CKU_CONTEXT_SPECIFIC)</c> with <see cref="ExpectedPin"/> (or a NULL PIN, the pinpad) after its
 /// <c>C_*Init</c>, else <c>C_Sign</c> and <c>C_Decrypt</c> answer <c>CKR_USER_NOT_LOGGED_IN</c>. A wrong PIN
 /// answers <c>CKR_PIN_INCORRECT</c> and leaves the operation as it was; the <see cref="LockAfter"/>-th wrong one in a
@@ -53,6 +57,7 @@ internal sealed class LoginTokenModule : FakeModule
 
     private readonly Lock _lock = new();
     private readonly List<(ulong Handle, bool ReadWrite)> _sessions = [];
+    private readonly List<CKR> _openSessionResults = [];
     private CKU? _loggedIn;
     private byte[]? _username;
     private int _loginCalls;
@@ -61,6 +66,9 @@ internal sealed class LoginTokenModule : FakeModule
     private (ulong Session, byte[] Pin)? _lastInitPin;
     private (ulong Session, byte[] OldPin, byte[] NewPin)? _lastSetPin;
     private readonly Dictionary<ulong, Dictionary<CKA, byte[]>> _objects = [];
+
+    // The session objects (CKA_TOKEN false) and the session that created each: its C_CloseSession destroys them.
+    private readonly Dictionary<ulong, ulong> _sessionObjects = [];
     private readonly Dictionary<ulong, Queue<ulong>> _finds = [];
     private readonly Dictionary<ulong, CKR> _failing = [];
     private ulong _nextObject = 0x100;
@@ -86,6 +94,14 @@ internal sealed class LoginTokenModule : FakeModule
     public IReadOnlyList<string> CallLog
     {
         get { lock (_lock) return [.. _callLog]; }
+    }
+
+    private readonly List<ulong> _destroyObjectCalls = [];
+
+    /// <summary>The handles <c>C_DestroyObject</c> was called for, in order, whatever it answered.</summary>
+    public IReadOnlyList<ulong> DestroyObjectCalls
+    {
+        get { lock (_lock) return [.. _destroyObjectCalls]; }
     }
 
     /// <summary>Empties <see cref="CallLog"/>.</summary>
@@ -116,6 +132,32 @@ internal sealed class LoginTokenModule : FakeModule
 
     /// <summary>Whether the token reports <c>CKF_WRITE_PROTECTED</c> and refuses read/write sessions.</summary>
     public bool WriteProtected { get; set; }
+
+    /// <summary>
+    /// How many sessions the application may have open at once, or <see langword="null"/> for no limit: one more
+    /// is <c>CKR_SESSION_COUNT</c> (PKCS#11 v3.2 C_OpenSession).
+    /// </summary>
+    public int? MaxSessions { get; set; }
+
+    /// <summary>
+    /// How many read/write sessions the application may have open at once, or <see langword="null"/> for no limit:
+    /// one more is <c>CKR_SESSION_COUNT</c>; a read-only one still opens within <see cref="MaxSessions"/>.
+    /// </summary>
+    public int? MaxRwSessions { get; set; }
+
+    /// <summary>
+    /// Whether <c>C_GetTokenInfo</c> reports <see cref="MaxSessions"/> and <see cref="MaxRwSessions"/> in
+    /// <c>ulMaxSessionCount</c> and <c>ulMaxRwSessionCount</c> (<c>CK_EFFECTIVELY_INFINITE</c> for no limit).
+    /// <see langword="false"/> reports <c>CK_EFFECTIVELY_INFINITE</c> whatever the limit, as pkcs11-mock does: the
+    /// fields are optional, so only <c>C_OpenSession</c>'s answer tells.
+    /// </summary>
+    public bool ReportSessionLimits { get; set; } = true;
+
+    /// <summary>Every <c>C_OpenSession</c> answer, in order.</summary>
+    public IReadOnlyList<CKR> OpenSessionResults
+    {
+        get { lock (_lock) return [.. _openSessionResults]; }
+    }
 
     /// <summary>
     /// Runs at the start of every <c>C_Login</c> and <c>C_LoginUser</c>, before the token's lock, with the session
@@ -196,6 +238,19 @@ internal sealed class LoginTokenModule : FakeModule
         }
     }
 
+    /// <summary>Whether the token holds an object with handle <paramref name="handle"/>, visible or not.</summary>
+    public bool HasObject(ulong handle)
+    {
+        lock (_lock)
+            return _objects.ContainsKey(handle);
+    }
+
+    /// <summary>
+    /// Whether <c>C_SessionCancel</c> works. <see langword="false"/> answers <c>CKR_FUNCTION_NOT_SUPPORTED</c> and
+    /// leaves the operations active, as on a module from before v3.0 (pkcs11-mock).
+    /// </summary>
+    public bool SupportsSessionCancel { get; set; } = true;
+
     /// <summary>
     /// Makes every later call on <paramref name="session"/> answer <paramref name="rv"/> (say
     /// <c>CKR_DEVICE_REMOVED</c>), until the session is closed.
@@ -251,28 +306,42 @@ internal sealed class LoginTokenModule : FakeModule
             info.SessionCount = (NativeCULong)(ulong)_sessions.Count;
             info.RwSessionCount = (NativeCULong)(ulong)_sessions.Count(s => s.ReadWrite);
         }
+        info.MaxSessionCount = (NativeCULong)Reported(MaxSessions);
+        info.MaxRwSessionCount = (NativeCULong)Reported(MaxRwSessions);
         return CKR.CKR_OK;
     }
 
     protected override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
+    {
+        lock (_lock)
+        {
+            CKR rv = OpenSessionLocked(slotId, flags, ref session);
+            _openSessionResults.Add(rv);
+            return rv;
+        }
+    }
+
+    private CKR OpenSessionLocked(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
     {
         if ((ulong)slotId != SlotId)
             return CKR.CKR_SLOT_ID_INVALID;
         if (((ulong)flags & CKF.CKF_SERIAL_SESSION) == 0)
             return CKR.CKR_SESSION_PARALLEL_NOT_SUPPORTED;
         bool readWrite = ((ulong)flags & CKF.CKF_RW_SESSION) != 0;
-        lock (_lock)
-        {
-            if (readWrite && WriteProtected)
-                return CKR.CKR_TOKEN_WRITE_PROTECTED;
-            if (!readWrite && _loggedIn == CKU.CKU_SO)
-                return CKR.CKR_SESSION_READ_WRITE_SO_EXISTS;
-            NativeCULong handle = NewSessionHandle();
-            _sessions.Add(((ulong)handle, readWrite));
-            session = handle;
-            return CKR.CKR_OK;
-        }
+        if (readWrite && WriteProtected)
+            return CKR.CKR_TOKEN_WRITE_PROTECTED;
+        if (!readWrite && _loggedIn == CKU.CKU_SO)
+            return CKR.CKR_SESSION_READ_WRITE_SO_EXISTS;
+        if (_sessions.Count >= MaxSessions || (readWrite && _sessions.Count(s => s.ReadWrite) >= MaxRwSessions))
+            return CKR.CKR_SESSION_COUNT;
+        NativeCULong handle = NewSessionHandle();
+        _sessions.Add(((ulong)handle, readWrite));
+        session = handle;
+        return CKR.CKR_OK;
     }
+
+    private ulong Reported(int? limit)
+        => ReportSessionLimits && limit is { } max ? (ulong)max : CK.CK_EFFECTIVELY_INFINITE;
 
     protected override CKR C_CloseSession(NativeCULong session)
     {
@@ -285,6 +354,11 @@ internal sealed class LoginTokenModule : FakeModule
             _failing.Remove((ulong)session);
             _finds.Remove((ulong)session);
             EndOperationsLocked((ulong)session, CKF.CKF_SIGN | CKF.CKF_DECRYPT);
+            foreach (ulong created in _sessionObjects.Where(o => o.Value == (ulong)session).Select(o => o.Key).ToList())
+            {
+                _sessionObjects.Remove(created);
+                _objects.Remove(created);
+            }
 
             // Closing the last session returns the application to public sessions.
             if (_sessions.Count == 0)
@@ -429,6 +503,8 @@ internal sealed class LoginTokenModule : FakeModule
         lock (_lock)
         {
             _callLog.Add("C_SessionCancel");
+            if (!SupportsSessionCancel)
+                return CKR.CKR_FUNCTION_NOT_SUPPORTED;
             if (!IsOpen(session))
                 return CKR.CKR_SESSION_HANDLE_INVALID;
             return EndOperationsLocked((ulong)session, (ulong)flags) ? CKR.CKR_OK : CKR.CKR_OPERATION_NOT_INITIALIZED;
@@ -627,11 +703,93 @@ internal sealed class LoginTokenModule : FakeModule
 
     // A private object needs a login, as on a real token; CKA_PRIVATE defaults to false here.
     protected override CKR C_CreateObject(NativeCULong session, CK_ATTRIBUTE[] template, ref NativeCULong objectId)
+        => Create(session, template, defaultClass: null, ref objectId);
+
+    /// <summary>The length of the ciphertext <c>C_EncapsulateKey</c> produces.</summary>
+    public const int CiphertextLength = 16;
+
+    /// <summary>
+    /// Whether <c>C_EncapsulateKey</c> asked for the length only (a NULL buffer) creates the shared key anyway, and
+    /// returns its handle, as SoftHSM does: the library's length probe then leaves a key behind.
+    /// </summary>
+    public bool EncapsulatesOnLengthProbe { get; set; }
+
+    /// <summary>
+    /// Every object made by <c>C_CreateObject</c> or a key-creating function (<c>C_GenerateKey</c>,
+    /// <c>C_GenerateKeyPair</c>, <c>C_UnwrapKey</c>, <c>C_DeriveKey</c>, <c>C_EncapsulateKey</c>,
+    /// <c>C_DecapsulateKey</c>), in order, whether or not it still exists.
+    /// </summary>
+    public IReadOnlyList<ulong> CreatedObjects
+    {
+        get { lock (_lock) return [.. _createdObjects]; }
+    }
+
+    private readonly List<ulong> _createdObjects = [];
+
+    /// <summary>
+    /// The handle the next object made will get, for a test that has the module give a destroyed object's number to
+    /// a new one, as PKCS#11 allows.
+    /// </summary>
+    public ulong NextObjectHandle
+    {
+        get { lock (_lock) return _nextObject; }
+        set { lock (_lock) _nextObject = value; }
+    }
+
+    // The key-creating functions accept any mechanism, key and input: each makes one object from its template, of
+    // the class the function implies when the template names none, and a session object unless CKA_TOKEN is true.
+    protected override CKR C_GenerateKey(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, ref NativeCULong key)
+        => Create(session, template, CKO.CKO_SECRET_KEY, ref key);
+
+    protected override CKR C_GenerateKeyPair(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate,
+        CK_ATTRIBUTE[] privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
+    {
+        lock (_lock)
+        {
+            CKR rv = Create(session, publicKeyTemplate, CKO.CKO_PUBLIC_KEY, ref publicKey);
+            return rv == CKR.CKR_OK ? Create(session, privateKeyTemplate, CKO.CKO_PRIVATE_KEY, ref privateKey) : rv;
+        }
+    }
+
+    protected override CKR C_UnwrapKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey,
+        CK_ATTRIBUTE[] template, ref NativeCULong key)
+        => Create(session, template, CKO.CKO_SECRET_KEY, ref key);
+
+    protected override CKR C_DeriveKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, ref NativeCULong key)
+        => Create(session, template, CKO.CKO_SECRET_KEY, ref key);
+
+    protected override CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template,
+        NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong key)
+    {
+        if (ciphertext.IsNull)
+        {
+            ciphertextLen = (NativeCULong)(ulong)CiphertextLength;
+            return EncapsulatesOnLengthProbe ? Create(session, template, CKO.CKO_SECRET_KEY, ref key) : CKR.CKR_OK;
+        }
+        if (ciphertext.Span.Length < CiphertextLength)
+        {
+            ciphertextLen = (NativeCULong)(ulong)CiphertextLength;
+            return CKR.CKR_BUFFER_TOO_SMALL;
+        }
+        ciphertext.Span[..CiphertextLength].Fill(0xC7);
+        ciphertextLen = (NativeCULong)(ulong)CiphertextLength;
+        return Create(session, template, CKO.CKO_SECRET_KEY, ref key);
+    }
+
+    protected override CKR C_DecapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template,
+        ReadOnlySpan<byte> ciphertext, ref NativeCULong key)
+        => Create(session, template, CKO.CKO_SECRET_KEY, ref key);
+
+    // One object from template; CKA_CLASS defaults to defaultClass when given.
+    private CKR Create(NativeCULong session, CK_ATTRIBUTE[] template, CKO? defaultClass, ref NativeCULong objectId)
     {
         Dictionary<CKA, byte[]> attributes = ReadTemplate(template);
+        if (defaultClass is { } objectClass)
+            attributes.TryAdd(CKA.CKA_CLASS, Ulong((ulong)objectClass));
         attributes.TryAdd(CKA.CKA_PRIVATE, [0]);
         attributes.TryAdd(CKA.CKA_LABEL, []);
         attributes.TryAdd(CKA.CKA_ID, []);
+        attributes.TryAdd(CKA.CKA_TOKEN, [0]);
         lock (_lock)
         {
             if (!IsOpen(session))
@@ -640,7 +798,27 @@ internal sealed class LoginTokenModule : FakeModule
                 return CKR.CKR_USER_NOT_LOGGED_IN;
             ulong handle = _nextObject++;
             _objects[handle] = attributes;
+            _createdObjects.Add(handle);
+            if (attributes[CKA.CKA_TOKEN] is not [not 0, ..])
+                _sessionObjects[handle] = (ulong)session;
             objectId = (NativeCULong)handle;
+            return CKR.CKR_OK;
+        }
+    }
+
+    protected override CKR C_DestroyObject(NativeCULong session, NativeCULong objectId)
+    {
+        lock (_lock)
+        {
+            _destroyObjectCalls.Add((ulong)objectId);
+            if (_failing.TryGetValue((ulong)session, out CKR failure))
+                return failure;
+            if (!IsOpen(session))
+                return CKR.CKR_SESSION_HANDLE_INVALID;
+            if (!IsVisible((ulong)objectId))
+                return CKR.CKR_OBJECT_HANDLE_INVALID;
+            _objects.Remove((ulong)objectId);
+            _sessionObjects.Remove((ulong)objectId);
             return CKR.CKR_OK;
         }
     }
@@ -741,7 +919,10 @@ internal sealed class LoginTokenModule : FakeModule
             {
                 Dictionary<CKA, byte[]> attributes = _objects[handle];
                 _objects.Remove(handle);
-                _objects[_nextObject++] = attributes;
+                ulong renamed = _nextObject++;
+                _objects[renamed] = attributes;
+                if (_sessionObjects.Remove(handle, out ulong creator))
+                    _sessionObjects[renamed] = creator;
             }
         }
         _loggedIn = null;

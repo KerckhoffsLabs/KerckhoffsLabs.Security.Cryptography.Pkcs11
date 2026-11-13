@@ -25,6 +25,8 @@ public sealed class TokenLoginTests_CratonHsm(CratonHsmBackendFixture backend)
         TokenLoginTestCases.Assert_AfterLastHolder_SlotSessionIsPublic(_backend);
 
     // See CratonHsmBackendFixture.CratonHsmTakesAContextSpecificLogin.
+    // Craton accepts CKA_ALWAYS_AUTHENTICATE but does not enforce it, so such a key signs with no context PIN:
+    // https://github.com/craton-co/craton-hsm-core/issues/99
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.ContextLoginAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM: C_Login refuses CKU_CONTEXT_SPECIFIC with CKR_USER_TYPE_INVALID")]
     public void AlwaysAuthenticateKey_SignsWithContextLogin() =>
         TokenLoginTestCases.Assert_AlwaysAuthenticateKey_SignsWithContextLogin(_backend);

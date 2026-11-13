@@ -53,6 +53,11 @@ public sealed partial class Pkcs11Session : IDisposable
     public Pkcs11Slot Slot { get; }
 
     /// <summary>Whether this session may change the token: read-only or read/write.</summary>
+    /// <remarks>
+    /// For a session a login lent its own session as (see <see cref="Pkcs11Login.OpenSession"/>), the access of that
+    /// session: a <see cref="SessionAccess.ReadOnly"/> request served by a read/write one reads
+    /// <see cref="SessionAccess.ReadWrite"/>.
+    /// </remarks>
     public SessionAccess Access { get; }
 
     /// <summary>
@@ -199,6 +204,14 @@ public sealed partial class Pkcs11Session : IDisposable
     /// releases its hold of <see cref="Login"/>, if any. Never sends <c>C_Logout</c> itself: when this was the
     /// last holder of the login, releasing the hold logs out. Idempotent.
     /// </summary>
+    /// <remarks>
+    /// A session the login lent its own session as (see <see cref="Pkcs11Login.OpenSession"/>) is not closed: it is
+    /// handed back to the login, for the next <see cref="Pkcs11Login.OpenSession"/>. As closing would, this destroys the
+    /// session objects (<c>CKA_TOKEN</c> false) created through it; token objects stay. An operation the module could
+    /// not cancel (it has no <c>C_SessionCancel</c>) stays active on the login's session, and the next session it is
+    /// lent to is told so when it starts one of that kind. If the login ended while the session was lent, the login's
+    /// session is already closed, and this only releases the hold.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Called from inside an operation on the same token, for a session that holds a login: the logout its
     /// release may send waits for operations to finish, so it cannot run from one. Nothing is closed then.

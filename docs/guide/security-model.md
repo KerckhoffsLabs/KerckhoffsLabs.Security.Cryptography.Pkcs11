@@ -102,9 +102,6 @@ These are outside what the library can defend against, and outside the scope of
   library, enforces that.
 - **`NistApproved` is not FIPS certification**: it restricts what this library sends; FIPS 140-3 also
   requires a validated module operating in its approved mode.
-- **A login needs two sessions at once.** The library keeps a session of its own for each login, so a token
-  that allows only one session at a time refuses the first session a login opens (`CKR_SESSION_COUNT`, from
-  the module). There is no fallback. See [Logins and sessions](#logins-and-sessions).
 - **Logins made outside the library are not seen.** Another component of the process calling the module
   directly, or another process, can log in or out without the library knowing; the module's answer then
   decides.
@@ -136,10 +133,22 @@ using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
   sent, and the module's answer decides, but a token is not required to check the PIN of a user already
   logged in. A login of another user (the security officer, or another `LoginUser` username) while one is
   held is refused before the module.
-- **The library keeps a session of its own for each login**, on which it sends `C_Login` and `C_Logout`:
-  read-only for the user, read/write for the security officer. It is what keeps a login alive while you have
-  no session open, and it is never handed out. A token that allows one session at a time cannot be used
-  with a login (see [Known limits](#known-limits)).
+- **The library keeps a session of its own for each login**, on which it sends `C_Login` and `C_Logout`. It is
+  what keeps a login alive while you have no session open. It is read/write for both users where the token
+  allows. For the user it falls back to a read-only session where the token refuses a read/write one (a
+  write-protected token, or no read/write session left for this application); the security officer has no
+  such fallback, as that user has only read/write sessions. On a token that refuses another session
+  (`CKR_SESSION_COUNT`, from the module), `login.OpenSession()` lends the login's own session, one at a
+  time: a second one, or a `slot.OpenSession()` while the login is held, fails with `CKR_SESSION_COUNT` and
+  the message says why. A read/write request that a read-only login session would have to serve is refused
+  the same way (`CKR_SESSION_COUNT`; the message says "read-only"); a read-only request is served. Disposing
+  a lent session returns it to the login and destroys the session objects created through that lent session
+  (token objects stay, and so does an object whose handle the token has since given to a different object:
+  each is checked to still read `CKA_TOKEN` false, with the class and label it was created with). A `Login` while a slot session holds the token's only session fails the same way.
+- **A lent session ends with its login.** Once the login ends (for instance after `CKR_PIN_LOCKED`, or when the
+  login's own session is lost), a lent session refuses every call with `ObjectDisposedException`: log in
+  again and open a new one. An ordinary session from `login.OpenSession()` is not like this: it stays open as
+  a public session.
 - **Private handles do not outlive their login.** PKCS#11 invalidates every handle to a private object when
   the user logs out, even if the user logs in again. A `Pkcs11Key`, `Pkcs11Object` or `Pkcs11Certificate`
   found under a login that has since ended refuses to send its private handle (`ObjectDisposedException`):

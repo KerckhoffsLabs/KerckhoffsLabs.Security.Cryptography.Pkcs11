@@ -100,6 +100,10 @@ internal sealed partial class Pkcs11SessionCore
             if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
                 ThrowIfError(rv, "C_EncapsulateKey (length probe)");
 
+            // A module that performs the encapsulation during the probe (SoftHSM) has made a key already; a borrower
+            // must still destroy it. The real call below overwrites sharedHandle, and records its own.
+            RecordCreated(sharedHandle);
+
             // A token that ignores the probe (SoftHSM does) reports no size at all. Continuing would
             // allocate an empty buffer and hand the caller an empty ciphertext for an encapsulation
             // the token really performed, side effects and all — so fail here instead. The CKR is
@@ -118,6 +122,7 @@ internal sealed partial class Pkcs11SessionCore
             ThrowIfError(rv, OpEncapsulateKey);
         }
 
+        RecordCreated(sharedHandle);
         mechanism.AbsorbOutput(mechParams);
 
         ct = ReportedLength.Trim(ct, ctLen, OpEncapsulateKey);
@@ -170,6 +175,7 @@ internal sealed partial class Pkcs11SessionCore
             template,
             ciphertext, out NativeCULong sharedHandle);
         ThrowIfError(rv, OpDecapsulateKey);
+        RecordCreated(sharedHandle);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
         GC.KeepAlive(sharedKeyTemplate);
@@ -264,6 +270,7 @@ internal sealed partial class Pkcs11SessionCore
             template,
             associatedData, out NativeCULong newKey);
         ThrowIfError(rv, OpUnwrapKeyAuthenticated);
+        RecordCreated(newKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
         GC.KeepAlive(unwrappedKeyTemplate);

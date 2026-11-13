@@ -289,7 +289,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** .NET Engineer A
 
 ### [BL-099] ⚠️ PARTIALLY RESOLVED — The v3.0 half of "bound at interop but publicly unreachable": `C_SessionCancel`, `C_LoginUser`, and the 14 message multi-part / message sign-verify functions
-- **Status:** Partially resolved 2026-11-13 (token login model, `docs/superpowers/specs/2026-11-12-token-login-model-design.md`). `C_LoginUser` is public as `Pkcs11Slot.LoginUser(TokenUser, SecurePin, string username)`, which returns a `Pkcs11Login` like `Login`; the username is part of the login's identity, compared ordinally and never logged.
+- **Status:** Partially resolved 2026-11-13 (token login model, PR #365). `C_LoginUser` is public as `Pkcs11Slot.LoginUser(TokenUser, SecurePin, string username)`, which returns a `Pkcs11Login` like `Login`; the username is part of the login's identity, compared ordinally and never logged.
 - **Area:** PKCS#11 Conformance
 - **Severity:** Medium
 - **Effort:** L

@@ -16,7 +16,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// it with <c>BOUNCY_HSM_CFG_STRING</c>, which the client reads when the library loads, so it is set
 /// before <see cref="Pkcs11Library.Load(string, Pkcs11LibraryOptions)"/>. Each run starts from a fresh token.
 /// A second token, <see cref="QualifiedAreaToken"/>, serves the <c>CKA_ALWAYS_AUTHENTICATE</c> case alone; every
-/// other suite uses the first.
+/// other suite uses the first. A failure to set up that second token is kept local
+/// (<see cref="QualifiedAreaUnavailableReason"/>): only the case that needs it skips, and the first token's suites run.
 ///
 /// Known upstream bugs are gated below, one flag each, and
 /// <c>Integration/Compat/BouncyHsmQuirkTests</c> fails once a gated bug is fixed.
@@ -36,9 +37,15 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// The second token, on the same server and library: one that simulates a qualified area, where the server marks
     /// a generated private key that is private, sign-only, sensitive and not extractable <c>CKA_ALWAYS_AUTHENTICATE</c>
     /// itself. See <see cref="BouncyHsmTakesAlwaysAuthenticateInATemplate"/>. <see langword="null"/> when
-    /// <see cref="BouncyHsmAvailable"/> is false.
+    /// <see cref="BouncyHsmAvailable"/> is false, or when setting it up failed (<see cref="QualifiedAreaUnavailableReason"/>).
     /// </summary>
-    public BouncyHsmQualifiedAreaToken QualifiedAreaToken { get; } = null!;
+    public BouncyHsmQualifiedAreaToken? QualifiedAreaToken { get; }
+
+    /// <summary>
+    /// Why <see cref="QualifiedAreaToken"/> is <see langword="null"/>, for the skip of the case that needs it;
+    /// <see langword="null"/> while the token is set up.
+    /// </summary>
+    public string? QualifiedAreaUnavailableReason { get; } = "Requires " + nameof(BouncyHsmAvailable);
 
     /// <summary>Mechanisms the token reports via <c>C_GetMechanismList</c>; empty when unavailable.</summary>
     public IReadOnlySet<CKM> SupportedMechanisms { get; } = new HashSet<CKM>();
@@ -234,8 +241,14 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <c>GenerateKeyPairHandler.UpdatePrivateKey</c>). The shared test token is made without it, as that would mark
     /// every sign-only key of every suite; the always-authenticate case runs instead on <see cref="QualifiedAreaToken"/>,
     /// a second token made with it, where the key's template leaves the attribute to the server, and its context
-    /// login (<c>LoginHandler</c>) takes that token's signature PIN. Not yet reported upstream.
-    /// BouncyHsmQuirkTests.AlwaysAuthenticateInATemplate_QuirkStillPresent fails once it is fixed.
+    /// login (<c>LoginHandler</c>) takes that token's signature PIN. Reported upstream as
+    /// <see href="https://github.com/harrison314/BouncyHsm/issues/145"/>.
+    /// <para>
+    /// No test is gated on this flag: the case runs ungated on <see cref="QualifiedAreaToken"/>. It is kept as the
+    /// record of the quirk for the #145 canary, BouncyHsmQuirkTests.AlwaysAuthenticateInATemplate_QuirkStillPresent,
+    /// which fails once it is fixed: then delete the canary and this flag, and the case may move back to the shared
+    /// token.
+    /// </para>
     /// </summary>
     public const bool BouncyHsmTakesAlwaysAuthenticateInATemplate = false;
 
@@ -520,8 +533,13 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
         try
         {
             _server.CreateSlot(TokenLabel, Settings.UserPin, Settings.SoPin);
-            _server.CreateSlot(Settings.BouncyHsmQualifiedTokenLabel, Settings.BouncyHsmQualifiedUserPin,
-                Settings.BouncyHsmQualifiedSoPin, Settings.BouncyHsmQualifiedSignaturePin);
+            // The second token's failure stays its own: see QualifiedAreaUnavailableReason.
+            bool qualifiedCreated = TrySetUp(() =>
+                {
+                    _server.CreateSlot(Settings.BouncyHsmQualifiedTokenLabel, Settings.BouncyHsmQualifiedUserPin,
+                        Settings.BouncyHsmQualifiedSoPin, Settings.BouncyHsmQualifiedSignaturePin);
+                    return true;
+                }, out string? qualifiedFailure);
 
             string config = $"Server=127.0.0.1; Port={_server.TcpPort}; LogTarget=ErrorConsole; LogLevel=ERROR;";
             Environment.SetEnvironmentVariable("BOUNCY_HSM_CFG_STRING", config);
@@ -534,10 +552,22 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
             SlotId = (NativeCULong)slot.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(slot.GetMechanismList());
 
-            Pkcs11Slot qualified = Library.GetSlotList().FirstOrDefault(s => s.GetTokenInfo().Label == Settings.BouncyHsmQualifiedTokenLabel)
-                ?? throw new InvalidOperationException($"BouncyHsm token '{Settings.BouncyHsmQualifiedTokenLabel}' did not appear in the slot list.");
-            QualifiedAreaToken = new BouncyHsmQualifiedAreaToken(LibraryPath, Library, (NativeCULong)qualified.SlotId.Value,
-                new HashSet<CKM>(qualified.GetMechanismList()));
+            Pkcs11Library library = Library;
+            string libraryPath = LibraryPath;
+            QualifiedAreaToken = qualifiedCreated
+                ? TrySetUp(() =>
+                {
+                    Pkcs11Slot qualified = library.GetSlotList().FirstOrDefault(s => s.GetTokenInfo().Label == Settings.BouncyHsmQualifiedTokenLabel)
+                        ?? throw new InvalidOperationException($"BouncyHsm token '{Settings.BouncyHsmQualifiedTokenLabel}' did not appear in the slot list.");
+                    return new BouncyHsmQualifiedAreaToken(libraryPath, library, (NativeCULong)qualified.SlotId.Value,
+                        new HashSet<CKM>(qualified.GetMechanismList()));
+                }, out qualifiedFailure)
+                : null;
+            QualifiedAreaUnavailableReason = QualifiedAreaToken is null
+                ? $"BouncyHsm's qualified-area token could not be set up: {qualifiedFailure}"
+                : null;
+            if (QualifiedAreaUnavailableReason is not null)
+                Console.Error.WriteLine(QualifiedAreaUnavailableReason);
         }
         catch
         {
@@ -552,6 +582,25 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     {
         Library?.Dispose();
         _server?.Dispose();
+    }
+
+    /// <summary>
+    /// Runs <paramref name="setUp"/> for a part of the fixture whose failure must stay local (the qualified-area
+    /// token): its result, or <see langword="null"/> with <paramref name="failure"/> saying why. Only for such a part:
+    /// the first token's set-up still throws, and fails the fixture.
+    /// </summary>
+    internal static T? TrySetUp<T>(Func<T> setUp, out string? failure) where T : notnull
+    {
+        try
+        {
+            failure = null;
+            return setUp();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            failure = $"{ex.GetType().Name}: {ex.Message}";
+            return default;
+        }
     }
 
     internal static string? ServerAssemblyPath()

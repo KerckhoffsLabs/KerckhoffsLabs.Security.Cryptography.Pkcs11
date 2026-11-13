@@ -281,6 +281,13 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <para>
     /// Disposing the session closes it and never logs out.
     /// </para>
+    /// <para>
+    /// A login keeps a session of its own, and on a token that allows this application one session at a time it
+    /// <b>lends</b> that session to its own <see cref="Pkcs11Login.OpenSession"/>. This method never lends: while a
+    /// login holds the token's only session, a session opened here fails with <c>CKR_SESSION_COUNT</c> (use the login's
+    /// <see cref="Pkcs11Login.OpenSession"/> instead). A session opened here also holds that only session against a
+    /// <see cref="Login"/>, which fails with <c>CKR_SESSION_COUNT</c> until the session is disposed.
+    /// </para>
     /// </remarks>
     /// <param name="access">
     /// <see cref="SessionAccess.ReadOnly"/> (the default, least privilege, and the only kind a write-protected
@@ -292,7 +299,10 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     /// <exception cref="Pkcs11SessionException">A read-only session while this application has the Security Officer
-    /// logged in (<c>CKR_SESSION_READ_WRITE_SO_EXISTS</c>, refused before the module).</exception>
+    /// logged in (<c>CKR_SESSION_READ_WRITE_SO_EXISTS</c>, refused before the module); or the token allows this
+    /// application no more sessions (<c>CKR_SESSION_COUNT</c>, from the module). A login keeps a session of its own,
+    /// so on a token that allows one session, a session opened while a login is held is refused: open it through the
+    /// login (<see cref="Pkcs11Login.OpenSession"/>) instead, and the message says so.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
     public Pkcs11Session OpenSession(SessionAccess access = SessionAccess.ReadOnly, ICryptoPolicy? policy = null)
     {
@@ -323,6 +333,20 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// The PIN is not kept: it is sent from <paramref name="pin"/>'s buffer and never copied or logged. Fetch it
     /// from a secret store rather than code or configuration.
     /// </para>
+    /// <para>
+    /// The first login opens a session of its own and keeps it until the last holder is disposed. It is read/write
+    /// where the token allows (read-only for a <see cref="TokenUser.User"/> on a write-protected token, or when the
+    /// token has no read/write session left for this application), so it counts against the token's session limits.
+    /// On a token that allows this application no more sessions (a <see cref="OpenSession"/> session holds its only
+    /// one) the login fails with <c>CKR_SESSION_COUNT</c> before any PIN is sent: dispose that session, or log in
+    /// first and open sessions through the login.
+    /// </para>
+    /// <para>
+    /// On a token that allows one session at a time, the login's own session is <b>lent</b> to
+    /// <see cref="Pkcs11Login.OpenSession"/>, one working session at a time, so a login does not need a second session
+    /// to work with. While it holds the token's only session, <see cref="OpenSession"/> fails with
+    /// <c>CKR_SESSION_COUNT</c>: open the session through the login instead.
+    /// </para>
     /// </remarks>
     /// <param name="user">Who logs in: <see cref="TokenUser.User"/>, or <see cref="TokenUser.SecurityOfficer"/>.</param>
     /// <param name="pin">The PIN. The caller keeps ownership of it.</param>
@@ -332,7 +356,9 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     /// <exception cref="Pkcs11AuthenticationException">Someone else is logged in, or the token refused the login.</exception>
     /// <exception cref="Pkcs11SessionException">A Security Officer login while this application has a read-only
-    /// session open on the token (<c>CKR_SESSION_READ_ONLY_EXISTS</c>, refused before the module).</exception>
+    /// session open on the token (<c>CKR_SESSION_READ_ONLY_EXISTS</c>, refused before the module); or the login's
+    /// own session could not open because the token allows this application no more sessions
+    /// (<c>CKR_SESSION_COUNT</c>, from the module; no PIN is sent).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or <c>C_Login</c>.</exception>
     public Pkcs11Login Login(TokenUser user, SecurePin pin)
     {
@@ -343,13 +369,16 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <summary>
     /// Logs <paramref name="user"/> in to the token through its protected authentication path (a pinpad or
     /// other reader of its own, for tokens with <see cref="TokenFlags.ProtectedAuthenticationPath"/>), or
-    /// shares the login this application already has for that user. See <see cref="Login"/>.
+    /// shares the login this application already has for that user. See <see cref="Login"/>, which also describes how
+    /// the login's session is lent on a token that allows one session, and the <c>CKR_SESSION_COUNT</c> cases.
     /// </summary>
     /// <param name="user">Who logs in.</param>
     /// <returns>The caller's hold of the login; dispose it once done.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     /// <exception cref="Pkcs11AuthenticationException">Someone else is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11SessionException">As for <see cref="Login"/>: <c>CKR_SESSION_READ_ONLY_EXISTS</c>, or
+    /// <c>CKR_SESSION_COUNT</c> when the login's own session could not open (the pinpad is not used then).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or <c>C_Login</c>.</exception>
     public Pkcs11Login LoginWithPinpad(TokenUser user) => LoginCore(user, pin: null, username: null);
 
@@ -361,7 +390,9 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <remarks>
     /// The username is part of who is logged in: a login under another username, or a <see cref="Login"/>
     /// without one, is another user, refused before the module while this one is held. Usernames compare
-    /// ordinally (exact, case-sensitive). The username is never logged.
+    /// ordinally (exact, case-sensitive). The username is never logged. As for <see cref="Login"/>, the login's own
+    /// session is lent to <see cref="Pkcs11Login.OpenSession"/> on a token that allows one session at a time, and
+    /// a login while a <see cref="OpenSession"/> session holds that only session fails with <c>CKR_SESSION_COUNT</c>.
     /// </remarks>
     /// <param name="user">Who logs in.</param>
     /// <param name="pin">The PIN. The caller keeps ownership of it.</param>
@@ -372,6 +403,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     /// <exception cref="Pkcs11AuthenticationException">Someone else is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11SessionException">As for <see cref="Login"/>: <c>CKR_SESSION_READ_ONLY_EXISTS</c>, or
+    /// <c>CKR_SESSION_COUNT</c> when the login's own session could not open (no PIN is sent then).</exception>
     /// <exception cref="Pkcs11Exception">
     /// Propagated from <c>C_OpenSession</c> or <c>C_LoginUser</c>; <c>CKR_FUNCTION_NOT_SUPPORTED</c> from a module
     /// before v3.0.
@@ -451,6 +484,15 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
             flags |= CKF.CKF_RW_SESSION;
 
         CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, out NativeCULong sessionId);
+        if (rv == CKR.CKR_SESSION_COUNT && !anchor && LoginRecord.IsLoggedIn)
+        {
+            // The module's answer, explained: the login's own session may be what uses up the token's sessions.
+            throw Pkcs11Exception.Create(CKR.CKR_SESSION_COUNT, Pkcs11Operations.OpOpenSession,
+                $"{Pkcs11Operations.OpOpenSession}: the token in slot {(ulong)_slotId} allows this application " +
+                "no further session of the kind asked for (it may allow read/write ones no more, or any), and this " +
+                "application's login on it keeps a session of its own. Open the session through that login " +
+                "(Pkcs11Login.OpenSession), or dispose the login first.");
+        }
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpOpenSession);
 
         // Counted before the handle exists and uncounted by its release, which runs exactly once however

@@ -13,6 +13,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// The native side of a <see cref="Pkcs11Session"/>: the logical connection between an application
 /// and a token, its spec-level calls, and the policy enforced on them.
 /// </summary>
+/// <remarks>
+/// <para>
+/// A core usually owns its session handle. Two kinds work on the anchor session of a token login
+/// (<see cref="TokenLoginRecord"/>, <see cref="IsAnchorSide"/>): the anchor's own core, which owns it and through which
+/// the record sends the login's calls; and a <b>borrowing</b> core (<see cref="Borrow"/>), which works on it for a
+/// session the login lent its anchor to, on a token that allows no other (<c>CKR_SESSION_COUNT</c>). A borrower shares
+/// the anchor's handle, lock and the state that goes with the lock, and has its own policy, context authentication and
+/// caches. It never closes the handle: disposing it returns the loan (<see cref="TokenLoginRecord.Return"/>).
+/// </para>
+/// </remarks>
 internal sealed partial class Pkcs11SessionCore : IDisposable
 {
     /// <summary>
@@ -35,6 +45,22 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
 
     /// <summary>The login record of the slot this session was opened on, shared by every load of the module.</summary>
     internal TokenLoginRecord LoginRecord => _record;
+
+    // Fixed at construction: Dispose clears _sessionHandle, and the lock order must not change under a waiter.
+    private readonly bool _isAnchorSide;
+
+    /// <summary>
+    /// Whether this core works on the anchor session of its slot's login (<see cref="TokenLoginRecord"/>): the anchor's
+    /// own core, or a borrower the anchor is lent to. Such a core takes the gate before its lock (see
+    /// <see cref="AcquireExclusive"/>), and the record's sends on it wait their turn (<see cref="AcquireForRecord"/>).
+    /// </summary>
+    internal bool IsAnchorSide => _isAnchorSide;
+
+    // Fixed at construction, like the handle's own flag.
+    private readonly bool _isReadWrite;
+
+    /// <summary>Whether the session was opened read/write (<c>CKF_RW_SESSION</c>).</summary>
+    internal bool IsReadWrite => _isReadWrite;
 
     // See ContextAuthentication. A reference, so a read never tears; read once per operation, under the lease.
     private volatile ContextAuthentication? _contextAuthentication;
@@ -71,6 +97,27 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     private NativeCULong _sessionId => _sessionHandle is null ? (NativeCULong)CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
 
     /// <summary>
+    /// What goes with a session's lock: the lock itself, and the state its users read to tell each other apart, or
+    /// that outlives one of them. One per session handle, so an anchor and the borrower it is lent to share it.
+    /// </summary>
+    internal sealed class LockState
+    {
+        /// <summary>The lock; see <see cref="_busyLock"/>.</summary>
+        public readonly object Lock = new();
+
+        /// <summary>See <see cref="_recordSends"/>.</summary>
+        public int RecordSends;
+
+        /// <summary>See <see cref="_applicationHolder"/>.</summary>
+        public int ApplicationHolder;
+
+        /// <summary>See <see cref="_operationsAbandoned"/>. Under the lock.</summary>
+        public ulong OperationsAbandoned;
+    }
+
+    private readonly LockState _lockState;
+
+    /// <summary>
     /// Lock object guarding concurrent native-call access to this <see cref="Pkcs11SessionCore"/>.
     /// PKCS#11 sessions are not safe for concurrent use; this lock detects cross-thread
     /// attempts and throws <see cref="InvalidOperationException"/>.
@@ -86,43 +133,114 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// cannot report contention by throwing and must not close the session under an in-flight native call.
     /// See the comment there.
     /// </para>
+    /// <para>
+    /// A borrower (<see cref="Borrow"/>) uses its anchor's: the session is one, whichever core drives it.
+    /// </para>
     /// </remarks>
-    private readonly object _busyLock = new();
+    private readonly object _busyLock;
 
     /// <summary>
-    /// Disposable token returned by <see cref="AcquireExclusive"/>. Holds the busy lock, a reference
-    /// on the session handle, and the token login's gate shared, and releases all three on dispose.
+    /// How many of the login record's sends (<see cref="AcquireForRecord"/>) are waiting for, or holding, this
+    /// session's lock. Above zero, an anchor-side <see cref="AcquireExclusive"/> that finds the lock taken waits for
+    /// it instead of throwing: the holder is the record, not a second user of the session. Shared with a borrower.
+    /// </summary>
+    private ref int _recordSends => ref _lockState.RecordSends;
+
+    /// <summary>
+    /// The managed thread id of the application lease (an anchor-side <see cref="AcquireExclusive"/>, not a record
+    /// send) that holds this session's lock, or 0. Written only by the thread holding the lock: set just after it is
+    /// taken, cleared just before it is released. So a nonzero read means an application thread holds the lock at that
+    /// instant, which is what an anchor-side <see cref="AcquireExclusive"/> needs to know before it refuses. Shared
+    /// with a borrower, so the anchor's and the borrower's leases see each other.
+    /// </summary>
+    /// <remarks>
+    /// Only ever compared with 0 (held or not), never with the current thread's id: the id is there for a debugger, not
+    /// for a decision. A reentrant lease on the holding thread never reaches the comparison (its <c>TryEnter</c>
+    /// succeeds), and the anchor and its borrower may run on different threads, so "same thread" would mean nothing
+    /// here. Keep it a zero test.
+    /// </remarks>
+    private ref int _applicationHolder => ref _lockState.ApplicationHolder;
+
+    /// <summary>
+    /// <see cref="_applicationHolder"/> as read now, for tests: 0 unless an application lease holds this session's
+    /// lock.
+    /// </summary>
+    internal int ApplicationHolderMark => Volatile.Read(ref _applicationHolder);
+
+    /// <summary>
+    /// Disposable token returned by <see cref="AcquireExclusive"/> and <see cref="AcquireForRecord"/>. Holds the busy
+    /// lock, a reference on the session handle, and the token login's gate shared, and releases all three on dispose.
     /// </summary>
     /// <remarks>
     /// <para>
     /// The gate (<see cref="TokenLoginRecord.EnterOperation"/>) is what keeps a first login or the final logout
     /// on the slot from landing inside the operation: they wait for it to finish, as PKCS#11 v3.2 asks of a
-    /// logout ("any active operations should be finished"). Taken after the busy lock, per the lock order:
-    /// session lock, then the gate, then the login record's lock.
+    /// logout ("any active operations should be finished").
+    /// </para>
+    /// <para>
+    /// Lock order: an ordinary session's lock, then the gate, then the record's send lock, then the anchor's lock,
+    /// then the record's lock. An ordinary core takes its lock, then the reference, then the gate. An anchor-side core
+    /// (<see cref="IsAnchorSide"/>) takes the gate first, then its lock, then the reference: its lock comes after the
+    /// gate, since the record closes the anchor while holding the gate (shared, from an operation that learns the login
+    /// ended; or exclusive, for the final logout). Were the anchor's lock taken first, a thread holding it and queued on
+    /// the gate behind a waiting final logout would wait for that logout, the logout for the operation in flight, and
+    /// the operation for the anchor's lock. Each kind releases in the reverse of the order it took.
     /// </para>
     /// <para>
     /// The reference is what keeps the session open for a whole operation, from <c>C_*Init</c> to the
     /// last call: closing the handle elsewhere (<c>Pkcs11Library.Dispose</c> closes every tracked
-    /// session) only marks it closed, and its <c>C_CloseSession</c> waits until this lease lets go.
+    /// session) only marks it closed, and its <c>C_CloseSession</c> waits until this lease lets go. The reference is
+    /// released before the lock, whichever the kind, so that deferred <c>C_CloseSession</c> runs while this thread
+    /// still holds the lock and no other operation can start on the session it is closing.
     /// </para>
     /// <para>
     /// Implemented as <c>internal sealed class</c> (not <c>ref struct</c>) so the test suite can
     /// invoke <see cref="AcquireExclusive"/> via <c>[InternalsVisibleTo]</c> and hold the lease
     /// across a thread boundary. The one extra heap allocation per public method call is
-    /// negligible against the cost of crossing the P/Invoke boundary that follows.
+    /// negligible against the cost of crossing the P/Invoke boundary that follows. It is kept small, and the same for
+    /// every kind: what a lease undoes on its session's <see cref="LockState"/> (the record send's count, the
+    /// application lease's mark) is recorded as flags read off the state it already references, not as callbacks, so
+    /// no lease allocates a closure (<c>OperationCostGuardTests</c> holds the budget).
     /// </para>
     /// </remarks>
     internal sealed class ExclusiveLease : IDisposable
     {
-        private readonly object _lock;
+        private readonly LockState _state;
+        private readonly bool _gateFirst;
+        private readonly bool _countsRecordSend;
+        private bool _clearsApplicationMark;
+        private bool _lockTaken;
+        private bool _released;
         private Pkcs11SessionHandle? _handle;
         private IDisposable? _operation;
-        private bool _released;
 
-        internal ExclusiveLease(object lockObj)
+        /// <param name="state">The session's lock and its state; the lock is taken through <see cref="TakeLock"/> or <see cref="LockTaken"/>.</param>
+        /// <param name="gateFirst">Whether the gate was taken before the lock (an anchor-side core), which reverses the release.</param>
+        /// <param name="countsRecordSend">
+        /// Whether this is a record send, already counted in <see cref="LockState.RecordSends"/> by the caller: dispose
+        /// uncounts it, once, after the lock is released (or was never taken).
+        /// </param>
+        internal ExclusiveLease(LockState state, bool gateFirst = false, bool countsRecordSend = false)
         {
-            _lock = lockObj;
-            _released = false;
+            _state = state;
+            _gateFirst = gateFirst;
+            _countsRecordSend = countsRecordSend;
+        }
+
+        /// <summary>Records that the caller already holds the lock (a successful <see cref="Monitor.TryEnter(object)"/>).</summary>
+        internal void LockTaken() => _lockTaken = true;
+
+        /// <summary>Waits for the lock.</summary>
+        internal void TakeLock() => Monitor.Enter(_state.Lock, ref _lockTaken);
+
+        /// <summary>
+        /// Marks this thread as the application lease holding the lock (<see cref="LockState.ApplicationHolder"/>);
+        /// dispose clears the mark while the lock is still held, just before it is released. Under the lock.
+        /// </summary>
+        internal void MarkApplicationHolder()
+        {
+            Volatile.Write(ref _state.ApplicationHolder, Environment.CurrentManagedThreadId);
+            _clearsApplicationMark = true;
         }
 
         /// <summary>Takes a reference on <paramref name="handle"/>; throws <see cref="ObjectDisposedException"/> if it is already closed.</summary>
@@ -137,16 +255,28 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         /// <summary>Holds <paramref name="record"/>'s gate shared until this lease is disposed.</summary>
         internal void EnterOperation(TokenLoginRecord record) => _operation = record.EnterOperation();
 
+        /// <summary>Whether this lease holds the gate yet.</summary>
+        internal bool HoldsGate => _operation is not null;
+
         public void Dispose()
         {
             if (_released) return;
             _released = true;
-            // In the reverse of the order taken: the gate, then the reference, then the lock.
-            _operation?.Dispose();
-            // The reference before the lock: a deferred C_CloseSession then runs while this thread still holds
-            // the lock, so no other operation can start on the session it is closing.
+            // In the reverse of the order taken. An ordinary core: the gate, then the reference, then the lock. An
+            // anchor-side core: the reference, then the lock, then the gate.
+            if (!_gateFirst)
+                _operation?.Dispose();
             _handle?.DangerousRelease();
-            Monitor.Exit(_lock);
+            if (_lockTaken)
+            {
+                if (_clearsApplicationMark)
+                    Volatile.Write(ref _state.ApplicationHolder, 0);
+                Monitor.Exit(_state.Lock);
+            }
+            if (_countsRecordSend)
+                Interlocked.Decrement(ref _state.RecordSends);
+            if (_gateFirst)
+                _operation?.Dispose();
         }
     }
 
@@ -156,7 +286,22 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// thread is already inside an exclusive section.
     /// </summary>
     /// <remarks>
-    /// Usage: <c>using var _ = AcquireExclusive(); ...</c>
+    /// <para>Usage: <c>using var _ = AcquireExclusive(); ...</c></para>
+    /// <para>
+    /// An anchor-side core (<see cref="IsAnchorSide"/>) holds the gate shared before it tries its lock (see
+    /// <see cref="ExclusiveLease"/> for the order). Finding the lock taken, it throws only when another application
+    /// lease holds it (<see cref="_applicationHolder"/>) and no record send is waiting for or holding it; otherwise it
+    /// waits: the record's sends take turns with the session's user, which is not concurrent use of the session by the
+    /// application. A holder that is a record send which has just released the lock (its counter already back to zero)
+    /// therefore never causes a refusal; at worst, an application lease caught in the instant between taking the lock
+    /// and marking itself, or between unmarking and releasing, is waited for rather than refused.
+    /// </para>
+    /// <para>
+    /// So on a lent session (a borrower shares the anchor's lock, counter and mark) the refusal of concurrent use is
+    /// best-effort: while a record send is waiting for or holding the lock, every anchor-side lease that finds it taken
+    /// waits, a second application thread of the same lent session included. It is refused only when it contends with
+    /// the other application thread alone.
+    /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown if a different thread currently holds the lock. The message identifies the caller
@@ -164,24 +309,92 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// </exception>
     internal ExclusiveLease AcquireExclusive([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
     {
-        if (!Monitor.TryEnter(_busyLock))
+        if (!_isAnchorSide)
         {
-            throw new InvalidOperationException(
-                "Concurrent access to a PKCS#11 Session is not supported. " +
-                $"Method '{caller ?? "<unknown>"}' was invoked while another operation is in progress " +
-                "on a different thread. Use a separate Session per thread.");
+            if (!Monitor.TryEnter(_busyLock))
+                throw ConcurrentAccess(caller);
+
+            var lease = new ExclusiveLease(_lockState);
+            lease.LockTaken();
+            return Enter(lease, caller);
         }
 
-        var lease = new ExclusiveLease(_busyLock);
+        var anchorLease = new ExclusiveLease(_lockState, gateFirst: true);
+        try
+        {
+            anchorLease.EnterOperation(_record);
+            if (Monitor.TryEnter(_busyLock))
+                anchorLease.LockTaken();
+            else if (Volatile.Read(ref _recordSends) == 0 && Volatile.Read(ref _applicationHolder) != 0)
+                throw ConcurrentAccess(caller);
+            else
+                anchorLease.TakeLock();
+
+            // Under the lock. The outermost application lease on this thread marks itself; a reentrant one finds the
+            // mark already set and leaves it to the outer lease to clear.
+            if (_applicationHolder == 0)
+                anchorLease.MarkApplicationHolder();
+        }
+        catch
+        {
+            anchorLease.Dispose();
+            throw;
+        }
+
+        return Enter(anchorLease, caller);
+    }
+
+    /// <summary>
+    /// Acquires this session for one of the login record's sends on its anchor (<c>C_Login</c>, <c>C_LoginUser</c>,
+    /// <c>C_Logout</c>, <c>C_InitPIN</c>): the gate shared, then the lock, waited for rather than refused, since
+    /// another thread may hold the anchor for an operation. While it waits or holds, the anchor's
+    /// <see cref="AcquireExclusive"/> waits too instead of throwing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The record calls this holding the gate (shared or exclusive), so the gate taken here is a recursive hold, and
+    /// holding the record's send lock, which comes before the anchor's lock. It never holds the record's lock.
+    /// </para>
+    /// <para>
+    /// On a core that is not anchor-side (a session the caller drives itself), this is <see cref="AcquireExclusive"/>:
+    /// the lock order and the refusal of concurrent use stay those of an ordinary session.
+    /// </para>
+    /// </remarks>
+    internal ExclusiveLease AcquireForRecord([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
+    {
+        if (!_isAnchorSide)
+            return AcquireExclusive(caller);
+
+        Interlocked.Increment(ref _recordSends);
+        var lease = new ExclusiveLease(_lockState, gateFirst: true, countsRecordSend: true);
+        try
+        {
+            lease.EnterOperation(_record);
+            lease.TakeLock();
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
+
+        return Enter(lease, caller);
+    }
+
+    // The checks every lease makes once it holds the lock, and the rest of what it takes: the reference, and, for an
+    // ordinary core, the gate (an anchor-side lease holds it already).
+    private ExclusiveLease Enter(ExclusiveLease lease, string? caller)
+    {
         try
         {
             // Under the lock, deliberately: checking before it would race Dispose, which sets the
             // flag while holding it. Every operation needs this, so it lives here rather than being
             // restated at each call site, where the omission of one line would be invisible.
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfUnusable();
             ThrowIfLost(caller);
             lease.Hold(_sessionHandle);
-            lease.EnterOperation(_record);
+            if (!lease.HoldsGate)
+                lease.EnterOperation(_record);
             return lease;
         }
         catch
@@ -191,6 +404,11 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         }
     }
 
+    private static InvalidOperationException ConcurrentAccess(string? caller) => new(
+        "Concurrent access to a PKCS#11 Session is not supported. " +
+        $"Method '{caller ?? "<unknown>"}' was invoked while another operation is in progress " +
+        "on a different thread. Use a separate Session per thread.");
+
     /// <summary>
     /// PKCS#11 handle of session
     /// </summary>
@@ -198,7 +416,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfUnusable();
 
             return (ulong)_sessionId;
         }
@@ -241,7 +459,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfUnusable();
             return _effectivePolicy;
         }
     }
@@ -278,7 +496,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <summary>Evaluates without throwing or logging.</summary>
     internal bool IsPermitted(PolicyRequest request)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         using (CallOutScope.Enter())
             return _effectivePolicy.Evaluate(request).IsAllowed;
     }
@@ -353,7 +571,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <exception cref="InvalidOperationException">The base policy's <see cref="ICryptoPolicy.AllowsOverride"/> is false.</exception>
     internal IDisposable UsePolicy(ICryptoPolicy policy)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(policy);
         if (!_basePolicy.AllowsOverride)
             throw new InvalidOperationException(
@@ -524,9 +742,26 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// handle is disposed and the session closed, so it can never be left open with no owner.
     /// </summary>
     internal Pkcs11SessionCore(LowLevelPkcs11Library pkcs11Library, NativeCULong slotId, Pkcs11SessionHandle sessionHandle, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
+        : this(pkcs11Library, slotId, sessionHandle, loggerFactory, policy, lockState: null, loan: null)
+    {
+    }
+
+    // Owns the handle unless loan is set (a borrower), and then shares lockState, the anchor's.
+    private Pkcs11SessionCore(LowLevelPkcs11Library pkcs11Library, NativeCULong slotId, Pkcs11SessionHandle sessionHandle,
+        ILoggerFactory? loggerFactory, ICryptoPolicy? policy, LockState? lockState, AnchorLoan? loan)
     {
         ArgumentNullException.ThrowIfNull(sessionHandle);
         _sessionHandle = sessionHandle;
+        _isAnchorSide = sessionHandle.IsAnchor;
+        _isReadWrite = sessionHandle.IsReadWrite;
+        _lockState = lockState ?? new LockState();
+        _busyLock = _lockState.Lock;
+        _loan = loan;
+        if (loan is not null)
+        {
+            _sessionObjects = [];
+            _abandonedAtBorrow = _lockState.OperationsAbandoned;
+        }
         try
         {
             if (sessionHandle.IsInvalid)
@@ -547,7 +782,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         }
         catch
         {
-            sessionHandle.Dispose();
+            // A borrower never closes the anchor it was lent, not even when it fails to be built.
+            if (loan is null)
+                sessionHandle.Dispose();
             throw;
         }
     }
@@ -589,7 +826,11 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <c>C_SessionCancel</c> before v3.0): the module may still hold them active. Cleared by the next
     /// successful <c>C_*Init</c> of the same kind.
     /// </summary>
-    private ulong _operationsAbandoned;
+    /// <remarks>
+    /// Shared with a borrower: an operation one leaves behind stays with the session, so it stays with the next
+    /// borrower of the anchor too.
+    /// </remarks>
+    private ref ulong _operationsAbandoned => ref _lockState.OperationsAbandoned;
 
     /// <summary>
     /// Ends whatever operations it saw begin, on any exit: an exception between <c>C_*Init</c> and the
@@ -680,9 +921,12 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         }
         if (rv == CKR.CKR_OPERATION_ACTIVE && (_operationsAbandoned & operation) != 0)
         {
-            throw new Pkcs11UnclassifiedException(rv, initFunction,
-                "An earlier operation of this kind on this session failed partway through, and this module " +
-                "cannot cancel it (it has no C_SessionCancel), so it is still active. Open a new session.");
+            const string Abandoned = "An earlier operation of this kind on this session failed partway through, and " +
+                "this module cannot cancel it (it has no C_SessionCancel), so it is still active. ";
+            throw new Pkcs11UnclassifiedException(rv, initFunction, _loan is null
+                ? Abandoned + "Open a new session."
+                : Abandoned + "This session is the login's own, lent because the token allows no other, so the " +
+                    "operation stays with it: dispose the login's sessions and the login, and log in again.");
         }
         ThrowIfError(rv, initFunction);
     }
@@ -788,7 +1032,8 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <para>
     /// The anchor session of a token login (<see cref="TokenLoginRecord"/>) lost ends that login
     /// (<see cref="TokenLoginRecord.MarkEnded"/>): every holder goes inactive, no <c>C_Logout</c> is sent for them,
-    /// and the next login starts afresh. <c>CKR_USER_NOT_LOGGED_IN</c> is not a loss and ends nothing.
+    /// and the next login starts afresh. <c>CKR_USER_NOT_LOGGED_IN</c> is not a loss and ends nothing. A borrower that
+    /// sees the loss reports it for the anchor it was lent, which the record closes; it does not close it itself.
     /// </para>
     /// </remarks>
     private void ObserveSessionLoss(CKR rv, string method)
@@ -807,14 +1052,23 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             Log.SessionTokenLost(_logger, (ulong)_sessionId, method, rv);
         }
 
+        // A borrower reports the loss for its lender: the session lost is the login's anchor, which only the record
+        // closes, and EndLogin ends the login only for that core. Ending it marks this loan ended, so every later call
+        // here is refused.
+        if (_loan is { } loan)
+        {
+            _record.AnchorLost(loan.Anchor, rv);
+            return;
+        }
+
         // An operation's lease holds a reference on the handle, so the release (and, for a removed token, its one
         // C_CloseSession) runs when that operation lets go, still under the session lock.
         Pkcs11SessionHandle handle = _sessionHandle;
         handle.Dispose();
 
         // The anchor of the token's login lost: the login went with it (decision 5), so the record ends it now and
-        // a new login starts afresh. Last, since ending it disposes this session. Lock order holds: this session's
-        // lock, the gate (held by the operation), then the record's lock.
+        // a new login starts afresh. Last, since ending it disposes this session. Lock order holds: the gate (an
+        // anchor-side lease takes it first), this anchor's lock, then the record's lock.
         if (handle.IsAnchor)
             _record.AnchorLost(this, rv);
     }
@@ -840,7 +1094,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_Logout</c>.</exception>
     internal void SendLogout()
     {
-        using var _ = AcquireExclusive();
+        using var _ = AcquireForRecord();
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Logout");
         Log.LoggingOutSession(_logger, (ulong)_sessionId);
@@ -920,6 +1174,12 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     private void Dispose(bool disposing)
     {
         Log.SessionTrace(_logger, (ulong)_sessionId, "Dispose2");
+
+        if (_loan is not null)
+        {
+            ReturnLoan(_loan);
+            return;
+        }
 
         // Releasing the handle issues C_CloseSession, so disposal has to hold the same lock every
         // native-touching method holds: session ids cross the P/Invoke boundary by value, and the

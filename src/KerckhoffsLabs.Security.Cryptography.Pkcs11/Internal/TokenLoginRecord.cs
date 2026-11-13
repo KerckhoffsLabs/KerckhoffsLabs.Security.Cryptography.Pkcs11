@@ -22,9 +22,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// <para>
 /// <b>Anchor session.</b> The record opens a session of its own before the first <c>C_Login</c>, sends
 /// <c>C_Login</c>/<c>C_LoginUser</c>, <c>C_Logout</c> and an SO login's <c>C_InitPIN</c> on it, and closes it after the final
-/// <c>C_Logout</c>. It keeps the login alive while no other session is open, and is never handed out. It is
-/// read/write for the SO (a read-only session would make the SO login fail) and read-only for the user (so a
-/// write-protected token works).
+/// <c>C_Logout</c>. It keeps the login alive while no other session is open. It is
+/// read/write for both users; a user's falls back to read-only when the token refuses read/write
+/// (<c>CKR_TOKEN_WRITE_PROTECTED</c>) or has no read/write session left for the application
+/// (<c>CKR_SESSION_COUNT</c>). The SO's never does: a read-only session would make the SO login fail.
+/// </para>
+/// <para>
+/// <b>Lending.</b> On a token that allows the application no other session (<c>C_OpenSession</c> answers
+/// <c>CKR_SESSION_COUNT</c>), the anchor is lent as the working session of a <see cref="Pkcs11Login.OpenSession"/>
+/// (<see cref="TryLend"/>), to one session at a time: a borrowing core (<see cref="Pkcs11SessionCore.Borrow"/>) works on
+/// it, and the record's own sends take turns with it. A read/write anchor serves either access, a read-only one only
+/// read-only sessions. The loan (<see cref="AnchorLoan"/>) ends when the borrower is disposed
+/// (<see cref="Return"/>), when the library it came through is disposed (<see cref="ReleaseHoldersOf"/> reclaims it
+/// before releasing that library's holds), or when the login ends, which closes the anchor and leaves the borrower
+/// refusing every call. A borrower never closes the anchor. A lent anchor always has a hold, its borrower's, so the
+/// final logout never meets one.
 /// </para>
 /// <para>
 /// <b>Shares.</b> A <see cref="Login"/> for the user already held still sends the PIN, and accepts
@@ -52,9 +64,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// exclusive.
 /// </para>
 /// <para>
-/// Lock order: a session's lock, then the gate, then this record's lock; never the reverse. The lock the sends
-/// on the anchor take turns on comes after the gate and is never held with the record's lock. No call into the
-/// module is made under the record's lock.
+/// Lock order: an ordinary session's lock, then the gate, then the send lock (the turns the sends on the anchor
+/// take), then the anchor's lock, then this record's lock; never the reverse. The anchor's own core takes the gate
+/// before its lock (<see cref="Pkcs11SessionCore.IsAnchorSide"/>), since this record closes the anchor while holding
+/// the gate. The sends on the anchor (<see cref="Pkcs11SessionCore.AcquireForRecord"/>) wait for its lock rather than
+/// refuse a thread that holds it, and the send lock is never held with the record's lock. No call into the module
+/// is made under the record's lock.
 /// </para>
 /// </remarks>
 internal sealed class TokenLoginRecord
@@ -67,8 +82,9 @@ internal sealed class TokenLoginRecord
     private readonly Lock _sendLock = new();
     private readonly List<LoginHold> _holders = [];
 
-    // All under _lock. Logged in exactly while _anchor is set.
+    // All under _lock. Logged in exactly while _anchor is set; _loan only while _anchor is.
     private Pkcs11SessionCore? _anchor;
+    private AnchorLoan? _loan;
     private TokenUser? _user;
     private string? _username;
     private long _generation;
@@ -117,10 +133,22 @@ internal sealed class TokenLoginRecord
     /// </summary>
     internal int WaitingForExclusiveGate => _gate.WaitingWriteCount;
 
+    /// <summary>
+    /// How many threads are waiting to hold the gate shared (an operation, or a share's login, queued behind a waiting
+    /// first login or final logout). A test seam, like <see cref="WaitingForExclusiveGate"/>.
+    /// </summary>
+    internal int WaitingForSharedGate => _gate.WaitingReadCount;
+
     /// <summary>The session the login was made on and is kept by, or <see langword="null"/> when not logged in.</summary>
     public Pkcs11SessionCore? Anchor
     {
         get { lock (_lock) return _anchor; }
+    }
+
+    /// <summary>The current loan of the anchor, or <see langword="null"/> when it is not lent.</summary>
+    internal AnchorLoan? Loan
+    {
+        get { lock (_lock) return _loan; }
     }
 
     /// <summary>Whether <paramref name="generation"/> is the current login, and it is still logged in.</summary>
@@ -167,7 +195,9 @@ internal sealed class TokenLoginRecord
     /// </exception>
     /// <exception cref="Pkcs11SessionException">
     /// An SO login while the library has a read-only session open on the slot (<c>CKR_SESSION_READ_ONLY_EXISTS</c>,
-    /// refused before the module).
+    /// refused before the module); or the anchor could not open because the token allows the application no more
+    /// sessions (<c>CKR_SESSION_COUNT</c> from <c>C_OpenSession</c>, with a message giving the library's session tally
+    /// on the slot). No <c>C_Login</c> is sent then.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or the login.</exception>
     /// <exception cref="ObjectDisposedException"><paramref name="owner"/> is disposed, or its disposal began before the hold was taken.</exception>
@@ -284,8 +314,8 @@ internal sealed class TokenLoginRecord
                 "holds it before logging in as someone else.");
         }
 
-        // Shares run concurrently under the shared gate; the anchor's own lease refuses a second thread rather
-        // than waiting, so the sends on it take turns here.
+        // Shares run concurrently under the shared gate, so the sends on the anchor take turns here; the send then
+        // waits for the anchor's lock if another thread holds it.
         try
         {
             lock (_sendLock)
@@ -347,7 +377,7 @@ internal sealed class TokenLoginRecord
         ArgumentNullException.ThrowIfNull(hold);
 
         // Shared, like an operation: the login cannot be logged out under the send. Lock order: the gate, then this
-        // record's lock, then the send lock (never with the record's lock), then the anchor's own.
+        // record's lock (released before the send), then the send lock, then the anchor's own, waited for.
         _gate.EnterReadLock();
         try
         {
@@ -378,14 +408,156 @@ internal sealed class TokenLoginRecord
     }
 
     /// <summary>
+    /// Lends the anchor of the login <paramref name="hold"/> keeps as the working session of a
+    /// <see cref="Pkcs11Login.OpenSession"/> whose <c>C_OpenSession</c> the module answered <c>CKR_SESSION_COUNT</c>:
+    /// returns the borrowing core, or <see langword="null"/> with <paramref name="refusal"/> saying why it cannot be
+    /// lent (it is lent already, or it is read-only and <paramref name="access"/> is read/write). Calls no module.
+    /// </summary>
+    /// <param name="hold">The share the new session will keep: it must be of the current login.</param>
+    /// <param name="owner">The library the session comes through; its disposal reclaims the loan.</param>
+    /// <param name="access">The access asked for: a read/write anchor serves either, a read-only one only <see cref="SessionAccess.ReadOnly"/>.</param>
+    /// <param name="policy">The borrower's policy; <see langword="null"/> means <see cref="CryptoPolicy.Recommended"/>.</param>
+    /// <param name="loggerFactory">The borrower's logger factory.</param>
+    /// <param name="refusal">Why the anchor was not lent, for the <c>CKR_SESSION_COUNT</c> the caller throws.</param>
+    /// <exception cref="ObjectDisposedException">
+    /// <paramref name="hold"/> is released or its login ended; or <paramref name="owner"/> is being disposed.
+    /// </exception>
+    internal Pkcs11SessionCore? TryLend(LoginHold hold, Pkcs11Library owner, SessionAccess access, ICryptoPolicy? policy,
+        ILoggerFactory? loggerFactory, out string? refusal)
+    {
+        ArgumentNullException.ThrowIfNull(hold);
+        ArgumentNullException.ThrowIfNull(owner);
+
+        Pkcs11SessionCore anchor;
+        long generation;
+        lock (_lock)
+        {
+            refusal = LendRefusalLocked(hold, access);
+            if (refusal is not null)
+                return null;
+            anchor = _anchor!;
+            generation = _generation;
+        }
+
+        // Built outside the lock: it runs the caller's logger factory. Another thread may lend the anchor, or the
+        // login end, meanwhile; checked again below before the loan is recorded.
+        AnchorLoan loan;
+        Pkcs11SessionCore borrower;
+        try
+        {
+            loan = new AnchorLoan(anchor, owner, generation, anchor.SessionId);
+            borrower = Pkcs11SessionCore.Borrow(anchor, loan, loggerFactory, policy);
+        }
+        catch (ObjectDisposedException) when (!IsCurrent(generation))
+        {
+            // The login ended meanwhile, which closed the anchor.
+            throw LoginEnded();
+        }
+        loan.Borrower = borrower;
+        BetweenLendPhases?.Invoke();
+
+        ILogger logger;
+        lock (_lock)
+        {
+            try
+            {
+                refusal = LendRefusalLocked(hold, access);
+                if (refusal is null && (!ReferenceEquals(_anchor, anchor) || _generation != generation))
+                    throw LoginEnded();
+                // As AddHolderLocked: a loan recorded after the owner's disposal released its holds would never be reclaimed.
+                if (owner.IsDisposingOrDisposed)
+                    throw OwnerDisposed();
+            }
+            catch
+            {
+                loan.MarkEnded();
+                throw;
+            }
+
+            if (refusal is not null)
+            {
+                // Never lent: nothing to return, and nothing else holds the borrower.
+                loan.MarkEnded();
+                return null;
+            }
+            _loan = loan;
+            logger = _logger;
+        }
+
+        Log.AnchorLent(logger, (ulong)_slotId, loan.SessionHandle);
+        return borrower;
+    }
+
+    /// <summary>
+    /// Test seam: runs in <see cref="TryLend"/> on the lending thread after the borrower is built and before the loan
+    /// is recorded, holding no lock, so a test can end the login, start the owner's disposal, or lend the anchor
+    /// elsewhere in between. <see langword="null"/> outside tests.
+    /// </summary>
+    internal Action? BetweenLendPhases { get; set; }
+
+    // Under _lock. Null when the anchor can be lent for access; else the refusal's message. A hold that is not of the
+    // current login throws, as Share does.
+    private string? LendRefusalLocked(LoginHold hold, SessionAccess access)
+    {
+        if (hold.IsReleased || _anchor is null || hold.Generation != _generation)
+            throw LoginEnded();
+        if (_loan is not null)
+        {
+            return $"{OpOpenSession}: the token in slot {(ulong)_slotId} allows this application no further " +
+                "session of the kind asked for, so the login lends its own session as the working session, and it is " +
+                "already lent to another session of the login. Dispose that session first: on this token a login has " +
+                "one working session at a time.";
+        }
+        if (access == SessionAccess.ReadWrite && !_anchor.IsReadWrite)
+        {
+            return $"{OpOpenSession}: the token in slot {(ulong)_slotId} allows this application no more sessions of " +
+                "that kind, and the login's own session, which it would lend, is read-only (the token refused a " +
+                "read/write session when the login was made). Open a read-only session (SessionAccess.ReadOnly).";
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Takes back the anchor lent under <paramref name="loan"/>, from the borrower's disposal; nothing when it is no
+    /// longer the current loan (the login ended meanwhile, or it was already returned).
+    /// </summary>
+    internal void Return(AnchorLoan loan)
+    {
+        ArgumentNullException.ThrowIfNull(loan);
+        ILogger logger;
+        lock (_lock)
+        {
+            if (!ReferenceEquals(_loan, loan))
+                return;
+            _loan = null;
+            logger = _logger;
+        }
+        Log.AnchorReturned(logger, (ulong)_slotId, loan.SessionHandle);
+    }
+
+    /// <summary>
     /// Releases every share that came through <paramref name="owner"/>, as its disposal does; the shares
-    /// become inactive, and if no share of the current login is left, it is logged out.
+    /// become inactive, and if no share of the current login is left, it is logged out. First takes back the anchor
+    /// if it is lent to a session that came through <paramref name="owner"/> (the borrower's return runs, and it is
+    /// disposed), so the final logout never meets a lent anchor.
     /// </summary>
     /// <exception cref="InvalidOperationException">Called from inside an operation (<see cref="EnterOperation"/>).</exception>
     public void ReleaseHoldersOf(Pkcs11Library owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ThrowIfInsideOperation();
+
+        AnchorLoan? reclaimed;
+        lock (_lock)
+            reclaimed = _loan is { } loan && ReferenceEquals(loan.Owner, owner) ? loan : null;
+
+        // Outside the record's lock: the return takes the gate and the anchor's lock, and destroys the session objects
+        // made through the borrower. It waits for an operation in flight on it.
+        if (reclaimed is not null)
+        {
+            reclaimed.MarkReclaimed();
+            reclaimed.Borrower.Dispose();
+        }
 
         long generation;
         bool last;
@@ -430,6 +602,8 @@ internal sealed class TokenLoginRecord
                 return;
             _generation++;
             _holders.Clear();
+            // Before the anchor closes: its borrower refuses every call from now on, and its return sends nothing.
+            EndLoanLocked();
             anchor = _anchor;
             _anchor = null;
             _user = null;
@@ -489,6 +663,13 @@ internal sealed class TokenLoginRecord
             LogOutIfUnheld(hold.Generation);
     }
 
+    // Under _lock. Ends the loan of the anchor, if any, before the anchor closes.
+    private void EndLoanLocked()
+    {
+        _loan?.MarkEnded();
+        _loan = null;
+    }
+
     // Under _lock. Refuses an owner whose disposal has begun: Pkcs11Library.Dispose marks itself disposing before it
     // releases its holds (ReleaseHoldersOf, which takes this lock), so either that release sees this hold, or this
     // check sees the mark.
@@ -514,6 +695,8 @@ internal sealed class TokenLoginRecord
             {
                 if (_holders.Count != 0 || _anchor is null || _generation != generation)
                     return;
+                // Not expected: a lent anchor has its borrower's hold. Should one be left, it is not lent any longer.
+                EndLoanLocked();
                 anchor = _anchor;
                 _anchor = null;
                 _user = null;
@@ -562,12 +745,51 @@ internal sealed class TokenLoginRecord
             "read-only sessions first, or open read/write ones.");
     }
 
+    // Opens the anchor read/write, so that it can do what any session of the login does should the token allow no
+    // other. A user anchor falls back to read-only where the token refuses read/write (write-protected) or has no
+    // read/write session left for this application; an SO anchor does not, as the SO has only read/write sessions
+    // (PKCS#11 v3.2 C_OpenSession, CKR_SESSION_READ_WRITE_SO_EXISTS). CKR_SESSION_COUNT from the last attempt keeps
+    // its code, with a message that says what holds the token's sessions.
     private Pkcs11SessionCore OpenAnchor(Pkcs11Library owner, TokenUser user, ILoggerFactory? loggerFactory)
     {
         // Throws ObjectDisposedException for a disposed owner. The anchor survives that owner's disposal
         // (it is shared by every load of the module), so it calls through a view that outlives the load.
-        return new Pkcs11Slot(owner, (ulong)_slotId, loggerFactory)
-            .OpenSessionCore(readWrite: user == TokenUser.SecurityOfficer, anchor: true);
+        var slot = new Pkcs11Slot(owner, (ulong)_slotId, loggerFactory);
+        try
+        {
+            try
+            {
+                return slot.OpenSessionCore(readWrite: true, anchor: true);
+            }
+            catch (Pkcs11Exception ex) when (user == TokenUser.User
+                && ex.ReturnValue is CKR.CKR_TOKEN_WRITE_PROTECTED or CKR.CKR_SESSION_COUNT)
+            {
+                return slot.OpenSessionCore(readWrite: false, anchor: true);
+            }
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_SESSION_COUNT)
+        {
+            throw NoSessionForLogin(ex);
+        }
+    }
+
+    // Decision F of the anchor-lending addendum: the anchor could not open because the token allows this application
+    // no more sessions. From the library's tally on the slot, which never counts sessions opened outside it.
+    private Pkcs11Exception NoSessionForLogin(Pkcs11Exception moduleAnswer)
+    {
+        int? open = _registry?.Sessions(_slotId) is { } tally ? tally.ReadOnly + tally.ReadWrite : null;
+        string held = open switch
+        {
+            > 0 => $"it has {open} session(s) open on the slot through this library: dispose them, or log in first " +
+                "and open sessions through the login (Pkcs11Login.OpenSession).",
+            0 => "the sessions that use it up were not opened through this library: close them, or log in first and " +
+                "open sessions through the login (Pkcs11Login.OpenSession).",
+            _ => "close the sessions this application has open on it, or log in first and open sessions through the " +
+                "login (Pkcs11Login.OpenSession).",
+        };
+        return new Pkcs11SessionException(CKR.CKR_SESSION_COUNT, OpOpenSession,
+            $"{OpOpenSession}: a login needs a session of its own, and the token in slot {(ulong)_slotId} allows this " +
+            $"application no further session of the kind asked for (read/write, or any); {held}", moduleAnswer);
     }
 
     private static void Send(Pkcs11SessionCore anchor, TokenUser user, SecurePin? pin, string? username)

@@ -123,7 +123,10 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <c>Token::login</c> in <c>src/token/token.rs</c> takes <c>CKU_USER</c> and <c>CKU_SO</c> only, so a private key
     /// with <c>CKA_ALWAYS_AUTHENTICATE = TRUE</c> cannot be re-authenticated for an operation. PKCS#11 v3.2 defines the
     /// context-specific login under <c>C_Login</c> and the private key objects' <c>CKA_ALWAYS_AUTHENTICATE</c>. Read from the source at the
-    /// pinned commit; not yet reported upstream.
+    /// pinned commit. Craton also accepts <c>CKA_ALWAYS_AUTHENTICATE</c> silently and does not enforce it: such a key
+    /// signs with no context PIN at all, so the refusal of the context login is not what stops an
+    /// always-authenticate key from being used. The non-enforcement is reported upstream as
+    /// <see href="https://github.com/craton-co/craton-hsm-core/issues/99"/>.
     /// </summary>
     public const bool CratonHsmTakesAContextSpecificLogin = false;
 
@@ -150,7 +153,9 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     /// False while session objects can outlive their session's <c>C_CloseSession</c>: observed in CI on the parallel
     /// close-while-searching case, a session key created by a session that has since closed was still found by
     /// another session once every thread was done. PKCS#11 v3.2 §5.6 (<c>C_CloseSession</c>) destroys the session's
-    /// objects. Not yet reported upstream; no tripwire yet, since it was seen only under that concurrency.
+    /// objects. The survival is deterministic, not a race: closing a session never destroys its session objects (the
+    /// parallel case merely showed it). Reported upstream as
+    /// <see href="https://github.com/craton-co/craton-hsm-core/issues/98"/>; no tripwire yet.
     /// </summary>
     public const bool CratonHsmDestroysSessionObjectsOnCloseSession = false;
 

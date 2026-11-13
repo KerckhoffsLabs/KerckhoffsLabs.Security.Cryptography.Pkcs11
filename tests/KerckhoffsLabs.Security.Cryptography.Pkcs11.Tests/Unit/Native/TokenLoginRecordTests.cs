@@ -37,19 +37,65 @@ public sealed class TokenLoginRecordTests : IDisposable
     }
 
     [Theory]
-    [InlineData(TokenUser.User, false)]
-    [InlineData(TokenUser.SecurityOfficer, true)]
-    public void FirstLogin_OpensAnchor_ReadOnlyForUser_ReadWriteForSo(TokenUser user, bool readWrite)
+    [InlineData(TokenUser.User)]
+    [InlineData(TokenUser.SecurityOfficer)]
+    public void FirstLogin_OpensAnchor_ReadWrite_ForUserAndSo(TokenUser user)
     {
         using LoginHold hold = Record.Login(_library, user, _pin, username: null);
 
         var anchor = Assert.Single(_module.OpenSessions);
-        Assert.Equal(readWrite, anchor.ReadWrite);
+        Assert.True(anchor.ReadWrite);
+        Assert.Equal([CKR.CKR_OK], _module.OpenSessionResults);
         Assert.Equal(user == TokenUser.User ? CKU.CKU_USER : CKU.CKU_SO, _module.LoggedIn);
         Assert.True(hold.IsActive);
         Assert.True(Record.IsLoggedIn);
         Assert.Equal(user, Record.User);
         Assert.NotNull(Record.Anchor);
+    }
+
+    [Fact]
+    public void UserAnchor_FallsBackToReadOnly_OnWriteProtectedToken()
+    {
+        _module.WriteProtected = true;
+
+        using LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
+
+        Assert.Equal([CKR.CKR_TOKEN_WRITE_PROTECTED, CKR.CKR_OK], _module.OpenSessionResults);
+        Assert.False(Assert.Single(_module.OpenSessions).ReadWrite);
+        Assert.Equal(1, _module.LoginCalls);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        Assert.True(hold.IsActive);
+    }
+
+    [Fact]
+    public void UserAnchor_FallsBackToReadOnly_WhenNoReadWriteSessionLeft()
+    {
+        _module.MaxRwSessions = 1;
+        using Pkcs11Session slotSession = Assert.Single(_library.GetSlotList()).OpenSession(SessionAccess.ReadWrite);
+
+        using LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
+
+        Assert.Equal([CKR.CKR_OK, CKR.CKR_SESSION_COUNT, CKR.CKR_OK], _module.OpenSessionResults);
+        Assert.False(_module.OpenSessions[^1].ReadWrite);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        Assert.True(hold.IsActive);
+        Assert.True(Record.IsLoggedIn);
+    }
+
+    [Fact]
+    public void SoAnchor_DoesNotFallBack()
+    {
+        _module.MaxRwSessions = 1;
+        using Pkcs11Session slotSession = Assert.Single(_library.GetSlotList()).OpenSession(SessionAccess.ReadWrite);
+
+        var ex = Assert.Throws<Pkcs11SessionException>(
+            () => Record.Login(_library, TokenUser.SecurityOfficer, _pin, username: null));
+
+        Assert.Equal(CKR.CKR_SESSION_COUNT, ex.ReturnValue);
+        Assert.Equal([CKR.CKR_OK, CKR.CKR_SESSION_COUNT], _module.OpenSessionResults);
+        Assert.Equal(0, _module.LoginCalls);
+        Assert.Single(_module.OpenSessions);
+        Assert.False(Record.IsLoggedIn);
     }
 
     [Fact]
@@ -328,7 +374,7 @@ public sealed class TokenLoginRecordTests : IDisposable
 
         Assert.All(failures, Assert.Null);
         var anchor = Assert.Single(_module.OpenSessions);
-        Assert.False(anchor.ReadWrite);
+        Assert.True(anchor.ReadWrite);
         Assert.Equal(2, _module.LoginCalls);
         Assert.All(holds, h => Assert.True(h!.IsActive));
 

@@ -159,7 +159,8 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// writes by default, gets a TPM key without decrypt, so the <c>CKA_VERIFY</c> tpm2-pkcs11 then derives
     /// is false and contradicts the template: <c>C_GenerateKeyPair</c> answers <c>CKR_GENERAL_ERROR</c>
     /// ("User specified and TPM specified attr mismatch"). Verifying is a public-key operation and needs no
-    /// TPM attribute. Not reported upstream.
+    /// TPM attribute. Fixed upstream in
+    /// <see href="https://github.com/tpm2-software/tpm2-pkcs11/pull/953">PR #953</see>, not yet released.
     /// </summary>
     public const bool Tpm2Pkcs11AcceptsSignOnlyKeyPairs = false;
 

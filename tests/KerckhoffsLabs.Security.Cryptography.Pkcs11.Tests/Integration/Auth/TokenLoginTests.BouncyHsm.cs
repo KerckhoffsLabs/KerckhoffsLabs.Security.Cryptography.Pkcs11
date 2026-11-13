@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
+using Xunit.Sdk;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 
@@ -25,8 +26,13 @@ public sealed class TokenLoginTests_BouncyHsm(BouncyHsmBackendFixture backend)
         TokenLoginTestCases.Assert_AfterLastHolder_SlotSessionIsPublic(_backend);
 
     // On the qualified-area token, which marks the key itself: see BouncyHsmBackendFixture.BouncyHsmTakesAlwaysAuthenticateInATemplate.
+    // The template quirk is reported upstream: https://github.com/harrison314/BouncyHsm/issues/145
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void AlwaysAuthenticateKey_SignsWithContextLogin() =>
-        TokenLoginTestCases.Assert_AlwaysAuthenticateKey_SignsWithContextLogin(_backend.QualifiedAreaToken,
-            tokenMarksTheKey: true, contextPin: _backend.QualifiedAreaToken.SignaturePin);
+    public void AlwaysAuthenticateKey_SignsWithContextLogin()
+    {
+        BouncyHsmQualifiedAreaToken token = _backend.QualifiedAreaToken
+            ?? throw SkipException.ForSkip(_backend.QualifiedAreaUnavailableReason ?? "BouncyHsm's qualified-area token is not set up.");
+        TokenLoginTestCases.Assert_AlwaysAuthenticateKey_SignsWithContextLogin(token, tokenMarksTheKey: true,
+            contextPin: token.SignaturePin);
+    }
 }

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -22,8 +23,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 /// Each session signs with a key of its own rather than one another session made: a session object is the
 /// application's (§5.6.2), but wolfPKCS11 keeps it to its session
 /// (<see cref="WolfPkcs11BackendFixture.WolfPkcs11SharesSessionObjectsAcrossSessions"/>), and sharing objects is not
-/// what these cases test. A login keeps a session of its own (its anchor) besides the ones it opens, so a token that
-/// allows one session at a time (pkcs11-mock) cannot run them.
+/// what these cases test. A login keeps a session of its own (its anchor) besides the ones it opens, so the cases that
+/// need two working sessions at once cannot run on a token that allows one session at a time (pkcs11-mock); the
+/// <c>Assert_OneSessionToken_*</c> cases are the ones written for it.
 /// </para>
 /// </remarks>
 internal static class TokenLoginTestCases
@@ -205,6 +207,95 @@ internal static class TokenLoginTestCases
         }
 
         Assert.Equal(CKS.CKS_RO_PUBLIC_SESSION, observer.GetSessionInfo().State);
+    }
+
+    // === Tokens that allow one session: the login lends its own ============================================
+
+    // CKR_SESSION_COUNT, with the library's explanation: each key phrase (stable words, not whole sentences).
+    private static Pkcs11SessionException AssertSessionCountRefused(Action open, params string[] keyPhrases)
+    {
+        var ex = Assert.ThrowsAny<Pkcs11SessionException>(open);
+        Assert.Equal(CKR.CKR_SESSION_COUNT, ex.ReturnValue);
+        foreach (string phrase in keyPhrases)
+            Assert.Contains(phrase, ex.Message, StringComparison.Ordinal);
+        return ex;
+    }
+
+    /// <summary>On a token that allows one session, <see cref="Pkcs11Login.OpenSession"/> lends the login's own
+    /// session: read/write, in "R/W User Functions".</summary>
+    internal static void Assert_OneSessionToken_LoginLendsItsSession(IPkcs11Backend backend)
+    {
+        using Pkcs11Login login = LogIn(backend);
+        using Pkcs11Session session = login.OpenSession();
+
+        Assert.Same(login, session.Login);
+        Assert.Equal(SessionAccess.ReadWrite, session.Access);
+        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
+    }
+
+    /// <summary>A second session is refused with <c>CKR_SESSION_COUNT</c> while the first is lent; the first keeps
+    /// working.</summary>
+    internal static void Assert_OneSessionToken_SecondSessionRefused_WhileLent(IPkcs11Backend backend)
+    {
+        using Pkcs11Login login = LogIn(backend);
+        using Pkcs11Session first = login.OpenSession();
+
+        AssertSessionCountRefused(() => login.OpenSession(), "lent", "Dispose that session first");
+        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, first.GetSessionInfo().State);
+    }
+
+    /// <summary>Disposing the lent session hands it back, and the login lends it again.</summary>
+    internal static void Assert_OneSessionToken_DisposedSessionIsLentAgain(IPkcs11Backend backend)
+    {
+        using Pkcs11Login login = LogIn(backend);
+        login.OpenSession().Dispose();
+
+        using Pkcs11Session again = login.OpenSession();
+        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, again.GetSessionInfo().State);
+    }
+
+    /// <summary>Once the lent session and the login are both disposed the login's session closes, the token is free,
+    /// and a slot session opens read-only in "R/O Public Session".</summary>
+    internal static void Assert_OneSessionToken_LastHolderFreesTheToken(IPkcs11Backend backend)
+    {
+        Pkcs11Login login = LogIn(backend);
+        Pkcs11Session? session = null;
+        try
+        {
+            session = login.OpenSession();
+            login.Dispose();
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State); // the session still holds it
+        }
+        finally
+        {
+            session?.Dispose();
+            login.Dispose();
+        }
+
+        using Pkcs11Session slotSession = Slot(backend).OpenSession();
+        Assert.Equal(CKS.CKS_RO_PUBLIC_SESSION, slotSession.GetSessionInfo().State);
+    }
+
+    /// <summary>While a login holds the token's only session, <see cref="Pkcs11Slot.OpenSession"/> fails with
+    /// <c>CKR_SESSION_COUNT</c>.</summary>
+    internal static void Assert_OneSessionToken_SlotSessionRefusedWhileLoggedIn(IPkcs11Backend backend)
+    {
+        using Pkcs11Login login = LogIn(backend);
+
+        AssertSessionCountRefused(() => Slot(backend).OpenSession(), "login on it keeps a session of its own",
+            "Pkcs11Login.OpenSession");
+    }
+
+    /// <summary>While a slot session holds the token's only session, a <see cref="Pkcs11Slot.Login"/> fails with
+    /// <c>CKR_SESSION_COUNT</c>, and works once the session is disposed.</summary>
+    internal static void Assert_OneSessionToken_LoginRefusedWhileSlotSessionOpen(IPkcs11Backend backend)
+    {
+        using (Pkcs11Session slotSession = Slot(backend).OpenSession())
+            AssertSessionCountRefused(() => LogIn(backend), "a login needs a session of its own", "log in first",
+                "Pkcs11Login.OpenSession");
+
+        using Pkcs11Login login = LogIn(backend);
+        Assert.True(login.IsActive);
     }
 
     /// <summary>
