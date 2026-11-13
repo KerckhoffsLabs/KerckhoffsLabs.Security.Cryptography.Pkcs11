@@ -38,6 +38,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// at <c>C_CloseSession</c>. Given that asymmetry, disposal stays inert and destruction stays
 /// explicit.
 /// </para>
+/// <para>
+/// After its own <see cref="Destroy"/> completes, a key is spent like a disposed one: every member that
+/// would reach the token throws <see cref="ObjectDisposedException"/> rather than send a handle the
+/// module may have given to another object.
+/// </para>
 /// </remarks>
 public sealed partial class Pkcs11Key : IDisposable
 {
@@ -50,6 +55,7 @@ public sealed partial class Pkcs11Key : IDisposable
     private readonly CKK _keyType;
     private readonly byte[] _id;
     private bool _disposed;
+    private bool _destroyed;
 
     internal Pkcs11Key(
         Pkcs11Session session,
@@ -99,7 +105,7 @@ public sealed partial class Pkcs11Key : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfUnusable();
             // One int, so a racing reader sees either "not read" or the final answer; both readers
             // compute the same value.
             int bits = _keySizeBits;
@@ -242,7 +248,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key exposes no readable handle; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
     public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(params ReadOnlySpan<CKA> types)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
 
         ObjectHandle handle = (IsAsymmetricKeyType(_keyType) && !PublicHandle.IsInvalid)
             ? PublicHandle
@@ -277,7 +283,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// underlying <c>C_GetAttributeValue</c> call.</exception>
     public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(KeyHandlePart part, params ReadOnlySpan<CKA> types)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
 
         ObjectHandle handle = part switch
         {
@@ -305,7 +311,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// </summary>
     internal ExportKeyInfo ReadExportKeyInfo()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ObjectHandle handle = PrivateHandle;
         if (handle.IsInvalid)
             return ExportKeyInfo.Unread;
@@ -350,7 +356,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from the underlying <c>C_FindObjects</c> or <c>C_GetAttributeValue</c> call.</exception>
     public Pkcs11Certificate? GetCertificate()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         return _session.OpenCertificateById(_id);
     }
 
@@ -449,7 +455,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// of the requested kind.</exception>
     internal ObjectHandle ResolveParameterHandle(Pkcs11SessionCore session, KeyHandlePart part, string paramName)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         if (!ReferenceEquals(_session.Core, session))
             throw new ArgumentException(
                 "The key belongs to a different session than the operation. Mechanism parameters can only " +
@@ -522,16 +528,55 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <c>Destroy</c> erases the key material from the token. The token enforces its own
     /// permissions — destroying a read-only object, or one created with
     /// <c>CKA_DESTROYABLE = false</c>, fails with a <see cref="Exceptions.Pkcs11Exception"/>
-    /// (typically <c>CKR_ACTION_PROHIBITED</c>). After a successful destroy the handles are stale;
-    /// still <see cref="Dispose"/> the key to release the wrapper.
+    /// (typically <c>CKR_ACTION_PROHIBITED</c>).
+    /// <para>
+    /// Once both objects are gone, every member that would reach the token, <c>Destroy</c> included,
+    /// throws <see cref="ObjectDisposedException"/>: the module may hand a destroyed object's handle to a
+    /// new object, so the wrapper must not send it again. Still <see cref="Dispose"/> the key.
+    /// </para>
+    /// <para>
+    /// The private half is destroyed first. If that succeeds and the public half is refused, the exception
+    /// propagates and the key carries only its public half: verification still works, and calling
+    /// <c>Destroy</c> again retries the public half alone.
+    /// </para>
+    /// <para>
+    /// Only this wrapper learns of the destroy. Another <see cref="Pkcs11Key"/> over the same object (from a
+    /// second lookup, say), or a destroy by another session or process, cannot be detected: a PKCS#11 handle
+    /// carries no generation.
+    /// </para>
     /// </remarks>
-    /// <exception cref="ObjectDisposedException">The key has already been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">The key has been disposed, or already destroyed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call — for example <see cref="CKR.CKR_ACTION_PROHIBITED"/> when the object is not destroyable.</exception>
     public void Destroy()
     {
+        ThrowIfUnusable();
+        // Reading both accessors resolves a pending companion first, so the pair is complete before
+        // anything is destroyed, and _companionPending is false by the time a half is cleared below: a
+        // cleared half is never looked up again (a fresh lookup by CKA_ID could find an unrelated object).
+        ObjectHandle privateHandle = PrivateHandle;
+        ObjectHandle publicHandle = PublicHandle;
+        if (!privateHandle.IsInvalid)
+        {
+            _session.Core.DestroyObject(privateHandle);
+            _knownPrivateHandle = ObjectHandle.Invalid;
+        }
+        if (!publicHandle.IsInvalid)
+        {
+            _session.Core.DestroyObject(publicHandle);
+            _knownPublicHandle = ObjectHandle.Invalid;
+        }
+        _destroyed = true;
+    }
+
+    /// <summary>
+    /// The guard on every member that reaches the token: refuses a disposed key, and a key whose own
+    /// <see cref="Destroy"/> completed, whose handles may since name other objects.
+    /// </summary>
+    private void ThrowIfUnusable()
+    {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!PrivateHandle.IsInvalid) _session.Core.DestroyObject(PrivateHandle);
-        if (!PublicHandle.IsInvalid) _session.Core.DestroyObject(PublicHandle);
+        if (_destroyed)
+            throw DestroyedObject.Exception(nameof(Pkcs11Key));
     }
 
     /// <inheritdoc/>
@@ -555,7 +600,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Sign</c> call.</exception>
     public byte[] Sign(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         if (PrivateHandle.IsInvalid)
@@ -589,7 +634,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/> when the managed fallback is taken for a <c>CKM_SHA*_RSA_PKCS_PSS</c> mechanism whose parameters are not the profile the BCL verifies (see remarks); <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when the token's RSA modulus or public exponent, read for managed verification, is empty or zero; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public bool Verify(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         // A secret key (HMAC, CMAC) verifies with the same object it signs with: it has no public half.
@@ -628,7 +673,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// </summary>
     internal byte[] SignPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
 
         if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
@@ -644,7 +689,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// </summary>
     internal bool VerifyPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest, ReadOnlySpan<byte> signature)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
 
         if (!PublicHandle.IsInvalid)
             return _session.Core.VerifyPkcs1Digest(hash, PublicHandle, digest, signature);
@@ -675,7 +720,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_Encrypt</c> call.</exception>
     public byte[] Encrypt(Mechanism mechanism, ReadOnlySpan<byte> plaintext)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         ObjectHandle handle = IsAsymmetricKeyType(_keyType)
@@ -705,7 +750,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Decrypt</c> call.</exception>
     public byte[] Decrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         if (PrivateHandle.IsInvalid)
@@ -725,7 +770,7 @@ public sealed partial class Pkcs11Key : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfUnusable();
             return _session.Core.SupportsMessageApi;
         }
     }
@@ -750,7 +795,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> plaintext)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
@@ -776,7 +821,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> ciphertext)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
@@ -800,7 +845,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's wrapping handle or <paramref name="targetKey"/>'s handle is unavailable; otherwise propagated from the underlying <c>C_WrapKey</c> call.</exception>
     public byte[] Wrap(Mechanism mechanism, Pkcs11Key targetKey)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(targetKey);
 
@@ -837,7 +882,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
     public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
@@ -941,7 +986,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ObjectTemplate sharedSecretTemplate,
         int expectedCiphertextLen = 0)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
 
@@ -968,7 +1013,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ReadOnlySpan<byte> ciphertext,
         ObjectTemplate sharedSecretTemplate)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
 
@@ -1055,7 +1100,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the token does not expose the derived value.</exception>
     public byte[] DeriveBytes(Mechanism mechanism, int length)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
         RequireKdfOutputMechanism(mechanism);
@@ -1088,7 +1133,7 @@ public sealed partial class Pkcs11Key : IDisposable
 
     private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 

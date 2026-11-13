@@ -4,8 +4,8 @@ _Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (c
 
 ## Summary
 
-- Open items: 93, 24 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 8 (1 partly resolved) | Medium: 47 (15 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 92, 24 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 8 (1 partly resolved) | Medium: 46 (15 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **Only one session per slot is usable.** The second `OpenSession` on a slot throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either session logs the other out (BL-084).
@@ -401,17 +401,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No — additive
 - **Raised by:** Cryptographer A, Cryptographer B
 - **Spec / References:** PKCS#11 v3.0 §2.3.5–2.3.6; RFC 8032
-
-### [BL-116] `Destroy()` leaves the wrapper fully usable with stale handles
-- **Area:** .NET API Design
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs:440-445` (doc remark at `:435-436`); `Pkcs11Object.cs:83-87`; `Pkcs11Certificate.cs:78-82` has the same shape
-- **Problem:** After a successful `Destroy()`, `_disposed` stays false, so every subsequent member — `Sign`, `Encrypt`, `GetValue`, and `Destroy()` itself — still passes its guard and re-sends the now-stale handle. Because PKCS#11 permits handle reuse, a second `Destroy()` after another object has taken the recycled handle destroys an unrelated object: irreversible key loss with no error. The doc comment at `Pkcs11Key.cs:186-187` recognises the handles become stale but nothing enforces it. `Pkcs11Key.Destroy` additionally has no partial-failure story: if the private destroy succeeds and the public one throws, the caller cannot tell which half survived.
-- **Proposed action:** Add a `_destroyed` flag set on success and have every member throw once it is set; clear each handle to `ObjectHandle.Invalid` as it is destroyed so a partial failure is self-describing.
-- **Breaks public API?** Yes — behavioural: calls that silently succeed today would throw. Must land before 1.0
-- **Raised by:** PKCS#11 Specialist B
-- **Spec / References:** PKCS#11 v3.2 §4.4 — object handles are valid only until the object is destroyed, and may be reused
 
 ### [BL-117] `Pkcs11Key.Wrap` accepts a target key from a different session without checking provenance
 - **Area:** PKCS#11 Conformance
@@ -1080,7 +1069,7 @@ Constant coverage was re-verified 2026-08-11 by diffing the enums against three 
 - **KEM/authenticated-unwrap secure-defaults application** (Cryptographer B, round 1): whether `EncapsulateKey`/`DecapsulateKey` and `UnwrapKeyAuthenticated` call `BuildSecureKeyDefaults` like `UnwrapKey`/`DeriveKey` do — a shared comment claims so, but the reviewer read only the latter two call sites in full. Confirm before 1.0.
 - **GitHub repository settings** (QA C, both rounds): branch protections, required status checks, tag protection, Environment approvals, and Private Vulnerability Reporting enablement are not verifiable from the repo — confirm in Settings. Specifically confirm that `lint`, all six `build-and-test` legs, `aot-smoke` and `softhsm-v240` are *required* checks; BL-139 changes character depending on whether `code-quality` is required.
 - **`CK_CCM_WRAP_PARAMS` field order and the `CK_XEDDSA_HASH_TYPE` value set** (Cryptographer A): `CK_GCM_WRAP_PARAMS` and both PQC context structs were confirmed against `vendor/opencryptoki/usr/include/pkcs11types.h:1890-1901`, but `CK_CCM_WRAP_PARAMS` appears in no vendored header. Someone with the OASIS v3.2 PDF should confirm that one before BL-103 is implemented.
-- **Real-HSM handle recycling frequency** (PKCS#11 Specialist B): whether shipping HSMs recycle session and object handles aggressively enough for BL-116 to fire in practice. The spec permits it and nothing defends against it, which is why it was raised; the actual frequency is vendor-dependent and would need a real-device experiment. (BL-071's half of this question is moot now that `CloseAllSessions()` is resolved by removal — there is no bookkeeping gap left to fire.)
+- ~~**Real-HSM handle recycling frequency** (PKCS#11 Specialist B): whether shipping HSMs recycle session and object handles aggressively enough for BL-116 to fire in practice.~~ Moot for object handles since BL-116's fix: a wrapper refuses every token call after its own `Destroy()`, whatever the module's recycling policy (`DestroyedWrapperTests`). Session-handle recycling still matters for a session the module closed on its own (`CKR_SESSION_CLOSED`, token removal), whose dispose still sends `C_Logout`/`C_CloseSession`. (BL-071's half of this question is moot now that `CloseAllSessions()` is resolved by removal — there is no bookkeeping gap left to fire.)
 - **`CKR_CANT_LOCK` prevalence** (PKCS#11 Specialist B): BL-085's practical severity depends on how many shipping modules refuse `CKF_OS_LOCKING_OK`. None of the four CI backends does, so that path has zero real-backend coverage today.
 - **Backend mechanism advertisement** (QA B): whether opencryptoki's software token advertises `CKD_SHA256_KDF` or `CKM_RSA_AES_KEY_WRAP` in this build is not determinable from source. BL-123 and BL-124 assume a capable backend can be found and should be implemented with a hard-fail guard so the assumption is checked rather than silently skipped.
 - **`ManagedSoftToken` Windows-packed dispatch** (QA A): whether `UnmanagedMemory.Read<CK_CCM_PARAMS>` in the fake resolves to the Windows-packed sibling layout on the Windows legs. The tests pass there, presumably via the `IsPackedForPkcs11` dispatch, but confirming it was outside that reviewer's lane.

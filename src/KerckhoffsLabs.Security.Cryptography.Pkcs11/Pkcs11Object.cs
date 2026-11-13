@@ -32,6 +32,7 @@ public sealed class Pkcs11Object : IDisposable
     private readonly ObjectHandle _handle;
     private readonly byte[] _id;
     private bool _disposed;
+    private bool _destroyed;
 
     internal Pkcs11Object(Pkcs11Session session, ObjectHandle handle, CKO objectClass, string? label, byte[] id)
     {
@@ -59,10 +60,10 @@ public sealed class Pkcs11Object : IDisposable
     /// object, or the payload for a data object.
     /// </summary>
     /// <exception cref="Pkcs11Exception"><c>CKA_VALUE</c> is sensitive or unreadable.</exception>
-    /// <exception cref="ObjectDisposedException">The view has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">The view has been disposed, or its object destroyed by <see cref="Destroy"/>.</exception>
     public byte[] GetValue()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         using var attrs = _session.Core.GetAttributeValue(_handle, [CKA.CKA_VALUE]);
         if (attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
@@ -77,13 +78,26 @@ public sealed class Pkcs11Object : IDisposable
     /// <remarks>
     /// This is the only method that destroys anything on the token. <see cref="Dispose"/> never
     /// does — see the class remarks for why the two are kept apart.
+    /// <para>
+    /// After a successful destroy, <see cref="GetValue"/> and <c>Destroy</c> throw
+    /// <see cref="ObjectDisposedException"/>: the module may give the handle to a new object, so this view
+    /// must not send it again. Another view over the same object cannot learn of the destroy.
+    /// </para>
     /// </remarks>
-    /// <exception cref="ObjectDisposedException">The view has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">The view has been disposed, or its object already destroyed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
     public void Destroy()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
         _session.Core.DestroyObject(_handle);
+        _destroyed = true;
+    }
+
+    private void ThrowIfUnusable()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_destroyed)
+            throw DestroyedObject.Exception(nameof(Pkcs11Object));
     }
 
     /// <summary>

@@ -24,6 +24,7 @@ public sealed class Pkcs11Certificate : IDisposable
     private readonly byte[] _id;
     private readonly X509Certificate2 _certificate;
     private bool _disposed;
+    private bool _destroyed;
 
     internal Pkcs11Certificate(
         Pkcs11Session session, ObjectHandle handle, string? label, byte[] id, X509Certificate2 certificate)
@@ -73,12 +74,21 @@ public sealed class Pkcs11Certificate : IDisposable
     /// The only member that destroys token state; <see cref="Dispose"/> never does. Subject to the
     /// token's <c>CKA_DESTROYABLE</c>/read-only permissions. Does not remove the associated key.
     /// </summary>
-    /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
+    /// <remarks>
+    /// After a successful destroy, a second <c>Destroy</c> throws <see cref="ObjectDisposedException"/>: the
+    /// module may give the handle to a new object, so it must not be sent again. <see cref="Certificate"/> and
+    /// <see cref="GetPrivateKey"/> keep working; the parsed certificate is held here, and the key is found by
+    /// <see cref="Id"/>, not by this handle.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">The certificate has been disposed, or already destroyed.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
     public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_destroyed)
+            throw DestroyedObject.Exception(nameof(Pkcs11Certificate));
         _session.Core.DestroyObject(_handle);
+        _destroyed = true;
     }
 
     /// <inheritdoc/>
