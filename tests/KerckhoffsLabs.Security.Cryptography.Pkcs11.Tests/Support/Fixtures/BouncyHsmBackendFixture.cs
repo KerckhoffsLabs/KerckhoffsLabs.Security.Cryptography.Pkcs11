@@ -424,6 +424,69 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the derived AES key length case: see <see cref="BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid"/>.</summary>
     public static bool AesKeyLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid;
 
+    /// <summary>
+    /// False while a key the HMAC key generators make (<c>CKM_SHA256_KEY_GEN</c>, <c>CKM_SHA3_256_KEY_GEN</c>,
+    /// <c>CKM_BLAKE2B_256_KEY_GEN</c>, <c>CKM_SHA512_T_KEY_GEN</c> and the rest) has <c>CKA_KEY_GEN_MECHANISM</c>
+    /// <c>CKM_GENERIC_SECRET_KEY_GEN</c>: <c>GenericSecretHmacKeyGenerator</c> builds a <c>GenericSecretKeyObject</c>, whose
+    /// constructor fixes that mechanism, and only changes its key type. PKCS#11 v3.2: the attribute names the
+    /// mechanism that generated the key. Reported upstream as harrison314/BouncyHsm#146.
+    /// BouncyHsmQuirkTests.HmacKeyGenMechanism_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRecordsTheHmacKeyGenMechanism = false;
+
+    /// <summary>
+    /// False while <c>CKM_SHAKE_128_KEY_DERIVATION</c> and <c>CKM_SHAKE_256_KEY_DERIVATION</c> derive no more than 32
+    /// and 64 bytes and refuse a longer <c>CKA_VALUE_LEN</c> with <c>CKR_TEMPLATE_INCONSISTENT</c>:
+    /// <c>DigestDeriveKeyGenerator</c> takes the XOF's default output, <c>GetDigestSize()</c>. A SHAKE is extendable, so
+    /// the derived key can be as long as the template asks (PKCS#11 v3.2). Reported upstream as harrison314/BouncyHsm#150.
+    /// BouncyHsmQuirkTests.ShakeDerivationLength_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmDerivesShakeKeysOfAnyLength = false;
+
+    /// <summary>The longest key BouncyHsm derives with a SHAKE: see <see cref="BouncyHsmDerivesShakeKeysOfAnyLength"/>.</summary>
+    public static string? ShakeDerivationNotTakenBecause(CKM mechanism, int length) =>
+        !BouncyHsmDerivesShakeKeysOfAnyLength && length > (mechanism == CKM.CKM_SHAKE_128_KEY_DERIVATION ? 32 : 64)
+            ? $"BouncyHsm derives no more than the SHAKE's default output with {mechanism}"
+            : null;
+
+    /// <summary>
+    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> reads its <c>CK_EXTRACT_PARAMS</c> as a number of bits to keep from
+    /// the start of the base key (<c>ExtractKeyFromKeyDeriveKeyGenerator</c>), so bit 0 gives an empty key. PKCS#11 v3.2:
+    /// it is the bit the derived key starts at, wrapping around the end of the base key, and
+    /// <c>CKA_VALUE_LEN</c> is the derived key's length. Reported upstream as harrison314/BouncyHsm#148.
+    /// BouncyHsmQuirkTests.ExtractKeyFromKey_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmExtractsFromTheBitGiven = false;
+
+    /// <summary>Gate for the CKM_EXTRACT_KEY_FROM_KEY cases: see <see cref="BouncyHsmExtractsFromTheBitGiven"/>.</summary>
+    public static bool ExtractKeyFromKeyAvailable => BouncyHsmAvailable && BouncyHsmExtractsFromTheBitGiven;
+
+    /// <summary>
+    /// False while <c>CKM_AES_CFB1</c> encrypts as CFB with a 128-bit segment: <c>BufferedCipherWrapperFactory</c> maps it
+    /// to BouncyCastle's <c>AES/CFB/NOPADDING</c>, whose segment is the block size (the line carries a TODO). PKCS#11 v3.2
+    /// and NIST SP 800-38A §6.3: a 1-bit segment. BouncyCastle has no 1-bit CFB (its <c>CfbBlockCipher</c> takes
+    /// whole bytes), so the fix is BouncyHsm's. Reported upstream as harrison314/BouncyHsm#149.
+    /// BouncyHsmQuirkTests.AesCfb1_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRunsCfb1WithAOneBitSegment = false;
+
+    /// <summary>Gate for the CKM_AES_CFB1 case: see <see cref="BouncyHsmRunsCfb1WithAOneBitSegment"/>.</summary>
+    public static bool AesCfb1Available => BouncyHsmAvailable && BouncyHsmRunsCfb1WithAOneBitSegment;
+
+    /// <summary>
+    /// False while <c>CKM_SHA512_224_HMAC</c> and <c>CKM_SHA512_256_HMAC</c> take only a <c>CKK_GENERIC_SECRET</c> key and
+    /// refuse the <c>CKK_SHA512_224_HMAC</c> and <c>CKK_SHA512_256_HMAC</c> keys their own key generators make, with
+    /// <c>CKR_KEY_HANDLE_INVALID</c>: <c>WrapperSignerFactory</c> registers them with no other key type, where the other
+    /// HMACs take theirs. PKCS#11 v3.2: these HMACs take a generic secret or their own key type, and a key of
+    /// the wrong type is <c>CKR_KEY_TYPE_INCONSISTENT</c>. Reported upstream as harrison314/BouncyHsm#147.
+    /// BouncyHsmQuirkTests.Sha512THmacKeyType_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmTakesSha512THmacKeys = false;
+
+    /// <summary>Whether the HMAC of a hash family takes the key its key generator makes: see <see cref="BouncyHsmTakesSha512THmacKeys"/>.</summary>
+    public static bool HmacTakesItsGeneratedKey(string family) =>
+        BouncyHsmTakesSha512THmacKeys || family is not ("SHA-512/224" or "SHA-512/256");
+
     public BouncyHsmBackendFixture()
     {
         if (!BouncyHsmAvailable) return;
