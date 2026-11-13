@@ -4,14 +4,13 @@ _Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (c
 
 ## Summary
 
-- Open items: 91, 24 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 8 (1 partly resolved) | Medium: 46 (15 partly resolved) | Low: 37 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 89, 25 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 5 (1 partly resolved) | Medium: 47 (16 partly resolved) | Low: 37 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
-  - **Only one session per slot is usable.** The second `OpenSession` on a slot throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either session logs the other out (BL-084).
-  - **The public surface is narrower than the module's.** There is no capability probe for the v3.0 message API or the v3.2 functions (BL-077), read-only sessions and write-protected tokens are unreachable (BL-079), `CKA_ALWAYS_AUTHENTICATE` re-authentication is unimplemented (BL-081), and the v3.0 and v3.2 functions bound at the interop layer have no public caller (BL-019, BL-099).
+  - **The public surface is narrower than the module's.** There is no capability probe for the v3.0 message API or the v3.2 functions (BL-077), and most of the v3.0 and v3.2 functions bound at the interop layer have no public caller (BL-019, BL-099).
   - **Roughly half the test suite cannot fail.** About half the test attributes are gated, the `PKCS11_TEST_EXPECT_*` guards check only backend *presence* and never mechanism availability, and no CI step counts skips, so a degraded OpenSSL 3.5 step would skip every ML-DSA/ML-KEM test with CI still green (BL-086, BL-129).
-- Release-readiness assessment: The core is unusually strong for a pre-1.0 library: the Windows `Pack=1`/`NativeCULong` scheme is complete and correct on all six RIDs, every PKCS#11 constant value matches the vendored headers, `CK_FUNCTION_LIST_3_2` field order is exact, no managed↔native parameter-struct layout defect exists, and PIN handling, logging and exception messages leak nothing (Appendix B). **No Critical was confirmed.** What stands between the library and a confident 1.0 is *completeness*, concentrated where SemVer makes the surface permanent: the 8 open High items, which are the one-session-per-slot limit (BL-084), the narrow session-opening and capability surface (BL-077, BL-079, BL-081), the missing streaming surface (BL-087), the publish workflow (BL-001), package validation (BL-002, waiting for 1.0.0), and the test-gate census (BL-086). The census should land early, because it is what will tell you whether the rest of the suite is really green.
+- Release-readiness assessment: The core is unusually strong for a pre-1.0 library: the Windows `Pack=1`/`NativeCULong` scheme is complete and correct on all six RIDs, every PKCS#11 constant value matches the vendored headers, `CK_FUNCTION_LIST_3_2` field order is exact, no managed↔native parameter-struct layout defect exists, and PIN handling, logging and exception messages leak nothing (Appendix B). **No Critical was confirmed.** What stands between the library and a confident 1.0 is *completeness*, concentrated where SemVer makes the surface permanent: the 5 open High items, which are the missing capability probe (BL-077), the missing streaming surface (BL-087), the publish workflow (BL-001), package validation (BL-002, waiting for 1.0.0), and the test-gate census (BL-086). The census should land early, because it is what will tell you whether the rest of the suite is really green.
 
 ## Critical
 
@@ -51,39 +50,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No — additive, though the shape of the capability type is a pre-1.0 decision
 - **Raised by:** PKCS#11 Specialist A
 - **Spec / References:** Distinct from BL-019: that covers the v3.2 *methods* being unreachable, this the support *predicate*, which stays unreachable even after BL-019 lands
-
-### [BL-079] The public session-opening surface is too narrow: read-only sessions are unreachable, write-protected tokens unusable, and slots addressable only by a possibly-ambiguous label
-- **Area:** PKCS#11 Conformance
-- **Severity:** High
-- **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Slot.cs:230` (`internal Pkcs11SessionCore OpenSessionCore(bool readWrite = true, ICryptoPolicy? policy = null)`); the three public factories, all label-only and all read-write, at `Pkcs11Library.cs:558` (`OpenSessionWithPin`), `:594` (`OpenSessionWithPinpad`), `:627` (`OpenSessionWithoutLogin`); `MatchSlotByLabel` at `:644-648`
-- **Problem:** Three defects in one surface, all verified by the coordinator. (a) `readWrite` exists and is honoured but `OpenSessionCore` is `internal` and neither public factory exposes it, so consumers always get `CKF_SERIAL_SESSION | CKF_RW_SESSION`; a read-only workload cannot get the token-enforced guarantee that a bug cannot create or destroy token objects. (b) Against a write-protected token — the normal state of read-only signing and certificate tokens — `C_OpenSession` with `CKF_RW_SESSION` returns `CKR_TOKEN_WRITE_PROTECTED`, so the library is wholly unusable there; the fixtures already know write-protected tokens are real (`Support/Fixtures/NssBackendFixture.cs:59`). (c) Both factories take a *token label string*, so a caller who enumerated slots via `GetSlotList()` and holds a `Pkcs11Slot`/`SlotId` must round-trip through a label — and `MatchSlotByLabel` uses `FirstOrDefault` over a case-sensitive `TrimEnd()` comparison, so two tokens sharing a label (permitted, and easy to produce on SoftHSM) silently resolve to whichever enumerates first, an unlabelled token is reachable only via `""`, and the environment condition "no such token" surfaces as `ArgumentException`.
-- **Proposed action:** Add `Pkcs11Slot.OpenSession(CKU, SecurePin, bool readWrite = true)` / `OpenSessionWithoutLogin(bool readWrite = true)` (or `Pkcs11Library.OpenSession(SlotId, …)`), surface `readWrite` on the label-based overloads, and throw a typed `Pkcs11TokenException` rather than `ArgumentException` when no token matches.
-- **Breaks public API?** No — additive, except the `ArgumentException` → `Pkcs11TokenException` change, which is behavioural and should land before 1.0
-- **Raised by:** PKCS#11 Specialist B, .NET Engineer A
-- **Spec / References:** PKCS#11 v3.2 §5.6.1 (`C_OpenSession`), §4.4 (read-only session object restrictions); `CKR_TOKEN_WRITE_PROTECTED`
-
-### [BL-081] `CKA_ALWAYS_AUTHENTICATE` / `CKU_CONTEXT_SPECIFIC` re-authentication is unimplemented, and the session lock structurally prevents it
-- **Area:** PKCS#11 Conformance
-- **Severity:** High
-- **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/CKA.cs:344` (referenced elsewhere only by the log-printing flag set at `Objects/ObjectAttribute.cs:424`); `Common/CKU.cs:21` (used only by `Internal/Log.cs:107`); `Internal/Pkcs11SessionCore.Session.cs:147` (`Login` is internal and takes `AcquireExclusive()`); `Pkcs11Library.cs:558-573` (`OpenSessionWithPin` accepts `CKU_CONTEXT_SPECIFIC` unchecked)
-- **Problem:** A private key with `CKA_ALWAYS_AUTHENTICATE = CK_TRUE` requires `C_Login(hSession, CKU_CONTEXT_SPECIFIC, …)` *between* `C_SignInit`/`C_DecryptInit` and `C_Sign`/`C_Decrypt`. `Pkcs11Key.Sign` runs init and operate as one exclusive-locked unit with no seam, and `Pkcs11SessionCore.Login` is internal and itself takes the exclusive lock, so even an internal caller could not re-authenticate mid-operation. Signing or decrypting with such a key — the default posture for signing keys on FIPS-mode HSMs and on PIV/eID cards — therefore fails with `CKR_USER_NOT_LOGGED_IN`. Separately, `OpenSession(slotLabel, CKU.CKU_CONTEXT_SPECIFIC, pin)` is accepted by the public signature although it can never be valid on a freshly opened session. Verified by the coordinator: `CKA.cs:346` is the only occurrence of the attribute in the library.
-- **Proposed action:** Add a context-specific re-auth path — an optional `SecurePin contextPin` or `Func<SecurePin>` callback on `Pkcs11Key.Sign`/`Decrypt` issuing `C_Login(CKU_CONTEXT_SPECIFIC)` inside the already-held lock between init and operate. Document `CKA_ALWAYS_AUTHENTICATE` in the private-key template builder, and reject `CKU_CONTEXT_SPECIFIC` in `OpenSession` with `ArgumentException`.
-- **Breaks public API?** No — additive overloads
-- **Raised by:** PKCS#11 Specialist A
-- **Spec / References:** PKCS#11 v3.2 §4.9 (`CKA_ALWAYS_AUTHENTICATE`), §5.6.6 `C_Login`
-
-### [BL-084] Only one session per slot is usable: the second `OpenSession` throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either logs the other out
-- **Area:** PKCS#11 Conformance
-- **Severity:** High
-- **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Library.cs:558-573` (unconditional `session.Login` at `:567`; likewise `:594-602` for the pinpad); `Pkcs11Session.cs:112-133` (`Dispose` → `_core.LogoutForDispose()` at `:125`); the guidance being contradicted is at `Internal/Pkcs11SessionCore.cs:137-140`; mapping at `Internal/ExceptionMapper.cs:29`
-- **Problem:** The session busy-guard's own error message instructs callers to "Use a separate Session per thread", but the only public way to obtain a session is `OpenSession`, which always calls `C_Login` and ends in `Pkcs11Exception.ThrowIfError` with no tolerance for an already-logged-in state. PKCS#11 login state is per-application-per-token, so a second `OpenSession` on the same slot returns `CKR_USER_ALREADY_LOGGED_IN`, which `Internal/ExceptionMapper.cs:29` maps to `Pkcs11AuthenticationException`. Symmetrically, `Pkcs11Session.Dispose` issues `C_Logout`, de-authenticating *every* other session on that slot — the doc comment acknowledges the token-wide effect and calls it intended, which it cannot be once more than one session exists. The concurrency model the library documents is therefore unreachable, and there is no session pooling. No test opens two concurrent sessions, and `Integration/ThreadSafety/SessionParallelTests.Pkcs11Mock.cs:19-21` states outright that real cross-session parallelism is not exercised. Verified by the coordinator.
-- **Proposed action:** Tolerate `CKR_USER_ALREADY_LOGGED_IN` in `OpenSession` as success; track a per-slot session count and skip `C_Logout` unless this is the last session on the slot; add a multi-session test against SoftHSM2 (`ulMaxSessionCount > 1`).
-- **Breaks public API?** No — behavioural fix
-- **Raised by:** PKCS#11 Specialist B
-- **Spec / References:** PKCS#11 v3.2 §5.6 (login state shared across an application's sessions with a token), §5.6.9 `C_Logout`
 
 ### [BL-086] Roughly half the suite is behind runtime gates and CI has no guard against a mass silent skip
 - **Area:** QA
@@ -284,8 +250,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/` — 24 public types, e.g. `Common/CKM.cs:7`, `Common/CKA.cs:6`, `Common/CKU.cs:6`, `Common/CKK.cs:6`, `Common/CKR.cs:6`; consumed by root-namespace signatures such as `Pkcs11Library.OpenSessionWithPin(…, CKU, …)` (`Pkcs11Library.cs:558`), the `Mechanism(CKM, …)` constructors and `Pkcs11Key.GetAttributeValue(params ReadOnlySpan<CKA>)`. The README quickstart shows the `…Pkcs11.Common` using (`README.md:56`), but the move-or-keep decision is still unrecorded
-- **Problem:** No non-trivial program can be written with a single `using KerckhoffsLabs.Security.Cryptography.Pkcs11;` — logging in needs `CKU`, any mechanism needs `CKM`, any template needs `CKA`/`CKK`, and any error handling needs `CKR`, all of which sit under `…Pkcs11.Common`. "Common" is also precisely the non-descriptive grouping the guidelines warn against, and it splits types that are inseparable in use.
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/` — 24 public types, e.g. `Common/CKM.cs:7`, `Common/CKA.cs:6`, `Common/CKU.cs:6`, `Common/CKK.cs:6`, `Common/CKR.cs:6`; consumed by root-namespace signatures such as the `Mechanism(CKM, …)` constructors and `Pkcs11Key.GetAttributeValue(params ReadOnlySpan<CKA>)`. The README quickstart shows the `…Pkcs11.Common` using (`README.md:56`), but the move-or-keep decision is still unrecorded
+- **Problem:** No non-trivial program can be written with a single `using KerckhoffsLabs.Security.Cryptography.Pkcs11;` — any mechanism needs `CKM`, any template needs `CKA`/`CKK`, and any error handling needs `CKR`, all of which sit under `…Pkcs11.Common`. "Common" is also precisely the non-descriptive grouping the guidelines warn against, and it splits types that are inseparable in use.
 - **Proposed action:** Move the constant enums into the root `…Pkcs11` namespace, keeping `Objects`, `Algorithms`, `MechanismParams` and `Exceptions` as they are. If `Common` stays, document the required `using` pair prominently in the README quickstart.
 - **Breaks public API?** Yes — namespace moves are SemVer-major; decide before 1.0
 - **Raised by:** .NET Engineer A
@@ -322,12 +288,14 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No — additive, but the shape is much easier to get right before the types are locked
 - **Raised by:** .NET Engineer A
 
-### [BL-099] The v3.0 half of "bound at interop but publicly unreachable": `C_SessionCancel`, `C_LoginUser`, and the 14 message multi-part / message sign-verify functions
+### [BL-099] ⚠️ PARTIALLY RESOLVED — The v3.0 half of "bound at interop but publicly unreachable": `C_SessionCancel`, `C_LoginUser`, and the 14 message multi-part / message sign-verify functions
+- **Status:** Partially resolved 2026-11-13 (token login model, `docs/superpowers/specs/2026-11-12-token-login-model-design.md`). `C_LoginUser` is public as `Pkcs11Slot.LoginUser(TokenUser, SecurePin, string username)`, which returns a `Pkcs11Login` like `Login`; the username is part of the login's identity, compared ordinally and never logged.
 - **Area:** PKCS#11 Conformance
 - **Severity:** Medium
 - **Effort:** L
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11SessionCore.cs:522` (`CancelOperations`, internal), `Internal/Pkcs11SessionCore.Session.cs:191` (`LoginUser`, internal); the message multi-part and message sign/verify functions are bound in `Native/LowLevelPkcs11Library.MessageSigning.cs`, `.MessageVerifying.cs`, `.MessageEncryption.cs` and `.MessageDecryption.cs`, with no caller outside `Native/`
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11SessionCore.cs` (`CancelOperations`, internal); the message multi-part and message sign/verify functions are bound in `Native/LowLevelPkcs11Library.MessageSigning.cs`, `.MessageVerifying.cs`, `.MessageEncryption.cs` and `.MessageDecryption.cs`, with no caller outside `Native/`
 - **Problem:** Of the 36 v3.x functions, 10 are reachable publicly and 26 are not; BL-019 enumerates only the v3.2 members of that set, so the v3.0 members are unrecorded. Two are more than completeness items: `C_SessionCancel` is the spec's only way to abort a stuck or partially-fed operation without closing the session — and `Pkcs11SessionCore` already uses it internally for unwind — and `C_LoginUser` is the only login path for HSMs with named user accounts beyond SO/User.
+- **Remaining scope:** `C_SessionCancel` (promote `CancelOperations` to `Pkcs11Session`), and the decision, documented, on whether the message multi-part and message sign/verify families ship in 1.0 or are deferred.
 - **Proposed action:** At minimum promote `CancelOperations(...)` and `LoginUser(...)` to `Pkcs11Session`; both are already implemented and guarded. Decide explicitly, and document, whether the message multi-part and message sign/verify families ship in 1.0 or are deferred.
 - **Breaks public API?** No — additive
 - **Raised by:** PKCS#11 Specialist A
@@ -407,7 +375,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Severity:** Medium
 - **Effort:** S
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs:701-720` (handle chosen at `:712-714`, used at `:719`)
-- **Problem:** `Wrap` null-checks `targetKey` and validates that its handle is non-invalid, but never verifies the target belongs to the same session — so a handle obtained from a *different* session is passed to this session's `C_WrapKey`. Session-object handles are session-scoped, so the best case is `CKR_OBJECT_HANDLE_INVALID`; the bad case is a numeric collision with a different object in the receiving session, wrapping the wrong key material with no error anywhere. Reachable today: two `OpenSessionWithoutLogin` calls, or two slots, produce two independent sessions.
+- **Problem:** `Wrap` null-checks `targetKey` and validates that its handle is non-invalid, but never verifies the target belongs to the same session — so a handle obtained from a *different* session is passed to this session's `C_WrapKey`. Session-object handles are session-scoped, so the best case is `CKR_OBJECT_HANDLE_INVALID`; the bad case is a numeric collision with a different object in the receiving session, wrapping the wrong key material with no error anywhere. Reachable today: two `OpenSession` calls on a slot, or two slots, produce two independent sessions.
 - **Proposed action:** Add a `ReferenceEquals(targetKey.Session, _session)` check at the top of `Wrap`, throwing `ArgumentException`, and audit any future cross-key method for the same check.
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist B
@@ -626,6 +594,16 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA C
 - **Spec / References:** Extends BL-002. `Generators/PackedStructsGenerator.cs:36-42` correctly no-ops when a compilation declares no `[PackedForPkcs11]` structs, so shipping the generator to consumers is itself safe
+
+### [BL-183] A lost login is noticed only when the library next uses the login's own session
+- **Area:** PKCS#11 Conformance
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/TokenLoginRecord.cs` (`AnchorLost`, `TryShareHeldLogin`); `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Login.cs` (`IsActive`, `OpenSession`)
+- **Problem:** After a token is pulled and put back, or a network HSM fails over, the module has dropped every session and the login, but the library learns of it only from a call on the login's own (anchor) session. Until then `Pkcs11Login.IsActive` reads `true`, `login.OpenSession()` succeeds (it makes no module call), and every operation on the new sessions fails with `CKR_USER_NOT_LOGGED_IN`, which by design ends nothing (decision 5: it is not evidence the login is gone). Calling `slot.Login(...)` again recovers in one call (the share's `C_Login` on the anchor reports the loss, the old login ends, and a first login follows), but an application that only reopens sessions from its long-lived login keeps failing.
+- **Proposed action:** When an operation on a session whose record is logged in gets `CKR_USER_NOT_LOGGED_IN`, probe the anchor with `C_GetSessionInfo`, taking its lease with `TryEnter` only and outside the operation's own session lease, so lock order (session lock, then gate, then record lock) holds. If the anchor reports one of #363's loss codes, the existing `AnchorLost` path ends the login, and `IsActive` turns `false`. The evidence is still the anchor's loss, so decision 5 is unchanged; still rethrow the operation's own `CKR_USER_NOT_LOGGED_IN`.
+- **Breaks public API?** No
+- **Raised by:** Final review of the token login model (PR #365, finding I1)
 
 ## Low
 
@@ -1059,7 +1037,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Session` expose no `Stream` overload at all. See BL-087 and BL-099.
 
-Condensed from PKCS#11 Specialist A, who cross-checked `CK_FUNCTION_LIST_3_0`/`_3_2`, `CK_INTERFACE`, and `CK_ASYNC_DATA` field-by-field against the vendored v3.2 header (`vendor/opencryptoki/usr/include/pkcs11types.h`) — exact match, including the 12 v3.2 additions in declaration order. **No v3.2 `C_*` function is missing at the interop layer.** Re-confirmed 2026-08-11: all 104 function-list entries are bound; **78 of 104 are reachable from the public API** (v2.40 68/68 in substance, v3.0 8 of 24, v3.2 2 of 12).
+Condensed from PKCS#11 Specialist A, who cross-checked `CK_FUNCTION_LIST_3_0`/`_3_2`, `CK_INTERFACE`, and `CK_ASYNC_DATA` field-by-field against the vendored v3.2 header (`vendor/opencryptoki/usr/include/pkcs11types.h`) — exact match, including the 12 v3.2 additions in declaration order. **No v3.2 `C_*` function is missing at the interop layer.** Re-confirmed 2026-08-11: all 104 function-list entries are bound; **78 of 104 are reachable from the public API** (v2.40 68/68 in substance, v3.0 8 of 24, v3.2 2 of 12); since 2026-11-13, 79, with `C_LoginUser` (v3.0 9 of 24).
 
 | Function group | Low-level (P/Invoke) | High-level (public façade) |
 |---|---|---|
@@ -1072,7 +1050,8 @@ Condensed from PKCS#11 Specialist A, who cross-checked `CK_FUNCTION_LIST_3_0`/`_
 | v2.40 key management / RNG | ✅ | ✅ |
 | v2.40 legacy (`C_GetFunctionStatus`, `C_CancelFunction`) | ✅ | low-level only (legacy no-ops) |
 | v3.0 interfaces (`C_GetInterfaceList`, `C_GetInterface`) | ✅ | ✅ |
-| v3.0 `C_LoginUser`, `C_SessionCancel` | ✅ | ❌ — implemented but `internal` — BL-099 |
+| v3.0 `C_LoginUser` | ✅ | ✅ — `Pkcs11Slot.LoginUser` |
+| v3.0 `C_SessionCancel` | ✅ | ❌ — implemented but `internal` — BL-099 |
 | v3.0 message-based AEAD — encrypt/decrypt single-shot triples | ✅ | ✅ |
 | v3.0 message-based — `Begin`/`Next` multi-part, message Sign/Verify (14 functions) | ✅ | ❌ — no caller outside `Native/` — BL-099 |
 | v3.2 KEM (`C_EncapsulateKey`, `C_DecapsulateKey`) | ✅ | ✅ |

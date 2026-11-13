@@ -85,7 +85,10 @@ public sealed class Pkcs11Login : IDisposable
     /// </param>
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
     /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>The open session; the caller disposes it. Disposing it closes it and never logs out.</returns>
+    /// <returns>
+    /// The open session; the caller disposes it. Disposing it closes it and releases its hold: it logs out only when it
+    /// is the login's last holder.
+    /// </returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
     /// <exception cref="Pkcs11SessionException">A read-only session under a Security Officer login

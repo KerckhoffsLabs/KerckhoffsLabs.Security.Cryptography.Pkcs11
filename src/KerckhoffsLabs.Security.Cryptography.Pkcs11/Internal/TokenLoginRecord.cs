@@ -44,7 +44,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// <c>C_Login</c> and the final <c>C_Logout</c> hold it exclusive. A login that shares the login already held
 /// holds it shared, like an operation. So a logout never lands inside an operation, as the spec asks ("before
 /// logging out, any active operations should be finished"); a slow pinpad on a first login or a final logout
-/// delays operations on the slot, a slow pinpad on a share delays only other logins. The gate is recursive, so
+/// delays operations on the slot, a slow pinpad on a share delays other logins, and also every new operation once a
+/// first login or final logout is waiting behind it (the gate makes new shared holders wait for a waiting exclusive
+/// one). The gate is recursive, so
 /// a thread that holds it exclusive (sending a login on the anchor) can enter an operation; a thread inside an
 /// operation cannot release a share (<see cref="ThrowIfInsideOperation"/>), since the last one needs it
 /// exclusive.
@@ -108,6 +110,12 @@ internal sealed class TokenLoginRecord
     {
         get { lock (_lock) return _username; }
     }
+
+    /// <summary>
+    /// How many threads are waiting to hold the gate exclusive (a first login or a final logout waiting for operations
+    /// in flight). A test seam: it lets a test wait until such a thread is blocked, instead of guessing with time.
+    /// </summary>
+    internal int WaitingForExclusiveGate => _gate.WaitingWriteCount;
 
     /// <summary>The session the login was made on and is kept by, or <see langword="null"/> when not logged in.</summary>
     public Pkcs11SessionCore? Anchor
@@ -245,7 +253,8 @@ internal sealed class TokenLoginRecord
         }
     }
 
-    // The share half of Login, under the gate (shared or exclusive): null when no one is logged in. Sends the
+    // The share half of Login, under the gate (shared or exclusive): null when no one is logged in, or when the
+    // send finds the login's anchor lost (the login then ended, and Login logs in afresh). Sends the
     // login on the anchor and accepts CKR_USER_ALREADY_LOGGED_IN, then takes a hold only if the login it was
     // sent for is still the current one: the module may have reported it ended meanwhile (MarkEnded does not
     // take the gate), and a hold stamped with the next generation would keep that one from ever logging out.
@@ -285,6 +294,14 @@ internal sealed class TokenLoginRecord
         catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_USER_ALREADY_LOGGED_IN)
         {
             // Expected: this application holds the login, so the token says so. Not a PIN check.
+        }
+        catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException && !IsCurrent(generation))
+        {
+            // The anchor was lost (a token pulled and put back, an HSM failover): the send reported it and
+            // AnchorLost ended that login, or another thread did and closed the anchor under this send. The
+            // caller asked to log in, so log in from scratch: null sends Login on to a first login under the gate
+            // held exclusive. The old generation stays ended: its holders inactive, its private handles refused.
+            return null;
         }
 
         lock (_lock)

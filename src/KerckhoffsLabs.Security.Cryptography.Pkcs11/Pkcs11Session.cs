@@ -22,8 +22,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <see cref="Pkcs11Slot.OpenSession"/>, one that keeps none but sees whatever login the application has on
 /// the token (PKCS#11 login state belongs to the application and the token, not to a session). The session
 /// does not own the library — callers continue to own and dispose the <see cref="Pkcs11Library"/>.
-/// <see cref="Dispose"/> closes the session (<c>C_CloseSession</c>) and never logs out: the last holder of
-/// the login does (see <see cref="Pkcs11Login"/>).
+/// <see cref="Dispose"/> closes the session (<c>C_CloseSession</c>) and releases its hold of the login, if it has
+/// one; it logs out only when it was the login's last holder (see <see cref="Pkcs11Login"/>).
 /// </para>
 /// <para>
 /// Keys obtained via the session's factory methods hold a non-owning reference to the

@@ -72,6 +72,8 @@ fact that the token did so. Choose a token whose enforcement you trust for the k
 | Fixed AEAD tag size | `AesGcmPkcs11`, `AesCcmPkcs11` constructors |
 | Module-reported lengths validated | every call site that sizes or reads a buffer from a length the module reports |
 | Secrets zeroed on release | `SecurePin`, `SecurePassword`, attribute and parameter buffers ([Secrets in memory](#secrets-in-memory)) |
+| A login ends only with its last holder; private handles refused after it | `Pkcs11Login`, `Pkcs11Session`, `Pkcs11Key`, `Pkcs11Object` ([Logins and sessions](#logins-and-sessions)) |
+| Read-only sessions by default where no login is needed | `Pkcs11Slot.OpenSession` ([Logins and sessions](#logins-and-sessions)) |
 
 ### Out of scope
 
@@ -100,6 +102,83 @@ These are outside what the library can defend against, and outside the scope of
   library, enforces that.
 - **`NistApproved` is not FIPS certification**: it restricts what this library sends; FIPS 140-3 also
   requires a validated module operating in its approved mode.
+- **A login needs two sessions at once.** The library keeps a session of its own for each login, so a token
+  that allows only one session at a time refuses the first session a login opens (`CKR_SESSION_COUNT`, from
+  the module). There is no fallback. See [Logins and sessions](#logins-and-sessions).
+- **Logins made outside the library are not seen.** Another component of the process calling the module
+  directly, or another process, can log in or out without the library knowing; the module's answer then
+  decides.
+
+<a id="logins-and-sessions"></a>
+## Logins and sessions
+
+In PKCS#11 a login belongs to the application and the token, not to a session: once the user is logged in,
+every session the application has with the token is logged in too, and logging out logs all of them out
+(PKCS#11 v3.2, "Session management functions"). The library models it that way, so that one component
+cannot log out another's sessions by accident.
+
+```csharp
+// The PIN comes from your secret store (a secret manager, or an environment variable the deployment sets),
+// never from source code. ReadPinFromSecretStore stands for that call.
+using SecurePin pin = ReadPinFromSecretStore("user-pin");
+using Pkcs11Login login = slot.Login(TokenUser.User, pin);   // the library does not keep the PIN
+
+using Pkcs11Session signing = login.OpenSession();   // read/write by default
+using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
+```
+
+- **A login ends with its last holder.** `Pkcs11Slot.Login`, `LoginWithPinpad` and `LoginUser` return a
+  `Pkcs11Login`, a hold of the token's login; each session opened through `login.OpenSession()` holds it too.
+  The token is logged out (`C_Logout`) when the last holder is disposed, in whatever order they go: disposing
+  the `Pkcs11Login` before its sessions leaves them working. Every `Pkcs11Library` loaded from the same module
+  shares the login, as the module does.
+- **A second login of the same user shares the first; it is not a second authentication.** The PIN is still
+  sent, and the module's answer decides, but a token is not required to check the PIN of a user already
+  logged in. A login of another user (the security officer, or another `LoginUser` username) while one is
+  held is refused before the module.
+- **The library keeps a session of its own for each login**, on which it sends `C_Login` and `C_Logout`:
+  read-only for the user, read/write for the security officer. It is what keeps a login alive while you have
+  no session open, and it is never handed out. A token that allows one session at a time cannot be used
+  with a login (see [Known limits](#known-limits)).
+- **Private handles do not outlive their login.** PKCS#11 invalidates every handle to a private object when
+  the user logs out, even if the user logs in again. A `Pkcs11Key`, `Pkcs11Object` or `Pkcs11Certificate`
+  found under a login that has since ended refuses to send its private handle (`ObjectDisposedException`):
+  log in and open it again. A logout waits for operations in flight on the token, so none is cut off
+  halfway.
+- **A lost token or HSM session is noticed late; logging in again recovers.** After the token is pulled and
+  put back, or a network HSM fails over, the module has dropped the login, but `Pkcs11Login.IsActive` may
+  still read `true` and `login.OpenSession()` still succeed until the library next uses the login's own
+  session; operations meanwhile fail with `CKR_USER_NOT_LOGGED_IN`. Call `slot.Login(...)` again: it finds
+  that session lost, ends the old login and logs in afresh in the same call. The old `Pkcs11Login`, its
+  sessions and its private handles stay ended; dispose them and use the new login.
+- **Sessions are read-only unless asked otherwise, where no login is needed.** `Pkcs11Slot.OpenSession()`
+  opens a read-only session that holds no login (it sees the application's login while there is one), the
+  only kind a write-protected token accepts. A read-only session creates and uses session objects; only
+  token objects (`persistOnToken: true`) need `SessionAccess.ReadWrite`. A read-only session and a security
+  officer login exclude each other, and the library refuses either one before the module when it knows of
+  the other.
+- **Keys with `CKA_ALWAYS_AUTHENTICATE`** need the PIN again for each use. A key uses its own session's
+  `Pkcs11Session.ContextAuthentication`, set to `ContextAuthentication.FromPin(...)` or
+  `ContextAuthentication.Pinpad`. A session from `login.OpenSession()` starts with a copy of
+  `Pkcs11Login.ContextAuthentication` taken when it opens, so set the login's **before** opening the sessions
+  that need it; setting it later changes only the sessions opened afterwards. To change an open session, set
+  its own `ContextAuthentication`. The library asks for the PIN after the operation's `C_SignInit` or
+  `C_DecryptInit` and sends `C_Login(CKU_CONTEXT_SPECIFIC)` for that one operation. A session without a
+  source refuses such a key before the operation starts (`InvalidOperationException`). `C_UnwrapKey` and `C_DecapsulateKey` start and finish in one call, with no point at
+  which to re-authenticate, so they are sent as they are and the token decides. A PIN locked during a
+  re-authentication ends the token's login, as the specification says it does.
+
+  ```csharp
+  // Called once per operation with the key about to be used; return a new SecurePin each time.
+  ContextAuthentication fromSecretStore = ContextAuthentication.FromPin(key => ReadPinFromSecretStore("user-pin"));
+
+  // Set on the login before opening sessions: each session copies it when it opens.
+  login.ContextAuthentication = fromSecretStore;
+  using Pkcs11Session session = login.OpenSession();
+
+  // Or on a session already open (including one from slot.OpenSession()).
+  signing.ContextAuthentication = fromSecretStore;
+  ```
 
 <a id="crypto-policies"></a>
 ## Crypto policies

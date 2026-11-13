@@ -30,6 +30,16 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public bool RequiresUserLogin => false;
 
+    /// <summary>
+    /// A capability, not a departure from PKCS#11: false while pkcs11-mock allows one open session at a time. A login
+    /// keeps a session of its own besides the ones it opens, so the first session a login opens is refused there with
+    /// <c>CKR_SESSION_COUNT</c>.
+    /// </summary>
+    public const bool MockAllowsSeveralSessions = false;
+
+    /// <summary>Gate for the cases that log in and open a session: see <see cref="MockAllowsSeveralSessions"/>.</summary>
+    public static bool LoginSessionsAvailable => MockAllowsSeveralSessions;
+
     public MockBackendFixture()
     {
         LibraryPath = Settings.MockLibraryPath;

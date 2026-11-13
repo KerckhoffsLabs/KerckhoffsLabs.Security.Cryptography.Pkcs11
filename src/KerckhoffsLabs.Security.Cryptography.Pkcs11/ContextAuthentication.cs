@@ -42,9 +42,14 @@ public abstract class ContextAuthentication
     /// is abandoned.
     /// </para>
     /// <para>
-    /// It runs while the operation holds the key's session, and the token's login open: a slow prompt delays a login
-    /// or the final logout on that token, never another session's operation. It must not use the same session, nor
-    /// release a login on that token (refused with <see cref="InvalidOperationException"/>).
+    /// It runs while the operation holds the key's session, and the token's login open. A slow prompt delays a login
+    /// or the final logout on that token; while one of those is waiting, it also delays every new operation on the
+    /// token, from any session, until the prompt returns.
+    /// </para>
+    /// <para>
+    /// It must not use the key's session: that is not allowed, and not enforced, so doing it interleaves calls
+    /// inside the operation in progress. It must not release a login on that token either; that one is refused
+    /// with <see cref="InvalidOperationException"/>.
     /// </para>
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="pinFor"/> is <see langword="null"/>.</exception>

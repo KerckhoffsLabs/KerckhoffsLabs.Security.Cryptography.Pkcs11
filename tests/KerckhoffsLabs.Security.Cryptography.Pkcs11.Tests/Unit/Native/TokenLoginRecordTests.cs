@@ -134,23 +134,25 @@ public sealed class TokenLoginRecordTests : IDisposable
     }
 
     [Fact]
-    public void SharedLogin_AnswerOtherThanAlreadyLoggedIn_Propagates_AndTakesNoHold()
+    public void SharedLogin_AnchorLost_EndsTheLogin_AndLogsInAfresh()
     {
         using LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
 
-        // Closed underneath the record, so the share's C_Login fails with something other than
-        // CKR_USER_ALREADY_LOGGED_IN.
+        // Closed underneath the record, so the share's C_Login answers CKR_SESSION_HANDLE_INVALID.
         var anchor = Assert.Single(_module.OpenSessions);
         Assert.Equal(CKR.CKR_OK, _library.LowLevelLibrary!.C_CloseSession((NativeCULong)anchor.Handle));
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Record.Login(_library, TokenUser.User, _pin, username: null));
+        // The anchor reported lost is unambiguous evidence the login is gone (decision 5): it ends, the first
+        // holder goes inactive with it, and the same Login then logs in from scratch on a new anchor.
+        using LoginHold second = Record.Login(_library, TokenUser.User, _pin, username: null);
 
-        // The anchor reported lost is unambiguous evidence the login is gone (decision 5): it ends, and the
-        // first holder goes inactive with it rather than keeping a closed anchor.
-        Assert.Equal(CKR.CKR_SESSION_HANDLE_INVALID, ex.ReturnValue);
         Assert.False(first.IsActive);
-        Assert.False(Record.IsLoggedIn);
-        Assert.Null(Record.Anchor);
+        Assert.True(second.IsActive);
+        Assert.True(Record.IsLoggedIn);
+        Assert.NotEqual(first.Generation, second.Generation);
+        var newAnchor = Assert.Single(_module.OpenSessions);
+        Assert.NotEqual(anchor.Handle, newAnchor.Handle);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
     }
 
     // Decision 5: CKR_USER_NOT_LOGGED_IN is not evidence that the login is gone.

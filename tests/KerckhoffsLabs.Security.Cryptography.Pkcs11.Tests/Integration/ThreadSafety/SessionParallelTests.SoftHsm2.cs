@@ -12,7 +12,9 @@ public sealed class SessionParallelTests_SoftHsm(SoftHsmBackendFixture backend)
     public void ParallelSessions_GenerateFindAndDestroyOwnKeys() =>
         SessionParallelTestCases.Assert_ParallelSessions_GenerateFindAndDestroyOwnKeys(_backend);
 
-    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    // SoftHSM is not safe when one session's objects are freed while another reads them: see
+    // SoftHsmBackendFixture.SoftHsmSurvivesClosingASessionWhileAnotherReadsItsObjects.
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SessionCloseRaceAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM crashes or answers CKR_ATTRIBUTE_VALUE_INVALID when a session's objects are freed while another session reads them")]
     public void ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind() =>
         SessionParallelTestCases.Assert_ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind(_backend);
 

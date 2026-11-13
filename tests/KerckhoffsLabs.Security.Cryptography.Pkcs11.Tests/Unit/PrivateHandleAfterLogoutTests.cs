@@ -139,28 +139,43 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
     // FindCertificates holds the login gate from its search through the reads that wrap each certificate, so a
     // logout asked for meanwhile waits for it, and the certificate is tied to the login it was found under.
+    // Synchronized on state, not time: the search does not go on until the logout is blocked on the gate, and what
+    // the read sees is captured inside the read itself (once FindCertificates returns, the logout may run at once).
     [Fact]
     public void FindCertificates_LogoutDuringTheSearch_WaitsForIt()
     {
         byte[] der = SelfSigned();
-        _module.AddObject(CKO.CKO_CERTIFICATE, "cert", isPrivate: true, value: der,
+        ulong handle = _module.AddObject(CKO.CKO_CERTIFICATE, "cert", isPrivate: true, value: der,
             more: new Dictionary<CKA, byte[]> { [CKA.CKA_CERTIFICATE_TYPE] = LoginTokenModule.Ulong((ulong)CKC.CKC_X_509) });
         using Pkcs11Session session = Slot.OpenSession();
         Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        TokenLoginRecord record = session.Core.LoginRecord;
 
         Thread? logout = null;
+        bool blocked = false;
         _module.DuringFind = () =>
         {
             _module.DuringFind = null;
             logout = new Thread(login.Dispose);
             logout.Start();
-            // Wait until the logout is blocked on the gate the search holds.
-            SpinWait.SpinUntil(() => (logout.ThreadState & ThreadState.WaitSleepJoin) != 0, TimeSpan.FromSeconds(10));
+            blocked = SpinWait.SpinUntil(() => record.WaitingForExclusiveGate > 0, TimeSpan.FromSeconds(60));
+        };
+        int logoutsDuringRead = -1;
+        int waitingDuringRead = -1;
+        _module.DuringGetAttributeValue = objectHandle =>
+        {
+            if (objectHandle != handle)
+                return;
+            logoutsDuringRead = _module.LogoutCalls;
+            waitingDuringRead = record.WaitingForExclusiveGate;
         };
 
         using ReadOnlyDisposableList<Pkcs11Certificate> certificates = session.FindCertificates();
-        Assert.Equal(0, _module.LogoutCalls); // still waiting while the certificate was read
-        logout!.Join(TimeSpan.FromSeconds(30));
+        Assert.True(logout!.Join(TimeSpan.FromSeconds(60)));
+
+        Assert.True(blocked, "the logout never blocked on the gate the search holds");
+        Assert.Equal(0, logoutsDuringRead);  // the certificate was read while still logged in
+        Assert.Equal(1, waitingDuringRead);  // with the logout still waiting for the search
         Assert.Equal(1, _module.LogoutCalls);
 
         Pkcs11Certificate certificate = Assert.Single(certificates);
@@ -292,16 +307,14 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
         var anchor = Assert.Single(_module.OpenSessions);
         _module.FailSession(anchor.Handle, CKR.CKR_DEVICE_REMOVED);
 
-        // The anchor's next call (a share's C_Login) reports it lost: the login is over.
-        var lost = Assert.Throws<Pkcs11TokenException>(() => Slot.Login(TokenUser.User, _pin));
-        Assert.Equal(CKR.CKR_DEVICE_REMOVED, lost.ReturnValue);
-        Assert.False(first.IsActive);
-        Assert.Empty(_module.OpenSessions); // the lost anchor was closed
-
-        // Nothing old disposed, and a new login is made from scratch.
+        // The anchor's next call (a share's C_Login) reports it lost: that login is over, and the same Login
+        // then logs in from scratch, on a new anchor.
         using Pkcs11Login second = Slot.Login(TokenUser.User, _pin);
+        Assert.False(first.IsActive);
         Assert.True(second.IsActive);
         Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        var newAnchor = Assert.Single(_module.OpenSessions); // the lost anchor was closed
+        Assert.NotEqual(anchor.Handle, newAnchor.Handle);
 
         // The old login's holder is inactive: releasing it sends nothing.
         int logouts = _module.LogoutCalls;
@@ -309,6 +322,48 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
         Assert.Equal(logouts, _module.LogoutCalls);
         Assert.True(second.IsActive);
         Assert.Throws<ObjectDisposedException>(() => key.Sign(Hmac, "data"u8));
+    }
+
+    [Fact]
+    public void TokenReinserted_NextLogin_LogsInAgainAndWorks()
+    {
+        // The long-lived pattern: log in once, open sessions from the login. Then the token is pulled and put
+        // back (or the HSM fails over): the module drops every session and the login.
+        Pkcs11Login first = Slot.Login(TokenUser.User, _pin);
+        Pkcs11Session oldSession = first.OpenSession();
+        using Pkcs11Key oldKey = oldSession.OpenKey("private-key");
+        oldKey.Sign(Hmac, "data"u8);
+        _module.ReinsertToken();
+
+        // Nothing has touched the anchor yet, so the old login cannot know.
+        Assert.True(first.IsActive);
+
+        // Logging in again finds the anchor lost, ends that login, and logs in afresh: one call, no exception.
+        int logins = _module.LoginCalls;
+        using Pkcs11Login second = Slot.Login(TokenUser.User, _pin);
+        Assert.True(second.IsActive);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        Assert.Equal(logins + 2, _module.LoginCalls); // the share's C_Login on the lost anchor, then the fresh one
+
+        // The old login, its sessions and its private handles stay ended.
+        Assert.False(first.IsActive);
+        Assert.Throws<ObjectDisposedException>(() => first.OpenSession());
+        int signInits = _module.CallCount("C_SignInit");
+        Assert.Throws<ObjectDisposedException>(() => oldKey.Sign(Hmac, "data"u8));
+        Assert.Equal(signInits, _module.CallCount("C_SignInit"));
+
+        // The new login works.
+        using (Pkcs11Session session = second.OpenSession())
+        using (Pkcs11Key key = session.OpenKey("private-key"))
+            Assert.Equal(LoginTokenModule.SignatureLength, key.Sign(Hmac, "data"u8).Length);
+
+        // Releasing the old holders sends no C_Logout, and leaves the new login in place.
+        int logouts = _module.LogoutCalls;
+        oldSession.Dispose();
+        first.Dispose();
+        Assert.Equal(logouts, _module.LogoutCalls);
+        Assert.True(second.IsActive);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
     }
 
     [Fact]

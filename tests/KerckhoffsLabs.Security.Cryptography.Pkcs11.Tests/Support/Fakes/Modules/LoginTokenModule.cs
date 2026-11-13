@@ -135,6 +135,12 @@ internal sealed class LoginTokenModule : FakeModule
     /// </summary>
     public Action? DuringFind { get; set; }
 
+    /// <summary>
+    /// Runs at the start of every <c>C_GetAttributeValue</c>, before the token's lock, with the object handle: lets a
+    /// test observe what else is going on while an object is read.
+    /// </summary>
+    public Action<ulong>? DuringGetAttributeValue { get; set; }
+
     /// <summary>The length of the signature <c>C_Sign</c> produces.</summary>
     public const int SignatureLength = 32;
 
@@ -198,6 +204,22 @@ internal sealed class LoginTokenModule : FakeModule
     {
         lock (_lock)
             _failing[session] = rv;
+    }
+
+    /// <summary>
+    /// The token pulled and put back, or a network HSM failing over: every session open now answers
+    /// <paramref name="rv"/> to every later call until it is closed, and the application is logged out. Private
+    /// object handles stay as they were: the test checks the library refuses them, not the module.
+    /// </summary>
+    public void ReinsertToken(CKR rv = CKR.CKR_DEVICE_REMOVED)
+    {
+        lock (_lock)
+        {
+            foreach ((ulong handle, _) in _sessions)
+                _failing[handle] = rv;
+            _loggedIn = null;
+            _username = null;
+        }
     }
 
     /// <summary>A snapshot of the open sessions, in the order they were opened.</summary>
@@ -567,6 +589,7 @@ internal sealed class LoginTokenModule : FakeModule
 
     protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
     {
+        DuringGetAttributeValue?.Invoke((ulong)objectHandle);
         lock (_lock)
         {
             if (_failing.TryGetValue((ulong)session, out CKR failure))

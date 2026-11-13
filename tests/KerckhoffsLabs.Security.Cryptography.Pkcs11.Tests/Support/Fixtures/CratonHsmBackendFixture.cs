@@ -119,6 +119,18 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool ReadOnlySessionObjectsAvailable => CratonHsmAvailable && CratonHsmMakesSessionObjectsInReadOnlySessions;
 
     /// <summary>
+    /// False while <c>C_Login</c> refuses <c>CKU_CONTEXT_SPECIFIC</c> with <c>CKR_USER_TYPE_INVALID</c>:
+    /// <c>Token::login</c> in <c>src/token/token.rs</c> takes <c>CKU_USER</c> and <c>CKU_SO</c> only, so a private key
+    /// with <c>CKA_ALWAYS_AUTHENTICATE = TRUE</c> cannot be re-authenticated for an operation. PKCS#11 v3.2 defines the
+    /// context-specific login under <c>C_Login</c> and the private key objects' <c>CKA_ALWAYS_AUTHENTICATE</c>. Read from the source at the
+    /// pinned commit; not yet reported upstream.
+    /// </summary>
+    public const bool CratonHsmTakesAContextSpecificLogin = false;
+
+    /// <summary>Gate for the <c>CKA_ALWAYS_AUTHENTICATE</c> cases: see <see cref="CratonHsmTakesAContextSpecificLogin"/>.</summary>
+    public static bool ContextLoginAvailable => CratonHsmAvailable && CratonHsmTakesAContextSpecificLogin;
+
+    /// <summary>
     /// False while any refused <c>C_Login</c> locks the right PIN out for a while: <c>C_Login</c> does not check a
     /// PIN's length, so one shorter than <c>ulMinPinLen</c> counts as a failed login, which opens a backoff window
     /// (<c>check_rate_limit</c> in <c>src/token/token.rs</c>) during which the right PIN is refused with
@@ -133,6 +145,19 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the C_Logout handle case: see <see cref="CratonHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => CratonHsmAvailable && CratonHsmDestroysPrivateSessionObjectsOnLogout;
+
+    /// <summary>
+    /// False while session objects can outlive their session's <c>C_CloseSession</c>: observed in CI on the parallel
+    /// close-while-searching case, a session key created by a session that has since closed was still found by
+    /// another session once every thread was done. PKCS#11 v3.2 §5.6 (<c>C_CloseSession</c>) destroys the session's
+    /// objects. Not yet reported upstream; no tripwire yet, since it was seen only under that concurrency.
+    /// </summary>
+    public const bool CratonHsmDestroysSessionObjectsOnCloseSession = false;
+
+    /// <summary>
+    /// Gate for the parallel close-while-searching case: see <see cref="CratonHsmDestroysSessionObjectsOnCloseSession"/>.
+    /// </summary>
+    public static bool SessionCloseCleanupAvailable => CratonHsmAvailable && CratonHsmDestroysSessionObjectsOnCloseSession;
 
     /// <summary>
     /// False while a template without an attribute PKCS#11 v3.2 says must be given still makes an object:

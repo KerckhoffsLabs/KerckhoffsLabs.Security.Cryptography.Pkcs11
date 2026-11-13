@@ -44,7 +44,8 @@ What each step does:
    `GetSlotList` by its ID then. **`slot.Login(TokenUser.User, pin)`** logs the normal user in and returns a
    `Pkcs11Login`, and **`login.OpenSession()`** opens a read/write session of that login. (A token that takes
    no login, such as a software crypto token, is used through `slot.OpenSession()` instead, which opens a
-   read-only session by default; pass `SessionAccess.ReadWrite` to create objects.) The session enforces the
+   read-only session by default. A read-only session creates session objects, such as the key below; pass
+   `SessionAccess.ReadWrite` to create or change token objects.) The session enforces the
    default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
    `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it to
    `OpenSession`; see [Using crypto policies](crypto-policies.md).
@@ -57,9 +58,9 @@ What each step does:
    constructor arguments (with a `Pkcs11Key` instead of key bytes) and the same `Encrypt` and `Decrypt`.
    The token does the work.
 5. **Disposal** releases everything in reverse order. Dispose sessions, logins and keys deterministically
-   (`using`), rather than leaving them to the garbage collector. Disposing a session never logs out: the
-   token is logged out when the login and every session opened from it have been disposed, in whatever
-   order.
+   (`using`), rather than leaving them to the garbage collector. The token is logged out when the login and
+   every session opened from it have been disposed, in whatever order: disposing one of them logs out only
+   when it is the last.
 
 ### In an application: load and log in once
 

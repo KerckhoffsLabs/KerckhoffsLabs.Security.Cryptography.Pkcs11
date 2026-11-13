@@ -7,6 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -920,4 +921,16 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             "BouncyHsmBackendFixture.BouncyHsmTakesSha512THmacKeys to true and delete this test.");
     }
 #pragma warning restore KLPKCS11008, KLPKCS11009
+
+    // On the shared token, which is not a qualified-area one: the case puts CKA_ALWAYS_AUTHENTICATE in the template.
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AlwaysAuthenticateInATemplate_QuirkStillPresent()
+    {
+        Exception? ex = Record.Exception(() => TokenLoginTestCases.Assert_AlwaysAuthenticateKey_SignsWithContextLogin(_backend));
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_ATTRIBUTE_READ_ONLY },
+            "C_GenerateKeyPair with CKA_ALWAYS_AUTHENTICATE in the private template no longer gives CKR_ATTRIBUTE_READ_ONLY " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmTakesAlwaysAuthenticateInATemplate to true and delete this test.");
+    }
 }

@@ -12,9 +12,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 ///
 /// Built from the vendor/bouncyhsm submodule by the opt-in BuildBouncyHsm MSBuild target
 /// (<see cref="Settings.BouncyHsmDirectory"/>). The fixture starts a private, in-memory server
-/// (<see cref="BouncyHsmServer"/>), creates one token through its REST API, and points the client at
+/// (<see cref="BouncyHsmServer"/>), creates its token through its REST API, and points the client at
 /// it with <c>BOUNCY_HSM_CFG_STRING</c>, which the client reads when the library loads, so it is set
 /// before <see cref="Pkcs11Library.Load(string, Pkcs11LibraryOptions)"/>. Each run starts from a fresh token.
+/// A second token, <see cref="QualifiedAreaToken"/>, serves the <c>CKA_ALWAYS_AUTHENTICATE</c> case alone; every
+/// other suite uses the first.
 ///
 /// Known upstream bugs are gated below, one flag each, and
 /// <c>Integration/Compat/BouncyHsmQuirkTests</c> fails once a gated bug is fixed.
@@ -29,6 +31,14 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public ReadOnlyMemory<byte> SoPin { get; } = Encoding.UTF8.GetBytes(Settings.SoPin);
     public ReadOnlyMemory<byte> UserPin { get; } = Encoding.UTF8.GetBytes(Settings.UserPin);
     public string TokenLabel { get; } = Settings.BouncyHsmTokenLabel;
+
+    /// <summary>
+    /// The second token, on the same server and library: one that simulates a qualified area, where the server marks
+    /// a generated private key that is private, sign-only, sensitive and not extractable <c>CKA_ALWAYS_AUTHENTICATE</c>
+    /// itself. See <see cref="BouncyHsmTakesAlwaysAuthenticateInATemplate"/>. <see langword="null"/> when
+    /// <see cref="BouncyHsmAvailable"/> is false.
+    /// </summary>
+    public BouncyHsmQualifiedAreaToken QualifiedAreaToken { get; } = null!;
 
     /// <summary>Mechanisms the token reports via <c>C_GetMechanismList</c>; empty when unavailable.</summary>
     public IReadOnlySet<CKM> SupportedMechanisms { get; } = new HashSet<CKM>();
@@ -213,6 +223,21 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the byte-operation derivations: see <see cref="BouncyHsmKeepsABaseKeysProtection"/>.</summary>
     public static bool BaseKeyProtectionAvailable => BouncyHsmAvailable && BouncyHsmKeepsABaseKeysProtection;
+
+    /// <summary>
+    /// False while a key template cannot set <c>CKA_ALWAYS_AUTHENTICATE</c>: the server lists it among the read-only
+    /// attributes (<c>StorageObject.IsReadOnlyAttribute</c>, <c>src/Src/BouncyHsm.Core/Services/Contracts/Entities/StorageObject.cs</c>),
+    /// so <c>C_GenerateKeyPair</c>, <c>C_CreateObject</c> and <c>C_SetAttributeValue</c> with it answer
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>. PKCS#11 v3.2 §4.10 (private key objects) gives it no footnote, so a template
+    /// may set it. The server sets it itself only on a token made with <c>SimulateQualifiedArea</c>, for a generated
+    /// private key that is private, sign-only, sensitive and not extractable (<c>PrivateKeyHelper.ComputeCkaAlwaysAuthenticate</c>,
+    /// <c>GenerateKeyPairHandler.UpdatePrivateKey</c>). The shared test token is made without it, as that would mark
+    /// every sign-only key of every suite; the always-authenticate case runs instead on <see cref="QualifiedAreaToken"/>,
+    /// a second token made with it, where the key's template leaves the attribute to the server, and its context
+    /// login (<c>LoginHandler</c>) takes that token's signature PIN. Not yet reported upstream.
+    /// BouncyHsmQuirkTests.AlwaysAuthenticateInATemplate_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmTakesAlwaysAuthenticateInATemplate = false;
 
     /// <summary>
     /// False while <c>C_CopyObject</c> changes <c>CKA_ALLOWED_MECHANISMS</c>, wider or narrower, with <c>CKR_OK</c>.
@@ -495,6 +520,8 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
         try
         {
             _server.CreateSlot(TokenLabel, Settings.UserPin, Settings.SoPin);
+            _server.CreateSlot(Settings.BouncyHsmQualifiedTokenLabel, Settings.BouncyHsmQualifiedUserPin,
+                Settings.BouncyHsmQualifiedSoPin, Settings.BouncyHsmQualifiedSignaturePin);
 
             string config = $"Server=127.0.0.1; Port={_server.TcpPort}; LogTarget=ErrorConsole; LogLevel=ERROR;";
             Environment.SetEnvironmentVariable("BOUNCY_HSM_CFG_STRING", config);
@@ -506,6 +533,11 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
                 ?? throw new InvalidOperationException($"BouncyHsm token '{TokenLabel}' did not appear in the slot list.");
             SlotId = (NativeCULong)slot.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(slot.GetMechanismList());
+
+            Pkcs11Slot qualified = Library.GetSlotList().FirstOrDefault(s => s.GetTokenInfo().Label == Settings.BouncyHsmQualifiedTokenLabel)
+                ?? throw new InvalidOperationException($"BouncyHsm token '{Settings.BouncyHsmQualifiedTokenLabel}' did not appear in the slot list.");
+            QualifiedAreaToken = new BouncyHsmQualifiedAreaToken(LibraryPath, Library, (NativeCULong)qualified.SlotId.Value,
+                new HashSet<CKM>(qualified.GetMechanismList()));
         }
         catch
         {
@@ -533,6 +565,30 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
         string path = Path.Join(Settings.BouncyHsmDirectory, "runtimes", SoftHsmBackendFixture.GetRid(), "native", "BouncyHsm.Pkcs11Lib.so");
         return File.Exists(path) ? path : null;
     }
+}
+
+/// <summary>
+/// The BouncyHsm fixture's second token, made with <c>SimulateQualifiedArea</c> (<see cref="BouncyHsmServer.CreateSlot"/>),
+/// as a backend of its own over the fixture's server and library, which it neither owns nor disposes. It serves the
+/// <c>CKA_ALWAYS_AUTHENTICATE</c> case alone (see <see cref="BouncyHsmBackendFixture.BouncyHsmTakesAlwaysAuthenticateInATemplate"/>):
+/// the server marks every private, sign-only, sensitive and not extractable key it generates there, and reports
+/// <c>CKF_SECONDARY_AUTHENTICATION</c>.
+/// </summary>
+public sealed class BouncyHsmQualifiedAreaToken(string libraryPath, Pkcs11Library library, NativeCULong slotId,
+    IReadOnlySet<CKM> supportedMechanisms) : IPkcs11Backend
+{
+    public string LibraryPath { get; } = libraryPath;
+    public Pkcs11Library Library { get; } = library;
+    public NativeCULong SlotId { get; } = slotId;
+    public ReadOnlyMemory<byte> SoPin { get; } = Encoding.UTF8.GetBytes(Settings.BouncyHsmQualifiedSoPin);
+    public ReadOnlyMemory<byte> UserPin { get; } = Encoding.UTF8.GetBytes(Settings.BouncyHsmQualifiedUserPin);
+
+    /// <summary>The PIN the token's <c>C_Login(CKU_CONTEXT_SPECIFIC)</c> takes, distinct from <see cref="UserPin"/>.</summary>
+    public ReadOnlyMemory<byte> SignaturePin { get; } = Encoding.UTF8.GetBytes(Settings.BouncyHsmQualifiedSignaturePin);
+
+    public string TokenLabel { get; } = Settings.BouncyHsmQualifiedTokenLabel;
+    public IReadOnlySet<CKM> SupportedMechanisms { get; } = supportedMechanisms;
+    public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 }
 
 /// <summary>xUnit collection definition for the BouncyHsm backend.</summary>
