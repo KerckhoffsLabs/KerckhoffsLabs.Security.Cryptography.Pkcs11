@@ -28,4 +28,12 @@ public sealed class HashPqcSignTests_BouncyHsm(BouncyHsmBackendFixture backend)
     [MemberData(nameof(HashPqcSignTestCases.ExplicitHashMlDsaPairs), MemberType = typeof(HashPqcSignTestCases))]
     public void HashMlDsa_ExplicitHash_AgreesWithCombined(CKM hash, CKM combined) =>
         HashPqcSignTestCases.Assert_HashMlDsa_ExplicitHash_AgreesWithCombined(_backend, hash, combined);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void HashMlDsa_ContextIsBound() =>
+        HashPqcSignTestCases.Assert_HashMlDsa_ContextIsBound(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void HashSlhDsa_ContextIsBound() =>
+        HashPqcSignTestCases.Assert_HashSlhDsa_ContextIsBound(_backend);
 }

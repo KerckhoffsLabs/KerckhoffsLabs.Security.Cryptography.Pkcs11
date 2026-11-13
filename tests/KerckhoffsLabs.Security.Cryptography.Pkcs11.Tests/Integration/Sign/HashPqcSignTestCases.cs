@@ -121,6 +121,48 @@ internal static class HashPqcSignTestCases
     internal static void Assert_HashSlhDsa_ExplicitHash_AgreesWithCombined(IPkcs11Backend backend, CKM hash, CKM combined) =>
         AssertExplicitHashAgreesWithCombined(backend, SlhDsa, hash, combined);
 
+    internal static void Assert_HashMlDsa_ContextIsBound(IPkcs11Backend backend) =>
+        AssertContextIsBound(backend, MlDsa, CKM.CKM_HASH_ML_DSA_SHA256);
+
+    internal static void Assert_HashSlhDsa_ContextIsBound(IPkcs11Backend backend) =>
+        AssertContextIsBound(backend, SlhDsa, CKM.CKM_HASH_SLH_DSA_SHA256);
+
+    // The context is part of what a HashML-DSA / HashSLH-DSA signature signs (FIPS 204 §5.4, FIPS 205 §10.2), so a
+    // signature verifies only under the exact context it was made with: not without one, and not under another of
+    // the same length that differs only in its last byte (which a token that dropped or truncated it would accept).
+    // The bare mechanism carries the context in CkmHashPqcSignParams, a different structure from the combined
+    // mechanism's CkmPqcSignParams, so where the token has it, the same signature is checked through it as well.
+    private static readonly byte[] SignedContext = "hash-pqc-context"u8.ToArray();
+    private static readonly byte[] OtherContext = "hash-pqc-contexu"u8.ToArray();
+
+    private static void AssertContextIsBound(IPkcs11Backend backend, PqcFamily family, CKM combined)
+    {
+        backend.RequireMechanisms(family.Generation, combined);
+        if (!backend.SupportsPqcSignContext)
+            Assert.Skip("Backend refuses a non-empty PQC signing context.");
+        WithKeyPair(backend, family, (session, key) =>
+        {
+            Mechanism Combined(byte[] context) => new(combined, new CkmPqcSignParams(context: context));
+
+            byte[] signature = key.Sign(Combined(SignedContext), Message);
+
+            Assert.True(key.Verify(Combined(SignedContext), Message, signature));
+            Assert.False(key.Verify(new Mechanism(combined, new CkmPqcSignParams()), Message, signature));
+            Assert.False(key.Verify(Combined(OtherContext), Message, signature));
+
+            if (!backend.Supports(family.Bare))
+                return;
+            Mechanism Bare(byte[] context) => new(family.Bare, new CkmHashPqcSignParams(CKM.CKM_SHA256, context: context));
+            byte[] digest = SHA256.HashData(Message);
+
+            Assert.True(key.Verify(Bare(SignedContext), digest, signature),
+                "a signature made with the combined mechanism should verify through the bare one under the same context");
+            Assert.False(key.Verify(Bare(OtherContext), digest, signature));
+            Assert.True(key.Verify(Combined(SignedContext), Message, key.Sign(Bare(SignedContext), digest)),
+                "a signature made with the bare mechanism should verify through the combined one under the same context");
+        });
+    }
+
     private static void AssertSignsAndVerifies(IPkcs11Backend backend, PqcFamily family, CKM combined)
     {
         backend.RequireMechanisms(family.Generation, combined);

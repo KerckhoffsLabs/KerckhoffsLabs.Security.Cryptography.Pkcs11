@@ -105,8 +105,11 @@ internal static class SlhDsaPkcs11TestCases
 
             byte[] sig = slhdsa.SignData(data, context);
             Assert.True(slhdsa.VerifyData(data, sig, context));
-            // A signature made with a context must not verify without it.
+            // A signature made with a context must not verify without it,
             Assert.False(slhdsa.VerifyData(data, sig));
+            // nor under a context of the same length that differs only in its last byte: a token that dropped or
+            // truncated the context on either side would pass the check above but not this one.
+            Assert.False(slhdsa.VerifyData(data, sig, "app-contexu"u8));
         });
     }
 
