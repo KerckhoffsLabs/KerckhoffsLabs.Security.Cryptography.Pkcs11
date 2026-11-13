@@ -18,7 +18,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Nss(NssBackendFixture backend)
     private readonly NssBackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()

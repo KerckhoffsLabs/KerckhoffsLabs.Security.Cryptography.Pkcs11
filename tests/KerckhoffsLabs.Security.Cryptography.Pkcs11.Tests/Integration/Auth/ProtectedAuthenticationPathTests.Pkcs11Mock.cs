@@ -75,17 +75,17 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         AssertArgumentsBad(() => slot.InitTokenWithPinpad(_backend.TokenLabel));
     }
 
-    // === Pkcs11Library / Pkcs11Session (public) ===========================
+    // === Pkcs11Slot / Pkcs11Session (public) ==============================
 
+    // The login's own session is the mock's only one; it is closed again when the module refuses the login.
     [Fact]
-    public void LibraryOpenSessionWithPinpad_NoPin_ReachesNativeCallAsNull() =>
-        AssertArgumentsBad(() => _backend.Library.OpenSessionWithPinpad(_backend.TokenLabel, CKU.CKU_USER));
+    public void SlotLoginWithPinpad_NoPin_ReachesNativeCallAsNull() =>
+        AssertArgumentsBad(() => _backend.Slot.LoginWithPinpad(TokenUser.User));
 
     [Fact]
     public void SessionSetPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         AssertArgumentsBad(session.SetPinWithPinpad);
     }
@@ -93,8 +93,13 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     [Fact]
     public void SessionInitPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_SO, new SecurePin(_backend.SoPin.Span));
+        // pkcs11-mock allows one session, so an SO login (which keeps a session of its own) cannot open a second one
+        // to work on: the SO logs in on the session itself, through the internal core. Closing the session ends
+        // the mock's login.
+        Pkcs11Slot slot = _backend.Slot;
+        using var session = new Pkcs11Session(_backend.Library, slot, slot.OpenSessionCore());
+        using (var soPin = new SecurePin(_backend.SoPin.Span))
+            session.Core.SendLogin(CKU.CKU_SO, soPin.Pin);
 
         AssertArgumentsBad(session.InitPinWithPinpad);
     }

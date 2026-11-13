@@ -19,9 +19,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Module
 internal abstract class SessionTestModule : FakeModule
 {
     private LowLevelPkcs11Library? _lowLevel;
+    private Pkcs11Library? _library;
 
     /// <summary>This module bound through the real loader, once; disposed with the module.</summary>
     public LowLevelPkcs11Library LowLevel => _lowLevel ??= LoadLowLevel();
+
+    /// <summary>
+    /// This module loaded and initialized as an application loads it, once, for what needs a
+    /// <see cref="Pkcs11Library"/> (a <see cref="Pkcs11Slot"/>); disposed with the module.
+    /// </summary>
+    public Pkcs11Library Library => _library ??= Load();
 
     /// <summary>A session on slot 0 of this module, as the library would hand out after <c>C_OpenSession</c>.</summary>
     /// <param name="sessionId">The session's handle; a fresh one that routes to this module when omitted.</param>
@@ -32,5 +39,9 @@ internal abstract class SessionTestModule : FakeModule
 
     protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
 
-    protected override void Disposing() => _lowLevel?.Dispose();
+    protected override void Disposing()
+    {
+        _library?.Dispose();
+        _lowLevel?.Dispose();
+    }
 }

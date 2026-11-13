@@ -116,18 +116,17 @@ public sealed class LibraryDisposeRaceTests
     }
 
     /// <summary>
-    /// A session's dispose logs out through <c>LogoutAndDispose</c>, which waits for the session lock
-    /// rather than going through <c>AcquireExclusive</c>. It must still hold the session's handle, as every
-    /// other operation does, or a library disposed meanwhile closes the session under the logout.
+    /// A token login's final logout (<c>SendLogout</c> on its anchor) holds the session's handle, as every
+    /// other operation does, so a library disposed meanwhile does not close the session under the logout.
     /// </summary>
     [Fact]
-    public async Task Dispose_DoesNotCloseASession_UnderItsLogoutAndDispose()
+    public async Task Dispose_DoesNotCloseASession_UnderItsLogout()
     {
         using var module = new ParkingModule();
         Pkcs11Library library = module.Load();
         var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
 
-        Task logout = Task.Run(session.LogoutAndDispose, Token);
+        Task logout = Task.Run(session.SendLogout, Token);
         Assert.True(module.Entered.Wait(Generous, Token), "the logout never reached the module");
 
         Task dispose = Task.Run(library.Dispose, Token);

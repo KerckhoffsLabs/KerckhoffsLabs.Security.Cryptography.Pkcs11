@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
@@ -13,8 +12,7 @@ public sealed class PinManagementGuardTests_Mock(MockBackendFixture f)
 {
     private readonly MockBackendFixture _backend = f;
 
-    private Pkcs11Session OpenSession() => _backend.Library.OpenSessionWithPin(
-        _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+    private Pkcs11Session OpenSession() => _backend.OpenSession();
 
     [Fact]
     public void SetPinWithPin_NullArgs_Throw()

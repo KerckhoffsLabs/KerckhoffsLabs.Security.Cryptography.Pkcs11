@@ -14,8 +14,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFi
 
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()

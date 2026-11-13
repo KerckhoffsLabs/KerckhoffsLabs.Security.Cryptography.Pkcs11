@@ -10,8 +10,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
     private readonly MockBackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     [Fact]
     public void Ctor_NullSession_Throws()

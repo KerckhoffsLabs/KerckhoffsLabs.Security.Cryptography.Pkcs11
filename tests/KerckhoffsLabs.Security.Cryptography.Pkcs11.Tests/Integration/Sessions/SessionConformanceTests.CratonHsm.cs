@@ -65,7 +65,7 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
     }
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
+    public void SecondLogin_WhileLoggedIn_SharesTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_SharesTheLogin(_backend);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.ReadOnlySessionObjectsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM refuses a session object in a read-only session")]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]

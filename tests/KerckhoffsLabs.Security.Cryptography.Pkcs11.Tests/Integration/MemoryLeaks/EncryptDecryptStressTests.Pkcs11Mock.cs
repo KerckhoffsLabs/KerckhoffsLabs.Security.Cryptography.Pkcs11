@@ -104,7 +104,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
             }
             finally
             {
-                session.SendLogout();
+                TestKeys.LogoutIfRequired(_backend, session);
                 session.Dispose();
             }
         }

@@ -34,7 +34,8 @@ internal static partial class ExampleCatalog
         try
         {
             using SecurePin pin = GettingStartedExamples.ReadPinFromEnvironment(variable);
-            using Pkcs11Session session = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin);
+            using Pkcs11Login login = backend.Slot.Login(TokenUser.User, pin);
+            using Pkcs11Session session = login.OpenSession();
             Assert.Equal(16, session.GenerateRandom(16).Length);
         }
         finally

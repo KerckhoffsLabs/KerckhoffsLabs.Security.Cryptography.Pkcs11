@@ -19,8 +19,7 @@ public sealed class DeriveSharedSecretEcdhTests_Mock(MockBackendFixture backend)
     private readonly MockBackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     private static Pkcs11Key DummyEcKey(Pkcs11Session session) =>
         new(session, privateHandle: new ObjectHandle(1), publicHandle: ObjectHandle.Invalid,

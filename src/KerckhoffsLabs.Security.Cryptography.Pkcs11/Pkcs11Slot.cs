@@ -36,7 +36,12 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     private readonly ILoggerFactory? _loggerFactory;
 
     /// <summary>
-    /// Low level PKCS#11 wrapper
+    /// The library this slot was listed by: what its sessions and logins come through.
+    /// </summary>
+    private readonly Pkcs11Library _library;
+
+    /// <summary>
+    /// Low level PKCS#11 wrapper of <see cref="_library"/>, taken when the slot was listed.
     /// </summary>
     private readonly LowLevelPkcs11Library _pkcs11Library;
 
@@ -53,36 +58,42 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <summary>
     /// Initializes new instance of Pkcs11Slot class
     /// </summary>
-    /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
+    /// <param name="library">The library the slot is listed by.</param>
     /// <param name="slotId">PKCS#11 handle of slot</param>
     /// <param name="loggerFactory">
     /// Logger factory inherited from the owning <see cref="Pkcs11Library"/>; <see langword="null"/>
     /// for no logging.
     /// </param>
-    internal Pkcs11Slot(LowLevelPkcs11Library pkcs11Library, ulong slotId, ILoggerFactory? loggerFactory = null)
+    /// <exception cref="ArgumentNullException"><paramref name="library"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException"><paramref name="library"/> is disposed.</exception>
+    internal Pkcs11Slot(Pkcs11Library library, ulong slotId, ILoggerFactory? loggerFactory = null)
     {
+        ArgumentNullException.ThrowIfNull(library);
+
         _loggerFactory = loggerFactory;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Slot>();
         Log.SlotTrace(_logger, slotId, "ctor");
 
-        ArgumentNullException.ThrowIfNull(pkcs11Library);
-
-        _pkcs11Library = pkcs11Library;
+        _library = library;
+        _pkcs11Library = library.LowLevelLibrary ?? throw new ObjectDisposedException(nameof(Pkcs11Library));
         _slotId = (NativeCULong)(slotId);
     }
+
+    /// <summary>The library this slot was listed by.</summary>
+    internal Pkcs11Library Library => _library;
 
     /// <summary>Whether <paramref name="other"/> is the same slot of the same <see cref="Pkcs11Library"/>.</summary>
     /// <param name="other">The slot to compare with.</param>
     /// <returns><see langword="true"/> if both name the same slot id through the same library.</returns>
     public bool Equals(Pkcs11Slot? other)
-        => other is not null && ReferenceEquals(_pkcs11Library, other._pkcs11Library) && _slotId == other._slotId;
+        => other is not null && ReferenceEquals(_library, other._library) && _slotId == other._slotId;
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => Equals(obj as Pkcs11Slot);
 
     /// <inheritdoc/>
     public override int GetHashCode()
-        => HashCode.Combine(RuntimeHelpers.GetHashCode(_pkcs11Library), (ulong)_slotId);
+        => HashCode.Combine(RuntimeHelpers.GetHashCode(_library), (ulong)_slotId);
 
     /// <summary>
     /// Obtains information about a particular slot in the system
@@ -238,6 +249,141 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     }
 
     /// <summary>
+    /// Opens a session with the token that holds no login: it sees whatever login this application has on
+    /// the token while there is one, but does not keep it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Login state belongs to the application and the token, not to a session (PKCS#11 v3.2, "Session
+    /// management functions"): while a <see cref="Pkcs11Login"/> of this application's is active on the
+    /// token, this session is in a user (or SO) state too, and its private objects are reachable. When the
+    /// last holder of that login goes, it drops back to a public state, and handles of private objects found
+    /// through it become invalid. Use <see cref="Pkcs11Login.OpenSession"/> for a session that keeps the login.
+    /// </para>
+    /// <para>
+    /// Disposing the session closes it and never logs out.
+    /// </para>
+    /// </remarks>
+    /// <param name="access">
+    /// <see cref="SessionAccess.ReadOnly"/> (the default, least privilege, and the only kind a write-protected
+    /// token accepts) or <see cref="SessionAccess.ReadWrite"/>.
+    /// </param>
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <returns>The open session; the caller disposes it.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
+    public Pkcs11Session OpenSession(SessionAccess access = SessionAccess.ReadOnly, ICryptoPolicy? policy = null)
+    {
+        ThrowIfUndefined(access);
+        ObjectDisposedException.ThrowIf(_library.IsDisposed, _library);
+
+        Pkcs11SessionCore core = OpenSessionCore(access == SessionAccess.ReadWrite, policy);
+        return new Pkcs11Session(_library, this, core, access);
+    }
+
+    /// <summary>
+    /// Logs <paramref name="user"/> in to the token with <paramref name="pin"/>, or shares the login this
+    /// application already has for that user, and returns this caller's hold of it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A login belongs to the token and the whole application, and stays while any holder remains: the
+    /// returned <see cref="Pkcs11Login"/> and every session opened through it. The last of them to be disposed
+    /// logs out (<c>C_Logout</c>); disposing a session never does.
+    /// </para>
+    /// <para>
+    /// Logging in for the user already logged in still sends the PIN; the token's
+    /// <c>CKR_USER_ALREADY_LOGGED_IN</c> is accepted only because this application holds that login, and a token
+    /// need not check the PIN then. Logging in as anyone else while a login is held is refused before the
+    /// module (<c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>).
+    /// </para>
+    /// <para>
+    /// The PIN is not kept: it is sent from <paramref name="pin"/>'s buffer and never copied or logged. Fetch it
+    /// from a secret store rather than code or configuration.
+    /// </para>
+    /// </remarks>
+    /// <param name="user">Who logs in: <see cref="TokenUser.User"/>, or <see cref="TokenUser.SecurityOfficer"/>.</param>
+    /// <param name="pin">The PIN. The caller keeps ownership of it.</param>
+    /// <returns>The caller's hold of the login; dispose it once done.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="pin"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11AuthenticationException">Someone else is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or <c>C_Login</c>.</exception>
+    public Pkcs11Login Login(TokenUser user, SecurePin pin)
+    {
+        ArgumentNullException.ThrowIfNull(pin);
+        return LoginCore(user, pin, username: null);
+    }
+
+    /// <summary>
+    /// Logs <paramref name="user"/> in to the token through its protected authentication path (a pinpad or
+    /// other reader of its own, for tokens with <see cref="TokenFlags.ProtectedAuthenticationPath"/>), or
+    /// shares the login this application already has for that user. See <see cref="Login"/>.
+    /// </summary>
+    /// <param name="user">Who logs in.</param>
+    /// <returns>The caller's hold of the login; dispose it once done.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11AuthenticationException">Someone else is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or <c>C_Login</c>.</exception>
+    public Pkcs11Login LoginWithPinpad(TokenUser user) => LoginCore(user, pin: null, username: null);
+
+    /// <summary>
+    /// Logs a named <paramref name="user"/> in to the token (<c>C_LoginUser</c>, PKCS#11 v3.0), for tokens with
+    /// user accounts, or shares the login this application already has for that same user and username. See
+    /// <see cref="Login"/>.
+    /// </summary>
+    /// <remarks>
+    /// The username is part of who is logged in: a login under another username, or a <see cref="Login"/>
+    /// without one, is another user, refused before the module while this one is held. Usernames compare
+    /// ordinally (exact, case-sensitive). The username is never logged.
+    /// </remarks>
+    /// <param name="user">Who logs in.</param>
+    /// <param name="pin">The PIN. The caller keeps ownership of it.</param>
+    /// <param name="username">The account name, sent UTF-8 encoded.</param>
+    /// <returns>The caller's hold of the login; dispose it once done.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="pin"/> or <paramref name="username"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="username"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11AuthenticationException">Someone else is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11Exception">
+    /// Propagated from <c>C_OpenSession</c> or <c>C_LoginUser</c>; <c>CKR_FUNCTION_NOT_SUPPORTED</c> from a module
+    /// before v3.0.
+    /// </exception>
+    public Pkcs11Login LoginUser(TokenUser user, SecurePin pin, string username)
+    {
+        ArgumentNullException.ThrowIfNull(pin);
+        ArgumentNullException.ThrowIfNull(username);
+        if (username.Length == 0)
+            throw new ArgumentException("Username must not be empty.", nameof(username));
+        return LoginCore(user, pin, username);
+    }
+
+    private Pkcs11Login LoginCore(TokenUser user, SecurePin? pin, string? username)
+    {
+        ThrowIfUndefined(user);
+        ObjectDisposedException.ThrowIf(_library.IsDisposed, _library);
+
+        Log.SlotTrace(_logger, (ulong)_slotId, username is null ? "Login" : "LoginUser");
+        LoginHold hold = LoginRecord.Login(_library, user, pin, username);
+        return new Pkcs11Login(this, user, username, hold);
+    }
+
+    /// <summary>The login record of this slot, shared by every load of the module.</summary>
+    internal TokenLoginRecord LoginRecord => TokenLoginRegistry.Of(_pkcs11Library.Module).For(_slotId);
+
+    private static void ThrowIfUndefined<T>(T value, [CallerArgumentExpression(nameof(value))] string? name = null)
+        where T : struct, Enum
+    {
+        if (!Enum.IsDefined(value))
+            throw new ArgumentOutOfRangeException(name, value, $"Not a defined {typeof(T).Name} value.");
+    }
+
+    /// <summary>
     /// Opens a session between an application and a token in a particular slot.
     /// </summary>
     /// <param name="readWrite">
@@ -247,8 +393,12 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// </param>
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
     /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <param name="anchor">
+    /// Whether this is the anchor session of the slot's login record: left open by the library's disposal,
+    /// and able to call the module after it (see <see cref="LowLevelPkcs11Library.ForSessionOutlivingItsLoad"/>).
+    /// </param>
     /// <returns>The opened session.</returns>
-    internal Pkcs11SessionCore OpenSessionCore(bool readWrite = true, ICryptoPolicy? policy = null)
+    internal Pkcs11SessionCore OpenSessionCore(bool readWrite = true, ICryptoPolicy? policy = null, bool anchor = false)
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "OpenSessionCore");
 
@@ -259,15 +409,38 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, out NativeCULong sessionId);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpOpenSession);
 
+        // Counted before the handle exists and uncounted by its release, which runs exactly once however
+        // the session closes (its owner, the library's disposal, the finalizer): so the tally never drifts.
+        TokenLoginRegistry registry = TokenLoginRegistry.Of(_pkcs11Library.Module);
+        NativeCULong slotId = _slotId;
+        SessionAccess access = readWrite ? SessionAccess.ReadWrite : SessionAccess.ReadOnly;
+        registry.SessionOpened(slotId, access);
+
         // Owned before any consumer code (the logger) runs, so a throw there closes the session
         // rather than leaving it open with nothing to close it.
-        var sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, sessionId);
+        Pkcs11SessionHandle sessionHandle;
+        try
+        {
+            sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, sessionId, slotId, readWrite, anchor,
+                released: () => registry.SessionClosed(slotId, access));
+        }
+        catch
+        {
+            registry.SessionClosed(slotId, access);
+            throw;
+        }
+
+        // An invalid handle is never released, so its count goes here; the core refuses it below.
+        if (sessionHandle.IsInvalid)
+            registry.SessionClosed(slotId, access);
+
         try
         {
             Log.SessionOpened(_logger, readWrite ? "read-write" : "read-only", (ulong)sessionId, (ulong)_slotId,
                 (policy ?? CryptoPolicy.Recommended).Name);
 
-            return new Pkcs11SessionCore(_pkcs11Library, _slotId, sessionHandle, _loggerFactory, policy);
+            LowLevelPkcs11Library calls = anchor ? _pkcs11Library.ForSessionOutlivingItsLoad() : _pkcs11Library;
+            return new Pkcs11SessionCore(calls, _slotId, sessionHandle, _loggerFactory, policy);
         }
         catch
         {

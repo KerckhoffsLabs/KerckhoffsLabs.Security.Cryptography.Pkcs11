@@ -80,7 +80,7 @@ public sealed class GenerateKeyPairFailureTests
         using Pkcs11Library library = module.Load();
         LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1);
-        using var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core);
+        using var session = new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core);
         using var publicTemplate = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .Label("pair").Verify().EcParams(Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()).Build();
         using var privateTemplate = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Label("pair").Sign().Build();

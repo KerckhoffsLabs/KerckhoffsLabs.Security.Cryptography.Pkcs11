@@ -15,7 +15,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
     // accept (see NssBackendFixture.RequireClassicAesGcm).
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
+        _backend.OpenSession();
 
     private static byte[] ReadEcPoint(Pkcs11Session session, ObjectHandle publicHandle)
     {

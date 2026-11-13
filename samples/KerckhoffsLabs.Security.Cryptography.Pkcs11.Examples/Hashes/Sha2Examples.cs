@@ -20,9 +20,9 @@ public static class Sha2Examples
         #region Sha2OnToken
         // 1. Load the module (its path from configuration) and open a session on the token. Hashing
         //    uses no key, so no login: a public session will do. Where a token wants a login for every
-        //    operation, open it with OpenSessionWithPin, as on the key pages.
+        //    operation, open the session from a login instead, as on the key pages.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
-        using Pkcs11Session session = library.OpenSessionWithoutLogin(tokenLabel);
+        using Pkcs11Session session = library.GetSlotByTokenLabel(tokenLabel).OpenSession();
 
         // 2. Each adapter is a HashAlgorithm over the session: ComputeHash, TransformBlock, streams, ...
         using var sha256 = new SHA256Pkcs11(session);

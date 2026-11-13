@@ -18,15 +18,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Construction is exclusively via <see cref="Pkcs11Library.OpenSessionWithPin(string, CKU, SecurePin, ICryptoPolicy?)"/>,
-/// <see cref="Pkcs11Library.OpenSessionWithPinpad(string, CKU, ICryptoPolicy?)"/>, or
-/// <see cref="Pkcs11Library.OpenSessionWithoutLogin(string, ICryptoPolicy?)"/>, which open the
-/// session (<c>C_OpenSession</c>) and, for the first two, log in (<c>C_Login</c>).
-/// The session does not own the library — callers continue to own and dispose the
-/// <see cref="Pkcs11Library"/>. On <see cref="Dispose"/> it logs the user out (<c>C_Logout</c>,
-/// best-effort — a token-wide state change, since PKCS#11 login state is per-application/slot) and
-/// then closes the session (<c>C_CloseSession</c>), so the HSM audit log records an explicit logout,
-/// not just a session close. A logout that fails because no user was logged in is ignored.
+/// Opened by <see cref="Pkcs11Login.OpenSession"/>, a session that keeps that login while it is open, or by
+/// <see cref="Pkcs11Slot.OpenSession"/>, one that keeps none but sees whatever login the application has on
+/// the token (PKCS#11 login state belongs to the application and the token, not to a session). The session
+/// does not own the library — callers continue to own and dispose the <see cref="Pkcs11Library"/>.
+/// <see cref="Dispose"/> closes the session (<c>C_CloseSession</c>) and never logs out: the last holder of
+/// the login does (see <see cref="Pkcs11Login"/>).
 /// </para>
 /// <para>
 /// Keys obtained via the session's factory methods hold a non-owning reference to the
@@ -36,17 +33,34 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 public sealed partial class Pkcs11Session : IDisposable
 {
     private readonly Pkcs11SessionCore _core;
+
+    // This session's hold of Login, released once the session is closed; null for a slot session.
+    private readonly LoginHold? _hold;
     private bool _disposed;
 
-    internal Pkcs11Session(Pkcs11Library library, Pkcs11Slot slot, Pkcs11SessionCore core)
+    internal Pkcs11Session(Pkcs11Library library, Pkcs11Slot slot, Pkcs11SessionCore core,
+        SessionAccess access = SessionAccess.ReadWrite, Pkcs11Login? login = null, LoginHold? hold = null)
     {
         Library = library;
         Slot = slot;
         _core = core;
+        Access = access;
+        Login = login;
+        _hold = hold;
     }
 
-    /// <summary>The slot this session is authenticated against.</summary>
+    /// <summary>The slot this session is open on.</summary>
     public Pkcs11Slot Slot { get; }
+
+    /// <summary>Whether this session may change the token: read-only or read/write.</summary>
+    public SessionAccess Access { get; }
+
+    /// <summary>
+    /// The login this session was opened through and keeps while open (<see cref="Pkcs11Login.OpenSession"/>),
+    /// or <see langword="null"/> for a session from <see cref="Pkcs11Slot.OpenSession"/>, which keeps none.
+    /// <see cref="GetSessionInfo"/> gives the module's own answer on the session's state.
+    /// </summary>
+    public Pkcs11Login? Login { get; }
 
     /// <summary>The library that hosts this session. The session does not own the library.</summary>
     public Pkcs11Library Library { get; }
@@ -155,17 +169,27 @@ public sealed partial class Pkcs11Session : IDisposable
         return _core.GetSessionInfo();
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Closes the session (<c>C_CloseSession</c>), waiting for an operation in flight on it, and then
+    /// releases its hold of <see cref="Login"/>, if any. Never sends <c>C_Logout</c> itself: when this was the
+    /// last holder of the login, releasing the hold logs out. Idempotent.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Called from inside an operation on the same token, for a session that holds a login: the logout its
+    /// release may send waits for operations to finish, so it cannot run from one. Nothing is closed then.
+    /// </exception>
     public void Dispose()
     {
         if (_disposed) return;
 
-        // Explicitly log out before closing the session so the token's audit log records a logout, not
-        // just a session close. Both happen under one hold of the session's lock, so no call on another
-        // thread can reach the session once logged out but not yet closed; the logout is best-effort, the
-        // close always happens. See Pkcs11SessionCore.LogoutAndDispose.
-        _core.LogoutAndDispose();
+        // Refused before anything changes: once the session is closed its hold could no longer be released.
+        _hold?.Record.ThrowIfInsideOperation();
+
+        // The close waits for this session's operation lease, so the hold is released after it, outside any
+        // operation, and the logout the last holder sends can take the login's gate.
+        _core.Dispose();
         _disposed = true;
+        _hold?.Dispose();
         GC.SuppressFinalize(this);
     }
 

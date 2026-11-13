@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Random;
@@ -16,8 +15,7 @@ public sealed class SessionRandomTests(MockBackendFixture backend)
     [Fact]
     public void GenerateRandom_ReturnsRequestedLength()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         byte[] bytes = session.GenerateRandom(32);
 
@@ -27,8 +25,7 @@ public sealed class SessionRandomTests(MockBackendFixture backend)
     [Fact]
     public void GenerateRandom_ZeroLength_ThrowsArgumentOutOfRange()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateRandom(0));
     }

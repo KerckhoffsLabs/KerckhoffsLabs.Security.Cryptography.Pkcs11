@@ -57,7 +57,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
         }
         finally
         {
-            session.SendLogout();
+            TestKeys.LogoutIfRequired(_backend, session);
             session.Dispose();
         }
     }
@@ -76,7 +76,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
         }
         finally
         {
-            session.SendLogout();
+            TestKeys.LogoutIfRequired(_backend, session);
             session.Dispose();
         }
     }

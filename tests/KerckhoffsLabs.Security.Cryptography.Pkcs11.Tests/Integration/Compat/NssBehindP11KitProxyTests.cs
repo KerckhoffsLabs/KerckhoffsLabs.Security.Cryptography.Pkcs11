@@ -63,7 +63,7 @@ public sealed class NssBehindP11KitProxyTests
         byte[] password = Encoding.UTF8.GetBytes("passwordPASSWORDpassword");
         byte[] salt = Encoding.UTF8.GetBytes("saltSALTsaltSALTsaltSALTsaltSALTsalt");
         byte[] actual;
-        using (var session = library.OpenSessionWithoutLogin(Settings.NssTokenLabel))
+        using (var session = slot.OpenSession())
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password, salt, 4096, HashAlgorithmName.SHA256, 32);
 

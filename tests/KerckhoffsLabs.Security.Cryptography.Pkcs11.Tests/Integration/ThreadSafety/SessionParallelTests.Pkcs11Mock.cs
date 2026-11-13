@@ -56,7 +56,7 @@ public sealed class SessionParallelTests(MockBackendFixture f)
                     }
                     finally
                     {
-                        session.SendLogout();
+                        TestKeys.LogoutIfRequired(_backend, session);
                         session.Dispose();
                     }
                 }

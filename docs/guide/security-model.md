@@ -107,11 +107,12 @@ These are outside what the library can defend against, and outside the scope of
 Every session enforces a **crypto policy**, chosen when it is opened:
 
 ```csharp
+// The login comes from slot.Login(TokenUser.User, pin), with the PIN from your secret store.
 // Default: Recommended — refuses broken algorithms, weak keys, and plaintext key export.
-using var session = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin);
+using var session = login.OpenSession();
 
 // FIPS: only NIST-approved functions; overrides are refused for the session's lifetime.
-using var fips = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin, CryptoPolicy.NistApproved);
+using var fips = login.OpenSession(policy: CryptoPolicy.NistApproved);
 
 // Legacy interop for one operation (not available on a NistApproved session):
 using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
@@ -172,7 +173,7 @@ ComposedCryptoPolicy reviewed = CryptoPolicy.Recommended.ToBuilder("MyApp")
         [CryptoOperation.Sign, CryptoOperation.Verify],
         "Vendor HSM signature scheme, reviewed for our release signing.")
     .Build();
-using var session = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin, reviewed);
+using var session = login.OpenSession(policy: reviewed);
 
 // One-off legacy interop: lift the policy for a single, scoped operation.
 using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy archive */ }

@@ -34,14 +34,33 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
     /// </summary>
     private readonly NativeCULong _sessionId;
 
+    /// <summary>Run once, at the end of the release; see the constructor.</summary>
+    private readonly Action? _released;
+
     /// <summary>Creates a session handle. The handle is invalid if <paramref name="sessionId"/> is <see cref="CK.CK_INVALID_HANDLE"/>.</summary>
+    /// <param name="library">The load of the module the session was opened through.</param>
+    /// <param name="sessionId">The session's handle.</param>
+    /// <param name="slotId">The slot the session was opened on.</param>
+    /// <param name="isReadWrite">Whether the session was opened with <c>CKF_RW_SESSION</c>.</param>
+    /// <param name="isAnchor">Whether the session is a token login's anchor; see <see cref="IsAnchor"/>.</param>
+    /// <param name="released">
+    /// Run exactly once when a valid handle is released, however that comes about (its owner's disposal,
+    /// <see cref="Pkcs11ModuleHandle.CloseAllTrackedSessions"/>, the finalizer), after <c>C_CloseSession</c>: what
+    /// lets the layer above keep count of the open sessions without this layer knowing it. It must not throw;
+    /// anything it throws is swallowed, since a release may not throw.
+    /// </param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="library"/> is null.</exception>
-    public Pkcs11SessionHandle(LowLevelPkcs11Library library, NativeCULong sessionId)
+    public Pkcs11SessionHandle(LowLevelPkcs11Library library, NativeCULong sessionId, NativeCULong slotId = default,
+        bool isReadWrite = false, bool isAnchor = false, Action? released = null)
         : base(IntPtr.Zero, ownsHandle: true)
     {
         ArgumentNullException.ThrowIfNull(library);
         _module = library.Module;
         _sessionId = sessionId;
+        SlotId = slotId;
+        IsReadWrite = isReadWrite;
+        IsAnchor = isAnchor;
+        _released = released;
 
         if (!IsInvalid)
         {
@@ -54,6 +73,19 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
 
     /// <summary>The underlying PKCS#11 session handle.</summary>
     public NativeCULong SessionId => _sessionId;
+
+    /// <summary>The slot the session was opened on.</summary>
+    public NativeCULong SlotId { get; }
+
+    /// <summary>Whether the session is read/write (<c>CKF_RW_SESSION</c>) rather than read-only.</summary>
+    public bool IsReadWrite { get; }
+
+    /// <summary>
+    /// Whether this is the anchor session of a token login, which every load of the module shares: it is left
+    /// open by <see cref="Pkcs11ModuleHandle.CloseAllTrackedSessions"/>, and closed by the login once its last
+    /// holder goes.
+    /// </summary>
+    public bool IsAnchor { get; }
 
     /// <summary>Set once the module has said this session no longer exists; see <see cref="MarkClosedByModule"/>.</summary>
     private volatile bool _closedByModule;
@@ -98,6 +130,15 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         }
         finally
         {
+            try
+            {
+                _released?.Invoke();
+            }
+            catch
+            {
+                // A release never throws; see the constructor.
+            }
+
             // Release last: only after C_CloseSession has had its chance to run does the module
             // become eligible for its own SafeHandle release.
             if (_moduleRefAdded) _module.ReleaseUse();

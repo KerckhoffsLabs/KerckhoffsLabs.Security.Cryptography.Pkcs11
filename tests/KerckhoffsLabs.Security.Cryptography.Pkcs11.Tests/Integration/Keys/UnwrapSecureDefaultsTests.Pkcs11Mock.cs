@@ -17,13 +17,13 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
 {
     private readonly MockBackendFixture _backend = f;
 
-    // Opens a logged-in mock session, runs the body, and always closes it — leaking a session on
+    // Opens a mock session (logged in where the backend needs it), runs the body, and always closes it — leaking a session on
     // the shared Mock fixture would cascade into the other Mock-collection tests.
     private void WithSession(Action<Pkcs11SessionCore> body)
     {
         var session = TestKeys.OpenLoggedInSession(_backend);
         try { body(session); }
-        finally { session.SendLogout(); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(_backend, session); session.Dispose(); }
     }
 
     private static List<ObjectAttribute> InsecureTemplate(ObjectAttribute insecure) =>

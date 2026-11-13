@@ -49,6 +49,15 @@ internal sealed class LoginTokenModule : FakeModule
     /// </summary>
     public Action<NativeCULong>? DuringLogin { get; set; }
 
+    /// <summary>
+    /// Runs inside every <c>C_Sign</c> that produces a signature (not a length probe), before the token's
+    /// lock: lets a test hold an operation in flight. <c>C_SignInit</c> accepts any mechanism and key.
+    /// </summary>
+    public Action? DuringSign { get; set; }
+
+    /// <summary>The length of the signature <c>C_Sign</c> produces.</summary>
+    public const int SignatureLength = 32;
+
     /// <summary>Who the application is logged in as, or <see langword="null"/> when its sessions are public.</summary>
     public CKU? LoggedIn
     {
@@ -165,6 +174,34 @@ internal sealed class LoginTokenModule : FakeModule
             if (_loggedIn is null)
                 return CKR.CKR_USER_NOT_LOGGED_IN;
             LogOutLocked();
+            return CKR.CKR_OK;
+        }
+    }
+
+    protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
+    {
+        lock (_lock)
+            return IsOpen(session) ? CKR.CKR_OK : CKR.CKR_SESSION_HANDLE_INVALID;
+    }
+
+    protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
+    {
+        if (!signature.IsNull)
+            DuringSign?.Invoke();
+        lock (_lock)
+        {
+            if (!IsOpen(session))
+                return CKR.CKR_SESSION_HANDLE_INVALID;
+            if (!signature.IsNull)
+            {
+                if (signature.Span.Length < SignatureLength)
+                {
+                    signatureLen = (NativeCULong)(ulong)SignatureLength;
+                    return CKR.CKR_BUFFER_TOO_SMALL;
+                }
+                signature.Span[..SignatureLength].Fill(0x5A);
+            }
+            signatureLen = (NativeCULong)(ulong)SignatureLength;
             return CKR.CKR_OK;
         }
     }

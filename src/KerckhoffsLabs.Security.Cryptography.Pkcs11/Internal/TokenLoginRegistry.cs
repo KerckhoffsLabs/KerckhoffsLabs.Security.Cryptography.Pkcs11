@@ -50,6 +50,13 @@ internal sealed class TokenLoginRegistry
         }
     }
 
+    /// <summary>Every login record made so far, for a library's disposal to release its holders in each.</summary>
+    public TokenLoginRecord[] Records()
+    {
+        lock (_lock)
+            return [.. _records.Values];
+    }
+
     /// <summary>Counts a session the library opened on <paramref name="slotId"/>.</summary>
     public void SessionOpened(NativeCULong slotId, SessionAccess access)
     {

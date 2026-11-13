@@ -1513,10 +1513,8 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.Dispose() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetInfo() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.LibraryInfo!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetInterface(string? interfaceName = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.InterfaceInfo!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetInterfaces() -> System.Collections.Generic.IReadOnlyList<KerckhoffsLabs.Security.Cryptography.Pkcs11.InterfaceInfo!>!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetSlotByTokenLabel(string! tokenLabel) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetSlotList(bool tokenPresent = true) -> System.Collections.Generic.IReadOnlyList<KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!>!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.OpenSessionWithoutLogin(string! slotLabel, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.OpenSessionWithPin(string! slotLabel, KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKU userType, KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! pin, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.OpenSessionWithPinpad(string! slotLabel, KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKU userType, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsConcurrentAccess.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsCryptokiVersion(System.Version! version) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.TryGetSlotEvent(out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot? slot) -> bool
@@ -2222,3 +2220,16 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess.ReadWrite = 1 -> Kerck
 KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser
 KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser.SecurityOfficer = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser
 KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser.User = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.Dispose() -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.IsActive.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.OpenSession(KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess access = KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess.ReadWrite, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.Slot.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.User.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.Username.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.Access.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.Login.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.Login(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user, KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! pin) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.LoginUser(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user, KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! pin, string! username) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.LoginWithPinpad(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.OpenSession(KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess access = KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess.ReadOnly, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!

@@ -319,9 +319,13 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
 
             slot.InitTokenWithPin(new SecurePin(SoPin.Span), TokenLabel);
 
-            using (Pkcs11Session so = Library.OpenSessionWithPin(TokenLabel, CKU.CKU_SO, new SecurePin(SoPin.Span)))
+            // The SO sets the user PIN from a session of its own login, which logs out when both are disposed.
+            using (var soPin = new SecurePin(SoPin.Span))
+            using (Pkcs11Login so = slot.Login(TokenUser.SecurityOfficer, soPin))
+            using (Pkcs11Session soSession = so.OpenSession())
+            using (var userPin = new SecurePin(UserPin.Span))
             {
-                so.InitPinWithPin(new SecurePin(UserPin.Span));
+                soSession.InitPinWithPin(userPin);
             }
 
             SlotId = (NativeCULong)slot.SlotId.Value;

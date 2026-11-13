@@ -32,13 +32,14 @@ The policy is chosen when the session is opened:
 
 ```csharp
 using var library = Pkcs11Library.Load(modulePath);
-using var pin = new SecurePin(pinFromYourSecretStore);
+using var pin = new SecurePin(pinFromYourSecretStore);   // from your secret store, never from code
+using Pkcs11Login login = library.GetSlotByTokenLabel(tokenLabel).Login(TokenUser.User, pin);
 
 // Default: Recommended.
-using var session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+using var session = login.OpenSession();
 
 // NistApproved: overrides are refused for the session's lifetime.
-using var fips = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, CryptoPolicy.NistApproved);
+using var fips = login.OpenSession(policy: CryptoPolicy.NistApproved);
 ```
 
 > `NistApproved` restricts what this library sends to the token; it is not a FIPS 140-3 certification, which
@@ -76,7 +77,7 @@ ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
         "Vendor HSM signature scheme, reviewed for our release signing.")
     .Build();
 
-using var session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, policy);
+using var session = login.OpenSession(policy: policy);
 ```
 
 | Refused | Narrow opt-in on `CryptoPolicyBuilder` |

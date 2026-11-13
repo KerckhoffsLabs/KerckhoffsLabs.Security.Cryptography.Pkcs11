@@ -30,6 +30,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     // The slot this session was opened on: what CKM_PKCS5_PBKD2 asks about to pick its parameter layout.
     private readonly NativeCULong _slotId;
 
+    // The login record of that slot, whose gate every operation holds shared (see AcquireExclusive).
+    private readonly TokenLoginRecord _record;
+
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
@@ -62,18 +65,24 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// a different thread calling while the lock is held fails immediately and
     /// <see cref="AcquireExclusive"/> throws.
     /// <para>
-    /// <see cref="Dispose(bool)"/> and <see cref="LogoutAndDispose"/> are the exceptions: they wait for the
-    /// lock instead of throwing, because they cannot report contention by throwing and must not close the
-    /// session under an in-flight native call. See the comment there.
+    /// <see cref="Dispose(bool)"/> is the exception: it waits for the lock instead of throwing, because it
+    /// cannot report contention by throwing and must not close the session under an in-flight native call.
+    /// See the comment there.
     /// </para>
     /// </remarks>
     private readonly object _busyLock = new();
 
     /// <summary>
-    /// Disposable token returned by <see cref="AcquireExclusive"/>. Holds the busy lock and a reference
-    /// on the session handle, and releases both on dispose.
+    /// Disposable token returned by <see cref="AcquireExclusive"/>. Holds the busy lock, a reference
+    /// on the session handle, and the token login's gate shared, and releases all three on dispose.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The gate (<see cref="TokenLoginRecord.EnterOperation"/>) is what keeps a first login or the final logout
+    /// on the slot from landing inside the operation: they wait for it to finish, as PKCS#11 v3.2 asks of a
+    /// logout ("any active operations should be finished"). Taken after the busy lock, per the lock order:
+    /// session lock, then the gate, then the login record's lock.
+    /// </para>
     /// <para>
     /// The reference is what keeps the session open for a whole operation, from <c>C_*Init</c> to the
     /// last call: closing the handle elsewhere (<c>Pkcs11Library.Dispose</c> closes every tracked
@@ -90,6 +99,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     {
         private readonly object _lock;
         private Pkcs11SessionHandle? _handle;
+        private IDisposable? _operation;
         private bool _released;
 
         internal ExclusiveLease(object lockObj)
@@ -107,11 +117,16 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
                 _handle = handle;
         }
 
+        /// <summary>Holds <paramref name="record"/>'s gate shared until this lease is disposed.</summary>
+        internal void EnterOperation(TokenLoginRecord record) => _operation = record.EnterOperation();
+
         public void Dispose()
         {
             if (_released) return;
             _released = true;
-            // The reference first: a deferred C_CloseSession then runs while this thread still holds
+            // In the reverse of the order taken: the gate, then the reference, then the lock.
+            _operation?.Dispose();
+            // The reference before the lock: a deferred C_CloseSession then runs while this thread still holds
             // the lock, so no other operation can start on the session it is closing.
             _handle?.DangerousRelease();
             Monitor.Exit(_lock);
@@ -149,6 +164,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             ThrowIfLost(caller);
             lease.Hold(_sessionHandle);
+            lease.EnterOperation(_record);
             return lease;
         }
         catch
@@ -498,6 +514,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         {
             if (sessionHandle.IsInvalid)
                 throw new ArgumentException("Invalid handle specified", nameof(sessionHandle));
+            ArgumentNullException.ThrowIfNull(pkcs11Library);
 
             // Both run consumer code (the factory, the logger), which may throw.
             // Fenced: a sink runs inside session operations, read-backs included, and must not be able to
@@ -509,6 +526,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             _effectivePolicy = _basePolicy;
             _pkcs11Library = pkcs11Library;
             _slotId = slotId;
+            _record = TokenLoginRegistry.Of(pkcs11Library.Module).For(slotId);
         }
         catch
         {
@@ -786,73 +804,6 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     }
 
     /// <summary>
-    /// The disposal of an owning <see cref="Pkcs11Session"/>: logs out, then closes the session, under one
-    /// hold of the busy lock. Waits for that lock instead of going through <see cref="AcquireExclusive"/>,
-    /// for the reason <see cref="Dispose(bool)"/> does: throwing on cross-thread contention would leave the
-    /// session open and replace any exception a surrounding <see langword="using"/> is unwinding. A session
-    /// that is already disposed is left alone.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// One hold, so no call on another thread can run between the two: taking the lock once for the logout
-    /// and again for the close let such a call reach a session that was still open but logged out, where a
-    /// private object it used had become invisible (<c>CKR_OBJECT_HANDLE_INVALID</c>) instead of the call
-    /// finding the session disposed.
-    /// </para>
-    /// <para>
-    /// The logout is best-effort and the close is not. The token may answer the logout with an error (the
-    /// caller already logged out, <c>CKR_USER_NOT_LOGGED_IN</c>, or it rejects it during teardown), and a
-    /// library disposed meanwhile has already closed the session, which the logout's lease reports as
-    /// <see cref="ObjectDisposedException"/>; the session is closed regardless. <c>C_Logout</c> affects the
-    /// whole application's login state on the slot, which is the intended end-of-context behaviour for an
-    /// owned session.
-    /// </para>
-    /// </remarks>
-    internal void LogoutAndDispose()
-    {
-        bool lockTaken = false;
-        try
-        {
-            Monitor.Enter(_busyLock, ref lockTaken);
-            if (_disposed)
-                return;
-
-            // No logout on a lost session: its number may now name another session, and a C_Logout through
-            // it would log out every session the application has on the token. See ObserveSessionLoss.
-            try
-            {
-                if (_lostTo == CKR.CKR_OK)
-                    LogoutForDispose();
-            }
-            catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException)
-            {
-                // Best-effort; see the remarks.
-            }
-
-            // Monitor is reentrant: the close runs inside the same hold as the logout.
-            Dispose();
-        }
-        finally
-        {
-            if (lockTaken)
-                Monitor.Exit(_busyLock);
-        }
-    }
-
-    // The logout of LogoutAndDispose, which already holds the lock. The lease takes it again (Monitor is
-    // reentrant) and a reference on the session handle, so a library disposed meanwhile cannot close the
-    // session under the logout; a session the library has already closed throws ObjectDisposedException
-    // from Hold.
-    private void LogoutForDispose()
-    {
-        Monitor.Enter(_busyLock);
-        using var lease = new ExclusiveLease(_busyLock);
-        lease.Hold(_sessionHandle);
-
-        LogoutHeld();
-    }
-
-    /// <summary>
     /// Sends <c>C_Logout</c> on this session, which logs the application out of the token in every one of
     /// its sessions; meant for the anchor session of the token's login record (see
     /// <see cref="TokenLoginRecord"/>).
@@ -863,14 +814,6 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         using var _ = AcquireExclusive();
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Logout");
-
-        LogoutHeld();
-    }
-
-    // The logout itself, shared by SendLogout and LogoutAndDispose, which differ only in how they take the
-    // session lease. The caller holds it.
-    private void LogoutHeld()
-    {
         Log.LoggingOutSession(_logger, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Logout(_sessionId);

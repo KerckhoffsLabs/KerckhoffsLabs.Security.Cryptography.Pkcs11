@@ -23,8 +23,7 @@ internal static class SecurePinLoginTestCases
     internal static void Assert_Login_RejectsNullSecurePin(IPkcs11Backend backend)
     {
         // The core's login takes the PIN's bytes, so the null guard lives at the public entry point.
-        Assert.Throws<ArgumentNullException>(
-            () => backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, (SecurePin)null!));
+        Assert.Throws<ArgumentNullException>(() => backend.Slot.Login(TokenUser.User, (SecurePin)null!));
     }
 }
 

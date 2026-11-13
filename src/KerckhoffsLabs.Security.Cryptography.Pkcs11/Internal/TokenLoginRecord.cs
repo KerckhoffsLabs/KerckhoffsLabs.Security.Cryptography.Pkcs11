@@ -407,9 +407,10 @@ internal sealed class TokenLoginRecord
 
     private Pkcs11SessionCore OpenAnchor(Pkcs11Library owner, TokenUser user, ILoggerFactory? loggerFactory)
     {
-        var lowLevel = owner.LowLevelLibrary ?? throw new ObjectDisposedException(nameof(Pkcs11Library));
-        return new Pkcs11Slot(lowLevel, (ulong)_slotId, loggerFactory)
-            .OpenSessionCore(readWrite: user == TokenUser.SecurityOfficer);
+        // Throws ObjectDisposedException for a disposed owner. The anchor survives that owner's disposal
+        // (it is shared by every load of the module), so it calls through a view that outlives the load.
+        return new Pkcs11Slot(owner, (ulong)_slotId, loggerFactory)
+            .OpenSessionCore(readWrite: user == TokenUser.SecurityOfficer, anchor: true);
     }
 
     private static void Send(Pkcs11SessionCore anchor, TokenUser user, SecurePin? pin, string? username)

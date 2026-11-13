@@ -20,7 +20,7 @@ public sealed class OpenSessionOwnershipTests
     public void LoggerThrowsOnTheOpenedLine_TheSessionIsClosed()
     {
         using var fake = new SessionFake();
-        var slot = new Pkcs11Slot(fake.LowLevel, SlotId, new ThrowingLoggerFactory(throwOnLog: "Opened"));
+        var slot = new Pkcs11Slot(fake.Library, SlotId, new ThrowingLoggerFactory(throwOnLog: "Opened"));
 
         Assert.Throws<LoggerFault>(() => slot.OpenSessionCore());
 
@@ -31,7 +31,7 @@ public sealed class OpenSessionOwnershipTests
     public void LoggerFactoryThrowsForTheSession_TheSessionIsClosed()
     {
         using var fake = new SessionFake();
-        var slot = new Pkcs11Slot(fake.LowLevel, SlotId, new ThrowingLoggerFactory(throwOnCategory: typeof(Pkcs11SessionCore).FullName));
+        var slot = new Pkcs11Slot(fake.Library, SlotId, new ThrowingLoggerFactory(throwOnCategory: typeof(Pkcs11SessionCore).FullName));
 
         Assert.Throws<LoggerFault>(() => slot.OpenSessionCore());
 
@@ -43,7 +43,7 @@ public sealed class OpenSessionOwnershipTests
     {
         using var fake = new SessionFake { SessionId = (NativeCULong)CK.CK_INVALID_HANDLE };
 
-        Assert.Throws<ArgumentException>(() => new Pkcs11Slot(fake.LowLevel, SlotId).OpenSessionCore());
+        Assert.Throws<ArgumentException>(() => new Pkcs11Slot(fake.Library, SlotId).OpenSessionCore());
 
         Assert.Empty(fake.Closed);
     }
@@ -53,7 +53,7 @@ public sealed class OpenSessionOwnershipTests
     {
         using var fake = new SessionFake();
 
-        using (Pkcs11SessionCore session = new Pkcs11Slot(fake.LowLevel, SlotId).OpenSessionCore())
+        using (Pkcs11SessionCore session = new Pkcs11Slot(fake.Library, SlotId).OpenSessionCore())
             Assert.Empty(fake.Closed);
 
         Assert.Equal([(NativeCULong)7UL], fake.Closed);

@@ -200,7 +200,13 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// <see langword="false"/> only for a blocking <c>C_WaitForSlotEvent</c>, which <c>C_Finalize</c> is
     /// meant to wake (see remarks).
     /// </param>
-    internal void AddUse(ref bool added, bool holdsOffFinalize = true)
+    /// <param name="underOpenSession">
+    /// Whether the caller holds an open session of this handle (its <see cref="Pkcs11SessionHandle"/>, with a
+    /// reference taken for the call), so the use is taken even once this handle is disposed: that session's own
+    /// use keeps the module initialized and mapped. Only for a session that outlives the disposal of the load
+    /// that opened it, a token login's anchor session.
+    /// </param>
+    internal void AddUse(ref bool added, bool holdsOffFinalize = true, bool underOpenSession = false)
     {
         DangerousAddRef(ref added);
         if (!added)
@@ -211,7 +217,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         // Read after taking the use, and Dispose writes before it reads the holds (both full fences): so
         // either this sees the dispose and backs out, or TryFinalize sees this use and leaves C_Finalize
         // to its release.
-        if (Volatile.Read(ref _disposed) != 0)
+        if (Volatile.Read(ref _disposed) != 0 && !underOpenSession)
         {
             added = false;
             ReleaseUse(holdsOffFinalize);
@@ -331,13 +337,19 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// <see cref="SafeHandle.Dispose()"/> is reentrant and thread-safe, so a caller disposing the same
     /// session on another thread is harmless.
     /// </summary>
+    /// <remarks>
+    /// An anchor session (<see cref="Pkcs11SessionHandle.IsAnchor"/>) is left open and tracked: it keeps a token
+    /// login that every load of the module shares, and closes once the last holder of that login goes, whichever
+    /// load it came through. Its use of this handle holds off <c>C_Finalize</c> until then.
+    /// </remarks>
     internal void CloseAllTrackedSessions()
     {
         Pkcs11SessionHandle[] live;
         lock (_sessionsLock)
         {
-            live = [.. _sessions.Select(wr => wr.TryGetTarget(out var h) ? h : null).OfType<Pkcs11SessionHandle>()];
-            _sessions.Clear();
+            _sessions.RemoveAll(wr => !wr.TryGetTarget(out _));
+            live = [.. _sessions.Select(wr => wr.TryGetTarget(out var h) ? h : null).OfType<Pkcs11SessionHandle>().Where(h => !h.IsAnchor)];
+            _sessions.RemoveAll(wr => wr.TryGetTarget(out var h) && !h.IsAnchor);
         }
 
         // A session's release never throws: a C_CloseSession that fails, or throws, is reported by its

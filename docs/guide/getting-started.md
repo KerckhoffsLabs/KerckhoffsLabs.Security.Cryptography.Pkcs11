@@ -38,11 +38,16 @@ What each step does:
 
 1. **`Pkcs11Library.Load`** maps the module and initializes it. Dispose it last: the library calls
    `C_Finalize` when it is disposed, if it was the one that initialized the module.
-2. **`OpenSessionWithPin`** finds the token by label, opens a session and logs in. (A token that takes
-   no login, such as a software crypto token, is opened with `OpenSessionWithoutLogin` instead.) The session enforces
-   the default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
-   `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it as
-   the last argument; see [Using crypto policies](crypto-policies.md).
+2. **`GetSlotByTokenLabel`** finds the slot holding the token with that label. It throws
+   `Pkcs11TokenException` (`CKR_TOKEN_NOT_PRESENT`) when no token has the label, and refuses with
+   `InvalidOperationException`, naming the slots, when more than one does: select the slot from
+   `GetSlotList` by its ID then. **`slot.Login(TokenUser.User, pin)`** logs the normal user in and returns a
+   `Pkcs11Login`, and **`login.OpenSession()`** opens a read/write session of that login. (A token that takes
+   no login, such as a software crypto token, is used through `slot.OpenSession()` instead, which opens a
+   read-only session by default; pass `SessionAccess.ReadWrite` to create objects.) The session enforces the
+   default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
+   `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it to
+   `OpenSession`; see [Using crypto policies](crypto-policies.md).
 3. **`GenerateAesKey`** creates the key on the token, sensitive and non-extractable, and allowed only to
    encrypt and decrypt. Each key-generation helper grants exactly one role; see
    [Key role separation](security-model.md#key-role-separation). The key is a **session object** and
@@ -51,18 +56,23 @@ What each step does:
 4. **`AesGcmPkcs11`** gives the key the shape of `System.Security.Cryptography.AesGcm`: the same
    constructor arguments (with a `Pkcs11Key` instead of key bytes) and the same `Encrypt` and `Decrypt`.
    The token does the work.
-5. **Disposal** releases everything in reverse order. Dispose sessions and keys deterministically
-   (`using`), rather than leaving them to the garbage collector.
+5. **Disposal** releases everything in reverse order. Dispose sessions, logins and keys deterministically
+   (`using`), rather than leaving them to the garbage collector. Disposing a session never logs out: the
+   token is logged out when the login and every session opened from it have been disposed, in whatever
+   order.
 
 ### In an application: load and log in once
 
 The example runs the whole flow in one method so you can read it in one place. An application doesn't
 load the module and log in for every operation. In PKCS#11 the login belongs to the application, not to
-the session: while one session is logged in, a second `OpenSessionWithPin` to the same token fails with
-`CKR_USER_ALREADY_LOGGED_IN`, which the library raises as `Pkcs11AuthenticationException`. Load the module
-and log in once at startup, keep the library and the session for the application's lifetime, and give the
-session to the code that opens keys and uses them. The example pages show the same full flow per method,
-for the same reason.
+the session: once the user is logged in, every session the application has on the token sees the login.
+Load the module and log in once at startup, keep the library and the `Pkcs11Login` for the application's
+lifetime, and open sessions from the login (`login.OpenSession()`) for the code that opens keys and uses
+them. A second `slot.Login` of the same user while the login is held shares it rather than failing, but it
+is not a second authentication: a token is not required to check the PIN of a user who is already logged
+in. Logging in as another user (the security officer, say) while one is held is refused with
+`Pkcs11AuthenticationException`. The example pages show the same full flow per method, for the same
+reason.
 
 ## Handling errors
 

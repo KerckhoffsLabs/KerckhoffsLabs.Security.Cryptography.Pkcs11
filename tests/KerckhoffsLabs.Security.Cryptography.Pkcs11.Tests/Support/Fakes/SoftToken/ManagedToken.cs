@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 
@@ -13,6 +12,14 @@ internal static class ManagedToken
 {
     public static Pkcs11Library NewLibrary() => new ManagedSoftToken().Load();
 
-    public static Pkcs11Session OpenSession(Pkcs11Library library, ICryptoPolicy? policy = null) =>
-        library.OpenSessionWithPin(ManagedSoftToken.TokenLabel, CKU.CKU_USER, new SecurePin("1234"), policy);
+    /// <summary>
+    /// A read/write session of a user login that the session alone holds: the token is logged out when the
+    /// session is disposed.
+    /// </summary>
+    public static Pkcs11Session OpenSession(Pkcs11Library library, ICryptoPolicy? policy = null)
+    {
+        using var pin = new SecurePin("1234");
+        using Pkcs11Login login = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel).Login(TokenUser.User, pin);
+        return login.OpenSession(SessionAccess.ReadWrite, policy);
+    }
 }

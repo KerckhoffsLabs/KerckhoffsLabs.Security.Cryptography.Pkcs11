@@ -534,30 +534,33 @@ internal static class SessionConformanceTestCases
         }
     }
 
-    // The login belongs to the application, not to a session (PKCS#11 v3.2 §5.6): while one Pkcs11Session is logged
-    // in, a second OpenSessionWithPin to the token is refused with CKR_USER_ALREADY_LOGGED_IN, raised as
-    // Pkcs11AuthenticationException, and the refusal leaves the first session logged in. Once the first session is
-    // disposed, a new login succeeds. Getting started's "load and log in once" section rests on this.
-    internal static void Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(IPkcs11Backend backend)
+    // The login belongs to the application, not to a session (PKCS#11 v3.2 §5.6): while the user is logged in, a
+    // second Login of the same user still sends C_Login, which the module answers CKR_USER_ALREADY_LOGGED_IN (or
+    // CKR_OK, re-verifying), and the library shares the login it holds instead of failing. Releasing that second
+    // hold leaves the first login's session logged in; the last holder's release logs the token out. Getting
+    // started's "load and log in once" section rests on this.
+    internal static void Assert_SecondLogin_WhileLoggedIn_SharesTheLogin(IPkcs11Backend backend)
     {
         if (!backend.RequiresUserLogin)
             Assert.Skip("The backend has no login.");
         LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
         LogOutTheToken(lowLevel, backend.SlotId);
+        Pkcs11Slot slot = Slot(backend);
 
         using (var pin = new SecurePin(backend.UserPin.Span))
-        using (Pkcs11Session first = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin))
+        using (Pkcs11Login first = slot.Login(TokenUser.User, pin))
+        using (Pkcs11Session session = first.OpenSession())
         {
-            using var again = new SecurePin(backend.UserPin.Span);
-            var refused = Assert.ThrowsAny<Pkcs11AuthenticationException>(
-                () => backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, again));
-            Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, refused.ReturnValue);
-            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, first.GetSessionInfo().State);
+            using (var again = new SecurePin(backend.UserPin.Span))
+            using (Pkcs11Login second = slot.Login(TokenUser.User, again))
+                Assert.True(second.IsActive);
+
+            Assert.True(first.IsActive);
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
         }
 
-        using var next = new SecurePin(backend.UserPin.Span);
-        using Pkcs11Session second = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, next);
-        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, second.GetSessionInfo().State);
+        using Pkcs11Session after = slot.OpenSession(SessionAccess.ReadWrite);
+        Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, after.GetSessionInfo().State);
     }
 
     // CKF_USER_PIN_COUNT_LOW means "an incorrect user login PIN has been entered at least once since the last
@@ -609,8 +612,7 @@ internal static class SessionConformanceTestCases
             Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, session).State);
         }
         finally { lowLevel.C_CloseSession(session); }
-        using var pin = new SecurePin(backend.UserPin.Span);
-        using var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin);
+        using var opened = backend.OpenSession();
         Assert.Equal(16, opened.GenerateRandom(16).Length);
     }
 
@@ -634,13 +636,12 @@ internal static class SessionConformanceTestCases
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
         {
             using var pin = new SecurePin(wrong);
-            using var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin);
+            using Pkcs11Login login = Slot(backend).Login(TokenUser.User, pin);
         });
         Assert.Equal(CKR.CKR_PIN_INCORRECT, ex.ReturnValue);
         Assert.DoesNotContain(System.Text.Encoding.UTF8.GetString(wrong), ex.ToString(), StringComparison.Ordinal);
-        using (var pin = new SecurePin(backend.UserPin.Span))
-        using (var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin))
-            Assert.Equal(16, opened.GenerateRandom(16).Length);
+        using var opened = backend.OpenSession();
+        Assert.Equal(16, opened.GenerateRandom(16).Length);
     }
 
     // A PIN shorter than ulMinPinLen or longer than ulMaxPinLen (§3.2, CK_TOKEN_INFO) logs nobody in, and C_SetPIN
