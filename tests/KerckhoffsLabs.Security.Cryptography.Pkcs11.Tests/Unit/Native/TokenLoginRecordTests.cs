@@ -145,8 +145,67 @@ public sealed class TokenLoginRecordTests : IDisposable
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Record.Login(_library, TokenUser.User, _pin, username: null));
 
+        // The anchor reported lost is unambiguous evidence the login is gone (decision 5): it ends, and the
+        // first holder goes inactive with it rather than keeping a closed anchor.
         Assert.Equal(CKR.CKR_SESSION_HANDLE_INVALID, ex.ReturnValue);
+        Assert.False(first.IsActive);
+        Assert.False(Record.IsLoggedIn);
+        Assert.Null(Record.Anchor);
+    }
+
+    // Decision 5: CKR_USER_NOT_LOGGED_IN is not evidence that the login is gone.
+    [Fact]
+    public void SharedLogin_UserNotLoggedIn_Propagates_AndKeepsTheLogin()
+    {
+        using LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        _module.FailSession(Assert.Single(_module.OpenSessions).Handle, CKR.CKR_USER_NOT_LOGGED_IN);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Record.Login(_library, TokenUser.User, _pin, username: null));
+
+        Assert.Equal(CKR.CKR_USER_NOT_LOGGED_IN, ex.ReturnValue);
         Assert.True(first.IsActive);
+        Assert.True(Record.IsLoggedIn);
+    }
+
+    // A library's disposal releases its holds; a share that lands after that release, while the library is
+    // being disposed, is refused rather than left held by a disposed library, which would keep the login.
+    [Fact]
+    public void Share_ThroughALibraryBeingDisposed_IsRefused_AndTakesNoHold()
+    {
+        LoginHold held = Record.Login(_library, TokenUser.User, _pin, username: null);
+        Pkcs11Library other = _module.Load();
+        _module.DuringLogin = _ =>
+        {
+            _module.DuringLogin = null;
+            var disposer = new Thread(other.Dispose);
+            disposer.Start();
+            disposer.Join();
+        };
+
+        Assert.Throws<ObjectDisposedException>(() => Record.Login(other, TokenUser.User, _pin, username: null));
+
+        held.Dispose();
+        Assert.Equal(1, _module.LogoutCalls);
+        Assert.False(Record.IsLoggedIn);
+    }
+
+    [Fact]
+    public void FirstLogin_ThroughALibraryBeingDisposed_IsRefused_AndLogsBackOut()
+    {
+        Pkcs11Library other = _module.Load();
+        _module.DuringLogin = _ =>
+        {
+            _module.DuringLogin = null;
+            var disposer = new Thread(other.Dispose);
+            disposer.Start();
+            disposer.Join();
+        };
+
+        Assert.Throws<ObjectDisposedException>(() => Record.Login(other, TokenUser.User, _pin, username: null));
+
+        Assert.False(Record.IsLoggedIn);
+        Assert.Null(_module.LoggedIn);
+        Assert.Empty(_module.OpenSessions);
     }
 
     [Fact]

@@ -72,7 +72,15 @@ internal sealed class TokenLoginRecord
     private long _generation;
     private ILogger _logger = NullLogger.Instance;
 
-    internal TokenLoginRecord(NativeCULong slotId) => _slotId = slotId;
+    // The module's registry, whose session tally refuses an SO login while a read-only session is open; null for a
+    // record made on its own, which then leaves that to the module.
+    private readonly TokenLoginRegistry? _registry;
+
+    internal TokenLoginRecord(NativeCULong slotId, TokenLoginRegistry? registry = null)
+    {
+        _slotId = slotId;
+        _registry = registry;
+    }
 
     /// <summary>The current login generation: changes on every first login and every reported end.</summary>
     public long Generation
@@ -115,6 +123,29 @@ internal sealed class TokenLoginRecord
     }
 
     /// <summary>
+    /// The login state now, for a private object found or made under it: see <see cref="LoginStamp"/>. Taken while
+    /// the gate is held (inside an operation), so it is the state the object's lookup or creation ran under.
+    /// </summary>
+    internal LoginStamp CurrentStamp()
+    {
+        lock (_lock)
+            return new LoginStamp(_generation, LoggedIn: _anchor is not null);
+    }
+
+    /// <summary>
+    /// Whether the login state <paramref name="stamp"/> recorded still holds, so a private object handle obtained
+    /// under it is still valid: for a login, that same login is still current (<see cref="IsCurrent"/>); for no
+    /// login, no login has started since.
+    /// </summary>
+    internal bool IsStillCurrent(LoginStamp stamp)
+    {
+        if (stamp.LoggedIn)
+            return IsCurrent(stamp.Generation);
+        lock (_lock)
+            return _anchor is null && _generation == stamp.Generation;
+    }
+
+    /// <summary>
     /// Logs <paramref name="user"/> in, or shares the login already held for the same user, and returns the
     /// caller's share of it.
     /// </summary>
@@ -126,8 +157,12 @@ internal sealed class TokenLoginRecord
     /// Someone else is logged in through this record (<c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>, refused before
     /// the module), or the module refused the login.
     /// </exception>
+    /// <exception cref="Pkcs11SessionException">
+    /// An SO login while the library has a read-only session open on the slot (<c>CKR_SESSION_READ_ONLY_EXISTS</c>,
+    /// refused before the module).
+    /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or the login.</exception>
-    /// <exception cref="ObjectDisposedException"><paramref name="owner"/> is disposed.</exception>
+    /// <exception cref="ObjectDisposedException"><paramref name="owner"/> is disposed, or its disposal began before the hold was taken.</exception>
     public LoginHold Login(Pkcs11Library owner, TokenUser user, SecurePin? pin, string? username)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -158,6 +193,8 @@ internal sealed class TokenLoginRecord
             if (TryShareHeldLogin(owner, user, pin, username, method) is { } shared)
                 return shared;
 
+            ThrowIfReadOnlySessionBlocksSo(user, method);
+
             Pkcs11SessionCore anchor = OpenAnchor(owner, user, loggerFactory);
             try
             {
@@ -173,13 +210,34 @@ internal sealed class TokenLoginRecord
 
             lock (_lock)
             {
-                _anchor = anchor;
-                _user = user;
-                _username = username;
-                _generation++;
-                _logger = new CallOutFencedLogger((loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<TokenLoginRecord>());
-                return AddHolderLocked(owner);
+                // The owner's disposal began while the login was sent: its holds may already be released, so a
+                // hold taken now would never be. Checked before the login is recorded, and undone below.
+                if (!owner.IsDisposingOrDisposed)
+                {
+                    _anchor = anchor;
+                    _user = user;
+                    _username = username;
+                    _generation++;
+                    _logger = new CallOutFencedLogger((loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<TokenLoginRecord>());
+                    return AddHolderLocked(owner);
+                }
             }
+
+            // Still under the gate held exclusive: nothing else saw this login. Log it back out (other sessions of
+            // the application share it) and close the anchor.
+            try
+            {
+                anchor.SendLogout();
+            }
+            catch (Pkcs11Exception)
+            {
+                // Closing the anchor below may end the login anyway; the owner's disposal is what is reported.
+            }
+            finally
+            {
+                anchor.Dispose();
+            }
+            throw OwnerDisposed();
         }
         finally
         {
@@ -241,7 +299,7 @@ internal sealed class TokenLoginRecord
     /// Takes another share of the login <paramref name="existing"/> holds, without calling the module: for a
     /// session opened under a login, which keeps the login as long as it is open.
     /// </summary>
-    /// <exception cref="ObjectDisposedException"><paramref name="existing"/> is released, or its login ended.</exception>
+    /// <exception cref="ObjectDisposedException"><paramref name="existing"/> is released, or its login ended; or <paramref name="owner"/> is being disposed.</exception>
     public LoginHold Share(LoginHold existing, Pkcs11Library owner)
     {
         ArgumentNullException.ThrowIfNull(existing);
@@ -296,12 +354,18 @@ internal sealed class TokenLoginRecord
     /// </summary>
     /// <param name="reason">The return code that reported it, for the log.</param>
     /// <remarks>Does not take the gate, so an operation that holds it shared may call this.</remarks>
-    public void MarkEnded(CKR reason)
+    public void MarkEnded(CKR reason) => EndLogin(reason, onlyAnchor: null);
+
+    // MarkEnded, or, with onlyAnchor, only while that session is the anchor (checked under the same hold of the
+    // lock that ends the login).
+    private void EndLogin(CKR reason, Pkcs11SessionCore? onlyAnchor)
     {
         Pkcs11SessionCore? anchor;
         ILogger logger;
         lock (_lock)
         {
+            if (onlyAnchor is not null && !ReferenceEquals(_anchor, onlyAnchor))
+                return;
             _generation++;
             _holders.Clear();
             anchor = _anchor;
@@ -315,6 +379,17 @@ internal sealed class TokenLoginRecord
             return;
         Log.TokenLoginEnded(logger, (ulong)_slotId, reason);
         anchor.Dispose();
+    }
+
+    /// <summary>
+    /// Ends the login when <paramref name="anchor"/>, the session it was made on, is reported lost (#363's codes),
+    /// as <see cref="MarkEnded"/> does; nothing when <paramref name="anchor"/> is not this record's current anchor
+    /// (a first login's anchor that failed before the login was recorded, or one already logged out).
+    /// </summary>
+    internal void AnchorLost(Pkcs11SessionCore anchor, CKR reason)
+    {
+        ArgumentNullException.ThrowIfNull(anchor);
+        EndLogin(reason, anchor);
     }
 
     /// <summary>
@@ -352,9 +427,13 @@ internal sealed class TokenLoginRecord
             LogOutIfUnheld(hold.Generation);
     }
 
-    // Under _lock.
+    // Under _lock. Refuses an owner whose disposal has begun: Pkcs11Library.Dispose marks itself disposing before it
+    // releases its holds (ReleaseHoldersOf, which takes this lock), so either that release sees this hold, or this
+    // check sees the mark.
     private LoginHold AddHolderLocked(Pkcs11Library owner)
     {
+        if (owner.IsDisposingOrDisposed)
+            throw OwnerDisposed();
         var hold = new LoginHold(this, owner, _generation);
         _holders.Add(hold);
         return hold;
@@ -405,6 +484,22 @@ internal sealed class TokenLoginRecord
         }
     }
 
+    // PKCS#11 v3.2 C_Login: an SO login fails with CKR_SESSION_READ_ONLY_EXISTS while the application has a
+    // read-only session open. Refused here from the sessions the library has open through any load of the module
+    // (decision 6); sessions opened outside the library are left to the module's answer.
+    private void ThrowIfReadOnlySessionBlocksSo(TokenUser user, string method)
+    {
+        if (user != TokenUser.SecurityOfficer || _registry is null)
+            return;
+        int readOnly = _registry.Sessions(_slotId).ReadOnly;
+        if (readOnly == 0)
+            return;
+        throw Pkcs11Exception.Create(CKR.CKR_SESSION_READ_ONLY_EXISTS, method,
+            $"{method}: the Security Officer cannot log in to the token in slot {(ulong)_slotId} while this " +
+            $"application has a read-only session open on it ({readOnly} open), as PKCS#11 forbids. Close the " +
+            "read-only sessions first, or open read/write ones.");
+    }
+
     private Pkcs11SessionCore OpenAnchor(Pkcs11Library owner, TokenUser user, ILoggerFactory? loggerFactory)
     {
         // Throws ObjectDisposedException for a disposed owner. The anchor survives that owner's disposal
@@ -422,6 +517,9 @@ internal sealed class TokenLoginRecord
         else
             anchor.SendLoginUser(userType, secret, username);
     }
+
+    private static ObjectDisposedException OwnerDisposed()
+        => new(nameof(Pkcs11Library), "The library this login was made through is disposed, or being disposed.");
 
     private static ObjectDisposedException LoginEnded()
         => new(nameof(LoginHold), "This login has ended: it was disposed, logged out, or the module reported it gone. Log in again.");
@@ -441,3 +539,18 @@ internal sealed class TokenLoginRecord
         }
     }
 }
+
+/// <summary>
+/// The login state of a token when a private object handle was obtained: the record's generation, and whether a
+/// login was held then. The handle is valid only while that state lasts (PKCS#11 v3.2 <c>C_Logout</c>: handles to
+/// private objects become invalid, even if a user logs back in).
+/// </summary>
+/// <remarks>
+/// Taken from the token's login record, never from the session that found the object: a session that holds no
+/// login still sees the application's login (login state is per application and token), so a private object it
+/// finds is tied to that login like any other. A private object found while not logged in (a module that shows
+/// private objects to public sessions) is tied to that state: any later login ends it.
+/// </remarks>
+/// <param name="Generation">The record's <see cref="TokenLoginRecord.Generation"/>.</param>
+/// <param name="LoggedIn">Whether a login was held.</param>
+internal readonly record struct LoginStamp(long Generation, bool LoggedIn);

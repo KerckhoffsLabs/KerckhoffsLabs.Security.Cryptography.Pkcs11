@@ -61,6 +61,15 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>Whether <see cref="Dispose"/> has run.</summary>
     internal bool IsDisposed => Volatile.Read(ref _disposed);
 
+    // Set first thing in Dispose, before this library's login holds are released, so a hold cannot be added after
+    // that release (see TokenLoginRecord.AddHolderLocked).
+    private int _disposing;
+
+    /// <summary>
+    /// Whether <see cref="Dispose"/> has started: from then on no login hold can be taken through this library.
+    /// </summary>
+    internal bool IsDisposingOrDisposed => Volatile.Read(ref _disposing) != 0 || IsDisposed;
+
     /// <summary>The logger factory from <see cref="Pkcs11LibraryOptions.LoggerFactory"/>, for what this library opens.</summary>
     internal ILoggerFactory? LoggerFactory => _loggerFactory;
 
@@ -703,6 +712,7 @@ public sealed class Pkcs11Library : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        Volatile.Write(ref _disposing, 1);
         Log.LibraryTrace(_logger, _libraryPath, "Dispose");
 
         // First: ends this library's slot-event waits at once, whatever else still uses the module.

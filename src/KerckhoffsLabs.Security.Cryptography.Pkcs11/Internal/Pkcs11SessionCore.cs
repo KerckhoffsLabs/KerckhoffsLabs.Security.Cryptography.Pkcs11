@@ -33,6 +33,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     // The login record of that slot, whose gate every operation holds shared (see AcquireExclusive).
     private readonly TokenLoginRecord _record;
 
+    /// <summary>The login record of the slot this session was opened on, shared by every load of the module.</summary>
+    internal TokenLoginRecord LoginRecord => _record;
+
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
@@ -768,6 +771,11 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// session after <c>CKR_DEVICE_REMOVED</c>. Only this session object learns of the loss; another session on the
     /// same token finds out from its own next call.
     /// </para>
+    /// <para>
+    /// The anchor session of a token login (<see cref="TokenLoginRecord"/>) lost ends that login
+    /// (<see cref="TokenLoginRecord.MarkEnded"/>): every holder goes inactive, no <c>C_Logout</c> is sent for them,
+    /// and the next login starts afresh. <c>CKR_USER_NOT_LOGGED_IN</c> is not a loss and ends nothing.
+    /// </para>
     /// </remarks>
     private void ObserveSessionLoss(CKR rv, string method)
     {
@@ -787,7 +795,14 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
 
         // An operation's lease holds a reference on the handle, so the release (and, for a removed token, its one
         // C_CloseSession) runs when that operation lets go, still under the session lock.
-        _sessionHandle.Dispose();
+        Pkcs11SessionHandle handle = _sessionHandle;
+        handle.Dispose();
+
+        // The anchor of the token's login lost: the login went with it (decision 5), so the record ends it now and
+        // a new login starts afresh. Last, since ending it disposes this session. Lock order holds: this session's
+        // lock, the gate (held by the operation), then the record's lock.
+        if (handle.IsAnchor)
+            _record.AnchorLost(this, rv);
     }
 
     /// <summary>Refuses a call on a session the module has said is gone, before it reaches the module.</summary>

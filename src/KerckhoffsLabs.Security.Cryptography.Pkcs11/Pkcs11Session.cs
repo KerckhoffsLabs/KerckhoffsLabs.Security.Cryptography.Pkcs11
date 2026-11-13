@@ -363,6 +363,10 @@ public sealed partial class Pkcs11Session : IDisposable
 
         _ = ClassesToSearch(filter, Keys); // refuses a CKA_CLASS that is not a key class
 
+        // The search and the reads that wrap each key run under one lease, which holds the login gate: a private
+        // key is tied to the login state the search ran under.
+        using var lease = _core.AcquireExclusive();
+
         // One search, not one per key class: the class comes with the attribute read each found object
         // gets anyway, and objects of other classes are dropped there.
         var handles = _core.FindAllObjects([.. filter.Attributes]);
@@ -393,6 +397,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         var handles = _core.FindAllObjects([.. filter.Attributes]);
         var result = new List<Pkcs11Object>(handles.Count);
         foreach (var handle in handles)
@@ -483,6 +488,7 @@ public sealed partial class Pkcs11Session : IDisposable
         if (Array.IndexOf(Keys.Classes, objectClass) >= 0)
             throw new ArgumentException($"{objectClass} is a key class: import keys with ImportKey.", nameof(template));
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         ObjectHandle handle = _core.CreateObject([.. template.Attributes]);
         return HydrateObjectFromHandle(handle);
     }
@@ -522,8 +528,12 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <c>CKA_VALUE</c> cannot be read; also propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public ReadOnlyDisposableList<Pkcs11Certificate> FindCertificates(ObjectTemplate filter)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
 
+        // The search and the reads that wrap each certificate run under one lease, which holds the login gate: a
+        // private certificate is tied to the login state the search ran under (see FindKeys).
+        using var lease = _core.AcquireExclusive();
         var result = new List<Pkcs11Certificate>();
         try
         {
@@ -701,6 +711,7 @@ public sealed partial class Pkcs11Session : IDisposable
             .SerialNumber(EncodedSerialNumber(certificate.RawData))
             .Value(certificate.RawData)
             .Build();
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         ObjectHandle handle = _core.CreateObject([.. template.Attributes]);
         return HydrateCertificateFromHandle(handle);
     }
@@ -718,7 +729,7 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private Pkcs11Certificate HydrateCertificateFromHandle(ObjectHandle handle)
     {
-        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID]);
+        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID, CKA.CKA_PRIVATE]);
         if (attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 "Pkcs11Certificate (CKA_VALUE unreadable)");
@@ -726,7 +737,8 @@ public sealed partial class Pkcs11Session : IDisposable
         var certificate = X509CertificateLoader.LoadCertificate(attrs[0].GetValueAsByteArray());
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
         byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
-        return new Pkcs11Certificate(this, handle, label, id, certificate);
+        bool isPrivate = PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[3]), CKO.CKO_CERTIFICATE);
+        return new Pkcs11Certificate(this, handle, label, id, certificate, isPrivate, CurrentLoginStamp());
     }
 
     /// <summary>
@@ -759,13 +771,17 @@ public sealed partial class Pkcs11Session : IDisposable
     {
         // One round trip when the token answers cleanly; the generic two-call read otherwise.
         if (_core.TryReadIdentity(handle, withKeyType: false, out ObjectIdentity identity))
-            return new Pkcs11Object(this, handle, identity.ObjectClass, identity.Label, identity.Id);
+        {
+            return new Pkcs11Object(this, handle, identity.ObjectClass, identity.Label, identity.Id,
+                identity.IsPrivate, CurrentLoginStamp());
+        }
 
-        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID]);
+        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID, CKA.CKA_PRIVATE]);
         var objectClass = (CKO)attrs[0].GetValueAsUlong();
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
         byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
-        return new Pkcs11Object(this, handle, objectClass, label, id);
+        bool isPrivate = PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[3]), objectClass);
+        return new Pkcs11Object(this, handle, objectClass, label, id, isPrivate, CurrentLoginStamp());
     }
 
     /// <summary>
@@ -785,6 +801,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(template);
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         var handle = _core.CreateObject([.. template.Attributes]);
         return HydrateKeyFromHandle(handle);
     }
@@ -804,6 +821,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         var handle = _core.GenerateKey(mechanism, [.. template.Attributes]);
         return HydrateKeyFromHandle(handle);
     }
@@ -840,6 +858,7 @@ public sealed partial class Pkcs11Session : IDisposable
         RequireClassIfSet(publicKeyTemplate, CKO.CKO_PUBLIC_KEY, nameof(publicKeyTemplate));
         RequireClassIfSet(privateKeyTemplate, CKO.CKO_PRIVATE_KEY, nameof(privateKeyTemplate));
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         _core.GenerateKeyPair(
             mechanism,
             [.. publicKeyTemplate.Attributes],
@@ -854,10 +873,15 @@ public sealed partial class Pkcs11Session : IDisposable
             CKA.CKA_KEY_TYPE,
             CKA.CKA_LABEL,
             CKA.CKA_ID,
+            CKA.CKA_PRIVATE,
         ]);
         var keyType = (CKK)attrs[0].GetValueAsUlong();
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
         byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
+
+        // The public half's CKA_PRIVATE takes one read of its own: a token may make it private too.
+        bool privateHalfIsPrivate = PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[3]), CKO.CKO_PRIVATE_KEY);
+        bool publicHalfIsPrivate = PrivateObjectLogin.IsPrivate(_core.TryReadPrivate(publicHandle), CKO.CKO_PUBLIC_KEY);
 
         return new Pkcs11Key(
             session: this,
@@ -865,7 +889,10 @@ public sealed partial class Pkcs11Session : IDisposable
             publicHandle: publicHandle,
             keyType: keyType,
             label: label,
-            id: id);
+            id: id,
+            privateHalfIsPrivate: privateHalfIsPrivate,
+            publicHalfIsPrivate: publicHalfIsPrivate,
+            loginStamp: CurrentLoginStamp());
     }
 
     private static void RequireClassIfSet(ObjectTemplate template, CKO expected, string paramName)
@@ -1111,7 +1138,8 @@ public sealed partial class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Hydrates an existing object handle into a Pkcs11Key (used after operations that
-    /// produce a new on-token object — Unwrap, Derive).
+    /// produce a new on-token object — Unwrap, Derive). Call it under the lease the operation ran in, so the key
+    /// is tied to the login state the object was made under.
     /// </summary>
     internal Pkcs11Key HydrateExistingHandleAsKey(ObjectHandle handle)
         => HydrateKeyFromHandle(handle);
@@ -1123,6 +1151,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// </summary>
     internal ObjectHandle FindCompanion(CKO companionClass, byte[] id, CKK keyType)
     {
+        using var lease = _core.AcquireExclusive();
         using var filter = ObjectTemplate.Empty()
             .Attribute(CKA.CKA_CLASS, (ulong)companionClass)
             .Attribute(CKA.CKA_KEY_TYPE, (ulong)keyType)
@@ -1131,6 +1160,19 @@ public sealed partial class Pkcs11Session : IDisposable
         var handles = _core.FindAllObjects([.. filter.Attributes]);
         return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
     }
+
+    /// <summary>
+    /// Whether a key half the library found without reading its identity (a key's other half) is a private object:
+    /// one <c>CKA_PRIVATE</c> read, or by class when the token does not report it.
+    /// </summary>
+    internal bool IsPrivateObject(ObjectHandle handle, CKO objectClass)
+        => PrivateObjectLogin.IsPrivate(_core.TryReadPrivate(handle), objectClass);
+
+    /// <summary>
+    /// The token's login state now, for a private object found or made under it. Call it under the lease the
+    /// lookup or creation ran in.
+    /// </summary>
+    internal LoginStamp CurrentLoginStamp() => _core.LoginRecord.CurrentStamp();
 
     // The lookups by CKA_ID refuse an empty id: it matches every object that has no CKA_ID.
     private const string EmptyIdMessage = "Id must not be empty.";
@@ -1185,7 +1227,7 @@ public sealed partial class Pkcs11Session : IDisposable
         => FindUnique(filter, Certificates, EachOnItsOwn, matched => HydrateCertificateFromHandle(matched[0].Handle));
 
     /// <summary>An object a lookup matched, with the attributes that decide which result it belongs to.</summary>
-    private sealed record ObjectCandidate(ObjectHandle Handle, CKO Class, CKK? KeyType, byte[] Id, string? Label);
+    private sealed record ObjectCandidate(ObjectHandle Handle, CKO Class, CKK? KeyType, byte[] Id, string? Label, bool? Private);
 
     /// <summary>
     /// Runs a lookup that must identify one object of <paramref name="family"/>: searches with
@@ -1200,6 +1242,7 @@ public sealed partial class Pkcs11Session : IDisposable
         Func<List<ObjectCandidate>, List<List<ObjectCandidate>>> group, Func<List<ObjectCandidate>, T> hydrate)
         where T : class
     {
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         List<ObjectCandidate> candidates =
             [.. SearchFamily(filter, family).Select(match => ReadCandidate(match.Handle, match.Class))];
 
@@ -1272,11 +1315,11 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private ObjectCandidate ReadCandidate(ObjectHandle handle, CKO objectClass)
     {
-        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL]);
+        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_PRIVATE]);
         CKK? keyType = attrs[0].CannotBeRead ? null : (CKK)attrs[0].GetValueAsUlong();
         byte[] id = attrs[1].CannotBeRead ? [] : attrs[1].GetValueAsByteArray();
         string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
-        return new ObjectCandidate(handle, objectClass, keyType, id, label);
+        return new ObjectCandidate(handle, objectClass, keyType, id, label, PrivateObjectLogin.Reported(attrs[3]));
     }
 
     /// <summary>
@@ -1323,11 +1366,14 @@ public sealed partial class Pkcs11Session : IDisposable
             publicHandle: publicHalf.Handle,
             keyType: privateHalf.KeyType!.Value,
             label: privateHalf.Label ?? publicHalf.Label,
-            id: privateHalf.Id);
+            id: privateHalf.Id,
+            privateHalfIsPrivate: PrivateObjectLogin.IsPrivate(privateHalf.Private, CKO.CKO_PRIVATE_KEY),
+            publicHalfIsPrivate: PrivateObjectLogin.IsPrivate(publicHalf.Private, CKO.CKO_PUBLIC_KEY),
+            loginStamp: CurrentLoginStamp());
     }
 
     /// <summary>
-    /// Reads CKA_CLASS, CKA_KEY_TYPE, CKA_LABEL, CKA_ID off the handle and constructs a
+    /// Reads CKA_CLASS, CKA_KEY_TYPE, CKA_LABEL, CKA_ID, CKA_PRIVATE off the handle and constructs a
     /// <see cref="Pkcs11Key"/>. A private or public key with a non-empty CKA_ID is marked to look up
     /// its other half the first time an operation needs it; nothing is searched here.
     /// </summary>
@@ -1346,11 +1392,12 @@ public sealed partial class Pkcs11Session : IDisposable
         CKK keyType;
         string? label;
         byte[] id;
+        bool isPrivate;
 
         // One round trip when the token answers cleanly; the generic two-call read otherwise.
         if (_core.TryReadIdentity(handle, withKeyType: true, out ObjectIdentity identity))
         {
-            (objectClass, keyType, label, id) = identity;
+            (objectClass, keyType, label, id, isPrivate) = identity;
             if (keysOnly && !IsKeyClass(objectClass))
                 return null;
         }
@@ -1362,6 +1409,7 @@ public sealed partial class Pkcs11Session : IDisposable
                 CKA.CKA_KEY_TYPE,
                 CKA.CKA_LABEL,
                 CKA.CKA_ID,
+                CKA.CKA_PRIVATE,
             ]);
             objectClass = (CKO)attrs[0].GetValueAsUlong();
             if (keysOnly && !IsKeyClass(objectClass))
@@ -1369,6 +1417,7 @@ public sealed partial class Pkcs11Session : IDisposable
             keyType = (CKK)attrs[1].GetValueAsUlong();
             label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
             id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
+            isPrivate = PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[4]), objectClass);
         }
 
         ObjectHandle privateHandle = ObjectHandle.Invalid;
@@ -1401,6 +1450,9 @@ public sealed partial class Pkcs11Session : IDisposable
             keyType: keyType,
             label: label,
             id: id,
-            companionPending: companionPending);
+            companionPending: companionPending,
+            privateHalfIsPrivate: isPrivate && objectClass != CKO.CKO_PUBLIC_KEY,
+            publicHalfIsPrivate: isPrivate && objectClass == CKO.CKO_PUBLIC_KEY,
+            loginStamp: CurrentLoginStamp());
     }
 }

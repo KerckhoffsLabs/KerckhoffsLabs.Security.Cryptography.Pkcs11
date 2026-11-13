@@ -178,6 +178,12 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// human-readable label. After this call the token is in its factory state —
     /// any prior keys, certificates, or user PIN are destroyed.
     /// </summary>
+    /// <remarks>
+    /// PKCS#11 v3.2 fails <c>C_InitToken</c> with <c>CKR_SESSION_EXISTS</c> while the application has a session open
+    /// with the token. The library refuses it before the module while it has a session or a login (which keeps a
+    /// session of its own) open on the slot through any load of the module. Sessions other applications have open
+    /// are not known to it: the spec leaves the outcome then undefined, and some tokens refuse it.
+    /// </remarks>
     /// <param name="soPin">Security Officer's initial PIN. Caller retains
     /// ownership of the <see cref="SecurePin"/>; its bytes go to the native call
     /// straight out of the pinned buffer it owns, with no transient copy.</param>
@@ -188,6 +194,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// or <paramref name="label"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="label"/>
     /// encodes to more than 32 bytes of UTF-8.</exception>
+    /// <exception cref="Pkcs11SessionException">This application has a session or a login open on the token,
+    /// through any load of the module (<c>CKR_SESSION_EXISTS</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying
     /// <c>C_InitToken</c> call.</exception>
     public void InitTokenWithPin(SecurePin soPin, string label)
@@ -208,6 +216,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         Array.Fill(tokenLabel, (byte)0x20);
         Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
 
+        ThrowIfSessionsExist();
+
         // The PIN goes to the native call straight out of the pinned buffer SecurePin owns;
         // no transient copy to zero. Matches Pkcs11SessionCore.Login's pattern.
         CKR rv = _pkcs11Library.C_InitToken(_slotId, soPin.Pin, tokenLabel);
@@ -221,12 +231,18 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// destroyed. PKCS#11 signals on-device PIN entry by calling <c>C_InitToken</c> with
     /// <c>pPin = NULL_PTR</c>.
     /// </summary>
+    /// <remarks>
+    /// Refused before the module while this application has any session or login on the token, as for
+    /// <see cref="InitTokenWithPin"/>.
+    /// </remarks>
     /// <param name="label">Token label. Encoded as UTF-8; must encode to 32
     /// bytes or fewer. PKCS#11 pads the label with ASCII spaces (0x20) to fill
     /// the on-token 32-byte field; it must NOT be null-terminated.</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="label"/>
     /// encodes to more than 32 bytes of UTF-8.</exception>
+    /// <exception cref="Pkcs11SessionException">This application has a session or a login open on the token,
+    /// through any load of the module (<c>CKR_SESSION_EXISTS</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying
     /// <c>C_InitToken</c> call.</exception>
     public void InitTokenWithPinpad(string label)
@@ -243,6 +259,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         byte[] tokenLabel = new byte[32];
         Array.Fill(tokenLabel, (byte)0x20);
         Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
+
+        ThrowIfSessionsExist();
 
         CKR rv = _pkcs11Library.C_InitToken(_slotId, default, tokenLabel);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitToken);
@@ -273,6 +291,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <returns>The open session; the caller disposes it.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11SessionException">A read-only session while this application has the Security Officer
+    /// logged in (<c>CKR_SESSION_READ_WRITE_SO_EXISTS</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
     public Pkcs11Session OpenSession(SessionAccess access = SessionAccess.ReadOnly, ICryptoPolicy? policy = null)
     {
@@ -311,6 +331,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     /// <exception cref="Pkcs11AuthenticationException">Someone else is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11SessionException">A Security Officer login while this application has a read-only
+    /// session open on the token (<c>CKR_SESSION_READ_ONLY_EXISTS</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or <c>C_Login</c>.</exception>
     public Pkcs11Login Login(TokenUser user, SecurePin pin)
     {
@@ -373,6 +395,18 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         return new Pkcs11Login(this, user, username, hold);
     }
 
+    // PKCS#11 v3.2 C_InitToken: CKR_SESSION_EXISTS while the application has a session open with the token. From
+    // the sessions the library has open through any load of the module, a login's anchor among them (decision 6).
+    private void ThrowIfSessionsExist()
+    {
+        (int readOnly, int readWrite) = TokenLoginRegistry.Of(_pkcs11Library.Module).Sessions(_slotId);
+        if (readOnly + readWrite == 0)
+            return;
+        throw Pkcs11Exception.Create(CKR.CKR_SESSION_EXISTS, Pkcs11Operations.OpInitToken,
+            $"{Pkcs11Operations.OpInitToken}: this application has {readOnly + readWrite} session(s) open on the token " +
+            $"in slot {(ulong)_slotId} (a login keeps one of its own). Dispose every session and login on it first.");
+    }
+
     /// <summary>The login record of this slot, shared by every load of the module.</summary>
     internal TokenLoginRecord LoginRecord => TokenLoginRegistry.Of(_pkcs11Library.Module).For(_slotId);
 
@@ -401,6 +435,16 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     internal Pkcs11SessionCore OpenSessionCore(bool readWrite = true, ICryptoPolicy? policy = null, bool anchor = false)
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "OpenSessionCore");
+
+        // PKCS#11 v3.2 C_OpenSession: CKR_SESSION_READ_WRITE_SO_EXISTS for a read-only session while the SO is
+        // logged in. Known from the login record (decision 6); an SO login made outside the library is left to the module.
+        if (!readWrite && LoginRecord.User == TokenUser.SecurityOfficer)
+        {
+            throw Pkcs11Exception.Create(CKR.CKR_SESSION_READ_WRITE_SO_EXISTS, Pkcs11Operations.OpOpenSession,
+                $"{Pkcs11Operations.OpOpenSession}: the Security Officer is logged in to the token in slot {(ulong)_slotId} " +
+                "through this application, and PKCS#11 allows no read-only session then. Open a read/write session, or " +
+                "dispose the SO login first.");
+        }
 
         ulong flags = CKF.CKF_SERIAL_SESSION;
         if (readWrite)

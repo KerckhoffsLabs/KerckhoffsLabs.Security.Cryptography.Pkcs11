@@ -23,18 +23,31 @@ public sealed class Pkcs11Certificate : IDisposable
     private readonly ObjectHandle _handle;
     private readonly byte[] _id;
     private readonly X509Certificate2 _certificate;
+    private readonly LoginStamp _loginStamp;
     private bool _disposed;
     private bool _destroyed;
 
     internal Pkcs11Certificate(
-        Pkcs11Session session, ObjectHandle handle, string? label, byte[] id, X509Certificate2 certificate)
+        Pkcs11Session session, ObjectHandle handle, string? label, byte[] id, X509Certificate2 certificate,
+        bool isPrivate = false, LoginStamp loginStamp = default)
     {
         _session = session;
         _handle = handle;
         _id = id ?? [];
         _certificate = certificate;
         Label = label;
+        IsPrivate = isPrivate;
+        _loginStamp = loginStamp;
     }
+
+    /// <summary>
+    /// Whether the certificate object is private (<c>CKA_PRIVATE</c>): its handle is then usable only while the login
+    /// it was found or made under lasts. The parsed <see cref="Certificate"/> is not affected.
+    /// </summary>
+    internal bool IsPrivate { get; }
+
+    /// <summary>The generation of the token login this certificate was found or made under (see <see cref="LoginStamp"/>).</summary>
+    internal long LoginGeneration => _loginStamp.Generation;
 
     /// <summary>The parsed X.509 certificate (identity + public key). Owned by this instance.</summary>
     public X509Certificate2 Certificate => _certificate;
@@ -80,13 +93,18 @@ public sealed class Pkcs11Certificate : IDisposable
     /// <see cref="GetPrivateKey"/> keep working; the parsed certificate is held here, and the key is found by
     /// <see cref="Id"/>, not by this handle.
     /// </remarks>
-    /// <exception cref="ObjectDisposedException">The certificate has been disposed, or already destroyed.</exception>
+    /// <exception cref="ObjectDisposedException">The certificate has been disposed, or already destroyed, or the certificate object is private and the login it was found or made under has ended.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
     public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_destroyed)
             throw DestroyedObject.Exception(nameof(Pkcs11Certificate));
+
+        // A private certificate object's handle is refused once its login has ended; checked under the session's
+        // lease, so no logout lands before the call.
+        using var lease = _session.Core.AcquireExclusive();
+        PrivateObjectLogin.ThrowIfEnded(IsPrivate, _loginStamp, _session.Core.LoginRecord, nameof(Pkcs11Certificate));
         _session.Core.DestroyObject(_handle);
         _destroyed = true;
     }

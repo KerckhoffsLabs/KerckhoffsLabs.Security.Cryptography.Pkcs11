@@ -15,6 +15,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// The view holds a non-owning handle into the session; the session must outlive it.
 /// </para>
 /// <para>
+/// A private object (<c>CKA_PRIVATE</c>) is tied to the token login it was found or made under: once that login
+/// ends, PKCS#11 invalidates its handle for good, and <see cref="GetValue"/> and <see cref="Destroy"/> throw
+/// <see cref="ObjectDisposedException"/>. Public objects are unaffected.
+/// </para>
+/// <para>
 /// <b>Disposal never destroys token state.</b> <c>Dispose</c> releases the managed wrapper (and any
 /// session or library this instance owns); <c>Destroy</c> is the only member that calls
 /// <c>C_DestroyObject</c>. The two are kept apart deliberately: whether a handle refers to a
@@ -31,17 +36,29 @@ public sealed class Pkcs11Object : IDisposable
     private readonly Pkcs11Session _session;
     private readonly ObjectHandle _handle;
     private readonly byte[] _id;
+    private readonly LoginStamp _loginStamp;
     private bool _disposed;
     private bool _destroyed;
 
-    internal Pkcs11Object(Pkcs11Session session, ObjectHandle handle, CKO objectClass, string? label, byte[] id)
+    internal Pkcs11Object(Pkcs11Session session, ObjectHandle handle, CKO objectClass, string? label, byte[] id,
+        bool isPrivate = false, LoginStamp loginStamp = default)
     {
         _session = session;
         _handle = handle;
         ObjectClass = objectClass;
         Label = label;
         _id = id ?? [];
+        IsPrivate = isPrivate;
+        _loginStamp = loginStamp;
     }
+
+    /// <summary>
+    /// Whether the object is private (<c>CKA_PRIVATE</c>): usable only while the login it was found or made under lasts.
+    /// </summary>
+    internal bool IsPrivate { get; }
+
+    /// <summary>The generation of the token login this object was found or made under (see <see cref="LoginStamp"/>).</summary>
+    internal long LoginGeneration => _loginStamp.Generation;
 
     /// <summary>The object's <c>CKA_CLASS</c> (e.g. <see cref="CKO.CKO_CERTIFICATE"/>, <see cref="CKO.CKO_DATA"/>).</summary>
     public CKO ObjectClass { get; }
@@ -60,10 +77,10 @@ public sealed class Pkcs11Object : IDisposable
     /// object, or the payload for a data object.
     /// </summary>
     /// <exception cref="Pkcs11Exception"><c>CKA_VALUE</c> is sensitive or unreadable.</exception>
-    /// <exception cref="ObjectDisposedException">The view has been disposed, or its object destroyed by <see cref="Destroy"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The view has been disposed, or its object destroyed by <see cref="Destroy"/>, or the object is private and the login it was found or made under has ended.</exception>
     public byte[] GetValue()
     {
-        ThrowIfUnusable();
+        using var use = Use();
         using var attrs = _session.Core.GetAttributeValue(_handle, [CKA.CKA_VALUE]);
         if (attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
@@ -84,20 +101,35 @@ public sealed class Pkcs11Object : IDisposable
     /// must not send it again. Another view over the same object cannot learn of the destroy.
     /// </para>
     /// </remarks>
-    /// <exception cref="ObjectDisposedException">The view has been disposed, or its object already destroyed.</exception>
+    /// <exception cref="ObjectDisposedException">The view has been disposed, or its object already destroyed, or the object is private and the login it was found or made under has ended.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
     public void Destroy()
     {
-        ThrowIfUnusable();
+        using var use = Use();
         _session.Core.DestroyObject(_handle);
         _destroyed = true;
     }
 
-    private void ThrowIfUnusable()
+    // The guard on every member that sends the handle: refuses a disposed view, a destroyed object, and a private
+    // object whose login has ended (see PrivateObjectLogin), that last under the session's lease, which the caller
+    // holds through its native calls so no logout lands in between.
+    private Pkcs11SessionCore.ExclusiveLease Use([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_destroyed)
             throw DestroyedObject.Exception(nameof(Pkcs11Object));
+
+        Pkcs11SessionCore.ExclusiveLease lease = _session.Core.AcquireExclusive(caller);
+        try
+        {
+            PrivateObjectLogin.ThrowIfEnded(IsPrivate, _loginStamp, _session.Core.LoginRecord, nameof(Pkcs11Object));
+            return lease;
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
     }
 
     /// <summary>

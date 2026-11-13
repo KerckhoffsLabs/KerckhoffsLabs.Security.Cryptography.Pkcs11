@@ -98,4 +98,15 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     /// <returns>The typed exception to throw.</returns>
     internal static Pkcs11Exception Create(CKR returnValue, string method)
         => ExceptionMapper.Map(returnValue, method);
+
+    /// <summary>
+    /// Builds the typed <see cref="Pkcs11Exception"/> subclass for <paramref name="returnValue"/> with a message of
+    /// the caller's: for a call refused before the module, with the code the module would have answered.
+    /// </summary>
+    /// <param name="returnValue">The PKCS#11 return value the module would have answered.</param>
+    /// <param name="method">Name of the PKCS#11 method that was refused.</param>
+    /// <param name="message">The message; must carry no secret.</param>
+    /// <returns>The typed exception to throw.</returns>
+    internal static Pkcs11Exception Create(CKR returnValue, string method, string message)
+        => ExceptionMapper.Map(returnValue, method, message);
 }

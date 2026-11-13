@@ -69,6 +69,8 @@ public sealed class Pkcs11Login : IDisposable
     /// <returns>The open session; the caller disposes it. Disposing it closes it and never logs out.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    /// <exception cref="Pkcs11SessionException">A read-only session under a Security Officer login
+    /// (<c>CKR_SESSION_READ_WRITE_SO_EXISTS</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
     public Pkcs11Session OpenSession(SessionAccess access = SessionAccess.ReadWrite, ICryptoPolicy? policy = null)
     {

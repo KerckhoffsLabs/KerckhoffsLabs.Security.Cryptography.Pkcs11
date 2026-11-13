@@ -113,6 +113,17 @@ internal sealed partial class Pkcs11SessionCore
     }
 
     /// <summary>
+    /// Reads an object's <c>CKA_PRIVATE</c> in one <c>C_GetAttributeValue</c> call, or <see langword="null"/> when the
+    /// token does not answer it cleanly.
+    /// </summary>
+    internal bool? TryReadPrivate(ObjectHandle objectHandle)
+    {
+        using var _ = AcquireExclusive();
+
+        return ObjectIdentityReader.TryReadPrivate(_pkcs11Library, _sessionId, (NativeCULong)objectHandle.ObjectId);
+    }
+
+    /// <summary>
     /// The most attributes a read lays out on the stack: the template and the two arrays that record
     /// what was allocated for it. A longer read puts them on the heap, so no caller can exhaust the
     /// stack by asking for many attributes.

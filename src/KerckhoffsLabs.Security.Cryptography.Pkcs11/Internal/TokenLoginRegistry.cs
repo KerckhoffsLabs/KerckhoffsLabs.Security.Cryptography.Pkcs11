@@ -45,7 +45,7 @@ internal sealed class TokenLoginRegistry
         lock (_lock)
         {
             if (!_records.TryGetValue((ulong)slotId, out TokenLoginRecord? record))
-                _records[(ulong)slotId] = record = new TokenLoginRecord(slotId);
+                _records[(ulong)slotId] = record = new TokenLoginRecord(slotId, this);
             return record;
         }
     }
