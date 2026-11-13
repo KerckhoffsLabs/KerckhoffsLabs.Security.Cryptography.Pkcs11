@@ -2233,3 +2233,11 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.Login(KerckhoffsLabs.Secu
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.LoginUser(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user, KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! pin, string! username) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.LoginWithPinpad(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.OpenSession(KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess access = KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess.ReadOnly, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication.FromPin(System.Func<KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!, KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin!>! pinFor) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication.Pinpad.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.AlwaysAuthenticate.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.ContextAuthentication.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.ContextAuthentication.set -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.ContextAuthentication.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.ContextAuthentication.set -> void

@@ -155,6 +155,82 @@ internal sealed partial class Pkcs11SessionCore
         ThrowIfError(rv, OpLogin);
     }
 
+    // -----------------------------------------------------------------------
+    // Context-specific login (CKA_ALWAYS_AUTHENTICATE) — sent by this session, inside one of its operations
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// The source to authenticate an operation with <paramref name="key"/> by, read before its <c>C_*Init</c>:
+    /// <see langword="null"/> when the key has no <c>CKA_ALWAYS_AUTHENTICATE</c> (or no key is known, a call by
+    /// handle), the session's <see cref="ContextAuthentication"/> otherwise. Read once, so a source set on another
+    /// thread meanwhile does not change an operation halfway. The caller holds the lease.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The key needs a context login and the session has no source: refused before the module, which would let the
+    /// operation start and answer <c>CKR_USER_NOT_LOGGED_IN</c> only at its end.
+    /// </exception>
+    private ContextAuthentication? ContextAuthenticationFor(Pkcs11Key? key)
+    {
+        if (key is null || !key.NeedsContextLogin)
+            return null;
+        return ContextAuthentication ?? throw new InvalidOperationException(
+            "This key has CKA_ALWAYS_AUTHENTICATE, so the token wants the PIN again for each use, and its session has " +
+            "no ContextAuthentication. Set Pkcs11Session.ContextAuthentication, or Pkcs11Login.ContextAuthentication " +
+            "before opening the session, to ContextAuthentication.FromPin(...) or ContextAuthentication.Pinpad.");
+    }
+
+    /// <summary>
+    /// Re-authenticates the operation just begun with <paramref name="key"/> (<c>C_Login(CKU_CONTEXT_SPECIFIC)</c>,
+    /// PKCS#11 v3.2 private_key_objects.md), with a PIN from <paramref name="source"/>: called after a successful
+    /// <c>C_*Init</c> and before the operation, under the same lease. Nothing when <paramref name="source"/> is
+    /// <see langword="null"/> (<see cref="ContextAuthenticationFor"/> found the key needs none).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Not a token login: no gate, no holder, no anchor; it is sent on this session and authenticates only the
+    /// operation in progress. The PIN the caller's code returns is disposed as soon as it has been sent.
+    /// </para>
+    /// <para>
+    /// On any failure the operation is left active (a wrong PIN leaves it "as if no login happened"), so the caller's
+    /// <see cref="OperationScope"/> cancels it while this exception unwinds. <c>CKR_PIN_LOCKED</c> also logged the
+    /// user out of the token (rule 7), so it ends the token login (<see cref="TokenLoginRecord.MarkEnded"/>, which does
+    /// not take the gate this operation holds). No other code ends it: <c>CKR_PIN_INCORRECT</c> and the rest only
+    /// propagate.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The caller's PIN callback returned no PIN.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_Login</c>.</exception>
+    private void AuthenticateContext(ContextAuthentication? source, Pkcs11Key? key)
+    {
+        if (source is null || key is null)
+            return;
+
+        if (source.IsPinpad)
+        {
+            Log.LoggingInProtectedPath(_logger, CKU.CKU_CONTEXT_SPECIFIC, (ulong)_sessionId);
+            SendContextLogin(default);
+            return;
+        }
+
+        SecurePin pin;
+        // Caller code, run on the library's behalf: nothing it does on this thread is the library's own read-back.
+        using (CallOutScope.Enter())
+            pin = source.PinFor(key);
+        using (pin)
+        {
+            Log.LoggingIn(_logger, CKU.CKU_CONTEXT_SPECIFIC, (ulong)_sessionId);
+            SendContextLogin(pin.Pin);
+        }
+    }
+
+    private void SendContextLogin(ReadOnlySpan<byte> pin)
+    {
+        CKR rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pin);
+        if (rv == CKR.CKR_PIN_LOCKED)
+            _record.MarkEnded(rv);
+        ThrowIfError(rv, OpLogin);
+    }
+
     /// <summary>
     /// Sends <c>C_LoginUser</c> (PKCS#11 v3.0) on this session: a user type plus a username, for tokens
     /// with named user accounts. Meant for the login record's anchor session, as <see cref="SendLogin"/> is.

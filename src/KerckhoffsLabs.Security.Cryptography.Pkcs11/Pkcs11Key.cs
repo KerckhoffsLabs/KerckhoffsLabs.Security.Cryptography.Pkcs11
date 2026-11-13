@@ -153,6 +153,66 @@ public sealed partial class Pkcs11Key : IDisposable
         }
     }
 
+    /// <summary>
+    /// Whether the token wants the PIN again for each use of this key: <c>CKA_ALWAYS_AUTHENTICATE</c> on its private
+    /// key (PKCS#11 v3.2 private_key_objects.md). Read once, on first access or first sign or decrypt, and cached.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see langword="false"/> for a secret key or a key with no private half (the attribute exists only on private
+    /// keys, so neither is read), and when the token does not report the attribute or it cannot be read.
+    /// </para>
+    /// <para>
+    /// When <see langword="true"/>, every sign and decrypt with the key re-authenticates inside the operation with
+    /// the PIN from its session's <see cref="Pkcs11Session.ContextAuthentication"/>, and is refused before it starts
+    /// when that is <see langword="null"/>. See <see cref="ContextAuthentication"/>.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">The key is disposed or destroyed, or, on the first read, the login its private key was found under has ended.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetAttributeValue</c> call; nothing is cached then.</exception>
+    public bool AlwaysAuthenticate
+    {
+        get
+        {
+            ThrowIfUnusable();
+            if (Volatile.Read(ref _alwaysAuthenticate) is var known && known != AlwaysAuthenticateNotRead)
+                return known == 1;
+            using var use = Use();
+            return NeedsContextLogin;
+        }
+    }
+
+    private const int AlwaysAuthenticateNotRead = -1;
+    private int _alwaysAuthenticate = AlwaysAuthenticateNotRead;
+
+    /// <summary>
+    /// <see cref="AlwaysAuthenticate"/>, for the session core, which holds the lease: read on the private half through
+    /// <see cref="PrivateHandle"/>, so a private key whose login has ended is refused here as everywhere else.
+    /// </summary>
+    internal bool NeedsContextLogin
+    {
+        get
+        {
+            int known = Volatile.Read(ref _alwaysAuthenticate);
+            if (known != AlwaysAuthenticateNotRead)
+                return known == 1;
+            bool value = ReadAlwaysAuthenticate();
+            Volatile.Write(ref _alwaysAuthenticate, value ? 1 : 0);
+            return value;
+        }
+    }
+
+    private bool ReadAlwaysAuthenticate()
+    {
+        if (!IsAsymmetricKeyType(_keyType))
+            return false;
+        ObjectHandle handle = PrivateHandle;
+        if (handle.IsInvalid)
+            return false;
+        using var attrs = _session.Core.GetAttributeValue(handle, [CKA.CKA_ALWAYS_AUTHENTICATE]);
+        return Decode(attrs[0], static a => a.GetValueAsBool(), false);
+    }
+
     private const int KeySizeNotRead = -1;
     private const int KeySizeUnknown = 0;
     private int _keySizeBits = KeySizeNotRead;
@@ -697,7 +757,7 @@ public sealed partial class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Sign (no private handle)");
 
-        return _session.Core.Sign(mechanism, PrivateHandle, data);
+        return _session.Core.Sign(mechanism, PrivateHandle, data, this);
     }
 
     /// <summary>
@@ -769,7 +829,7 @@ public sealed partial class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.SignPkcs1Digest (no private handle)");
 
-        return _session.Core.SignPkcs1Digest(hash, PrivateHandle, digest);
+        return _session.Core.SignPkcs1Digest(hash, PrivateHandle, digest, this);
     }
 
     /// <summary>
@@ -847,7 +907,7 @@ public sealed partial class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Decrypt (no private handle)");
 
-        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext, RsaCiphertextCheckFor(mechanism));
+        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext, RsaCiphertextCheckFor(mechanism), this);
     }
 
     /// <summary>
@@ -919,7 +979,7 @@ public sealed partial class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.MessageDecrypt (no private handle)");
 
-        return _session.Core.MessageDecrypt(mechanism, PrivateHandle, messageParams, associatedData, ciphertext);
+        return _session.Core.MessageDecrypt(mechanism, PrivateHandle, messageParams, associatedData, ciphertext, this);
     }
 
     /// <summary>

@@ -51,6 +51,25 @@ public sealed class Pkcs11Login : IDisposable
     public string? Username { get; }
 
     /// <summary>
+    /// Where the sessions this login opens from now on get the PIN for keys with <c>CKA_ALWAYS_AUTHENTICATE</c>, or
+    /// <see langword="null"/> (the default) for none. Copied into each session when <see cref="OpenSession"/> opens it,
+    /// so changing it later leaves open sessions as they are; set <see cref="Pkcs11Session.ContextAuthentication"/> to
+    /// change one of those. See <see cref="Pkcs11.ContextAuthentication"/>.
+    /// </summary>
+    /// <remarks>
+    /// It belongs to this <see cref="Pkcs11Login"/> object, not to the token's login: another
+    /// <see cref="Pkcs11Login"/> for the same login has its own, so one component's PIN callback is never asked about
+    /// another's keys.
+    /// </remarks>
+    public ContextAuthentication? ContextAuthentication
+    {
+        get => Volatile.Read(ref _contextAuthentication);
+        set => Volatile.Write(ref _contextAuthentication, value);
+    }
+
+    private ContextAuthentication? _contextAuthentication;
+
+    /// <summary>
     /// Whether this hold still keeps the login: it is not disposed, its library is not disposed, and the login
     /// has not ended.
     /// </summary>
@@ -85,6 +104,7 @@ public sealed class Pkcs11Login : IDisposable
         try
         {
             Pkcs11SessionCore core = Slot.OpenSessionCore(access == SessionAccess.ReadWrite, policy);
+            core.ContextAuthentication = ContextAuthentication;
             return new Pkcs11Session(library, Slot, core, access, this, share);
         }
         catch

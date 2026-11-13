@@ -36,6 +36,20 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <summary>The login record of the slot this session was opened on, shared by every load of the module.</summary>
     internal TokenLoginRecord LoginRecord => _record;
 
+    // See ContextAuthentication. A reference, so a read never tears; read once per operation, under the lease.
+    private volatile ContextAuthentication? _contextAuthentication;
+
+    /// <summary>
+    /// Where this session's keys with <c>CKA_ALWAYS_AUTHENTICATE</c> get their PIN, or <see langword="null"/> for
+    /// none (such a key is then refused before <c>C_*Init</c>). Set from the <see cref="Pkcs11Login"/> that opened the
+    /// session, or by the caller.
+    /// </summary>
+    internal ContextAuthentication? ContextAuthentication
+    {
+        get => _contextAuthentication;
+        set => _contextAuthentication = value;
+    }
+
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>

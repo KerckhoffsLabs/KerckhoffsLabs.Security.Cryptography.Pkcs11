@@ -62,6 +62,31 @@ public sealed partial class Pkcs11Session : IDisposable
     /// </summary>
     public Pkcs11Login? Login { get; }
 
+    /// <summary>
+    /// Where this session's keys with <c>CKA_ALWAYS_AUTHENTICATE</c> (<see cref="Pkcs11Key.AlwaysAuthenticate"/>) get
+    /// the PIN the token wants again for each sign or decrypt, or <see langword="null"/> for none, in which case such a
+    /// key is refused before the operation starts. See <see cref="Pkcs11.ContextAuthentication"/>.
+    /// </summary>
+    /// <remarks>
+    /// A session from <see cref="Pkcs11Login.OpenSession"/> starts with that login's
+    /// <see cref="Pkcs11Login.ContextAuthentication"/>, copied when it opens; one from
+    /// <see cref="Pkcs11Slot.OpenSession"/> starts with none. Setting it affects the operations that start afterwards.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">The session is disposed.</exception>
+    public ContextAuthentication? ContextAuthentication
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _core.ContextAuthentication;
+        }
+        set
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _core.ContextAuthentication = value;
+        }
+    }
+
     /// <summary>The library that hosts this session. The session does not own the library.</summary>
     public Pkcs11Library Library { get; }
 

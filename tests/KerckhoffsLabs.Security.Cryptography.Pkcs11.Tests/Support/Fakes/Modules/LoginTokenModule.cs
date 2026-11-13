@@ -30,6 +30,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Module
 /// would, until the session is closed.
 /// </para>
 /// <para>
+/// Sign and decrypt operations are tracked per session, as PKCS#11 v3.2 requires: a second <c>C_SignInit</c> or
+/// <c>C_DecryptInit</c> while one is active answers <c>CKR_OPERATION_ACTIVE</c>, and <c>C_SessionCancel</c> ends
+/// them. A private key with <c>CKA_ALWAYS_AUTHENTICATE</c> true (private_key_objects.md) needs a
+/// <c>C_Login(CKU_CONTEXT_SPECIFIC)</c> with <see cref="ExpectedPin"/> (or a NULL PIN, the pinpad) after its
+/// <c>C_*Init</c>, else <c>C_Sign</c> and <c>C_Decrypt</c> answer <c>CKR_USER_NOT_LOGGED_IN</c>. A wrong PIN
+/// answers <c>CKR_PIN_INCORRECT</c> and leaves the operation as it was; the <see cref="LockAfter"/>-th wrong one in a
+/// row answers <c>CKR_PIN_LOCKED</c> and logs the application out. A context login with no such operation answers
+/// <c>CKR_OPERATION_NOT_INITIALIZED</c>. <see cref="CallLog"/> records the order of these calls.
+/// </para>
+/// <para>
 /// State is guarded by one lock, so tests may call from several threads.
 /// </para>
 /// </remarks>
@@ -54,6 +64,52 @@ internal sealed class LoginTokenModule : FakeModule
     private readonly Dictionary<ulong, Queue<ulong>> _finds = [];
     private readonly Dictionary<ulong, CKR> _failing = [];
     private ulong _nextObject = 0x100;
+    private readonly Dictionary<(ulong Session, ulong Kind), ActiveOperation> _operations = [];
+    private readonly List<string> _callLog = [];
+    private readonly List<byte[]> _contextPins = [];
+    private int _wrongContextPins;
+
+    // An operation begun by C_SignInit or C_DecryptInit, and whether its key needs, and has had, a context login.
+    private sealed class ActiveOperation(bool alwaysAuthenticate)
+    {
+        public bool AlwaysAuthenticate { get; } = alwaysAuthenticate;
+        public bool Authenticated { get; set; }
+    }
+
+    /// <summary>The <c>C_Login(CKU_CONTEXT_SPECIFIC)</c> entry of <see cref="CallLog"/>.</summary>
+    public const string ContextLogin = "C_Login(CKU_CONTEXT_SPECIFIC)";
+
+    /// <summary>
+    /// The sign and decrypt calls, in order: <c>C_SignInit</c>, <c>C_Sign</c>, <c>C_DecryptInit</c>,
+    /// <c>C_Decrypt</c>, <see cref="ContextLogin"/> and <c>C_SessionCancel</c>.
+    /// </summary>
+    public IReadOnlyList<string> CallLog
+    {
+        get { lock (_lock) return [.. _callLog]; }
+    }
+
+    /// <summary>Empties <see cref="CallLog"/>.</summary>
+    public void ClearCallLog()
+    {
+        lock (_lock)
+            _callLog.Clear();
+    }
+
+    /// <summary>The PIN of every context login that reached an operation, in order; empty for a pinpad (NULL) one.</summary>
+    public IReadOnlyList<byte[]> ContextPins
+    {
+        get { lock (_lock) return [.. _contextPins]; }
+    }
+
+    /// <summary>How many wrong context-login PINs in a row lock the PIN (<c>CKR_PIN_LOCKED</c>).</summary>
+    public int LockAfter { get; set; } = 3;
+
+    /// <summary>Whether a sign or decrypt operation is active on <paramref name="session"/>.</summary>
+    public bool HasActiveOperation(ulong session)
+    {
+        lock (_lock)
+            return _operations.Keys.Any(k => k.Session == session);
+    }
 
     /// <summary>The PIN <c>C_Login</c> accepts, for every user type; anything else is <c>CKR_PIN_INCORRECT</c>.</summary>
     public byte[] ExpectedPin { get; set; } = "1234"u8.ToArray();
@@ -206,6 +262,7 @@ internal sealed class LoginTokenModule : FakeModule
             _sessions.RemoveAt(index);
             _failing.Remove((ulong)session);
             _finds.Remove((ulong)session);
+            EndOperationsLocked((ulong)session, CKF.CKF_SIGN | CKF.CKF_DECRYPT);
 
             // Closing the last session returns the application to public sessions.
             if (_sessions.Count == 0)
@@ -220,6 +277,8 @@ internal sealed class LoginTokenModule : FakeModule
         lock (_lock)
         {
             _loginCalls++;
+            if ((CKU)(ulong)userType == CKU.CKU_CONTEXT_SPECIFIC)
+                _callLog.Add(ContextLogin);
             if (_failing.TryGetValue((ulong)session, out CKR failure))
                 return failure;
             return LoginLocked(session, (CKU)(ulong)userType, pin, username: null);
@@ -306,7 +365,8 @@ internal sealed class LoginTokenModule : FakeModule
 
     // Any mechanism; any key the token does not know (the tests that sign with a made-up handle), but not an
     // object it knows and the session cannot see.
-    protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => InitOn(session, key);
+    protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
+        => BeginOperation(session, key, CKF.CKF_SIGN, "C_SignInit");
 
     // Verify, encrypt and decrypt accept any mechanism and key, like sign: every signature verifies, and the
     // ciphers copy their input.
@@ -323,10 +383,105 @@ internal sealed class LoginTokenModule : FakeModule
     protected override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> encryptedData, ref NativeCULong encryptedDataLen)
         => Copy(session, data, encryptedData, ref encryptedDataLen);
 
-    protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => InitOn(session, key);
+    protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
+        => BeginOperation(session, key, CKF.CKF_DECRYPT, "C_DecryptInit");
 
     protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
-        => Copy(session, encryptedData, data, ref dataLen);
+    {
+        lock (_lock)
+        {
+            _callLog.Add("C_Decrypt");
+            CKR rv = UseOperationLocked((ulong)session, CKF.CKF_DECRYPT);
+            if (rv != CKR.CKR_OK)
+                return rv;
+            rv = Copy(session, encryptedData, data, ref dataLen);
+            // A length query or CKR_BUFFER_TOO_SMALL leaves the operation active; anything else ends it (5.2).
+            if (!(rv == CKR.CKR_BUFFER_TOO_SMALL || (rv == CKR.CKR_OK && data.IsNull)))
+                EndOperationsLocked((ulong)session, CKF.CKF_DECRYPT);
+            return rv;
+        }
+    }
+
+    protected override CKR C_SessionCancel(NativeCULong session, NativeCULong flags)
+    {
+        lock (_lock)
+        {
+            _callLog.Add("C_SessionCancel");
+            if (!IsOpen(session))
+                return CKR.CKR_SESSION_HANDLE_INVALID;
+            return EndOperationsLocked((ulong)session, (ulong)flags) ? CKR.CKR_OK : CKR.CKR_OPERATION_NOT_INITIALIZED;
+        }
+    }
+
+    private CKR BeginOperation(NativeCULong session, NativeCULong key, ulong kind, string function)
+    {
+        lock (_lock)
+        {
+            _callLog.Add(function);
+            CKR rv = InitOn(session, key);
+            if (rv != CKR.CKR_OK)
+                return rv;
+            if (_operations.ContainsKey(((ulong)session, kind)))
+                return CKR.CKR_OPERATION_ACTIVE;
+            bool alwaysAuthenticate = _objects.TryGetValue((ulong)key, out Dictionary<CKA, byte[]>? attributes)
+                && attributes.TryGetValue(CKA.CKA_ALWAYS_AUTHENTICATE, out byte[]? value) && value is [not 0, ..];
+            _operations[((ulong)session, kind)] = new ActiveOperation(alwaysAuthenticate);
+            return CKR.CKR_OK;
+        }
+    }
+
+    // The operation a C_Sign or C_Decrypt continues: none is CKR_OPERATION_NOT_INITIALIZED, and one whose key needs a
+    // context login that has not happened is CKR_USER_NOT_LOGGED_IN, which ends it (5.2).
+    private CKR UseOperationLocked(ulong session, ulong kind)
+    {
+        if (!_operations.TryGetValue((session, kind), out ActiveOperation? operation))
+            return CKR.CKR_OPERATION_NOT_INITIALIZED;
+        if (operation.AlwaysAuthenticate && !operation.Authenticated)
+        {
+            _operations.Remove((session, kind));
+            return CKR.CKR_USER_NOT_LOGGED_IN;
+        }
+        return CKR.CKR_OK;
+    }
+
+    // Ends the operations of the kinds in flags on session; whether there was any.
+    private bool EndOperationsLocked(ulong session, ulong flags)
+    {
+        bool any = false;
+        foreach (ulong kind in new[] { CKF.CKF_SIGN, CKF.CKF_DECRYPT })
+        {
+            if ((flags & kind) != 0)
+                any |= _operations.Remove((session, kind));
+        }
+        return any;
+    }
+
+    // PKCS#11 v3.2 C_Login with CKU_CONTEXT_SPECIFIC: only for an active operation whose key has
+    // CKA_ALWAYS_AUTHENTICATE, else CKR_OPERATION_NOT_INITIALIZED with the operation untouched.
+    private CKR ContextLoginLocked(ulong session, ReadOnlySpan<byte> pin)
+    {
+        ActiveOperation? operation = _operations
+            .Where(o => o.Key.Session == session && o.Value.AlwaysAuthenticate)
+            .Select(o => o.Value)
+            .FirstOrDefault();
+        if (operation is null)
+            return CKR.CKR_OPERATION_NOT_INITIALIZED;
+        _contextPins.Add(pin.ToArray());
+
+        // An empty PIN is the protected authentication path: the device accepts it.
+        if (!pin.IsEmpty && !pin.SequenceEqual(ExpectedPin))
+        {
+            if (++_wrongContextPins < LockAfter)
+                return CKR.CKR_PIN_INCORRECT;
+            // A locked PIN also logs the user out (private_key_objects.md), which ends this operation too.
+            LogOutLocked();
+            EndOperationsLocked(session, CKF.CKF_SIGN | CKF.CKF_DECRYPT);
+            return CKR.CKR_PIN_LOCKED;
+        }
+        _wrongContextPins = 0;
+        operation.Authenticated = true;
+        return CKR.CKR_OK;
+    }
 
     private CKR InitOn(NativeCULong session, NativeCULong key)
     {
@@ -473,8 +628,12 @@ internal sealed class LoginTokenModule : FakeModule
             DuringSign?.Invoke();
         lock (_lock)
         {
+            _callLog.Add("C_Sign");
             if (!IsOpen(session))
                 return CKR.CKR_SESSION_HANDLE_INVALID;
+            CKR rv = UseOperationLocked((ulong)session, CKF.CKF_SIGN);
+            if (rv != CKR.CKR_OK)
+                return rv;
             if (!signature.IsNull)
             {
                 if (signature.Span.Length < SignatureLength)
@@ -483,6 +642,7 @@ internal sealed class LoginTokenModule : FakeModule
                     return CKR.CKR_BUFFER_TOO_SMALL;
                 }
                 signature.Span[..SignatureLength].Fill(0x5A);
+                EndOperationsLocked((ulong)session, CKF.CKF_SIGN);
             }
             signatureLen = (NativeCULong)(ulong)SignatureLength;
             return CKR.CKR_OK;
@@ -520,7 +680,7 @@ internal sealed class LoginTokenModule : FakeModule
         if (!IsOpen(session))
             return CKR.CKR_SESSION_HANDLE_INVALID;
         if (userType == CKU.CKU_CONTEXT_SPECIFIC)
-            return CKR.CKR_OPERATION_NOT_INITIALIZED; // this fake starts no operations
+            return ContextLoginLocked((ulong)session, pin);
         if (userType is not (CKU.CKU_SO or CKU.CKU_USER))
             return CKR.CKR_USER_TYPE_INVALID;
         if (_loggedIn is { } held)
