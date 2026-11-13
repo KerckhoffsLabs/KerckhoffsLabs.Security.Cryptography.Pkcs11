@@ -1341,9 +1341,8 @@ internal static class ObjectConformanceTestCases
     // modulus, below every advertised minimum (CKR_KEY_SIZE_RANGE); an EC curve by an OID no curve has
     // (1.2.3.4, CKR_CURVE_NOT_SUPPORTED or CKR_ATTRIBUTE_VALUE_INVALID); and a CKA_UNIQUE_ID in the private key's
     // template only, so that a token that makes the public key first has to undo it (§4.4.1). Whatever the code,
-    // no object carries the label both templates give. Through the raw call: the library would refuse the curve
-    // itself, and retries a generation that fails with CKR_FUNCTION_FAILED. leavesAnObjectBehind records a backend
-    // that refuses the pair but keeps the key it made first.
+    // no object carries the label both templates give. Through the raw call, since the library would refuse the
+    // curve itself. leavesAnObjectBehind records a backend that refuses the pair but keeps the key it made first.
     internal static void Assert_RefusedKeyPairGeneration_LeavesNothing(IPkcs11Backend backend, string refused, bool leavesAnObjectBehind = false)
     {
         CKM mechanism = refused.StartsWith("RSA", StringComparison.Ordinal) ? CKM.CKM_RSA_PKCS_KEY_PAIR_GEN : CKM.CKM_EC_KEY_PAIR_GEN;

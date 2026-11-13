@@ -104,22 +104,11 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes);
         CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes);
 
-        NativeCULong publicKeyId;
-        NativeCULong privateKeyId;
-
-        // NSS bug 1012786: C_GenerateKeyPair (RSA in particular) can fail with CKR_FUNCTION_FAILED
-        // under a transient RNG hiccup (e.g. an interrupted read()/getentropy() syscall). PKCS#11
-        // v3.2 §11.1.1 explicitly distinguishes this from CKR_GENERAL_ERROR as retry-safe: "it is
-        // possible that an attempt to make the exact same function call again would succeed."
-        // Matches SunPKCS11's own workaround (p11_keymgmt.c, MAX_ATTEMPTS = 3) — no delay between
-        // attempts, since the failure mode is a syscall interruption, not a slow-to-clear condition.
-        const int maxAttempts = 3;
-        CKR rv;
-        int attempt = 0;
-        do
-        {
-            rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, in ckMechanism, publicKeyTemplate, privateKeyTemplate, out publicKeyId, out privateKeyId);
-        } while (rv == CKR.CKR_FUNCTION_FAILED && ++attempt < maxAttempts);
+        // One native call, never retried here. §11.1.1 says a CKR_FUNCTION_FAILED call might succeed if
+        // repeated, not that the failed one left nothing behind: a token can refuse a pair and keep the half
+        // it made first (SoftHSM2 does, ObjectConformanceTests.SoftHsm2), so each silent retry could add an
+        // orphan with the caller's label. Whether to retry, and what to clean up first, is the caller's call.
+        CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, in ckMechanism, publicKeyTemplate, privateKeyTemplate, out NativeCULong publicKeyId, out NativeCULong privateKeyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
