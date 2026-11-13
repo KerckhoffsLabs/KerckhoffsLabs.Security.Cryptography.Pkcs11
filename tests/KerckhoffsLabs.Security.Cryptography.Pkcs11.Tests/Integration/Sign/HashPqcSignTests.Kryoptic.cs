@@ -28,4 +28,12 @@ public sealed class HashPqcSignTests_Kryoptic(KryopticBackendFixture backend)
     [MemberData(nameof(HashPqcSignTestCases.ExplicitHashMlDsaPairs), MemberType = typeof(HashPqcSignTestCases))]
     public void HashMlDsa_ExplicitHash_AgreesWithCombined(CKM hash, CKM combined) =>
         HashPqcSignTestCases.Assert_HashMlDsa_ExplicitHash_AgreesWithCombined(_backend, hash, combined);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void HashMlDsa_ContextIsBound() =>
+        HashPqcSignTestCases.Assert_HashMlDsa_ContextIsBound(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void HashSlhDsa_ContextIsBound() =>
+        HashPqcSignTestCases.Assert_HashSlhDsa_ContextIsBound(_backend);
 }

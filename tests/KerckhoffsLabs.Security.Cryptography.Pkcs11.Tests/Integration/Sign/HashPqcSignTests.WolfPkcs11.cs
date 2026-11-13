@@ -28,4 +28,12 @@ public sealed class HashPqcSignTests_WolfPkcs11(WolfPkcs11BackendFixture backend
     [MemberData(nameof(HashPqcSignTestCases.ExplicitHashMlDsaPairs), MemberType = typeof(HashPqcSignTestCases))]
     public void HashMlDsa_ExplicitHash_AgreesWithCombined(CKM hash, CKM combined) =>
         HashPqcSignTestCases.Assert_HashMlDsa_ExplicitHash_AgreesWithCombined(_backend, hash, combined);
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void HashMlDsa_ContextIsBound() =>
+        HashPqcSignTestCases.Assert_HashMlDsa_ContextIsBound(_backend);
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void HashSlhDsa_ContextIsBound() =>
+        HashPqcSignTestCases.Assert_HashSlhDsa_ContextIsBound(_backend);
 }

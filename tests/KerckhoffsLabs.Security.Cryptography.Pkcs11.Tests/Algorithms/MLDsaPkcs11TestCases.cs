@@ -133,6 +133,7 @@ internal static class MLDsaPkcs11TestCases
                 byte[] contextSig = mldsa.SignData(data, context);
                 Assert.True(bcl.VerifyData(data, contextSig, context));
                 Assert.False(bcl.VerifyData(data, contextSig));
+                Assert.False(bcl.VerifyData(data, contextSig, "app-contexu"u8));
             }
         });
     }
@@ -148,8 +149,11 @@ internal static class MLDsaPkcs11TestCases
 
             byte[] sig = mldsa.SignData(data, context);
             Assert.True(mldsa.VerifyData(data, sig, context));
-            // A signature made with a context must not verify without it.
+            // A signature made with a context must not verify without it,
             Assert.False(mldsa.VerifyData(data, sig));
+            // nor under a context of the same length that differs only in its last byte: a token that dropped or
+            // truncated the context on either side would pass the check above but not this one.
+            Assert.False(mldsa.VerifyData(data, sig, "app-contexu"u8));
         });
     }
 
