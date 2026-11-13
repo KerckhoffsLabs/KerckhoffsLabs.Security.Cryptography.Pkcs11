@@ -41,6 +41,12 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId})::{Operation}: C_SessionCancel returned {Rv} during cleanup")]
     public static partial void SessionCancelFailed(ILogger logger, ulong sessionId, string operation, CKR rv);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId})::{Operation}: the module answered {Rv}, so the session is treated as closed: later calls on it fail, and no C_Logout or C_CloseSession is sent for it")]
+    public static partial void SessionClosedByModule(ILogger logger, ulong sessionId, string operation, CKR rv);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId})::{Operation}: the module answered {Rv}, so the session is treated as lost: later calls on it fail, no C_Logout is sent for it, and C_CloseSession is sent once, now")]
+    public static partial void SessionTokenLost(ILogger logger, ulong sessionId, string operation, CKR rv);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId})::FindAllObjects: C_FindObjectsFinal returned {Rv}")]
     public static partial void FindObjectsFinalFailed(ILogger logger, ulong sessionId, CKR rv);
 

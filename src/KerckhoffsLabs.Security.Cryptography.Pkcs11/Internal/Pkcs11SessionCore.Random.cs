@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 using static KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.Pkcs11Operations;
@@ -22,7 +21,7 @@ internal sealed partial class Pkcs11SessionCore
 
         // The caller's entropy goes straight to the token: no copy to zero on the way out.
         CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed);
-        Pkcs11Exception.ThrowIfError(rv, OpSeedRandom);
+        ThrowIfError(rv, OpSeedRandom);
     }
 
     /// <summary>
@@ -38,7 +37,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(seed);
 
         CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed);
-        Pkcs11Exception.ThrowIfError(rv, OpSeedRandom);
+        ThrowIfError(rv, OpSeedRandom);
     }
 
     /// <summary>
@@ -57,7 +56,7 @@ internal sealed partial class Pkcs11SessionCore
         // The token fills the caller's span directly. There is no transient array holding a second
         // copy of freshly generated key material, which is the point of passing a span you control.
         CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, destination);
-        Pkcs11Exception.ThrowIfError(rv, OpGenerateRandom);
+        ThrowIfError(rv, OpGenerateRandom);
         return destination.Length;
     }
 
@@ -77,7 +76,7 @@ internal sealed partial class Pkcs11SessionCore
 
         byte[] randomData = new byte[length];
         CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData);
-        Pkcs11Exception.ThrowIfError(rv, OpGenerateRandom);
+        ThrowIfError(rv, OpGenerateRandom);
 
         return randomData;
     }

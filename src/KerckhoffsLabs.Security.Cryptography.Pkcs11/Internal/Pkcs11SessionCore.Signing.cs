@@ -176,7 +176,7 @@ internal sealed partial class Pkcs11SessionCore
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
             rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part.AsSpan(0, bytesRead));
-            Pkcs11Exception.ThrowIfError(rv, OpVerifyUpdate);
+            ThrowIfError(rv, OpVerifyUpdate);
         }
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
@@ -252,7 +252,7 @@ internal sealed partial class Pkcs11SessionCore
         operation.Begin(CKF.CKF_VERIFY_RECOVER, rv, OpVerifyRecoverInit);
 
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, default, lengthOnly: true, out NativeCULong dataLen);
-        Pkcs11Exception.ThrowIfError(rv, OpVerifyRecover);
+        ThrowIfError(rv, OpVerifyRecover);
 
         byte[] recovered = new byte[ReportedLength.ForAllocation(dataLen, OpVerifyRecover)];
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, recovered, lengthOnly: false, out dataLen);

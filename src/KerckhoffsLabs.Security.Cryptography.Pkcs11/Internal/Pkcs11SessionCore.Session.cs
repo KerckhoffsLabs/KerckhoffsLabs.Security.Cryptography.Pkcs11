@@ -27,7 +27,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin");
 
         CKR rv = _pkcs11Library.C_InitPIN(_sessionId, userPin.Pin);
-        Pkcs11Exception.ThrowIfError(rv, OpInitPIN);
+        ThrowIfError(rv, OpInitPIN);
     }
 
     /// <summary>
@@ -43,7 +43,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin (protected authentication path)");
 
         CKR rv = _pkcs11Library.C_InitPIN(_sessionId, default);
-        Pkcs11Exception.ThrowIfError(rv, OpInitPIN);
+        ThrowIfError(rv, OpInitPIN);
     }
 
     // -----------------------------------------------------------------------
@@ -65,7 +65,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin");
 
         CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldPin.Pin, newPin.Pin);
-        Pkcs11Exception.ThrowIfError(rv, OpSetPIN);
+        ThrowIfError(rv, OpSetPIN);
     }
 
     /// <summary>
@@ -82,7 +82,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin (protected authentication path)");
 
         CKR rv = _pkcs11Library.C_SetPIN(_sessionId, default, default);
-        Pkcs11Exception.ThrowIfError(rv, OpSetPIN);
+        ThrowIfError(rv, OpSetPIN);
     }
 
     /// <summary>
@@ -96,7 +96,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetSessionInfo");
 
         CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out CK_SESSION_INFO sessionInfo);
-        Pkcs11Exception.ThrowIfError(rv, OpGetSessionInfo);
+        ThrowIfError(rv, OpGetSessionInfo);
 
         return new SessionInfo(_sessionId, sessionInfo);
     }
@@ -132,7 +132,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpSetOperationState);
+        ThrowIfError(rv, OpSetOperationState);
     }
 
     // -----------------------------------------------------------------------
@@ -155,7 +155,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.LoggingIn(_logger, userType, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
-        Pkcs11Exception.ThrowIfError(rv, OpLogin);
+        ThrowIfError(rv, OpLogin);
     }
 
     /// <summary>
@@ -174,7 +174,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, default);
-        Pkcs11Exception.ThrowIfError(rv, OpLogin);
+        ThrowIfError(rv, OpLogin);
     }
 
     /// <summary>
@@ -206,7 +206,7 @@ internal sealed partial class Pkcs11SessionCore
         try
         {
             CKR rv = _pkcs11Library.C_LoginUser(_sessionId, userType, pin.Pin, usernameBytes);
-            Pkcs11Exception.ThrowIfError(rv, OpLoginUser);
+            ThrowIfError(rv, OpLoginUser);
         }
         finally
         {

@@ -41,7 +41,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, in ckMechanism, template, out NativeCULong keyId);
-        Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
+        ThrowIfError(rv, OpGenerateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -109,7 +109,7 @@ internal sealed partial class Pkcs11SessionCore
         // it made first (SoftHSM2 does, ObjectConformanceTests.SoftHsm2), so each silent retry could add an
         // orphan with the caller's label. Whether to retry, and what to clean up first, is the caller's call.
         CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, in ckMechanism, publicKeyTemplate, privateKeyTemplate, out NativeCULong publicKeyId, out NativeCULong privateKeyId);
-        Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
+        ThrowIfError(rv, OpGenerateKeyPair);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(publicKeyAttributes);
@@ -185,7 +185,7 @@ internal sealed partial class Pkcs11SessionCore
 
         byte[] buffer = new byte[wrappedLen];
         CKR rv = _pkcs11Library.C_WrapKey(_sessionId, in ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, lengthOnly: false, out NativeCULong len);
-        Pkcs11Exception.ThrowIfError(rv, OpWrapKey);
+        ThrowIfError(rv, OpWrapKey);
 
         return ReportedLength.Trim(buffer, len, OpWrapKey);
     }
@@ -234,7 +234,7 @@ internal sealed partial class Pkcs11SessionCore
         checkInput?.Invoke(wrappedKey);
 
         CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, in ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, out NativeCULong unwrappedKey);
-        Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
+        ThrowIfError(rv, OpUnwrapKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -427,7 +427,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, in ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, out NativeCULong derivedKey);
-        Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
+        ThrowIfError(rv, OpDeriveKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);

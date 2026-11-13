@@ -28,7 +28,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, out NativeCULong objectId);
-        Pkcs11Exception.ThrowIfError(rv, OpCreateObject);
+        ThrowIfError(rv, OpCreateObject);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -56,7 +56,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, out NativeCULong objectId);
-        Pkcs11Exception.ThrowIfError(rv, OpCopyObject);
+        ThrowIfError(rv, OpCopyObject);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -76,7 +76,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpDestroyObject);
+        ThrowIfError(rv, OpDestroyObject);
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         CKR rv = _pkcs11Library.C_GetObjectSize(_sessionId, (NativeCULong)(objectHandle.ObjectId), out NativeCULong objectSize);
-        Pkcs11Exception.ThrowIfError(rv, OpGetObjectSize);
+        ThrowIfError(rv, OpGetObjectSize);
 
         return (ulong)(objectSize);
     }
@@ -238,7 +238,7 @@ internal sealed partial class Pkcs11SessionCore
     {
         CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template);
         if (IsGetAttributeValueFatal(rv))
-            Pkcs11Exception.ThrowIfError(rv, OpGetAttributeValue);
+            ThrowIfError(rv, OpGetAttributeValue);
     }
 
     /// <summary>
@@ -509,7 +509,7 @@ internal sealed partial class Pkcs11SessionCore
             template[i] = attributes[i].CkAttribute;
 
         CKR rv = _pkcs11Library.C_SetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template);
-        Pkcs11Exception.ThrowIfError(rv, OpSetAttributeValue);
+        ThrowIfError(rv, OpSetAttributeValue);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -528,7 +528,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template);
-        Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
+        ThrowIfError(rv, OpFindObjectsInit);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -549,7 +549,7 @@ internal sealed partial class Pkcs11SessionCore
 
         NativeCULong[] objects = new NativeCULong[objectCount];
         CKR rv = _pkcs11Library.C_FindObjects(_sessionId, objects, out NativeCULong foundObjectsCount);
-        Pkcs11Exception.ThrowIfError(rv, OpFindObjects);
+        ThrowIfError(rv, OpFindObjects);
 
         int found = ReportedLength.Written(foundObjectsCount, objects.Length, OpFindObjects);
         for (int i = 0; i < found; i++)
@@ -568,7 +568,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjectsFinal");
 
         CKR rv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
-        Pkcs11Exception.ThrowIfError(rv, OpFindObjectsFinal);
+        ThrowIfError(rv, OpFindObjectsFinal);
     }
 
     /// <summary>
@@ -587,7 +587,7 @@ internal sealed partial class Pkcs11SessionCore
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template);
-        Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
+        ThrowIfError(rv, OpFindObjectsInit);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -599,7 +599,7 @@ internal sealed partial class Pkcs11SessionCore
             do
             {
                 rv = _pkcs11Library.C_FindObjects(_sessionId, objects, out NativeCULong objectCount);
-                Pkcs11Exception.ThrowIfError(rv, OpFindObjects);
+                ThrowIfError(rv, OpFindObjects);
 
                 found = ReportedLength.Written(objectCount, objects.Length, OpFindObjects);
                 for (int i = 0; i < found; i++)
