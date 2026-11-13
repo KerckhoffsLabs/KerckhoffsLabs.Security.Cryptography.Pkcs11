@@ -136,62 +136,49 @@ internal sealed partial class Pkcs11SessionCore
     }
 
     // -----------------------------------------------------------------------
-    // Login — SecurePin overload (canonical) + obsolete legacy overloads
+    // Login — sent by the token login record (TokenLoginRecord), never by a session of its own
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// Logs a user into a token
+    /// Sends <c>C_Login</c> on this session. Login state belongs to the application and the token, not
+    /// to this session, so this is meant for the anchor session of the token's login record (see
+    /// <see cref="TokenLoginRecord"/>).
     /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    public void Login(CKU userType, SecurePin pin)
+    /// <param name="userType">Type of user.</param>
+    /// <param name="pin">
+    /// The PIN, straight from the pinned buffer its owner holds, with no transient copy; empty for the
+    /// protected authentication path, which the interop layer marshals to <c>pPin = NULL_PTR</c>,
+    /// <c>ulPinLen = 0</c>.
+    /// </param>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_Login</c>.</exception>
+    internal void SendLogin(CKU userType, ReadOnlySpan<byte> pin)
     {
         using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(pin);
-
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
-        Log.LoggingIn(_logger, userType, (ulong)_sessionId);
+        if (pin.IsEmpty)
+            Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
+        else
+            Log.LoggingIn(_logger, userType, (ulong)_sessionId);
 
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
+        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin);
         ThrowIfError(rv, OpLogin);
     }
 
     /// <summary>
-    /// Logs a user into a token via the token's own pinpad, for tokens advertising
-    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. PKCS#11 signals this by calling
-    /// <c>C_Login</c> with <c>pPin = NULL_PTR</c>, <c>ulPinLen = 0</c> — this overload passes an
-    /// empty span, which the interop layer marshals to a null pointer.
+    /// Sends <c>C_LoginUser</c> (PKCS#11 v3.0) on this session: a user type plus a username, for tokens
+    /// with named user accounts. Meant for the login record's anchor session, as <see cref="SendLogin"/> is.
     /// </summary>
     /// <param name="userType">Type of user.</param>
-    public void Login(CKU userType)
-    {
-        using var _ = AcquireExclusive();
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "Login (protected authentication path)");
-
-        Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
-
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, default);
-        ThrowIfError(rv, OpLogin);
-    }
-
-    /// <summary>
-    /// Logs a user into a token by user type plus a free-form username (PKCS#11 v3.0).
-    /// Use this overload for HSMs that support named user accounts beyond SO/User.
-    /// </summary>
-    /// <param name="userType">Type of user.</param>
-    /// <param name="pin">User's PIN. Caller retains ownership; its bytes go to the native
-    /// call straight out of the pinned buffer it owns, with no transient copy.</param>
-    /// <param name="username">Account username (UTF-8 encoded). Must not be null or empty.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="pin"/> or <paramref name="username"/> is null.</exception>
+    /// <param name="pin">The PIN; empty for the protected authentication path, as for <see cref="SendLogin"/>.</param>
+    /// <param name="username">Account username, sent UTF-8 encoded. Must not be null or empty. Never logged.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="username"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="username"/> is empty.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from C_LoginUser. <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> indicates the loaded library is v2.40 or otherwise does not export C_LoginUser.</exception>
-    public void LoginUser(CKU userType, SecurePin pin, string username)
+    internal void SendLoginUser(CKU userType, ReadOnlySpan<byte> pin, string username)
     {
         using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(pin);
         ArgumentNullException.ThrowIfNull(username);
         if (username.Length == 0)
             throw new ArgumentException("Username must not be empty.", nameof(username));
@@ -205,7 +192,7 @@ internal sealed partial class Pkcs11SessionCore
         byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try
         {
-            CKR rv = _pkcs11Library.C_LoginUser(_sessionId, userType, pin.Pin, usernameBytes);
+            CKR rv = _pkcs11Library.C_LoginUser(_sessionId, userType, pin, usernameBytes);
             ThrowIfError(rv, OpLoginUser);
         }
         finally

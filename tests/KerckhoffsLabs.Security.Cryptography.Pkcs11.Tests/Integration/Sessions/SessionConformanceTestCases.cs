@@ -410,7 +410,7 @@ internal static class SessionConformanceTestCases
 
         using var user = TestKeys.OpenLoggedInSession(backend);
         try { Assert.Empty(user.FindAllObjects([attrClass, attrLabel])); }
-        finally { user.Logout(); }
+        finally { user.SendLogout(); }
     }
 
     /// <summary>Who makes the object, and by which call: "<c>SO|public; generate|derive|unwrap|copy</c>".</summary>
@@ -905,7 +905,7 @@ internal static class SessionConformanceTestCases
 
         using var session = Slot(backend).OpenSessionCore();
         using var pin = new SecurePin(backend.UserPin.Span);
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         bool loggedIn = true;
         try
         {
@@ -975,7 +975,7 @@ internal static class SessionConformanceTestCases
                     }
             }
 
-            session.Logout();
+            session.SendLogout();
             loggedIn = false;
             Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, (NativeCULong)session.SessionId).State);
 
@@ -992,14 +992,14 @@ internal static class SessionConformanceTestCases
                 Assert.True(ex.ReturnValue == CKR.CKR_USER_NOT_LOGGED_IN, $"{call} of a private object with nobody logged in returned {ex.ReturnValue}.");
             }
 
-            session.Login(CKU.CKU_USER, pin);
+            session.SendLogin(CKU.CKU_USER, pin.Pin);
             loggedIn = true;
             Assert.Empty(session.FindAllObjects([attrLabel]));
         }
         finally
         {
             if (loggedIn)
-                session.Logout();
+                session.SendLogout();
         }
     }
 
@@ -1023,7 +1023,7 @@ internal static class SessionConformanceTestCases
         if (backend.RequiresUserLogin)
         {
             using var pin = new SecurePin(backend.UserPin.Span);
-            session.Login(CKU.CKU_USER, pin);
+            session.SendLogin(CKU.CKU_USER, pin.Pin);
         }
         try
         {
@@ -1234,7 +1234,7 @@ internal static class SessionConformanceTestCases
         using var session = Slot(backend).OpenSessionCore();
         var sid = (NativeCULong)session.SessionId;
         using var pin = new SecurePin(backend.UserPin.Span);
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         bool loggedIn = true;
         try
         {
@@ -1249,7 +1249,7 @@ internal static class SessionConformanceTestCases
                 Assert.True(read[0].GetValueAsBool(), "The data object reads the CKA_PRIVATE = FALSE it was made with: drop the pin.");
             }
 
-            session.Logout();
+            session.SendLogout();
             loggedIn = false;
 
             if (tokenKey is { } key)
@@ -1281,7 +1281,7 @@ internal static class SessionConformanceTestCases
                 Assert.Equal([publicSessionObject.ObjectId], session.FindAllObjects([attrLabel]).Select(h => h.ObjectId));
             }
 
-            session.Login(CKU.CKU_USER, pin);
+            session.SendLogin(CKU.CKU_USER, pin.Pin);
             loggedIn = true;
             AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, privateSessionObject), "C_GetAttributeValue on a destroyed private session object after a new login");
             Assert.DoesNotContain(session.FindAllObjects([attrData, attrLabel]), h => h.ObjectId != publicSessionObject.ObjectId);
@@ -1289,11 +1289,11 @@ internal static class SessionConformanceTestCases
         finally
         {
             if (!loggedIn)
-                session.Login(CKU.CKU_USER, pin);
+                session.SendLogin(CKU.CKU_USER, pin.Pin);
             // Found again by label: the token key's handle may have changed with the new login.
             foreach (ObjectHandle handle in session.FindAllObjects([attrLabel]))
                 session.DestroyObject(handle);
-            session.Logout();
+            session.SendLogout();
         }
     }
 

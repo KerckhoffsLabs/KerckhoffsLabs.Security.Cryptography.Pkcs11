@@ -100,6 +100,15 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Information, Message = "Session({SessionId}): policy restored {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyRestored(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Slot({SlotId}): C_Logout for the last holder of the login returned {Rv}; closing its anchor session anyway")]
+    public static partial void TokenLogoutFailed(ILogger logger, ulong slotId, CKR rv);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Slot({SlotId}): the login's anchor session was already closed, so no C_Logout was sent for its last holder")]
+    public static partial void TokenLogoutAnchorClosed(ILogger logger, ulong slotId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Slot({SlotId}): the module reported the login ended ({Reason}); its holders are no longer logged in")]
+    public static partial void TokenLoginEnded(ILogger logger, ulong slotId, CKR reason);
+
     /// <summary>
     /// A user type as a log argument: converts from <see cref="CKU"/> without work, and renders as
     /// <see cref="UserTypeName"/> only when a message is formatted, so a disabled level costs nothing.

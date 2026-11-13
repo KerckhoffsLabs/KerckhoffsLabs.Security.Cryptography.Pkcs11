@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -100,6 +101,12 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         // that comes after that joins a fresh one (see ResetAfterFinalize), so the end of the old stream,
         // whose wait C_Finalize woke, never reaches it.
         public SlotEventDispatcher SlotEvents = new();
+
+        // State the layers above keep per module rather than per load, keyed by its type (see Shared<T>):
+        // the token login records, since a login belongs to the module's Cryptoki state and every load of
+        // it shares that. Recreated with the slot events (see ResetAfterFinalize): C_Finalize ends every
+        // session and login, so a load that comes after it starts from none.
+        public ConcurrentDictionary<Type, object> Shared = new();
 
         // How the module was initialized, for every load of it: a ConcurrencyMode, written by the load
         // whose C_Initialize succeeded. Not under s_loadsLock: it is set from inside a call.
@@ -272,6 +279,21 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// </summary>
     internal SlotEventDispatcher SlotEvents
         => _slotEvents ?? throw new InvalidOperationException("The module was never bound.");
+
+    /// <summary>
+    /// The one <typeparamref name="T"/> of the module, shared by every load of it until its next
+    /// <c>C_Finalize</c>, created on first use. Lets a layer above keep module-wide state here (the token
+    /// login records) without this layer depending on it.
+    /// </summary>
+    /// <remarks>
+    /// Two first uses that race may both construct a <typeparamref name="T"/>; both get the same one, so
+    /// its constructor must have no side effects.
+    /// </remarks>
+    internal T Shared<T>() where T : class, new()
+    {
+        Loads loads = _loads ?? throw new InvalidOperationException("The module was never bound.");
+        return (T)Volatile.Read(ref loads.Shared).GetOrAdd(typeof(T), static _ => new T());
+    }
 
     /// <summary>Count of still-live tracked sessions (test/diagnostic seam).</summary>
     internal int TrackedSessionCount
@@ -449,7 +471,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     }
 
     // Always under s_loadsLock. Decided once: a load of the module that comes later initializes it
-    // afresh, owes nothing, and gets a slot-event stream of its own.
+    // afresh, owes nothing, and gets a slot-event stream and shared state (no logins) of its own.
     private void ResetAfterFinalize()
     {
         if (_loads is null)
@@ -457,6 +479,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         _loads.FinalizeOwed = false;
         Volatile.Write(ref _loads.Mode, (int)ConcurrencyMode.Unknown);
         _loads.SlotEvents = new SlotEventDispatcher();
+        Volatile.Write(ref _loads.Shared, new ConcurrentDictionary<Type, object>());
     }
 }
 

@@ -147,7 +147,7 @@ internal static class InsecureOperationGateTestCases
         }
         finally
         {
-            try { session.Logout(); } catch { }
+            try { session.SendLogout(); } catch { }
             try { session.Dispose(); } catch { }
         }
     }
@@ -175,7 +175,7 @@ internal static class InsecureOperationGateTestCases
         }
         finally
         {
-            try { session.Logout(); } catch { }
+            try { session.SendLogout(); } catch { }
             try { session.Dispose(); } catch { }
         }
     }
@@ -205,7 +205,7 @@ internal static class InsecureOperationGateTestCases
         }
         finally
         {
-            try { session.Logout(); } catch { }
+            try { session.SendLogout(); } catch { }
             try { session.Dispose(); } catch { }
         }
     }
@@ -228,7 +228,7 @@ internal static class InsecureOperationGateTestCases
         }
         finally
         {
-            try { session.Logout(); } catch { }
+            try { session.SendLogout(); } catch { }
             try { session.Dispose(); } catch { }
         }
     }
@@ -255,7 +255,7 @@ internal static class InsecureOperationGateTestCases
         }
         finally
         {
-            try { session.Logout(); } catch { }
+            try { session.SendLogout(); } catch { }
             try { session.Dispose(); } catch { }
         }
     }
@@ -282,7 +282,7 @@ internal static class InsecureOperationGateTestCases
         }
         finally
         {
-            try { session.Logout(); } catch { }
+            try { session.SendLogout(); } catch { }
             try { session.Dispose(); } catch { }
         }
     }
@@ -310,7 +310,7 @@ internal static class InsecureOperationGateTestCases
         }
         finally
         {
-            try { session.Logout(); } catch { }
+            try { session.SendLogout(); } catch { }
             try { session.Dispose(); } catch { }
         }
     }

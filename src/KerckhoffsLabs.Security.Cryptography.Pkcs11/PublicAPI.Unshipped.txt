@@ -2216,3 +2216,9 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PrivateKeyScope.Where(
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Session.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.EnforcePolicy(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest! request) -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.IsAllowedByPolicy(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest! request) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess
+KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess.ReadOnly = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess
+KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess.ReadWrite = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess
+KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser
+KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser.SecurityOfficer = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser
+KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser.User = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser

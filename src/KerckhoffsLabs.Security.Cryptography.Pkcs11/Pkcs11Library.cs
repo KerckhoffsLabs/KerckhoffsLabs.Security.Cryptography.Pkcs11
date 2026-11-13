@@ -58,6 +58,9 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     internal LowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
 
+    /// <summary>The logger factory from <see cref="Pkcs11LibraryOptions.LoggerFactory"/>, for what this library opens.</summary>
+    internal ILoggerFactory? LoggerFactory => _loggerFactory;
+
     /// <summary>
     /// Cached per-token quirk for ML-KEM decapsulation: whether the shared-secret template must
     /// omit <c>CKA_VALUE_LEN</c>. Tokens disagree on the unwrap-created key — SoftHSM rejects
@@ -649,7 +652,7 @@ public sealed class Pkcs11Library : IDisposable
         var session = matched.OpenSessionCore(policy: policy);
         try
         {
-            session.Login(userType, pin);
+            session.SendLogin(userType, pin.Pin);
             return new Pkcs11Session(this, matched, session);
         }
         catch
@@ -684,7 +687,7 @@ public sealed class Pkcs11Library : IDisposable
         var session = matched.OpenSessionCore(policy: policy);
         try
         {
-            session.Login(userType);
+            session.SendLogin(userType, default);
             return new Pkcs11Session(this, matched, session);
         }
         catch

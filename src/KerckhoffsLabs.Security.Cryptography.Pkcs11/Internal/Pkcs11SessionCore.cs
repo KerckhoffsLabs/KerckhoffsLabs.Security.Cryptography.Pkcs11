@@ -853,9 +853,12 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     }
 
     /// <summary>
-    /// Logs a user out from a token
+    /// Sends <c>C_Logout</c> on this session, which logs the application out of the token in every one of
+    /// its sessions; meant for the anchor session of the token's login record (see
+    /// <see cref="TokenLoginRecord"/>).
     /// </summary>
-    public void Logout()
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_Logout</c>.</exception>
+    internal void SendLogout()
     {
         using var _ = AcquireExclusive();
 
@@ -864,7 +867,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         LogoutHeld();
     }
 
-    // The logout itself, shared by Logout and LogoutAndDispose, which differ only in how they take the
+    // The logout itself, shared by SendLogout and LogoutAndDispose, which differ only in how they take the
     // session lease. The caller holds it.
     private void LogoutHeld()
     {

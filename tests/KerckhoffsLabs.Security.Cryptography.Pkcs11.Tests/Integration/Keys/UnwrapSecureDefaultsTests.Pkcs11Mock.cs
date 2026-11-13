@@ -23,7 +23,7 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
     {
         var session = TestKeys.OpenLoggedInSession(_backend);
         try { body(session); }
-        finally { session.Logout(); session.Dispose(); }
+        finally { session.SendLogout(); session.Dispose(); }
     }
 
     private static List<ObjectAttribute> InsecureTemplate(ObjectAttribute insecure) =>
