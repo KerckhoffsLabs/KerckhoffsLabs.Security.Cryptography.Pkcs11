@@ -1556,8 +1556,6 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.GenerateRsaKeyTranspor
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.GenerateRsaSigningKeyPair(int modulusBits = 4096, string? label = null, bool persistOnToken = false) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.GetSessionInfo() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionInfo!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.ImportKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! template) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.InitPinWithPin(KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! userPin) -> void
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.InitPinWithPinpad() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.Library.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.Policy.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.SeedRandom(System.ReadOnlySpan<byte> seed) -> void
@@ -2222,6 +2220,8 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser.SecurityOfficer = 1 -> Ker
 KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser.User = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.Dispose() -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.InitUserPinWithPin(KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePin! userPin) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.InitUserPinWithPinpad() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.IsActive.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.OpenSession(KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess access = KerckhoffsLabs.Security.Cryptography.Pkcs11.SessionAccess.ReadWrite, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy? policy = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.Slot.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!

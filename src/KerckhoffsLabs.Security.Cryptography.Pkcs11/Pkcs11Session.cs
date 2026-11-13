@@ -1060,63 +1060,50 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Changes the logged-in user's PIN via <c>C_SetPIN</c>. The session must be authenticated as
-    /// the user (or SO) whose PIN is being changed.
+    /// Changes a PIN via <c>C_SetPIN</c>: the PIN of the user this application is logged in to the token as, or the
+    /// normal user's PIN when it is not logged in (PKCS#11 v3.2). Needs a read/write session. To set the normal
+    /// user's PIN as the Security Officer, use <see cref="Pkcs11Login.InitUserPinWithPin"/>.
     /// </summary>
     /// <param name="oldPin">The current PIN.</param>
     /// <param name="newPin">The replacement PIN.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="oldPin"/> or <paramref name="newPin"/> is <see langword="null"/>.</exception>
+    /// <exception cref="Pkcs11SessionException">A read-only session (<c>CKR_SESSION_READ_ONLY</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change (e.g. wrong old PIN, policy violation).</exception>
     public void SetPinWithPin(SecurePin oldPin, SecurePin newPin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(oldPin);
         ArgumentNullException.ThrowIfNull(newPin);
+        ThrowIfReadOnlyForSetPin();
         _core.SetPin(oldPin, newPin);
     }
 
     /// <summary>
-    /// Changes the logged-in user's PIN via the token's own pinpad, for tokens advertising
+    /// Changes a PIN, as <see cref="SetPinWithPin"/> does, via the token's own pinpad, for tokens advertising
     /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. Both the old and new PIN are entered on
     /// the device; PKCS#11 signals this by calling <c>C_SetPIN</c> with both PIN pointers
-    /// <c>NULL_PTR</c>.
+    /// <c>NULL_PTR</c>. Needs a read/write session.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="Pkcs11SessionException">A read-only session (<c>CKR_SESSION_READ_ONLY</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change.</exception>
     public void SetPinWithPinpad()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfReadOnlyForSetPin();
         _core.SetPin();
     }
 
-    /// <summary>
-    /// Initializes the normal user's PIN via <c>C_InitPIN</c>. Requires a session authenticated as
-    /// the Security Officer (SO).
-    /// </summary>
-    /// <param name="userPin">The user PIN to set.</param>
-    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <see langword="null"/>.</exception>
-    /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
-    public void InitPinWithPin(SecurePin userPin)
+    // PKCS#11 v3.2 C_SetPIN: only in the "R/W Public", "R/W SO Functions" or "R/W User Functions" states, else
+    // CKR_SESSION_READ_ONLY. The library opened this session and knows its access, so it answers for the module.
+    private void ThrowIfReadOnlyForSetPin()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        ArgumentNullException.ThrowIfNull(userPin);
-        _core.InitPin(userPin);
-    }
-
-    /// <summary>
-    /// Initializes the normal user's PIN via the token's own pinpad, for tokens advertising
-    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. Requires a session authenticated as the
-    /// Security Officer (SO); PKCS#11 signals on-device entry by calling <c>C_InitPIN</c> with
-    /// <c>pPin = NULL_PTR</c>.
-    /// </summary>
-    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
-    public void InitPinWithPinpad()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        _core.InitPin();
+        if (Access != SessionAccess.ReadOnly)
+            return;
+        throw Pkcs11Exception.Create(CKR.CKR_SESSION_READ_ONLY, Pkcs11Operations.OpSetPIN,
+            $"{Pkcs11Operations.OpSetPIN}: this is a read-only session, and PKCS#11 changes a PIN only in a read/write " +
+            "one. Open a read/write session to change it.");
     }
 
     /// <summary>

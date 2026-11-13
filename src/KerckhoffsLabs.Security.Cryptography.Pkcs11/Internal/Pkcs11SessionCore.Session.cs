@@ -11,38 +11,27 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 internal sealed partial class Pkcs11SessionCore
 {
     // -----------------------------------------------------------------------
-    // InitPin — SecurePin overload (canonical) + obsolete legacy overloads
+    // InitPin — sent by the token login record (TokenLoginRecord) on an SO login's anchor, never by a session
+    // of its own
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// Initializes the normal user's PIN using a <see cref="SecurePin"/>.
+    /// Sends <c>C_InitPIN</c> on this session. PKCS#11 v3.2 allows it only in the "R/W SO Functions" state, so it
+    /// is meant for the read/write anchor session of a Security Officer login (see <see cref="TokenLoginRecord"/>).
     /// </summary>
-    /// <param name="userPin">Pin value</param>
-    public void InitPin(SecurePin userPin)
-    {
-        using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(userPin);
-
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin");
-
-        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, userPin.Pin);
-        ThrowIfError(rv, OpInitPIN);
-    }
-
-    /// <summary>
-    /// Initializes the normal user's PIN via the token's own pinpad, for tokens advertising
-    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. PKCS#11 signals this by calling
-    /// <c>C_InitPIN</c> with <c>pPin = NULL_PTR</c>, <c>ulPinLen = 0</c> — this overload passes an
-    /// empty span, which the interop layer marshals to a null pointer.
-    /// </summary>
-    public void InitPin()
+    /// <param name="pin">
+    /// The new normal-user PIN, straight from the pinned buffer its owner holds, with no transient copy; empty for
+    /// the protected authentication path, which the interop layer marshals to <c>pPin = NULL_PTR</c>,
+    /// <c>ulPinLen = 0</c>.
+    /// </param>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_InitPIN</c>.</exception>
+    internal void SendInitPin(ReadOnlySpan<byte> pin)
     {
         using var _ = AcquireExclusive();
 
-        Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin (protected authentication path)");
+        Log.SessionTrace(_logger, (ulong)_sessionId, pin.IsEmpty ? "InitPin (protected authentication path)" : "InitPin");
 
-        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, default);
+        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, pin);
         ThrowIfError(rv, OpInitPIN);
     }
 

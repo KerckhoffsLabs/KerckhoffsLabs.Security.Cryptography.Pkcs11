@@ -95,6 +95,57 @@ public sealed class Pkcs11Login : IDisposable
     }
 
     /// <summary>
+    /// Sets the normal user's PIN (<c>C_InitPIN</c>), as the Security Officer this login is for. Sent on the
+    /// login's own read/write session, the "R/W SO Functions" state PKCS#11 v3.2 requires, so no session need be
+    /// open.
+    /// </summary>
+    /// <param name="userPin">
+    /// The new normal-user PIN. Read from a secret store at the point of use rather than hardcoded; the library
+    /// neither keeps nor logs it.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// This login is not the Security Officer's (<see cref="User"/>); refused before the module, which would answer
+    /// <c>CKR_USER_NOT_LOGGED_IN</c>.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    /// <exception cref="Pkcs11Exception">
+    /// Propagated from <c>C_InitPIN</c> (a PIN the token's policy refuses, for instance). A lost session or token
+    /// also ends the login.
+    /// </exception>
+    public void InitUserPinWithPin(SecurePin userPin)
+    {
+        ArgumentNullException.ThrowIfNull(userPin);
+        InitUserPin(userPin);
+    }
+
+    /// <summary>
+    /// Sets the normal user's PIN (<c>C_InitPIN</c>) on the token's own pinpad, as the Security Officer this login
+    /// is for: for tokens with <see cref="TokenFlags.ProtectedAuthenticationPath"/>. PKCS#11 signals on-device entry
+    /// with <c>pPin = NULL_PTR</c>. Sent on the login's own read/write session, as
+    /// <see cref="InitUserPinWithPin"/> is.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// This login is not the Security Officer's (<see cref="User"/>); refused before the module.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_InitPIN</c>. A lost session or token also ends the login.</exception>
+    public void InitUserPinWithPinpad() => InitUserPin(null);
+
+    private void InitUserPin(SecurePin? userPin)
+    {
+        // PKCS#11 v3.2 C_InitPIN: only in the "R/W SO Functions" state, else CKR_USER_NOT_LOGGED_IN.
+        if (User != TokenUser.SecurityOfficer)
+        {
+            throw new InvalidOperationException(
+                "Only a Security Officer login can set the normal user's PIN (C_InitPIN). Log in with " +
+                "TokenUser.SecurityOfficer; to change the PIN of the user logged in, use Pkcs11Session.SetPinWithPin.");
+        }
+
+        _hold.Record.InitUserPin(_hold, userPin);
+    }
+
+    /// <summary>
     /// Releases this hold of the login. The last holder to go logs out: if sessions opened through
     /// <see cref="OpenSession"/> are still open, the login stays until they are disposed too. Idempotent.
     /// </summary>

@@ -76,14 +76,6 @@ public sealed class Pkcs11SessionCoreTests
     // === Argument-null guards (fire before any native call) =================================
 
     [Fact]
-    public void InitPin_NullPin_Throws()
-    {
-        using var fake = new SessionFake();
-        using var s = fake.CreateSession(SessionId);
-        Assert.Throws<ArgumentNullException>(() => s.InitPin(null!));
-    }
-
-    [Fact]
     public void SetPin_NullArgs_Throw()
     {
         using var fake = new SessionFake();

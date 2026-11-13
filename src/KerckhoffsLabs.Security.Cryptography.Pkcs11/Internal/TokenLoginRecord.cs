@@ -21,7 +21,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// </para>
 /// <para>
 /// <b>Anchor session.</b> The record opens a session of its own before the first <c>C_Login</c>, sends
-/// <c>C_Login</c>/<c>C_LoginUser</c> and <c>C_Logout</c> on it, and closes it after the final
+/// <c>C_Login</c>/<c>C_LoginUser</c>, <c>C_Logout</c> and an SO login's <c>C_InitPIN</c> on it, and closes it after the final
 /// <c>C_Logout</c>. It keeps the login alive while no other session is open, and is never handed out. It is
 /// read/write for the SO (a read-only session would make the SO login fail) and read-only for the user (so a
 /// write-protected token works).
@@ -312,6 +312,51 @@ internal sealed class TokenLoginRecord
             if (existing.IsReleased || _anchor is null || existing.Generation != _generation)
                 throw LoginEnded();
             return AddHolderLocked(owner);
+        }
+    }
+
+    /// <summary>
+    /// Sends <c>C_InitPIN</c> on the anchor of the login <paramref name="hold"/> keeps, for
+    /// <see cref="Pkcs11Login.InitUserPinWithPin"/> and <see cref="Pkcs11Login.InitUserPinWithPinpad"/>. The caller
+    /// has checked the login is the Security Officer's, whose anchor is read/write: the "R/W SO Functions" state
+    /// PKCS#11 v3.2 requires.
+    /// </summary>
+    /// <param name="hold">The caller's share of the login.</param>
+    /// <param name="pin">The new normal-user PIN, or <see langword="null"/> for the protected authentication path.</param>
+    /// <exception cref="ObjectDisposedException"><paramref name="hold"/> is released, or its login ended.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_InitPIN</c>; a lost anchor also ends the login.</exception>
+    internal void InitUserPin(LoginHold hold, SecurePin? pin)
+    {
+        ArgumentNullException.ThrowIfNull(hold);
+
+        // Shared, like an operation: the login cannot be logged out under the send. Lock order: the gate, then this
+        // record's lock, then the send lock (never with the record's lock), then the anchor's own.
+        _gate.EnterReadLock();
+        try
+        {
+            Pkcs11SessionCore anchor;
+            lock (_lock)
+            {
+                if (hold.IsReleased || _anchor is null || hold.Generation != _generation)
+                    throw LoginEnded();
+                anchor = _anchor;
+            }
+
+            try
+            {
+                // Shares send their login on the anchor concurrently under the shared gate; take turns with them.
+                lock (_sendLock)
+                    anchor.SendInitPin(pin is null ? default : pin.Pin);
+            }
+            catch (ObjectDisposedException) when (!IsCurrent(hold.Generation))
+            {
+                // The module reported the login gone (MarkEnded does not take the gate) and the anchor was closed.
+                throw LoginEnded();
+            }
+        }
+        finally
+        {
+            _gate.ExitReadLock();
         }
     }
 

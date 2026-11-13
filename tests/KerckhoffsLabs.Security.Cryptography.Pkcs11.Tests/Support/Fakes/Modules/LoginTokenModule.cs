@@ -48,6 +48,8 @@ internal sealed class LoginTokenModule : FakeModule
     private int _loginCalls;
     private int _logoutCalls;
     private int _initTokenCalls;
+    private (ulong Session, byte[] Pin)? _lastInitPin;
+    private (ulong Session, byte[] OldPin, byte[] NewPin)? _lastSetPin;
     private readonly Dictionary<ulong, Dictionary<CKA, byte[]>> _objects = [];
     private readonly Dictionary<ulong, Queue<ulong>> _finds = [];
     private readonly Dictionary<ulong, CKR> _failing = [];
@@ -233,6 +235,56 @@ internal sealed class LoginTokenModule : FakeModule
             if (_failing.TryGetValue((ulong)session, out CKR failure))
                 return failure;
             return LoginLocked(session, (CKU)(ulong)userType, pin, username.ToArray());
+        }
+    }
+
+    /// <summary>
+    /// The last <c>C_InitPIN</c> that succeeded: the session it came on and the PIN (empty for the protected
+    /// authentication path), or <see langword="null"/> when none has.
+    /// </summary>
+    public (ulong Session, byte[] Pin)? LastInitPin
+    {
+        get { lock (_lock) return _lastInitPin; }
+    }
+
+    /// <summary>The last <c>C_SetPIN</c> that succeeded: the session and both PINs (empty for a pinpad).</summary>
+    public (ulong Session, byte[] OldPin, byte[] NewPin)? LastSetPin
+    {
+        get { lock (_lock) return _lastSetPin; }
+    }
+
+    // PKCS#11 v3.2 C_InitPIN: only in the "R/W SO Functions" state, else CKR_USER_NOT_LOGGED_IN.
+    protected override CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin)
+    {
+        lock (_lock)
+        {
+            if (_failing.TryGetValue((ulong)session, out CKR failure))
+                return failure;
+            int index = _sessions.FindIndex(s => s.Handle == (ulong)session);
+            if (index < 0)
+                return CKR.CKR_SESSION_HANDLE_INVALID;
+            if (_loggedIn != CKU.CKU_SO || !_sessions[index].ReadWrite)
+                return CKR.CKR_USER_NOT_LOGGED_IN;
+            _lastInitPin = ((ulong)session, pin.ToArray());
+            return CKR.CKR_OK;
+        }
+    }
+
+    // PKCS#11 v3.2 C_SetPIN: only in "R/W Public", "R/W SO Functions" or "R/W User Functions", else
+    // CKR_SESSION_READ_ONLY. The fake checks no PINs.
+    protected override CKR C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
+    {
+        lock (_lock)
+        {
+            if (_failing.TryGetValue((ulong)session, out CKR failure))
+                return failure;
+            int index = _sessions.FindIndex(s => s.Handle == (ulong)session);
+            if (index < 0)
+                return CKR.CKR_SESSION_HANDLE_INVALID;
+            if (!_sessions[index].ReadWrite)
+                return CKR.CKR_SESSION_READ_ONLY;
+            _lastSetPin = ((ulong)session, oldPin.ToArray(), newPin.ToArray());
+            return CKR.CKR_OK;
         }
     }
 

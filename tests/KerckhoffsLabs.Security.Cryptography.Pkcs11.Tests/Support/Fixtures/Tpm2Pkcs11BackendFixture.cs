@@ -322,13 +322,12 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
 
                 slot.InitTokenWithPin(new SecurePin(SoPin.Span), TokenLabel);
 
-                // The SO sets the user PIN from a session of its own login, which logs out when both are disposed.
+                // The SO sets the user PIN (C_InitPIN on its login's own read/write session); disposing the login logs out.
                 using (var soPin = new SecurePin(SoPin.Span))
                 using (Pkcs11Login so = slot.Login(TokenUser.SecurityOfficer, soPin))
-                using (Pkcs11Session soSession = so.OpenSession())
                 using (var userPin = new SecurePin(UserPin.Span))
                 {
-                    soSession.InitPinWithPin(userPin);
+                    so.InitUserPinWithPin(userPin);
                 }
 
                 SlotId = (NativeCULong)slot.SlotId.Value;

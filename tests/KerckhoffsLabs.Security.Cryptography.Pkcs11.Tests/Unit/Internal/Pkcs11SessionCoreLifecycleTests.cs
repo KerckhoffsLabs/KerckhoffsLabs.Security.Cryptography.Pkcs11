@@ -137,24 +137,24 @@ public sealed class Pkcs11SessionCoreLifecycleTests
     // === PIN management =====================================================
 
     [Fact]
-    public void InitPin_Ok_PassesPin()
+    public void SendInitPin_Ok_PassesPin()
     {
         using var fake = new LifecycleFake();
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("9876");
 
-        s.InitPin(pin);
+        s.SendInitPin(pin.Pin);
 
         Assert.Equal("9876"u8.ToArray(), fake.CapturedPin);
     }
 
     [Fact]
-    public void InitPin_Error_Throws()
+    public void SendInitPin_Error_Throws()
     {
         using var fake = new LifecycleFake { InitPinRv = CKR.CKR_USER_NOT_LOGGED_IN };
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("9876");
-        Assert.ThrowsAny<Pkcs11Exception>(() => s.InitPin(pin));
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.SendInitPin(pin.Pin));
     }
 
     [Fact]

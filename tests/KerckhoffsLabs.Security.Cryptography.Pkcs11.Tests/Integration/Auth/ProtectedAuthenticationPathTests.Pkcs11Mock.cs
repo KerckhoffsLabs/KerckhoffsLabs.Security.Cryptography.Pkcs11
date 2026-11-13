@@ -55,11 +55,13 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
         using var session = slot.OpenSessionCore();
         // C_InitPIN requires an SO-authenticated session before it even looks at the PIN
-        // pointer, so log in with a real PIN first — only InitPin itself is under test.
+        // pointer, so log in with a real PIN first — only InitPin itself is under test. This is the send
+        // Pkcs11Login.InitUserPinWithPinpad makes on the SO login's anchor; that public path, which would need an
+        // SO login of its own, is covered over LoginTokenModule (Unit/PinManagementTests).
         using var soPin = new SecurePin(_backend.SoPin.Span);
         session.SendLogin(CKU.CKU_SO, soPin.Pin);
 
-        AssertArgumentsBad(() => session.InitPin());
+        AssertArgumentsBad(() => session.SendInitPin(default));
     }
 
     // === Pkcs11Slot (public) =================================================
@@ -88,19 +90,5 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         using var session = _backend.OpenSession();
 
         AssertArgumentsBad(session.SetPinWithPinpad);
-    }
-
-    [Fact]
-    public void SessionInitPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
-    {
-        // pkcs11-mock allows one session, so an SO login (which keeps a session of its own) cannot open a second one
-        // to work on: the SO logs in on the session itself, through the internal core. Closing the session ends
-        // the mock's login.
-        Pkcs11Slot slot = _backend.Slot;
-        using var session = new Pkcs11Session(_backend.Library, slot, slot.OpenSessionCore());
-        using (var soPin = new SecurePin(_backend.SoPin.Span))
-            session.Core.SendLogin(CKU.CKU_SO, soPin.Pin);
-
-        AssertArgumentsBad(session.InitPinWithPinpad);
     }
 }
