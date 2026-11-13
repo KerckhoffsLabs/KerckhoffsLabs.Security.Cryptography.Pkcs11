@@ -89,6 +89,34 @@ public sealed class DestroyedWrapperTests
         });
     }
 
+    // The target's handle goes into C_WrapKey too: once the target's own Destroy has succeeded, that handle may name
+    // another key, and wrapping it would export a key the caller never chose.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Wrap_OfATargetDestroyedOrDisposed_IsRefusedBeforeTheToken(bool destroyed)
+    {
+        using var module = new DestroyModule();
+        WithSession(module, session =>
+        {
+            using Pkcs11Key wrapping = new(session, new ObjectHandle(8UL), ObjectHandle.Invalid, CKK.CKK_AES, "kek", []);
+            Pkcs11Key target = Secret(session);
+            if (destroyed)
+                target.Destroy();
+            else
+                target.Dispose();
+            int calls = module.TotalCalls;
+
+            var ex = Assert.Throws<ObjectDisposedException>(() => wrapping.Wrap(new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP), target));
+
+            if (destroyed)
+                Assert.Contains("Destroy()", ex.Message, StringComparison.Ordinal);
+            Assert.Equal(calls, module.TotalCalls);
+            Assert.Equal(0, module.CallCount("C_WrapKey"));
+            target.Dispose();
+        });
+    }
+
     [Fact]
     public void Key_DisposedAfterItsOwnDestroy_DoesNotThrow()
     {

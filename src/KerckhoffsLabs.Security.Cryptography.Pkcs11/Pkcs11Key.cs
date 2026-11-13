@@ -839,7 +839,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <param name="mechanism">The wrap mechanism (e.g. <see cref="CKM.CKM_AES_KEY_WRAP"/>).</param>
     /// <param name="targetKey">The key being wrapped. Must carry a private/symmetric handle.</param>
     /// <returns>The wrapped key bytes — opaque blob to be transported / stored.</returns>
-    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if this key or <paramref name="targetKey"/> has been disposed or destroyed (<see cref="Destroy"/>), before the token is reached.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="targetKey"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's wrapping handle or <paramref name="targetKey"/>'s handle is unavailable; otherwise propagated from the underlying <c>C_WrapKey</c> call.</exception>
@@ -848,6 +848,10 @@ public sealed partial class Pkcs11Key : IDisposable
         ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(targetKey);
+
+        // The target's handle is sent too: once its own Destroy succeeded it may name another key, and wrapping that
+        // would export a key the caller never chose. Refused before the token, as for this key.
+        targetKey.ThrowIfUnusable();
 
         ObjectHandle wrapHandle = IsAsymmetricKeyType(_keyType) ? PublicHandle : PrivateHandle;
         if (wrapHandle.IsInvalid)
