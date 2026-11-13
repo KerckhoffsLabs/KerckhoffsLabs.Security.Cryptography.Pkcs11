@@ -85,7 +85,7 @@ internal sealed partial class Pkcs11SessionCore
                 _sessionId, in ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
                 template,
                 ct, lengthOnly: false, out ctLen, out sharedHandle);
-            Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
+            ThrowIfError(rv, OpEncapsulateKey);
         }
         else
         {
@@ -98,7 +98,7 @@ internal sealed partial class Pkcs11SessionCore
             // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
             // Only a genuine error aborts the probe.
             if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
+                ThrowIfError(rv, "C_EncapsulateKey (length probe)");
 
             // A token that ignores the probe (SoftHSM does) reports no size at all. Continuing would
             // allocate an empty buffer and hand the caller an empty ciphertext for an encapsulation
@@ -115,7 +115,7 @@ internal sealed partial class Pkcs11SessionCore
                 _sessionId, in ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
                 template,
                 ct, lengthOnly: false, out ctLen, out sharedHandle);
-            Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
+            ThrowIfError(rv, OpEncapsulateKey);
         }
 
         mechanism.AbsorbOutput(mechParams);
@@ -169,7 +169,7 @@ internal sealed partial class Pkcs11SessionCore
             _sessionId, in ckMechanism, (NativeCULong)decapsulatingPrivateKey.ObjectId,
             template,
             ciphertext, out NativeCULong sharedHandle);
-        Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
+        ThrowIfError(rv, OpDecapsulateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
         GC.KeepAlive(sharedKeyTemplate);
@@ -211,13 +211,13 @@ internal sealed partial class Pkcs11SessionCore
         // the token populated wrappedLen despite the (null) output buffer. Only a genuine
         // error aborts the probe.
         if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-            Pkcs11Exception.ThrowIfError(rv, "C_WrapKeyAuthenticated (length probe)");
+            ThrowIfError(rv, "C_WrapKeyAuthenticated (length probe)");
 
         byte[] wrapped = new byte[ReportedLength.ForAllocation(wrappedLen, OpWrapKeyAuthenticated)];
         rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, in ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
             associatedData, wrapped, lengthOnly: false, out wrappedLen);
-        Pkcs11Exception.ThrowIfError(rv, OpWrapKeyAuthenticated);
+        ThrowIfError(rv, OpWrapKeyAuthenticated);
 
         mechanism.AbsorbOutput(mechParams);
 
@@ -263,7 +263,7 @@ internal sealed partial class Pkcs11SessionCore
             wrappedKey,
             template,
             associatedData, out NativeCULong newKey);
-        Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
+        ThrowIfError(rv, OpUnwrapKeyAuthenticated);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
         GC.KeepAlive(unwrappedKeyTemplate);
@@ -352,7 +352,7 @@ internal sealed partial class Pkcs11SessionCore
         while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
         {
             rv = _pkcs11Library.C_VerifySignatureUpdate(_sessionId, buffer.AsSpan(0, read));
-            Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureUpdate);
+            ThrowIfError(rv, OpVerifySignatureUpdate);
         }
 
         rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
@@ -381,7 +381,7 @@ internal sealed partial class Pkcs11SessionCore
         Log.SessionGetValidationFlags(_logger, (ulong)_sessionId, (ulong)validationType);
 
         CKR rv = _pkcs11Library.C_GetSessionValidationFlags(_sessionId, (NativeCULong)(ulong)validationType, out NativeCULong flags);
-        Pkcs11Exception.ThrowIfError(rv, OpGetSessionValidationFlags);
+        ThrowIfError(rv, OpGetSessionValidationFlags);
 
         return (ulong)flags;
     }

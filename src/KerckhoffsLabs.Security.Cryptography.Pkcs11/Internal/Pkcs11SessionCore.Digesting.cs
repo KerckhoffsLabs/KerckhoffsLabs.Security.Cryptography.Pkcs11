@@ -34,7 +34,7 @@ internal sealed partial class Pkcs11SessionCore
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
+        ThrowIfError(rv, OpDigestKey);
 
         byte[] digest = CallWithLengthProbe(
             (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, lengthOnly, out length),
@@ -153,7 +153,7 @@ internal sealed partial class Pkcs11SessionCore
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
             rv = _pkcs11Library.C_DigestUpdate(_sessionId, part.AsSpan(0, bytesRead));
-            Pkcs11Exception.ThrowIfError(rv, OpDigestUpdate);
+            ThrowIfError(rv, OpDigestUpdate);
         }
 
         byte[] digest = CallWithLengthProbe(

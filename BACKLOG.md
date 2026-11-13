@@ -4,8 +4,8 @@ _Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (c
 
 ## Summary
 
-- Open items: 92, 24 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 8 (1 partly resolved) | Medium: 46 (15 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 91, 24 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 8 (1 partly resolved) | Medium: 46 (15 partly resolved) | Low: 37 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **Only one session per slot is usable.** The second `OpenSession` on a slot throws `CKR_USER_ALREADY_LOGGED_IN`, and disposing either session logs the other out (BL-084).
@@ -495,7 +495,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Add a real-backend test that a private-key sign on an un-logged-in session surfaces `Pkcs11AuthenticationException` and that private objects are invisible to `FindObjects`; add an "operation failure leaves the session usable" test (force a failure with a bad mechanism parameter, then run a successful operation on the same session) and run it on both a v3.x and the gated v2.40 module.
 - **Breaks public API?** No
 - **Raised by:** QA B
-- **Spec / References:** BL-049 is the missing cancel call on one method and BL-052 is token removal; neither covers session recoverability on modules where `C_SessionCancel` does not exist
+- **Spec / References:** BL-049 is the missing cancel call on one method and BL-052 (resolved: a lost session now stops sending its handle, `SessionLossTests`) was token removal; neither covers session recoverability on modules where `C_SessionCancel` does not exist
 
 ### [BL-126] ⚠️ PARTIALLY RESOLVED — All four named priorities, HKDF, ChaCha20 and IKE-derive landed; X3DH/X2Ratchet and XEdDSA still never reach a real module (and never can — no vendored backend implements them)
 - **Area:** QA
@@ -682,16 +682,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Consider an opt-in on load (interface name / max version); at minimum document the default-interface behavior.
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist A
-
-### [BL-052] Token-removed / device-error mid-operation is only tested at the CKR-mapping level
-- **Area:** QA
-- **Severity:** Low
-- **Effort:** M
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Exceptions/ExceptionMapperTests.cs:49-56`
-- **Problem:** No test injects `CKR_DEVICE_REMOVED` between Init and Final to prove the session is left usable (busy-guard released, no unmanaged leak); the `ManagedSoftToken` fault-injection hooks already exist.
-- **Proposed action:** Add a fake-injected device-removed mid-digest/mid-sign case asserting clean teardown.
-- **Breaks public API?** No
-- **Raised by:** QA B
 
 ### [BL-054] ⚠️ PARTIALLY RESOLVED — Publish-trigger and artifact hardening gaps (no environment gate, no concurrency guard, snupkg unattested)
 - **Status:** Partially resolved 2026-10-19 by #215. The symbol package is attested alongside the `.nupkg` and the assemblies extracted from it, and the attested packages are attached to the GitHub release by a separate `contents: write` job.

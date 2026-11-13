@@ -71,17 +71,17 @@ internal sealed partial class Pkcs11SessionCore
             if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
             {
                 rv = _pkcs11Library.C_EncryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-                Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
+                ThrowIfError(rv, OpEncryptInit);
 
                 rv = _pkcs11Library.C_Encrypt(_sessionId, data, default, lengthOnly: true, out NativeCULong probeLen);
-                Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
+                ThrowIfError(rv, OpEncrypt);
 
                 encryptedData = new byte[ReportedLength.ForAllocation(probeLen, OpEncrypt)];
                 rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
             }
         }
 
-        Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
+        ThrowIfError(rv, OpEncrypt);
         operation.Completed();
 
         // Inside the scope's lifetime: the parameter block the token may have written into (an AEAD
@@ -239,7 +239,7 @@ internal sealed partial class Pkcs11SessionCore
         CKR rv = _pkcs11Library.C_GetSlotInfo(slotId, out CK_SLOT_INFO slot);
         if (rv != CKR.CKR_FUNCTION_NOT_SUPPORTED)
         {
-            Pkcs11Exception.ThrowIfError(rv, OpGetSlotInfo);
+            ThrowIfError(rv, OpGetSlotInfo);
             var slotInfo = new SlotInfo(slotId, slot);
             if (CkmPkcs5Pbkd2Params.IsNss(slotInfo))
             {
@@ -254,7 +254,7 @@ internal sealed partial class Pkcs11SessionCore
             reason = "module version unknown";
             return false;
         }
-        Pkcs11Exception.ThrowIfError(rv, OpGetInfo);
+        ThrowIfError(rv, OpGetInfo);
         var libraryInfo = new LibraryInfo(info);
         reason = $"Cryptoki {libraryInfo.CryptokiVersion}";
         return CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference(libraryInfo);
@@ -295,7 +295,7 @@ internal sealed partial class Pkcs11SessionCore
         using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
         CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
-        Pkcs11Exception.ThrowIfError(rv, OpMessageEncryptInit);
+        ThrowIfError(rv, OpMessageEncryptInit);
 
         mechanism.AbsorbOutput(mechParams);
 
@@ -373,7 +373,7 @@ internal sealed partial class Pkcs11SessionCore
                 if ((ulong)decryptedDataLen <= (ulong)decryptedData.Length)
                 {
                     rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, default, lengthOnly: true, out decryptedDataLen);
-                    Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+                    ThrowIfError(rv, OpDecrypt);
                 }
 
                 CryptographicOperations.ZeroMemory(decryptedData);
@@ -381,7 +381,7 @@ internal sealed partial class Pkcs11SessionCore
                 rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out decryptedDataLen);
             }
 
-            Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+            ThrowIfError(rv, OpDecrypt);
             operation.Completed();
 
             mechanism.AbsorbOutput(mechParams);
@@ -522,7 +522,7 @@ internal sealed partial class Pkcs11SessionCore
         using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
         CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
-        Pkcs11Exception.ThrowIfError(rv, OpMessageDecryptInit);
+        ThrowIfError(rv, OpMessageDecryptInit);
 
         mechanism.AbsorbOutput(mechParams);
 

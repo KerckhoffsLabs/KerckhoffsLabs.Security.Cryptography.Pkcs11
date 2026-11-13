@@ -147,6 +147,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             // flag while holding it. Every operation needs this, so it lives here rather than being
             // restated at each call site, where the omission of one line would be invisible.
             ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfLost(caller);
             lease.Hold(_sessionHandle);
             return lease;
         }
@@ -538,7 +539,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         Log.SessionCancelOperations(_logger, (ulong)_sessionId, flags);
 
         CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, (NativeCULong)flags);
-        Pkcs11Exception.ThrowIfError(rv, OpSessionCancel);
+        ThrowIfError(rv, OpSessionCancel);
     }
 
     /// <summary>
@@ -648,7 +649,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
                 "An earlier operation of this kind on this session failed partway through, and this module " +
                 "cannot cancel it (it has no C_SessionCancel), so it is still active. Open a new session.");
         }
-        Pkcs11Exception.ThrowIfError(rv, initFunction);
+        ThrowIfError(rv, initFunction);
     }
 
     /// <summary>
@@ -657,6 +658,10 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// </summary>
     private void CancelAbandoned(ulong operations, string operationName)
     {
+        // A lost session has nothing to cancel, and the module would only answer the loss again.
+        if (_lostTo != CKR.CKR_OK)
+            return;
+
         CKR rv;
         try
         {
@@ -680,6 +685,104 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
                 Log.SessionCancelFailed(_logger, (ulong)_sessionId, operationName, rv);
                 return;
         }
+    }
+
+    /// <summary>
+    /// The code with which the module said this session is gone, or <see cref="CKR.CKR_OK"/> while it is not.
+    /// Written and read under <see cref="_busyLock"/>.
+    /// </summary>
+    private CKR _lostTo = CKR.CKR_OK;
+
+    /// <summary>
+    /// Whether <paramref name="rv"/> says this session no longer exists on the module:
+    /// <c>CKR_SESSION_CLOSED</c> or <c>CKR_SESSION_HANDLE_INVALID</c> (this session is closed), or
+    /// <c>CKR_DEVICE_REMOVED</c> or <c>CKR_TOKEN_NOT_PRESENT</c> (its token is gone).
+    /// </summary>
+    /// <remarks>
+    /// Other failures, <c>CKR_DEVICE_ERROR</c>, <c>CKR_FUNCTION_FAILED</c> and <c>CKR_GENERAL_ERROR</c> among
+    /// them, leave the session as it was: it may still be open and logged in, and treating it as lost would
+    /// leave it so until <c>C_Finalize</c>.
+    /// </remarks>
+    private static bool IsSessionLoss(CKR rv) => rv is CKR.CKR_SESSION_CLOSED or CKR.CKR_SESSION_HANDLE_INVALID
+        or CKR.CKR_DEVICE_REMOVED or CKR.CKR_TOKEN_NOT_PRESENT;
+
+    /// <summary>
+    /// The session's own guard-clause: records a loss (<see cref="ObserveSessionLoss"/>) before throwing, so the
+    /// session stops sending its number, which the module may give to a session opened since.
+    /// </summary>
+    private void ThrowIfError(CKR rv, string method)
+    {
+        if (rv == CKR.CKR_OK)
+            return;
+        ObserveSessionLoss(rv, method);
+        Pkcs11Exception.Throw(rv, method);
+    }
+
+    /// <summary>The exception for <paramref name="rv"/>, built after recording a loss, for a literal <c>throw</c>.</summary>
+    private Pkcs11Exception Failure(CKR rv, string method)
+    {
+        ObserveSessionLoss(rv, method);
+        return Pkcs11Exception.Create(rv, method);
+    }
+
+    /// <summary>
+    /// On the first return code that says the session is gone, stops the session from sending its number again.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// After a module closes a session, it may hand the same number to one opened since, by this application or
+    /// another part of it. Sending the old number then acts on that session: a <c>C_Logout</c> logs out every
+    /// session the application has on the token (login state is per application, not per session), and a
+    /// <c>C_CloseSession</c> closes someone else's session. So from here on:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>every later call on this session fails before reaching the module, with the same code;</item>
+    /// <item>disposal sends no <c>C_Logout</c>, and no <c>C_SessionCancel</c> for an abandoned operation;</item>
+    /// <item>for <c>CKR_SESSION_CLOSED</c> and <c>CKR_SESSION_HANDLE_INVALID</c>, no <c>C_CloseSession</c> either:
+    /// the module has said the session is closed;</item>
+    /// <item>for <c>CKR_DEVICE_REMOVED</c> and <c>CKR_TOKEN_NOT_PRESENT</c>, one <c>C_CloseSession</c>, now rather
+    /// than at disposal. These do not say the module closed the session itself (on a network HSM they can be
+    /// transient), and a session left open could stay logged in until <c>C_Finalize</c>; closing at once, as soon
+    /// as the current operation lets go of the handle, leaves the least time for the number to be reused.</item>
+    /// </list>
+    /// <para>
+    /// This is a design choice rather than a spec requirement: PKCS#11 v3.2 does not say that a module closes every
+    /// session after <c>CKR_DEVICE_REMOVED</c>. Only this session object learns of the loss; another session on the
+    /// same token finds out from its own next call.
+    /// </para>
+    /// </remarks>
+    private void ObserveSessionLoss(CKR rv, string method)
+    {
+        if (!IsSessionLoss(rv) || _lostTo != CKR.CKR_OK || _sessionHandle is null)
+            return;
+
+        _lostTo = rv;
+        if (rv is CKR.CKR_SESSION_CLOSED or CKR.CKR_SESSION_HANDLE_INVALID)
+        {
+            Log.SessionClosedByModule(_logger, (ulong)_sessionId, method, rv);
+            _sessionHandle.MarkClosedByModule();
+        }
+        else
+        {
+            Log.SessionTokenLost(_logger, (ulong)_sessionId, method, rv);
+        }
+
+        // An operation's lease holds a reference on the handle, so the release (and, for a removed token, its one
+        // C_CloseSession) runs when that operation lets go, still under the session lock.
+        _sessionHandle.Dispose();
+    }
+
+    /// <summary>Refuses a call on a session the module has said is gone, before it reaches the module.</summary>
+    private void ThrowIfLost(string? caller)
+    {
+        if (_lostTo == CKR.CKR_OK)
+            return;
+
+        string method = caller ?? "<unknown>";
+        string message = $"{method}: this session was lost ({_lostTo}) and can no longer be used. Open a new session.";
+        throw _lostTo is CKR.CKR_DEVICE_REMOVED or CKR.CKR_TOKEN_NOT_PRESENT
+            ? new Pkcs11TokenException(_lostTo, method, message)
+            : new Pkcs11SessionException(_lostTo, method, message);
     }
 
     /// <summary>
@@ -714,9 +817,12 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             if (_disposed)
                 return;
 
+            // No logout on a lost session: its number may now name another session, and a C_Logout through
+            // it would log out every session the application has on the token. See ObserveSessionLoss.
             try
             {
-                LogoutForDispose();
+                if (_lostTo == CKR.CKR_OK)
+                    LogoutForDispose();
             }
             catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException)
             {
@@ -765,7 +871,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         Log.LoggingOutSession(_logger, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Logout(_sessionId);
-        Pkcs11Exception.ThrowIfError(rv, OpLogout);
+        ThrowIfError(rv, OpLogout);
     }
 
     /// <summary>
@@ -778,7 +884,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetFunctionStatus");
 
         CKR rv = _pkcs11Library.C_GetFunctionStatus(_sessionId);
-        Pkcs11Exception.ThrowIfError(rv, OpGetFunctionStatus);
+        ThrowIfError(rv, OpGetFunctionStatus);
     }
 
     /// <summary>
@@ -791,7 +897,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "CancelFunction");
 
         CKR rv = _pkcs11Library.C_CancelFunction(_sessionId);
-        Pkcs11Exception.ThrowIfError(rv, OpCancelFunction);
+        ThrowIfError(rv, OpCancelFunction);
     }
 
     /// <summary>

@@ -70,11 +70,11 @@ internal sealed partial class Pkcs11SessionCore
     /// basis of its length: it does not verify, as the BCL's own verifiers report for a malformed signature,
     /// rather than an operational failure.
     /// </remarks>
-    private static bool IsVerified(CKR rv, string operation)
+    private bool IsVerified(CKR rv, string operation)
     {
         if (rv == CKR.CKR_OK) return true;
         if (rv is CKR.CKR_SIGNATURE_INVALID or CKR.CKR_SIGNATURE_LEN_RANGE) return false;
-        throw Pkcs11Exception.Create(rv, operation);
+        throw Failure(rv, operation);
     }
 
     /// <summary>
@@ -88,7 +88,7 @@ internal sealed partial class Pkcs11SessionCore
     /// CKR_DEVICE_ERROR. A key or mechanism error has already surfaced from the init call, which is
     /// checked before this.
     /// </remarks>
-    private static bool IsVerified(CKR rv, string operation, CKM mechanism, int signatureLength)
+    private bool IsVerified(CKR rv, string operation, CKM mechanism, int signatureLength)
         => (KnownOutputLength.Of(mechanism) is not { } macLength || signatureLength == macLength)
            && IsVerified(rv, operation);
 
@@ -111,7 +111,7 @@ internal sealed partial class Pkcs11SessionCore
     private delegate CKR TwoInputLengthProbedCall(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second, Span<byte> buffer, bool lengthOnly, out NativeCULong length);
 
     /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string, int?, Func{CKR})"/>
-    private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation, int? guess = null)
+    private byte[] CallWithLengthProbe(LengthProbedCall call, string operation, int? guess = null)
         => CallWithLengthProbe([], (ReadOnlySpan<byte> _, Span<byte> buffer, bool lengthOnly, out NativeCULong length) => call(buffer, lengthOnly, out length), operation, guess);
 
     /// <summary>
@@ -139,14 +139,14 @@ internal sealed partial class Pkcs11SessionCore
     /// v3.2 §5.2 (NSS does): the retry then fails with <c>CKR_OPERATION_NOT_INITIALIZED</c>, and the output
     /// is found with a length query on the restarted operation instead.
     /// </param>
-    private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation,
+    private byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation,
         int? guess = null, Func<CKR>? restart = null)
         => CallWithLengthProbe(input, [],
             (ReadOnlySpan<byte> first, ReadOnlySpan<byte> _, Span<byte> buffer, bool lengthOnly, out NativeCULong length) => call(first, buffer, lengthOnly, out length),
             operation, guess, restart);
 
     /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string, int?, Func{CKR})"/>
-    private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second, TwoInputLengthProbedCall call, string operation,
+    private byte[] CallWithLengthProbe(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second, TwoInputLengthProbedCall call, string operation,
         int? guess = null, Func<CKR>? restart = null)
     {
         if (guess is int guessed)
@@ -167,12 +167,12 @@ internal sealed partial class Pkcs11SessionCore
                 if (filled != CKR.CKR_OPERATION_NOT_INITIALIZED || restart is null)
                     return Filled(sized, filled, written, operation);
                 CryptographicOperations.ZeroMemory(sized);
-                Pkcs11Exception.ThrowIfError(restart(), operation);
+                ThrowIfError(restart(), operation);
             }
         }
 
         CKR rv = call(first, second, default, lengthOnly: true, out NativeCULong reported);
-        Pkcs11Exception.ThrowIfError(rv, operation);
+        ThrowIfError(rv, operation);
 
         byte[] buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
         rv = call(first, second, buffer, lengthOnly: false, out reported);
@@ -192,11 +192,11 @@ internal sealed partial class Pkcs11SessionCore
     /// write into it before it fails, and for a decryption that is plaintext, perhaps plaintext whose
     /// tag check then failed.
     /// </summary>
-    private static byte[] Filled(byte[] buffer, CKR rv, NativeCULong written, string operation)
+    private byte[] Filled(byte[] buffer, CKR rv, NativeCULong written, string operation)
     {
         try
         {
-            Pkcs11Exception.ThrowIfError(rv, operation);
+            ThrowIfError(rv, operation);
             return ReportedLength.Trim(buffer, written, operation);
         }
         catch
@@ -248,7 +248,7 @@ internal sealed partial class Pkcs11SessionCore
     /// </remarks>
     /// <returns>Whether the updates gave back every byte they were given, so the transform holds nothing
     /// back for its final.</returns>
-    private static bool PumpStreamThrough(
+    private bool PumpStreamThrough(
         Stream inputStream,
         Stream outputStream,
         int bufferLength,
@@ -265,7 +265,7 @@ internal sealed partial class Pkcs11SessionCore
             {
                 CKR rv = update(input.AsSpan(0, bytesRead), output, out NativeCULong outputLen);
                 if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                    Pkcs11Exception.ThrowIfError(rv, operation);
+                    ThrowIfError(rv, operation);
 
                 // A length no longer than the buffer was not reported (opencryptoki leaves the caller's in
                 // place), and an update has no length query of its own here, so the buffer is doubled instead,
@@ -280,7 +280,7 @@ internal sealed partial class Pkcs11SessionCore
 
                     rv = update(input.AsSpan(0, bytesRead), output, out outputLen);
                 }
-                Pkcs11Exception.ThrowIfError(rv, operation);
+                ThrowIfError(rv, operation);
 
                 int written = ReportedLength.Written(outputLen, output.Length, operation);
                 outputStream.Write(output, 0, written);
@@ -323,10 +323,10 @@ internal sealed partial class Pkcs11SessionCore
     /// block or a tag and lost it must not look like a shorter output.
     /// </para>
     /// </remarks>
-    private static byte[] CallFinal(LengthProbedCall final, string operation, int bufferLength, bool nothingHeldBack)
+    private byte[] CallFinal(LengthProbedCall final, string operation, int bufferLength, bool nothingHeldBack)
     {
         CKR rv = final(default, lengthOnly: true, out NativeCULong reported);
-        Pkcs11Exception.ThrowIfError(rv, operation);
+        ThrowIfError(rv, operation);
 
         byte[] buffer = new byte[Math.Max(ReportedLength.ForAllocation(reported, operation), Math.Max(bufferLength, FinalPartMargin))];
         rv = final(buffer, lengthOnly: false, out NativeCULong written);

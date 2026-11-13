@@ -55,6 +55,17 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
     /// <summary>The underlying PKCS#11 session handle.</summary>
     public NativeCULong SessionId => _sessionId;
 
+    /// <summary>Set once the module has said this session no longer exists; see <see cref="MarkClosedByModule"/>.</summary>
+    private volatile bool _closedByModule;
+
+    /// <summary>
+    /// Records that the module answered <c>CKR_SESSION_CLOSED</c> or <c>CKR_SESSION_HANDLE_INVALID</c> for this
+    /// session: it is already closed, and the module may give its number to a session opened since, which a
+    /// <c>C_CloseSession</c> here would close. The release then skips that call but still untracks the handle and
+    /// releases its use of the module, so <c>C_Finalize</c> is not held off.
+    /// </summary>
+    internal void MarkClosedByModule() => _closedByModule = true;
+
     /// <inheritdoc/>
     public override bool IsInvalid => (ulong)_sessionId == CK.CK_INVALID_HANDLE;
 
@@ -66,6 +77,9 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
             if (IsInvalid) return true;
             try
             {
+                if (_closedByModule)
+                    return true;
+
                 // Through the module, not the library: the library may already be disposed (an
                 // abandoned session's finalizer runs in any order relative to the library's), but this
                 // handle's reference keeps the module mapped for the call.
