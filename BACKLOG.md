@@ -1026,10 +1026,11 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** `WaitForSlotEvent` design review (PR #331)
 
 ### [BL-183] Lift the five BouncyHsm mechanism-coverage gates once BouncyHsm fixes them
+- **Status:** Partially resolved 2026-11-14 by the `vendor/bouncyhsm` bump to development (ebfefd60 has these fixes; the branch pins 626ea09e): (1) is fixed (harrison314/BouncyHsm 16addbc5); (4) is gone, since BouncyHsm no longer offers `CKM_AES_CFB1` (2ab722af), so its case skips as unadvertised; (3) is fixed in part (f7be50fb): the parameter is now the start bit, but each byte's bits are numbered from the least significant and the extraction does not wrap around (BL-188). The gates for (1), (3) and (4) and their quirk tests are gone; (2) and (5) remain.
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmRecordsTheHmacKeyGenMechanism`, `BouncyHsmDerivesShakeKeysOfAnyLength`, `BouncyHsmExtractsFromTheBitGiven`, `BouncyHsmRunsCfb1WithAOneBitSegment`, `BouncyHsmTakesSha512THmacKeys`); `Integration/Mechanisms/MechanismCoverageTests.BouncyHsm.cs`; `Integration/Compat/BouncyHsmQuirkTests.cs`
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmDerivesShakeKeysOfAnyLength`, `BouncyHsmTakesSha512THmacKeys`); `Integration/Mechanisms/MechanismCoverageTests.BouncyHsm.cs`; `Integration/Compat/BouncyHsmQuirkTests.cs`
 - **Problem:** `MechanismCoverageTestCases`, which drives every mechanism BouncyHsm lists, found five places where the pinned BouncyHsm (8592a1d1) answers differently from PKCS#11 v3.2. (1) Every HMAC key generator (`CKM_SHA256_KEY_GEN`, `CKM_SHA3_256_KEY_GEN`, `CKM_BLAKE2B_256_KEY_GEN`, `CKM_SHA512_T_KEY_GEN` and the rest) records `CKA_KEY_GEN_MECHANISM` as `CKM_GENERIC_SECRET_KEY_GEN`. (2) `CKM_SHAKE_128_KEY_DERIVATION` and `CKM_SHAKE_256_KEY_DERIVATION` derive no more than 32 and 64 bytes and refuse a longer `CKA_VALUE_LEN` with `CKR_TEMPLATE_INCONSISTENT`. (3) `CKM_EXTRACT_KEY_FROM_KEY` reads `CK_EXTRACT_PARAMS` as a number of bits to keep, not as the bit the derived key starts at. (4) `CKM_AES_CFB1` encrypts with a 128-bit segment. (5) `CKM_SHA512_224_HMAC` and `CKM_SHA512_256_HMAC` refuse the keys their own key generators make, with `CKR_KEY_HANDLE_INVALID`. Each gate's doc comment names the BouncyHsm source line responsible; all five are in BouncyHsm's code, not in BouncyCastle 2.7.0, which it uses (BouncyCastle has no 1-bit CFB, and its SHAKE gives any output length). Reported upstream as harrison314/BouncyHsm#146 (1), #150 (2), #148 (3), #149 (4) and #147 (5).
 - **Proposed action:** After a `vendor/bouncyhsm` bump with a fix, the matching `BouncyHsmQuirkTests.*_QuirkStillPresent` test fails; then set the flag to true and delete the test.
 - **Breaks public API?** No
@@ -1075,6 +1076,16 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Review HSS for the Recommended policy (stateful: one-time keys must never be reused, so a key must not be copied, backed up or restored; SP 800-208 requires generation and signing in hardware cryptographic modules). If it is admitted, add a `CK_ULONG`-array `Attribute` overload (or HSS-specific builder methods) and named LMS / LM-OTS type constants, and move the test cases onto them.
 - **Breaks public API?** No (additions only)
 - **Raised by:** HSS tests
+
+### [BL-188] Report the BouncyHsm quirks the bump to development 626ea09e found
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmRefusesAnXorKeyWithoutALength`, `BouncyHsmExtractsBitsMostSignificantFirst`, `BouncyHsmExtractsAroundTheEndOfTheKey`); `Integration/Keys/BaseKeyProtectionTests.BouncyHsm.cs`; `Integration/Mechanisms/MechanismCoverageTests.BouncyHsm.cs`; `Integration/Compat/BouncyHsmQuirkTests.cs`
+- **Problem:** With harrison314/BouncyHsm#141 and #148 fixed, cases that were gated whole run again and show three narrower departures from PKCS#11 v3.2. (1) `C_DeriveKey(CKM_XOR_BASE_AND_DATA)` with `CKK_GENERIC_SECRET` and no `CKA_VALUE_LEN` makes a 1-byte key (`XorBaseAndDataDeriveKeyGenerator` takes the key type's minimal length); §6.43 fails the call, because a generic secret has no well-defined length. The derived-key protection cases check an XOR key made in the clear first, so they skip XOR; with a `CKA_VALUE_LEN`, XOR keeps the base key's protection. (2) `CKM_EXTRACT_KEY_FROM_KEY` numbers each base-key byte's bits from the least significant, so 0x329F84A9 from bit 4, one byte, is 0xF3, not 0x29. (3) It does not wrap around the end of the base key, and refuses 0x329F84A9 from bit 8, four bytes, with `CKR_TEMPLATE_INCONSISTENT`. Separately, #136 (15c9fa29), #141 (976634e, 1483858) and #146 (16addbc5) are fixed on `development` but still open upstream.
+- **Proposed action:** Report (1) to (3) upstream, (2) and (3) as a follow-up to #148, and suggest closing #136, #141 and #146. After a `vendor/bouncyhsm` bump with a fix, the matching `BouncyHsmQuirkTests.*_QuirkStillPresent` test fails; then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
 
 ## PKCS#11 v3.2 Coverage Matrix
 

@@ -50,8 +50,7 @@ internal static partial class MechanismCoverageTestCases
 
     // Each HMAC key generator makes a key of its own key type, which its HMAC signs and verifies with (unless the
     // backend's wrapper says that HMAC does not take it).
-    internal static void Assert_HmacKeyGen_MakesAKeyItsHmacTakes(IPkcs11Backend backend, string familyName, bool recordsTheKeyGenMechanism = true,
-        bool hmacTakesTheKey = true)
+    internal static void Assert_HmacKeyGen_MakesAKeyItsHmacTakes(IPkcs11Backend backend, string familyName, bool hmacTakesTheKey = true)
     {
         HashFamily family = Family(familyName);
         CKM keyGen = family.KeyGen!.Value;
@@ -67,14 +66,14 @@ internal static partial class MechanismCoverageTestCases
             Assert.True(session.Verify(hmac, key, Message, mac));
             mac[0] ^= 0x01;
             Assert.False(session.Verify(hmac, key, Message, mac));
-        }, recordsTheKeyGenMechanism);
+        });
     }
 
     // CKM_SHA512_T_KEY_GEN makes a CKK_SHA512_T_HMAC key (PKCS#11 v3.2).
-    internal static void Assert_Sha512TKeyGen_MakesASha512THmacKey(IPkcs11Backend backend, bool recordsTheKeyGenMechanism = true)
+    internal static void Assert_Sha512TKeyGen_MakesASha512THmacKey(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA512_T_KEY_GEN);
-        AssertGenerates(backend, CKM.CKM_SHA512_T_KEY_GEN, CKK.CKK_SHA512_T_HMAC, 32, [CKA.CKA_SIGN, CKA.CKA_VERIFY], (_, _) => { }, recordsTheKeyGenMechanism);
+        AssertGenerates(backend, CKM.CKM_SHA512_T_KEY_GEN, CKK.CKK_SHA512_T_HMAC, 32, [CKA.CKA_SIGN, CKA.CKA_VERIFY], (_, _) => { });
     }
 
     // CKM_CAMELLIA_KEY_GEN makes 128-, 192- and 256-bit Camellia keys, each of which encrypts and decrypts.

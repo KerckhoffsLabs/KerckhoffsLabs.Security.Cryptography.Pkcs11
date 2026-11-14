@@ -11,7 +11,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanisms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
@@ -428,12 +427,10 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void HkdfOutputAboveTheRfcLimit_QuirkStillPresent()
     {
-        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
         var (rv, _) = HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 255 x 32 + 1");
-        var (narrowed, length) = HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 2^32 + 1");
 
-        Assert.True(rv == CKR.CKR_GENERAL_ERROR && narrowed == CKR.CKR_OK && length == 1,
-            $"C_DeriveKey(CKM_HKDF_DERIVE) past RFC 5869's limit no longer answers CKR_GENERAL_ERROR, or 2^32 + 1 a 1-byte key (got {rv}; {narrowed}, {length}): set " +
+        Assert.True(rv == CKR.CKR_GENERAL_ERROR,
+            $"C_DeriveKey(CKM_HKDF_DERIVE) past RFC 5869's limit no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit to true and delete this test.");
     }
 
@@ -445,32 +442,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         Assert.True(rv == CKR.CKR_OBJECT_HANDLE_INVALID,
             $"C_DeriveKey(CKM_HKDF_DERIVE) with an EC public key as the salt key no longer answers CKR_OBJECT_HANDLE_INVALID (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void KeyLengthAttributeAbove32Bits_QuirkStillPresent()
-    {
-        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
-        var (secretRv, secretLength) = Mechanisms.MechanismParameterTestCases.GenerateGenericSecret(_backend, (1UL << 32) + 16);
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        CKR rv;
-        int modulusBytes = 0;
-        try
-        {
-            rv = Keys.GenerateRsaKeyPairTestCases.GenerateRawRsa(_backend, session, (1UL << 32) + 2048, [0x01, 0x00, 0x01], out ObjectHandle pub, out ObjectHandle priv);
-            if (rv == CKR.CKR_OK)
-            {
-                using (var read = session.GetAttributeValue(pub, [CKA.CKA_MODULUS]))
-                    modulusBytes = read[0].GetValueAsByteArray().Length;
-                session.DestroyObject(priv);
-                session.DestroyObject(pub);
-            }
-        }
-        finally { TestKeys.LogoutIfRequired(_backend, session); }
-
-        Assert.True(rv == CKR.CKR_OK && modulusBytes == 256 && secretRv == CKR.CKR_OK && secretLength == 16,
-            $"CKA_MODULUS_BITS 2^32 + 2048 no longer makes a 2048-bit key ({rv}, {modulusBytes} bytes), or CKA_VALUE_LEN 2^32 + 16 a 16-byte " +
-            $"generic secret ({secretRv}, {secretLength}): set BouncyHsmBackendFixture.BouncyHsmRefusesAKeyLengthAttributeAbove32Bits to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -505,12 +476,42 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void BaseKeyProtection_QuirkStillPresent()
+    public void XorKeyWithoutALength_QuirkStillPresent()
     {
-        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, "XOR_BASE_AND_DATA; sensitive and unextractable"));
-        Assert.True(failure is XunitException and not SkipException,
-            "BouncyHsm now gives a key derived from a protected key the base key's protection (harrison314/BouncyHsm#141): set " +
-            "BouncyHsmBackendFixture.BouncyHsmKeepsABaseKeysProtection to true and delete this test.");
+        CKR rv = CKR.CKR_OK;
+        ulong length = 0;
+        using var session = TestKeys.OpenLoggedInSession(_backend);
+        try
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var derive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+            using var value = new ObjectAttribute(CKA.CKA_VALUE, new byte[16]);
+            ObjectHandle baseKey = session.CreateObject([keyClass, keyType, token, derive, value]);
+            try
+            {
+                using var buffers = new NativeBuffers();
+                byte[] data = new byte[16];
+                Mechanism xor = RawParameter.From(CKM.CKM_XOR_BASE_AND_DATA,
+                    new CK_KEY_DERIVATION_STRING_DATA { Data = buffers.Of(data), Len = (NativeCULong)(ulong)data.Length });
+                ObjectHandle derived = session.DeriveKey(xor, baseKey, [keyClass, keyType, token]);
+                try
+                {
+                    using var read = session.GetAttributeValue(derived, [CKA.CKA_VALUE_LEN]);
+                    length = read[0].GetValueAsUlong();
+                }
+                finally { session.DestroyObject(derived); }
+            }
+            catch (Pkcs11Exception ex) { rv = ex.ReturnValue; }
+            finally { session.DestroyObject(baseKey); }
+        }
+        finally { TestKeys.LogoutIfRequired(_backend, session); }
+
+        Assert.True(rv == CKR.CKR_OK && length == 1,
+            $"C_DeriveKey(CKM_XOR_BASE_AND_DATA) of a generic secret with no CKA_VALUE_LEN no longer makes a 1-byte key (got {rv}, {length} bytes): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAnXorKeyWithoutALength to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -569,30 +570,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void HmacKeyGenMechanism_QuirkStillPresent()
-    {
-        ulong recorded = 0;
-        WithInsecureSession(session =>
-        {
-            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
-            using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
-            ObjectHandle key = session.GenerateKey(new Mechanism(CKM.CKM_SHA256_KEY_GEN), [keyClass, token, length, sign]);
-            try
-            {
-                using var read = session.GetAttributeValue(key, [CKA.CKA_KEY_GEN_MECHANISM]);
-                recorded = read[0].GetValueAsUlong();
-            }
-            finally { session.DestroyObject(key); }
-        });
-
-        Assert.True(recorded == (ulong)CKM.CKM_GENERIC_SECRET_KEY_GEN,
-            $"A CKM_SHA256_KEY_GEN key no longer records CKM_GENERIC_SECRET_KEY_GEN as its CKA_KEY_GEN_MECHANISM (got 0x{recorded:X}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmRecordsTheHmacKeyGenMechanism to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ShakeDerivationLength_QuirkStillPresent()
     {
         var ex = Record.Exception(() => DerivedFrom([1, 2, 3, 4], new Mechanism(CKM.CKM_SHAKE_128_KEY_DERIVATION), 64));
@@ -604,40 +581,30 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void ExtractKeyFromKey_QuirkStillPresent()
+    public void ExtractKeyFromKeyBitOrder_QuirkStillPresent()
     {
-        // From bit 16 of 0x329F84A9, two bytes are 0x84A9; BouncyHsm keeps the first 16 bits, 0x329F.
-        byte[] bit16 = new byte[UnmanagedMemory.NativeULongSize];
-        bit16[0] = 16; // little-endian CK_ULONG
-        byte[]? got = DerivedFrom([0x32, 0x9F, 0x84, 0xA9], new Mechanism(CKM.CKM_EXTRACT_KEY_FROM_KEY, bit16), 2, [0x32, 0x9F], [0x84, 0xA9]);
+        // From bit 4 of 0x329F84A9, one byte is 0x29; numbering each byte's bits from the least significant gives 0xF3.
+        byte[] bit4 = new byte[UnmanagedMemory.NativeULongSize];
+        bit4[0] = 4; // little-endian CK_ULONG
+        byte[]? got = DerivedFrom([0x32, 0x9F, 0x84, 0xA9], new Mechanism(CKM.CKM_EXTRACT_KEY_FROM_KEY, bit4), 1, [0x29], [0xF3]);
 
-        Assert.True(got is [0x32, 0x9F],
-            $"CKM_EXTRACT_KEY_FROM_KEY from bit 16 no longer keeps the first 16 bits (got {(got is null ? "neither" : Convert.ToHexString(got))}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmExtractsFromTheBitGiven to true and delete this test.");
+        Assert.True(got is [0xF3],
+            $"CKM_EXTRACT_KEY_FROM_KEY from bit 4 no longer numbers each byte's bits from the least significant (got {(got is null ? "neither" : Convert.ToHexString(got))}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmExtractsBitsMostSignificantFirst to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void AesCfb1_QuirkStillPresent()
+    public void ExtractKeyFromKeyWrap_QuirkStillPresent()
     {
-        byte[] key = [.. Enumerable.Range(0, 16).Select(i => (byte)i)];
-        byte[] iv = [.. Enumerable.Range(0, 16).Select(i => (byte)(0xF0 + i))];
-        byte[] plaintext = "the quick brown fox"u8.ToArray();
-        byte[] ciphertext = [];
-        WithInsecureSession(session =>
-        {
-            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var encrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-            using var value = new ObjectAttribute(CKA.CKA_VALUE, key);
-            ObjectHandle handle = session.CreateObject([keyClass, keyType, token, encrypt, value]);
-            try { ciphertext = session.Encrypt(new Mechanism(CKM.CKM_AES_CFB1, iv), handle, plaintext); }
-            finally { session.DestroyObject(handle); }
-        });
+        // From bit 8 of 0x329F84A9, four bytes wrap around to 0x9F84A932.
+        byte[] bit8 = new byte[UnmanagedMemory.NativeULongSize];
+        bit8[0] = 8; // little-endian CK_ULONG
+        var ex = Record.Exception(() => DerivedFrom([0x32, 0x9F, 0x84, 0xA9], new Mechanism(CKM.CKM_EXTRACT_KEY_FROM_KEY, bit8), 4));
 
-        Assert.True(ciphertext.AsSpan().SequenceEqual(Mechanisms.MechanismCoverageTestCases.ReferenceCfb(key, iv, plaintext, 128)),
-            "CKM_AES_CFB1 no longer encrypts as CFB with a 128-bit segment: set " +
-            "BouncyHsmBackendFixture.BouncyHsmRunsCfb1WithAOneBitSegment to true and delete this test.");
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_TEMPLATE_INCONSISTENT },
+            "CKM_EXTRACT_KEY_FROM_KEY from bit 8, four bytes of a 4-byte key, no longer gives CKR_TEMPLATE_INCONSISTENT " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmExtractsAroundTheEndOfTheKey to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]

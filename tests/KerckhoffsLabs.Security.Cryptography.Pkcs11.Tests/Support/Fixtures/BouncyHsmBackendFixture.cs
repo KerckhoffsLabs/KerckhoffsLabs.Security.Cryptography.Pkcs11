@@ -175,16 +175,15 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmChecksTheKeyPairTemplatesClassAndKeyType = false;
 
     /// <summary>
-    /// False while <c>C_DeriveKey</c> gives the derived key the template's <c>CKA_SENSITIVE</c> and
-    /// <c>CKA_EXTRACTABLE</c>, not the base key's, for <c>CKM_CONCATENATE_BASE_AND_DATA</c>,
-    /// <c>CKM_CONCATENATE_DATA_AND_BASE</c>, <c>CKM_XOR_BASE_AND_DATA</c> and <c>CKM_CONCATENATE_BASE_AND_KEY</c>: a
-    /// sensitive or unextractable key can be read through a key derived from it. PKCS#11 v3.2 §6.43. Reported upstream
-    /// as harrison314/BouncyHsm#141. BouncyHsmQuirkTests.BaseKeyProtection_QuirkStillPresent fails once it is fixed.
+    /// False while <c>C_DeriveKey(CKM_XOR_BASE_AND_DATA)</c> with <c>CKK_GENERIC_SECRET</c> and no <c>CKA_VALUE_LEN</c>
+    /// answers <c>CKR_OK</c> and makes a 1-byte key: <c>XorBaseAndDataDeriveKeyGenerator</c> takes the key type's minimal
+    /// length. PKCS#11 v3.2 §6.43: a key type given without a length must have a well-defined length, and a generic
+    /// secret has none, so the call fails (the other backends make a key as long as the shorter of the base key and the
+    /// data). The derived-key protection cases check an XOR key made in the clear first, so they skip XOR on BouncyHsm. Found
+    /// when the fix for harrison314/BouncyHsm#141 (976634e and 1483858, in ebfefd60) let those cases run. Not yet reported
+    /// upstream. BouncyHsmQuirkTests.XorKeyWithoutALength_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmKeepsABaseKeysProtection = false;
-
-    /// <summary>Gate for the byte-operation derivations: see <see cref="BouncyHsmKeepsABaseKeysProtection"/>.</summary>
-    public static bool BaseKeyProtectionAvailable => BouncyHsmAvailable && BouncyHsmKeepsABaseKeysProtection;
+    public const bool BouncyHsmRefusesAnXorKeyWithoutALength = false;
 
     /// <summary>
     /// False while <c>C_CopyObject</c> changes <c>CKA_ALLOWED_MECHANISMS</c>, wider or narrower, with <c>CKR_OK</c>.
@@ -311,9 +310,9 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>
     /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with SHA-256 and <c>CKA_VALUE_LEN</c> 8161 (255 x 32 + 1, past
-    /// RFC 5869's limit) answers <c>CKR_GENERAL_ERROR</c>, and with <c>CKA_VALUE_LEN</c> 2^32 + 1 answers <c>CKR_OK</c>
-    /// and makes a 1-byte key (the length cut to its low 32 bits). PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6:
-    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// RFC 5869's limit) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>. A
+    /// <c>CKA_VALUE_LEN</c> of 2^32 + 1 is refused since harrison314/BouncyHsm#136 (15c9fa29).
     /// BouncyHsmQuirkTests.HkdfOutputAboveTheRfcLimit_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit = false;
@@ -328,30 +327,6 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent = false;
 
     /// <summary>
-    /// Gate for the out-of-range HKDF parameter case: see <see cref="BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit"/> and
-    /// <see cref="BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent"/>.
-    /// </summary>
-    public static bool HkdfParameterRefusalAvailable =>
-        BouncyHsmAvailable && BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit && BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent;
-
-    /// <summary>
-    /// False while a <c>CK_ULONG</c> length attribute in a key template is cut to its low 32 bits on a 64-bit platform:
-    /// <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with <c>CKA_MODULUS_BITS</c> 2^32 + 2048 makes a 2048-bit key
-    /// (ulMaxKeySize 6144), and <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> with <c>CKA_VALUE_LEN</c> 2^32 + 16
-    /// answers <c>CKR_OK</c>. PKCS#11 v3.2 §6.1.4, §6.8.3, §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
-    /// BouncyHsmQuirkTests.KeyLengthAttributeAbove32Bits_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRefusesAKeyLengthAttributeAbove32Bits = false;
-
-    /// <summary>
-    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a key one byte longer than the ulMaxKeySize it
-    /// reports (10485760 bits, so 1310721 bytes). PKCS#11 v3.2 §6.8.3: the range is in bits; past it is
-    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
-    /// </summary>
-    public const bool BouncyHsmBoundsAGenericSecretByItsMaximum = false;
-
-    /// <summary>
     /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> of a <c>CKK_AES</c> key with <c>CKA_VALUE_LEN</c> 13 answers
     /// <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §6.10.2 (16, 24 or 32 bytes), §4.1, §5.1.6:
     /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
@@ -361,16 +336,6 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the derived AES key length case: see <see cref="BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid"/>.</summary>
     public static bool AesKeyLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid;
-
-    /// <summary>
-    /// False while a key the HMAC key generators make (<c>CKM_SHA256_KEY_GEN</c>, <c>CKM_SHA3_256_KEY_GEN</c>,
-    /// <c>CKM_BLAKE2B_256_KEY_GEN</c>, <c>CKM_SHA512_T_KEY_GEN</c> and the rest) has <c>CKA_KEY_GEN_MECHANISM</c>
-    /// <c>CKM_GENERIC_SECRET_KEY_GEN</c>: <c>GenericSecretHmacKeyGenerator</c> builds a <c>GenericSecretKeyObject</c>, whose
-    /// constructor fixes that mechanism, and only changes its key type. PKCS#11 v3.2: the attribute names the
-    /// mechanism that generated the key. Reported upstream as harrison314/BouncyHsm#146.
-    /// BouncyHsmQuirkTests.HmacKeyGenMechanism_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRecordsTheHmacKeyGenMechanism = false;
 
     /// <summary>
     /// False while <c>CKM_SHAKE_128_KEY_DERIVATION</c> and <c>CKM_SHAKE_256_KEY_DERIVATION</c> derive no more than 32
@@ -388,28 +353,22 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
             : null;
 
     /// <summary>
-    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> reads its <c>CK_EXTRACT_PARAMS</c> as a number of bits to keep from
-    /// the start of the base key (<c>ExtractKeyFromKeyDeriveKeyGenerator</c>), so bit 0 gives an empty key. PKCS#11 v3.2:
-    /// it is the bit the derived key starts at, wrapping around the end of the base key, and
-    /// <c>CKA_VALUE_LEN</c> is the derived key's length. Reported upstream as harrison314/BouncyHsm#148.
-    /// BouncyHsmQuirkTests.ExtractKeyFromKey_QuirkStillPresent fails once it is fixed.
+    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> numbers the bits of each base-key byte from the least significant
+    /// (<c>ExtractKeyFromKeyDeriveKeyGenerator.Extract</c>), so an extraction that does not start on a byte boundary
+    /// gives other bits: 0x329F84A9 from bit 4, one byte, is 0xF3, where PKCS#11 v3.2, which counts from the most
+    /// significant bit of the first byte, gives 0x29. Since harrison314/BouncyHsm#148 was fixed (f7be50fb) the
+    /// <c>CK_EXTRACT_PARAMS</c> is the start bit, so a start on a byte boundary is right. Not yet reported upstream.
+    /// BouncyHsmQuirkTests.ExtractKeyFromKeyBitOrder_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmExtractsFromTheBitGiven = false;
-
-    /// <summary>Gate for the CKM_EXTRACT_KEY_FROM_KEY cases: see <see cref="BouncyHsmExtractsFromTheBitGiven"/>.</summary>
-    public static bool ExtractKeyFromKeyAvailable => BouncyHsmAvailable && BouncyHsmExtractsFromTheBitGiven;
+    public const bool BouncyHsmExtractsBitsMostSignificantFirst = false;
 
     /// <summary>
-    /// False while <c>CKM_AES_CFB1</c> encrypts as CFB with a 128-bit segment: <c>BufferedCipherWrapperFactory</c> maps it
-    /// to BouncyCastle's <c>AES/CFB/NOPADDING</c>, whose segment is the block size (the line carries a TODO). PKCS#11 v3.2
-    /// and NIST SP 800-38A §6.3: a 1-bit segment. BouncyCastle has no 1-bit CFB (its <c>CfbBlockCipher</c> takes
-    /// whole bytes), so the fix is BouncyHsm's. Reported upstream as harrison314/BouncyHsm#149.
-    /// BouncyHsmQuirkTests.AesCfb1_QuirkStillPresent fails once it is fixed.
+    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> does not wrap around the end of the base key: it takes the bits from the
+    /// start bit to the end, so 0x329F84A9 from bit 8, four bytes, is refused with <c>CKR_TEMPLATE_INCONSISTENT</c>
+    /// (PKCS#11 v3.2 wraps around, giving 0x9F84A932). Not yet reported upstream.
+    /// BouncyHsmQuirkTests.ExtractKeyFromKeyWrap_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmRunsCfb1WithAOneBitSegment = false;
-
-    /// <summary>Gate for the CKM_AES_CFB1 case: see <see cref="BouncyHsmRunsCfb1WithAOneBitSegment"/>.</summary>
-    public static bool AesCfb1Available => BouncyHsmAvailable && BouncyHsmRunsCfb1WithAOneBitSegment;
+    public const bool BouncyHsmExtractsAroundTheEndOfTheKey = false;
 
     /// <summary>
     /// False while <c>CKM_SHA512_224_HMAC</c> and <c>CKM_SHA512_256_HMAC</c> take only a <c>CKK_GENERIC_SECRET</c> key and

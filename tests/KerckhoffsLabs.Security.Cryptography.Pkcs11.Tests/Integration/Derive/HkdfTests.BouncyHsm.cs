@@ -29,7 +29,14 @@ public sealed class HkdfTests_BouncyHsm(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ExtractOnly_MatchesBclViaSignProbe() => HkdfTestCases.Assert_ExtractOnly_MatchesBclViaSignProbe(_backend);
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfParameterRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm refuses an HKDF output past RFC 5869's limit with CKR_GENERAL_ERROR or cuts it, and a salt key with CKR_OBJECT_HANDLE_INVALID")]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(HkdfTestCases.HkdfParameterFaults), MemberType = typeof(HkdfTestCases))]
-    public void Hkdf_ParameterOutOfRange_IsRefused(string fault) => HkdfTestCases.Assert_Hkdf_ParameterOutOfRange_IsRefused(_backend, fault);
+    public void Hkdf_ParameterOutOfRange_IsRefused(string fault)
+    {
+        if (fault == "CKA_VALUE_LEN 255 x 32 + 1" && !BouncyHsmBackendFixture.BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit)
+            Assert.Skip("BouncyHsm refuses an HKDF output past RFC 5869's limit with CKR_GENERAL_ERROR");
+        if (fault == "a salt key that is an EC public key" && !BouncyHsmBackendFixture.BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent)
+            Assert.Skip("BouncyHsm refuses an HKDF salt key of the wrong type with CKR_OBJECT_HANDLE_INVALID");
+        HkdfTestCases.Assert_Hkdf_ParameterOutOfRange_IsRefused(_backend, fault);
+    }
 }
