@@ -77,7 +77,7 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// lets the template set either value; the base key decides only <c>CKA_ALWAYS_SENSITIVE</c> and
     /// <c>CKA_NEVER_EXTRACTABLE</c>. Since harrison314/BouncyHsm 976634e, which fixed harrison314/BouncyHsm#141 in
     /// <c>DeriveKeyGeneratorBase</c>: the §6.43 rule is right for the byte-operation mechanisms, but
-    /// <c>HkdfDeriveKeyGenerator</c> shares the base class. Not yet reported upstream.
+    /// <c>HkdfDeriveKeyGenerator</c> shares the base class. Reported upstream in a comment on harrison314/BouncyHsm#141.
     /// BouncyHsmQuirkTests.HkdfDerivedKeySensitivity_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmHkdfTakesTheTemplatesSensitivity = false;
@@ -211,7 +211,8 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// of <c>C_WrapKey</c> or the unwrapping key of <c>C_UnwrapKey</c>. The handle is valid; PKCS#11 v3.2 §5.1.6
     /// keeps <c>CKR_OBJECT_HANDLE_INVALID</c> for a handle that is not, lists it for none of these functions, and
     /// answers a non-key with <c>CKR_KEY_HANDLE_INVALID</c> (<c>CKR_WRAPPING_KEY_HANDLE_INVALID</c>,
-    /// <c>CKR_UNWRAPPING_KEY_HANDLE_INVALID</c>) or a key-type or key-function code. Not yet reported upstream.
+    /// <c>CKR_UNWRAPPING_KEY_HANDLE_INVALID</c>) or a key-type or key-function code. Likely the same cause as
+    /// harrison314/BouncyHsm#152 (<c>FindObjectByHandle&lt;T&gt;</c>), which mentions it.
     /// BouncyHsmQuirkTests.NonKeyObjectAsAKey_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmRefusesANonKeyObjectAsAKey = false;
@@ -305,6 +306,7 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// RFC 5869's limit) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6:
     /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>. A
     /// <c>CKA_VALUE_LEN</c> of 2^32 + 1 is refused since harrison314/BouncyHsm#136 (15c9fa29).
+    /// Reported upstream as harrison314/BouncyHsm#152.
     /// BouncyHsmQuirkTests.HkdfOutputAboveTheRfcLimit_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit = false;
@@ -314,6 +316,7 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <c>hSaltKey</c> answers <c>CKR_OBJECT_HANDLE_INVALID</c>; the handle is a valid key's. PKCS#11 v3.2 §6.62.2
     /// names no code: <c>CKR_MECHANISM_PARAM_INVALID</c>, <c>CKR_KEY_HANDLE_INVALID</c> or
     /// <c>CKR_KEY_TYPE_INCONSISTENT</c> (§5.1.6).
+    /// Reported upstream as harrison314/BouncyHsm#152.
     /// BouncyHsmQuirkTests.HkdfSaltKeyOfTheWrongType_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent = false;
