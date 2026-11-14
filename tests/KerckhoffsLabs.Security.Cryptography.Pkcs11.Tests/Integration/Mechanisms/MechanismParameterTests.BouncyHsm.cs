@@ -50,12 +50,5 @@ public sealed class MechanismParameterTests_BouncyHsm(BouncyHsmBackendFixture ba
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.GenericSecretLengths), MemberType = typeof(MechanismParameterTestCases))]
-    public void GenericSecretKeyGen_LengthIsBoundedInBits(string row)
-    {
-        if (row == "2^32 + 16" && !BouncyHsmBackendFixture.BouncyHsmRefusesAKeyLengthAttributeAbove32Bits)
-            Assert.Skip("BouncyHsm cuts CKA_VALUE_LEN to 32 bits");
-        if (row == "ulMaxKeySize / 8 + 1" && !BouncyHsmBackendFixture.BouncyHsmBoundsAGenericSecretByItsMaximum)
-            Assert.Skip("BouncyHsm makes a generic secret past the ulMaxKeySize it reports");
-        MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
-    }
+    public void GenericSecretKeyGen_LengthIsBoundedInBits(string row) => MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
 }

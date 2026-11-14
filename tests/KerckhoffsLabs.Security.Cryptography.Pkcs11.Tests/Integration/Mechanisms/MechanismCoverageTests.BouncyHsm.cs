@@ -60,22 +60,21 @@ public sealed class MechanismCoverageTests_BouncyHsm(BouncyHsmBackendFixture bac
     [InlineData(CKM.CKM_XOR_BASE_AND_DATA)]
     public void StringDataDerivation(CKM mechanism) => MechanismCoverageTestCases.Assert_StringDataDerivation(_backend, mechanism);
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.ExtractKeyFromKeyAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm reads CK_EXTRACT_PARAMS as a number of bits to keep")]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.Extractions), MemberType = typeof(MechanismCoverageTestCases))]
-    public void ExtractKeyFromKey_StartsAtTheBitGiven(string baseKey, int bit, int length) => MechanismCoverageTestCases.Assert_ExtractKeyFromKey_StartsAtTheBitGiven(_backend, baseKey, bit, length);
+    public void ExtractKeyFromKey_StartsAtTheBitGiven(string baseKey, int bit, int length)
+    {
+        if (bit % 8 != 0 && !BouncyHsmBackendFixture.BouncyHsmExtractsBitsMostSignificantFirst)
+            Assert.Skip("BouncyHsm numbers the bits of each base-key byte from the least significant.");
+        MechanismCoverageTestCases.Assert_ExtractKeyFromKey_StartsAtTheBitGiven(_backend, baseKey, bit, length,
+            BouncyHsmBackendFixture.BouncyHsmExtractsAroundTheEndOfTheKey);
+    }
 
     // --- Ciphers ----------------------------------------------------------------
 
-    // CKM_AES_CFB1 has its own case below.
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    [InlineData(CKM.CKM_AES_OFB)]
-    [InlineData(CKM.CKM_AES_CFB8)]
-    [InlineData(CKM.CKM_AES_CFB64)]
-    [InlineData(CKM.CKM_AES_CFB128)]
+    [MemberData(nameof(MechanismCoverageTestCases.AesFeedbackModes), MemberType = typeof(MechanismCoverageTestCases))]
     public void AesFeedbackMode_MatchesSp80038a(CKM mechanism) => MechanismCoverageTestCases.Assert_AesFeedbackMode_MatchesSp80038a(_backend, mechanism);
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.AesCfb1Available), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm runs CKM_AES_CFB1 with a 128-bit segment")]
-    public void AesCfb1_MatchesSp80038a() => MechanismCoverageTestCases.Assert_AesFeedbackMode_MatchesSp80038a(_backend, CKM.CKM_AES_CFB1);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.CtsLengths), MemberType = typeof(MechanismCoverageTestCases))]
@@ -96,11 +95,10 @@ public sealed class MechanismCoverageTests_BouncyHsm(BouncyHsmBackendFixture bac
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.KeyGenFamilies), MemberType = typeof(MechanismCoverageTestCases))]
     public void HmacKeyGen_MakesAKeyItsHmacTakes(string family) => MechanismCoverageTestCases.Assert_HmacKeyGen_MakesAKeyItsHmacTakes(_backend, family,
-        BouncyHsmBackendFixture.BouncyHsmRecordsTheHmacKeyGenMechanism, BouncyHsmBackendFixture.HmacTakesItsGeneratedKey(family));
+        BouncyHsmBackendFixture.HmacTakesItsGeneratedKey(family));
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void Sha512TKeyGen_MakesASha512THmacKey() => MechanismCoverageTestCases.Assert_Sha512TKeyGen_MakesASha512THmacKey(_backend,
-        BouncyHsmBackendFixture.BouncyHsmRecordsTheHmacKeyGenMechanism);
+    public void Sha512TKeyGen_MakesASha512THmacKey() => MechanismCoverageTestCases.Assert_Sha512TKeyGen_MakesASha512THmacKey(_backend);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.CamelliaKeyLengths), MemberType = typeof(MechanismCoverageTestCases))]

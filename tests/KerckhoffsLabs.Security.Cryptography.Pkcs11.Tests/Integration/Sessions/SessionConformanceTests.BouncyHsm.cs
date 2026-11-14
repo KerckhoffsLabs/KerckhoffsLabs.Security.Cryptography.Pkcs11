@@ -34,10 +34,7 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
     public void StaleHandles_AreRefused() => SessionConformanceTestCases.Assert_StaleHandles_AreRefused(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void SessionObject_OutlivesNoSessionOfIts()
-    {
-        Assert.Skip("BouncyHsm shows a session object only to the session that created it.");
-    }
+    public void SessionObject_OutlivesNoSessionOfIts() => SessionConformanceTestCases.Assert_SessionObject_OutlivesNoSessionOfIts(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void SecondLibraryInstance_LeavesTheFirstWorking() => SessionConformanceTestCases.Assert_SecondLibraryInstance_LeavesTheFirstWorking(_backend);
@@ -49,18 +46,16 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.LogoutInvalidationAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm keeps private session objects after C_Logout")]
     public void Logout_InvalidatesPrivateHandles() => SessionConformanceTestCases.Assert_Logout_InvalidatesPrivateHandles(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.SoUserExclusionAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm logs the user in over the SO")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void SoAndUser_ExcludeEachOther() => SessionConformanceTestCases.Assert_SoAndUser_ExcludeEachOther(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.SoPrivateObjectRefusalAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm lets the SO make a private object")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void So_CreatesNoPrivateObject() => SessionConformanceTestCases.Assert_So_CreatesNoPrivateObject(_backend);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.PrivateObjectCalls), MemberType = typeof(SessionConformanceTestCases))]
     public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall)
     {
-        if (whoAndCall.StartsWith("SO;", StringComparison.Ordinal) && !BouncyHsmBackendFixture.SoPrivateObjectRefusalAvailable)
-            Assert.Skip("BouncyHsm lets the SO make a private object.");
         SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
     }
 
@@ -74,10 +69,10 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.PinLengthRangeAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm reports its maximum PIN length as its minimum")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.PinLengthRangeAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm takes a PIN shorter than the minimum it reports")]
     public void PinOutsideTheLengthRange_IsRefused() => SessionConformanceTestCases.Assert_PinOutsideTheLengthRange_IsRefused(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.ShortMechanismListAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm leaves *pulCount as given on CKR_BUFFER_TOO_SMALL")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void MechanismList_OneShort_IsBufferTooSmall() => SessionConformanceTestCases.Assert_MechanismList_OneShort_IsBufferTooSmall(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]

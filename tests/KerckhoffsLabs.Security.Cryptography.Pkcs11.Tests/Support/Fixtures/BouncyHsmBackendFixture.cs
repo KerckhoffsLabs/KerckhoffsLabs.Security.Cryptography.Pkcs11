@@ -41,14 +41,6 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
         OperatingSystem.IsLinux() && ServerAssemblyPath() is not null && NativeLibraryPath() is not null;
 
     /// <summary>
-    /// False while the server refuses to digest empty data: the fix for harrison314/BouncyHsm#115 lets
-    /// <c>ulDataLen == 0</c> through the client and the server signs and verifies empty data, but
-    /// <c>DigestSessionState.Final</c> still answers a digest of no data with <c>CKR_DATA_LEN_RANGE</c>. Not yet
-    /// reported upstream. BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmAcceptsEmptyDigest = false;
-
-    /// <summary>
     /// False while the native client refuses <c>ulSignatureLen == 0</c> in <c>C_Verify</c> with
     /// <c>CKR_ARGUMENTS_BAD</c> (<c>bouncy-pkcs11.c</c>, as does <c>C_VerifyFinal</c>), where an empty signature is simply invalid. Not yet
     /// reported upstream. BouncyHsmQuirkTests.EmptySignature_QuirkStillPresent fails once it is fixed.
@@ -65,69 +57,8 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// </summary>
     public const bool BouncyHsmDestroysPrivateSessionObjectsOnLogout = false;
 
-    /// <summary>
-    /// False while the SO and the user can be logged in at once: with the SO logged in, <c>C_Login(CKU_USER)</c>
-    /// answers <c>CKR_OK</c> (<c>LoginHandler</c> checks only for a login of the same type), where PKCS#11 v3.2
-    /// §5.1.6 answers <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>. Not yet reported upstream.
-    /// BouncyHsmQuirkTests.UserLoginOverTheSo_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmKeepsTheSoAndTheUserApart = false;
-
-    /// <summary>
-    /// False while the SO can make a private object: with the SO logged in, <c>C_CreateObject</c> with
-    /// <c>CKA_PRIVATE = TRUE</c> succeeds, where PKCS#11 v3.2 §5.7.1 allows only public objects unless the normal
-    /// user is logged in (<c>CKR_USER_NOT_LOGGED_IN</c>, §5.1.6). Not yet reported upstream.
-    /// BouncyHsmQuirkTests.PrivateObjectAsTheSo_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRefusesPrivateObjectsToTheSo = false;
-
-    /// <summary>
-    /// False while <c>C_GetTokenInfo</c> reports <c>ulMinPinLen</c> as the maximum: the native client copies
-    /// <c>MaxPinLen</c> into both fields (<c>bouncy-pkcs11.c</c>, <c>C_GetTokenInfo</c>), so the token reports a
-    /// range of [512, 512] that leaves out the PIN it logs in with, where the server's own minimum is 4
-    /// (<c>P11Constants.MinPinLength</c>). PKCS#11 v3.2 §3.2 (<c>CK_TOKEN_INFO</c>). Not yet reported upstream.
-    /// BouncyHsmQuirkTests.MinimumPinLength_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmReportsItsMinimumPinLength = false;
-
-    /// <summary>
-    /// False while <c>C_GetMechanismList</c> into a list too short answers <c>CKR_BUFFER_TOO_SMALL</c> but leaves
-    /// <c>*pulCount</c> as the caller gave it: <c>GetMechanismListHandler</c> sends no data with the error, so the
-    /// native client has no count to write. PKCS#11 v3.2 §5.5.5: "In either case, the value *pulCount is set to
-    /// hold the number of mechanisms". Not yet reported upstream.
-    /// BouncyHsmQuirkTests.ShortMechanismList_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmReportsTheMechanismCountOnAShortList = false;
-
-    /// <summary>
-    /// False while a sensitive ML-DSA or ML-KEM private key reveals its secret: with <c>CKA_SENSITIVE = TRUE</c>,
-    /// <c>C_GetAttributeValue</c> of an ML-DSA key's <c>CKA_VALUE</c> and <c>CKA_SEED</c>, and of an ML-KEM key's
-    /// <c>CKA_VALUE</c>, answers <c>CKR_OK</c> and returns the private key. <c>MlDsaPrivateKeyObject</c> and
-    /// <c>MlKemPrivateKeyObject</c> (and <c>SlhDsaPrivateKeyObject</c>) do not override
-    /// <c>IsSensitiveAttribute</c>, which the RSA, EC, EdDSA and Montgomery private keys do. PKCS#11 v3.2 §6.67.3
-    /// and §6.68.3, footnote 7: these attributes cannot be revealed while the key is sensitive (§5.7.5:
-    /// <c>CKR_ATTRIBUTE_SENSITIVE</c>, <c>ulValueLen</c> = <c>CK_UNAVAILABLE_INFORMATION</c>). Not yet reported
-    /// upstream. BouncyHsmQuirkTests.SensitivePqcPrivateKey_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmHidesSensitivePqcPrivateKeys = false;
-
-    /// <summary>Gate for the short mechanism list case: see <see cref="BouncyHsmReportsTheMechanismCountOnAShortList"/>.</summary>
-    public static bool ShortMechanismListAvailable => BouncyHsmAvailable && BouncyHsmReportsTheMechanismCountOnAShortList;
-
-    /// <summary>Gate for the PIN length case: see <see cref="BouncyHsmReportsItsMinimumPinLength"/>.</summary>
-    public static bool PinLengthRangeAvailable => BouncyHsmAvailable && BouncyHsmReportsItsMinimumPinLength;
-
-    /// <summary>Gate for the SO-and-user login case: see <see cref="BouncyHsmKeepsTheSoAndTheUserApart"/>.</summary>
-    public static bool SoUserExclusionAvailable => BouncyHsmAvailable && BouncyHsmKeepsTheSoAndTheUserApart;
-
-    /// <summary>Gate for the SO private-object case: see <see cref="BouncyHsmRefusesPrivateObjectsToTheSo"/>.</summary>
-    public static bool SoPrivateObjectRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesPrivateObjectsToTheSo;
-
     /// <summary>Gate for the C_Logout handle case: see <see cref="BouncyHsmDestroysPrivateSessionObjectsOnLogout"/>.</summary>
     public static bool LogoutInvalidationAvailable => BouncyHsmAvailable && BouncyHsmDestroysPrivateSessionObjectsOnLogout;
-
-    /// <summary>Gate for empty-input digest cases: see <see cref="BouncyHsmAcceptsEmptyDigest"/>.</summary>
-    public static bool EmptyDigestAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptyDigest;
 
     /// <summary>Gate for cases that verify an empty RSA signature: see <see cref="BouncyHsmAcceptsEmptySignature"/>.</summary>
     public static bool WrongLengthRsaSignatureRejectionAvailable => BouncyHsmAvailable && BouncyHsmAcceptsEmptySignature;
@@ -138,6 +69,80 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// derives each additional key from the next bytes of the KDF output. Seen on the pinned BouncyHsm.
     /// </summary>
     public const bool BouncyHsmDerivesAdditionalSp800108Keys = false;
+
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> overrides the template's <c>CKA_SENSITIVE</c> and
+    /// <c>CKA_EXTRACTABLE</c> from the base key: a sensitive base gives a sensitive key and a non-extractable base a
+    /// non-extractable one, whatever the template asks, so an HKDF output cannot be read back. PKCS#11 v3.2 §6.62.3
+    /// lets the template set either value; the base key decides only <c>CKA_ALWAYS_SENSITIVE</c> and
+    /// <c>CKA_NEVER_EXTRACTABLE</c>. Since harrison314/BouncyHsm 976634e, which fixed harrison314/BouncyHsm#141 in
+    /// <c>DeriveKeyGeneratorBase</c>: the §6.43 rule is right for the byte-operation mechanisms, but
+    /// <c>HkdfDeriveKeyGenerator</c> shares the base class. Reported upstream in a comment on harrison314/BouncyHsm#141.
+    /// BouncyHsmQuirkTests.HkdfDerivedKeySensitivity_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmHkdfTakesTheTemplatesSensitivity = false;
+
+    /// <summary>
+    /// False while <c>C_DigestFinal</c> with no <c>C_DigestUpdate</c> answers <c>CKR_DATA_LEN_RANGE</c>, where the
+    /// digest of an empty message is defined. A single-part <c>C_Digest</c> of empty data works since
+    /// harrison314/BouncyHsm 4360a76. BouncyHsmQuirkTests.EmptyMultipartDigest_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmDigestsAnEmptyMultipartMessage = false;
+
+    /// <summary>Gate for the empty multi-part digest case: see <see cref="BouncyHsmDigestsAnEmptyMultipartMessage"/>.</summary>
+    public static bool EmptyMultipartDigestAvailable => BouncyHsmAvailable && BouncyHsmDigestsAnEmptyMultipartMessage;
+
+    /// <summary>
+    /// False while <c>C_UnwrapKey(CKM_RSA_PKCS_OAEP)</c> of a blob one byte longer than the modulus answers
+    /// <c>CKR_WRAPPED_KEY_INVALID</c> (<c>CKR_GENERAL_ERROR</c> before harrison314/BouncyHsm a601b4c). PKCS#11 v3.2
+    /// §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
+    /// BouncyHsmQuirkTests.OaepBlobOfTheWrongLength_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmRefusesAnOaepBlobByItsLength = false;
+
+    /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="BouncyHsmRefusesAnOaepBlobByItsLength"/>.</summary>
+    public static bool OaepBlobLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnOaepBlobByItsLength;
+
+    /// <summary>
+    /// False while <c>C_SetAttributeValue</c> changes <c>CKA_MODIFIABLE</c> of an existing object with <c>CKR_OK</c>.
+    /// PKCS#11 v3.2 §4.4: it changes only in a copy (§4.1.3). <c>CKA_PRIVATE</c> is refused since harrison314/BouncyHsm
+    /// a2cf8fe. BouncyHsmQuirkTests.ModifiableFlagChange_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmFixesTheModifiableFlag = false;
+
+    /// <summary>
+    /// False while <c>C_SetAttributeValue</c> of a new <c>CKA_PUBLIC_EXPONENT</c> on an RSA public key, or
+    /// <c>CKA_EC_POINT</c> on an EC public key, answers <c>CKR_OK</c> and the key takes the new value. PKCS#11 v3.2
+    /// §6.1.2 and §6.3.3: <c>CKR_ATTRIBUTE_READ_ONLY</c>. An AES <c>CKA_VALUE</c> and an RSA <c>CKA_MODULUS</c> are
+    /// refused since harrison314/BouncyHsm a2cf8fe and d530e04.
+    /// BouncyHsmQuirkTests.PublicKeyComponentChange_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmFixesPublicKeyComponents = false;
+
+    /// <summary>
+    /// False while <c>C_SetAttributeValue</c> changes an object's <c>CKA_UNIQUE_ID</c> with <c>CKR_OK</c>. PKCS#11
+    /// v3.2 §4.4.1: the token generates it and it cannot be changed (<c>CKR_ATTRIBUTE_READ_ONLY</c>). A copy has its
+    /// own since harrison314/BouncyHsm 514945b.
+    /// BouncyHsmQuirkTests.UniqueIdChange_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmKeepsCkaUniqueIdReadOnly = false;
+
+    /// <summary>Gate for the CKA_UNIQUE_ID case: see <see cref="BouncyHsmKeepsCkaUniqueIdReadOnly"/>.</summary>
+    public static bool UniqueIdReadOnlyAvailable => BouncyHsmAvailable && BouncyHsmKeepsCkaUniqueIdReadOnly;
+
+    /// <summary>
+    /// False while <c>C_SetPIN</c> takes a PIN shorter than the token's <c>ulMinPinLen</c>: a 3-byte PIN answers
+    /// <c>CKR_OK</c> with a reported range of [4, 512]. PKCS#11 v3.2 §5.6.4: <c>CKR_PIN_LEN_RANGE</c>.
+    /// <c>C_GetTokenInfo</c> reports the minimum since harrison314/BouncyHsm bf651ed.
+    /// BouncyHsmQuirkTests.ShortPin_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmEnforcesItsPinLengthRange = false;
+
+    /// <summary>Gate for the PIN length case: see <see cref="BouncyHsmEnforcesItsPinLengthRange"/>.</summary>
+    public static bool PinLengthRangeAvailable => BouncyHsmAvailable && BouncyHsmEnforcesItsPinLengthRange;
+
+    /// <summary>Gate for cases that read back an HKDF-derived key: see <see cref="BouncyHsmHkdfTakesTheTemplatesSensitivity"/>.</summary>
+    public static bool HkdfReadbackAvailable => BouncyHsmAvailable && BouncyHsmHkdfTakesTheTemplatesSensitivity;
 
     /// <summary>Gate for the SP 800-108 additional-key case: see <see cref="BouncyHsmDerivesAdditionalSp800108Keys"/>.</summary>
     public static bool Sp800108AdditionalKeyAvailable => BouncyHsmAvailable && BouncyHsmDerivesAdditionalSp800108Keys;
@@ -170,49 +175,15 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmChecksTheKeyPairTemplatesClassAndKeyType = false;
 
     /// <summary>
-    /// False while <c>C_CopyObject</c> gives the copy the original's <c>CKA_UNIQUE_ID</c>, so two objects in the
-    /// session share one. PKCS#11 v3.2 §4.4.1: a value "MUST be generated by the token" for every new object and
-    /// be unique across all objects visible to a session. Not yet reported upstream.
-    /// BouncyHsmQuirkTests.CopyUniqueId_QuirkStillPresent fails once it is fixed.
+    /// False while <c>C_DeriveKey(CKM_XOR_BASE_AND_DATA)</c> with <c>CKK_GENERIC_SECRET</c> and no <c>CKA_VALUE_LEN</c>
+    /// answers <c>CKR_OK</c> and makes a 1-byte key: <c>XorBaseAndDataDeriveKeyGenerator</c> takes the key type's minimal
+    /// length. PKCS#11 v3.2 §6.43: a key type given without a length must have a well-defined length, and a generic
+    /// secret has none, so the call fails (the other backends make a key as long as the shorter of the base key and the
+    /// data). The derived-key protection cases check an XOR key made in the clear first, so they skip XOR on BouncyHsm. Found
+    /// when the fix for harrison314/BouncyHsm#141 (976634e and 1483858, in ebfefd60) let those cases run. Reported upstream
+    /// as harrison314/BouncyHsm#151. BouncyHsmQuirkTests.XorKeyWithoutALength_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmGivesACopyItsOwnUniqueId = false;
-
-    /// <summary>
-    /// False while a key's material can be changed after creation: <c>C_SetAttributeValue</c> of a new
-    /// <c>CKA_VALUE</c> on an AES key, <c>CKA_MODULUS</c> or <c>CKA_PUBLIC_EXPONENT</c> on an RSA public key and
-    /// <c>CKA_EC_POINT</c> on an EC public key, and <c>C_CopyObject</c> with a new <c>CKA_VALUE</c>, answer
-    /// <c>CKR_OK</c> and the key takes the new value. PKCS#11 v3.2 §6.7, §6.1.2, §6.3.3 (no footnote 8), §4.1.2
-    /// and §4.1.3: <c>CKR_ATTRIBUTE_READ_ONLY</c>. Not yet reported upstream.
-    /// BouncyHsmQuirkTests.KeyMaterialChange_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmFixesKeyMaterial = false;
-
-    /// <summary>
-    /// False while <c>C_SetAttributeValue</c> changes <c>CKA_PRIVATE</c> and <c>CKA_MODIFIABLE</c> of an existing
-    /// object with <c>CKR_OK</c>. PKCS#11 v3.2 §4.4: "Only the CKA_LABEL attribute can be modified after the
-    /// object is created"; these change only in a copy (§4.1.3). <c>CKA_TOKEN</c> is refused
-    /// (<c>CKR_GENERAL_ERROR</c>). Not yet reported upstream.
-    /// BouncyHsmQuirkTests.PrivateFlagChange_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmFixesThePrivateAndModifiableFlags = false;
-
-    /// <summary>Gate for the CKA_UNIQUE_ID case: see <see cref="BouncyHsmGivesACopyItsOwnUniqueId"/>.</summary>
-    public static bool UniqueIdAvailable => BouncyHsmAvailable && BouncyHsmGivesACopyItsOwnUniqueId;
-
-    /// <summary>Gate for the key material case: see <see cref="BouncyHsmFixesKeyMaterial"/>.</summary>
-    public static bool KeyMaterialFixedAvailable => BouncyHsmAvailable && BouncyHsmFixesKeyMaterial;
-
-    /// <summary>
-    /// False while <c>C_DeriveKey</c> gives the derived key the template's <c>CKA_SENSITIVE</c> and
-    /// <c>CKA_EXTRACTABLE</c>, not the base key's, for <c>CKM_CONCATENATE_BASE_AND_DATA</c>,
-    /// <c>CKM_CONCATENATE_DATA_AND_BASE</c>, <c>CKM_XOR_BASE_AND_DATA</c> and <c>CKM_CONCATENATE_BASE_AND_KEY</c>: a
-    /// sensitive or unextractable key can be read through a key derived from it. PKCS#11 v3.2 §6.43. Reported upstream
-    /// as harrison314/BouncyHsm#141. BouncyHsmQuirkTests.BaseKeyProtection_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmKeepsABaseKeysProtection = false;
-
-    /// <summary>Gate for the byte-operation derivations: see <see cref="BouncyHsmKeepsABaseKeysProtection"/>.</summary>
-    public static bool BaseKeyProtectionAvailable => BouncyHsmAvailable && BouncyHsmKeepsABaseKeysProtection;
+    public const bool BouncyHsmRefusesAnXorKeyWithoutALength = false;
 
     /// <summary>
     /// False while <c>C_CopyObject</c> changes <c>CKA_ALLOWED_MECHANISMS</c>, wider or narrower, with <c>CKR_OK</c>.
@@ -223,38 +194,6 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the copy cases that change <c>CKA_ALLOWED_MECHANISMS</c>: see <see cref="BouncyHsmKeepsAllowedMechanismsOnACopy"/>.</summary>
     public static bool AllowedMechanismsCopyAvailable => BouncyHsmAvailable && BouncyHsmKeepsAllowedMechanismsOnACopy;
-
-    /// <summary>
-    /// False while <c>C_CreateObject</c> with <c>CKA_TOKEN</c> given as <c>{NULL, 1}</c> (a NULL <c>pValue</c> with a
-    /// length) crashes the process (SIGSEGV): the native client reads the CK_BBOOL without checking the pointer.
-    /// PKCS#11 v3.2 §4.1.1 point 2 (<c>CKR_ATTRIBUTE_VALUE_INVALID</c>), or <c>CKR_ARGUMENTS_BAD</c>. Not yet
-    /// reported upstream. No tripwire: reproducing the crash would take the test host down.
-    /// </summary>
-    public const bool BouncyHsmSurvivesANullAttributeValue = false;
-
-    /// <summary>
-    /// False while a malformed attribute value is refused with <c>CKR_GENERAL_ERROR</c> or
-    /// <c>CKR_DEVICE_ERROR</c>: <c>C_CreateObject</c> and <c>C_FindObjectsInit</c> with a 4-byte <c>CKA_TOKEN</c>
-    /// answer <c>CKR_GENERAL_ERROR</c>, and with a <c>{NULL, n}</c> <c>CKA_VALUE</c> or <c>CKA_LABEL</c>
-    /// <c>CKR_DEVICE_ERROR</c>. PKCS#11 v3.2 §4.1.1 point 2: <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (or
-    /// <c>CKR_ARGUMENTS_BAD</c> for the NULL ones). Not yet reported upstream.
-    /// BouncyHsmQuirkTests.MalformedAttributeValue_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRefusesMalformedAttributeValues = false;
-
-    /// <summary>Gate for the malformed attribute case: see <see cref="BouncyHsmRefusesMalformedAttributeValues"/>.</summary>
-    public static bool MalformedAttributeRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesMalformedAttributeValues;
-
-    /// <summary>
-    /// False while <c>C_SetAttributeValue(CKA_COPYABLE = TRUE)</c> on an object created with
-    /// <c>CKA_COPYABLE = FALSE</c> answers <c>CKR_OK</c> and makes it copyable again. PKCS#11 v3.2 Table 19:
-    /// CKA_COPYABLE "Can't be set to TRUE once it is set to FALSE". Not yet reported upstream.
-    /// BouncyHsmQuirkTests.CopyableUndone_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmKeepsCkaCopyableFalse = false;
-
-    /// <summary>Gate for the CKA_COPYABLE one-way case: see <see cref="BouncyHsmKeepsCkaCopyableFalse"/>.</summary>
-    public static bool CopyableOneWayAvailable => BouncyHsmAvailable && BouncyHsmKeepsCkaCopyableFalse;
 
     /// <summary>
     /// False while an RSA key of the wrong class is refused with <c>CKR_KEY_HANDLE_INVALID</c>: a public key given
@@ -272,7 +211,8 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// of <c>C_WrapKey</c> or the unwrapping key of <c>C_UnwrapKey</c>. The handle is valid; PKCS#11 v3.2 §5.1.6
     /// keeps <c>CKR_OBJECT_HANDLE_INVALID</c> for a handle that is not, lists it for none of these functions, and
     /// answers a non-key with <c>CKR_KEY_HANDLE_INVALID</c> (<c>CKR_WRAPPING_KEY_HANDLE_INVALID</c>,
-    /// <c>CKR_UNWRAPPING_KEY_HANDLE_INVALID</c>) or a key-type or key-function code. Not yet reported upstream.
+    /// <c>CKR_UNWRAPPING_KEY_HANDLE_INVALID</c>) or a key-type or key-function code. Likely the same cause as
+    /// harrison314/BouncyHsm#152 (<c>FindObjectByHandle&lt;T&gt;</c>), which mentions it.
     /// BouncyHsmQuirkTests.NonKeyObjectAsAKey_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmRefusesANonKeyObjectAsAKey = false;
@@ -303,16 +243,6 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// BouncyHsmQuirkTests.EmptyCbcPadCiphertext_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmRefusesAnEmptyCbcPadCiphertext = false;
-
-    /// <summary>
-    /// False while <c>C_UnwrapKey(CKM_RSA_PKCS_OAEP)</c> of a blob one byte short of the modulus answers
-    /// <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
-    /// BouncyHsmQuirkTests.OaepBlobOfTheWrongLength_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRefusesAnOaepBlobByItsLength = false;
-
-    /// <summary>Gate for the RSA-OAEP wrapped-key length case: see <see cref="BouncyHsmRefusesAnOaepBlobByItsLength"/>.</summary>
-    public static bool OaepBlobLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnOaepBlobByItsLength;
 
     /// <summary>
     /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit</c> with a <c>CK_GCM_PARAMS</c> or <c>CK_CCM_PARAMS</c>
@@ -373,9 +303,10 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>
     /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with SHA-256 and <c>CKA_VALUE_LEN</c> 8161 (255 x 32 + 1, past
-    /// RFC 5869's limit) answers <c>CKR_GENERAL_ERROR</c>, and with <c>CKA_VALUE_LEN</c> 2^32 + 1 answers <c>CKR_OK</c>
-    /// and makes a 1-byte key (the length cut to its low 32 bits). PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6:
-    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
+    /// RFC 5869's limit) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6:
+    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>. A
+    /// <c>CKA_VALUE_LEN</c> of 2^32 + 1 is refused since harrison314/BouncyHsm#136 (15c9fa29).
+    /// Reported upstream as harrison314/BouncyHsm#152.
     /// BouncyHsmQuirkTests.HkdfOutputAboveTheRfcLimit_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit = false;
@@ -385,33 +316,10 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <c>hSaltKey</c> answers <c>CKR_OBJECT_HANDLE_INVALID</c>; the handle is a valid key's. PKCS#11 v3.2 §6.62.2
     /// names no code: <c>CKR_MECHANISM_PARAM_INVALID</c>, <c>CKR_KEY_HANDLE_INVALID</c> or
     /// <c>CKR_KEY_TYPE_INCONSISTENT</c> (§5.1.6).
+    /// Reported upstream as harrison314/BouncyHsm#152.
     /// BouncyHsmQuirkTests.HkdfSaltKeyOfTheWrongType_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent = false;
-
-    /// <summary>
-    /// Gate for the out-of-range HKDF parameter case: see <see cref="BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit"/> and
-    /// <see cref="BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent"/>.
-    /// </summary>
-    public static bool HkdfParameterRefusalAvailable =>
-        BouncyHsmAvailable && BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit && BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent;
-
-    /// <summary>
-    /// False while a <c>CK_ULONG</c> length attribute in a key template is cut to its low 32 bits on a 64-bit platform:
-    /// <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with <c>CKA_MODULUS_BITS</c> 2^32 + 2048 makes a 2048-bit key
-    /// (ulMaxKeySize 6144), and <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> with <c>CKA_VALUE_LEN</c> 2^32 + 16
-    /// answers <c>CKR_OK</c>. PKCS#11 v3.2 §6.1.4, §6.8.3, §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
-    /// BouncyHsmQuirkTests.KeyLengthAttributeAbove32Bits_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRefusesAKeyLengthAttributeAbove32Bits = false;
-
-    /// <summary>
-    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> makes a key one byte longer than the ulMaxKeySize it
-    /// reports (10485760 bits, so 1310721 bytes). PKCS#11 v3.2 §6.8.3: the range is in bits; past it is
-    /// <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
-    /// </summary>
-    public const bool BouncyHsmBoundsAGenericSecretByItsMaximum = false;
 
     /// <summary>
     /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> of a <c>CKK_AES</c> key with <c>CKA_VALUE_LEN</c> 13 answers
@@ -423,16 +331,6 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the derived AES key length case: see <see cref="BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid"/>.</summary>
     public static bool AesKeyLengthRefusalAvailable => BouncyHsmAvailable && BouncyHsmRefusesAnAesKeyOfAnInvalidLengthAsInvalid;
-
-    /// <summary>
-    /// False while a key the HMAC key generators make (<c>CKM_SHA256_KEY_GEN</c>, <c>CKM_SHA3_256_KEY_GEN</c>,
-    /// <c>CKM_BLAKE2B_256_KEY_GEN</c>, <c>CKM_SHA512_T_KEY_GEN</c> and the rest) has <c>CKA_KEY_GEN_MECHANISM</c>
-    /// <c>CKM_GENERIC_SECRET_KEY_GEN</c>: <c>GenericSecretHmacKeyGenerator</c> builds a <c>GenericSecretKeyObject</c>, whose
-    /// constructor fixes that mechanism, and only changes its key type. PKCS#11 v3.2: the attribute names the
-    /// mechanism that generated the key. Reported upstream as harrison314/BouncyHsm#146.
-    /// BouncyHsmQuirkTests.HmacKeyGenMechanism_QuirkStillPresent fails once it is fixed.
-    /// </summary>
-    public const bool BouncyHsmRecordsTheHmacKeyGenMechanism = false;
 
     /// <summary>
     /// False while <c>CKM_SHAKE_128_KEY_DERIVATION</c> and <c>CKM_SHAKE_256_KEY_DERIVATION</c> derive no more than 32
@@ -450,28 +348,23 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
             : null;
 
     /// <summary>
-    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> reads its <c>CK_EXTRACT_PARAMS</c> as a number of bits to keep from
-    /// the start of the base key (<c>ExtractKeyFromKeyDeriveKeyGenerator</c>), so bit 0 gives an empty key. PKCS#11 v3.2:
-    /// it is the bit the derived key starts at, wrapping around the end of the base key, and
-    /// <c>CKA_VALUE_LEN</c> is the derived key's length. Reported upstream as harrison314/BouncyHsm#148.
-    /// BouncyHsmQuirkTests.ExtractKeyFromKey_QuirkStillPresent fails once it is fixed.
+    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> numbers the bits of each base-key byte from the least significant
+    /// (<c>ExtractKeyFromKeyDeriveKeyGenerator.Extract</c>), so an extraction that does not start on a byte boundary
+    /// gives other bits: 0x329F84A9 from bit 4, one byte, is 0xF3, where PKCS#11 v3.2, which counts from the most
+    /// significant bit of the first byte, gives 0x29. Since harrison314/BouncyHsm#148 was fixed (f7be50fb) the
+    /// <c>CK_EXTRACT_PARAMS</c> is the start bit, so a start on a byte boundary is right. Reported upstream in #148,
+    /// reopened.
+    /// BouncyHsmQuirkTests.ExtractKeyFromKeyBitOrder_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmExtractsFromTheBitGiven = false;
-
-    /// <summary>Gate for the CKM_EXTRACT_KEY_FROM_KEY cases: see <see cref="BouncyHsmExtractsFromTheBitGiven"/>.</summary>
-    public static bool ExtractKeyFromKeyAvailable => BouncyHsmAvailable && BouncyHsmExtractsFromTheBitGiven;
+    public const bool BouncyHsmExtractsBitsMostSignificantFirst = false;
 
     /// <summary>
-    /// False while <c>CKM_AES_CFB1</c> encrypts as CFB with a 128-bit segment: <c>BufferedCipherWrapperFactory</c> maps it
-    /// to BouncyCastle's <c>AES/CFB/NOPADDING</c>, whose segment is the block size (the line carries a TODO). PKCS#11 v3.2
-    /// and NIST SP 800-38A §6.3: a 1-bit segment. BouncyCastle has no 1-bit CFB (its <c>CfbBlockCipher</c> takes
-    /// whole bytes), so the fix is BouncyHsm's. Reported upstream as harrison314/BouncyHsm#149.
-    /// BouncyHsmQuirkTests.AesCfb1_QuirkStillPresent fails once it is fixed.
+    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> does not wrap around the end of the base key: it takes the bits from the
+    /// start bit to the end, so 0x329F84A9 from bit 8, four bytes, is refused with <c>CKR_TEMPLATE_INCONSISTENT</c>
+    /// (PKCS#11 v3.2 wraps around, giving 0x9F84A932). Reported upstream in harrison314/BouncyHsm#148, reopened.
+    /// BouncyHsmQuirkTests.ExtractKeyFromKeyWrap_QuirkStillPresent fails once it is fixed.
     /// </summary>
-    public const bool BouncyHsmRunsCfb1WithAOneBitSegment = false;
-
-    /// <summary>Gate for the CKM_AES_CFB1 case: see <see cref="BouncyHsmRunsCfb1WithAOneBitSegment"/>.</summary>
-    public static bool AesCfb1Available => BouncyHsmAvailable && BouncyHsmRunsCfb1WithAOneBitSegment;
+    public const bool BouncyHsmExtractsAroundTheEndOfTheKey = false;
 
     /// <summary>
     /// False while <c>CKM_SHA512_224_HMAC</c> and <c>CKM_SHA512_256_HMAC</c> take only a <c>CKK_GENERIC_SECRET</c> key and

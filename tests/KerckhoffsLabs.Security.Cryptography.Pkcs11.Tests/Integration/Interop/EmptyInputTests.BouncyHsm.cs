@@ -8,7 +8,7 @@ public sealed class EmptyInputTests_BouncyHsm(BouncyHsmBackendFixture backend)
 {
     private readonly BouncyHsmBackendFixture _backend = backend;
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.EmptyDigestAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm answers a digest of empty data with CKR_DATA_LEN_RANGE")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Sha256_EmptyInput_MatchesBcl_SessionReusable() => EmptyInputTestCases.Assert_Sha256_EmptyInput_MatchesBcl_SessionReusable(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]

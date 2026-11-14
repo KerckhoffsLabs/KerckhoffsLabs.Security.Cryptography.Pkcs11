@@ -809,9 +809,9 @@ internal static class AlgorithmConformanceTestCases
     private static readonly byte[] EcdhZ = Convert.FromHexString("46fc62106420ff012e54a434fbdd2d25ccc5852060561e68040dd7778997bd7b");
 
     // With CKD_SHA256_KDF, ECDH's output is the ANSI X9.63 KDF over Z and the shared data
-    // (SHA-256(Z || 00000001 || sharedData) for 32 bytes), with and without shared data. counterStartsAtZero
-    // records a module whose KDF counts from 0, and refused one that does not take the KDF, with its code.
-    internal static void Assert_Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData(IPkcs11Backend backend, bool counterStartsAtZero = false, CKR? refused = null)
+    // (SHA-256(Z || 00000001 || sharedData) for 32 bytes), with and without shared data. refused
+    // records a module that does not take the KDF, with its code.
+    internal static void Assert_Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData(IPkcs11Backend backend, CKR? refused = null)
     {
         backend.RequireMechanisms(CKM.CKM_ECDH1_DERIVE, CKM.CKM_SHA256_HMAC);
         WithSession(backend, session =>
@@ -827,7 +827,7 @@ internal static class AlgorithmConformanceTestCases
                         Assert.Equal(refusal, Assert.ThrowsAny<Pkcs11Exception>(() => HmacOfDerived(session, ecdh, priv, 32)).ReturnValue);
                         continue;
                     }
-                    byte[] expected = SHA256.HashData([.. EcdhZ, 0, 0, 0, counterStartsAtZero ? (byte)0 : (byte)1, .. shared]);
+                    byte[] expected = SHA256.HashData([.. EcdhZ, 0, 0, 0, 1, .. shared]);
                     Assert.Equal(HMACSHA256.HashData(expected, Message), OrSkip(() => HmacOfDerived(session, ecdh, priv, 32), "CKD_SHA256_KDF"));
                 }
             }
