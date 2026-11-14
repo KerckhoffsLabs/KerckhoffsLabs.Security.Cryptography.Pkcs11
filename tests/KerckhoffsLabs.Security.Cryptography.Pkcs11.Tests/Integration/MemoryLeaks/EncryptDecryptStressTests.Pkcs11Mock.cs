@@ -60,7 +60,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
 
         for (int i = 0; i < 100; i++)
         {
-            var session = TestKeys.OpenLoggedInSession(_backend);
+            using var session = TestKeys.OpenLoggedInSession(_backend);
             // Raw AES-CBC is gated by default; opt in since this stress test only
             // cares about unmanaged-allocation discipline, not the choice of mechanism.
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
@@ -104,8 +104,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
             }
             finally
             {
-                session.Logout();
-                session.Dispose();
+                TestKeys.LogoutIfRequired(_backend, session);
             }
         }
 

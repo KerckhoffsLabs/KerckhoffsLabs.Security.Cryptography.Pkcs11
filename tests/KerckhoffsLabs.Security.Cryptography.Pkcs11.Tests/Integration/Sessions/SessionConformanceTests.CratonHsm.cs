@@ -65,7 +65,13 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
     }
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
+    public void SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void ShareOrLogin_LogsInOnce_AndSharesAfter() => SessionConformanceTestCases.Assert_ShareOrLogin_LogsInOnce_AndSharesAfter(_backend);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void TokenUri_FindsItsSlotAgain() => SessionConformanceTestCases.Assert_TokenUri_FindsItsSlotAgain(_backend);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.ReadOnlySessionObjectsAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM refuses a session object in a read-only session")]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]

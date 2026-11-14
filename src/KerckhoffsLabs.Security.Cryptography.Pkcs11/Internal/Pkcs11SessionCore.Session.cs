@@ -11,39 +11,49 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 internal sealed partial class Pkcs11SessionCore
 {
     // -----------------------------------------------------------------------
-    // InitPin — SecurePin overload (canonical) + obsolete legacy overloads
+    // InitPin — sent by the token login record (TokenLoginRecord) on an SO login's anchor, never by a session
+    // of its own
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// Initializes the normal user's PIN using a <see cref="SecurePin"/>.
+    /// Sends <c>C_InitPIN</c> on this session. PKCS#11 v3.2 allows it only in the "R/W SO Functions" state, so it
+    /// is meant for the read/write anchor session of a Security Officer login (see <see cref="TokenLoginRecord"/>).
     /// </summary>
-    /// <param name="userPin">Pin value</param>
-    public void InitPin(SecurePin userPin)
+    /// <param name="pin">
+    /// The new normal-user PIN, straight from the pinned buffer its owner holds, with no transient copy; empty for
+    /// the protected authentication path, which the interop layer marshals to <c>pPin = NULL_PTR</c>,
+    /// <c>ulPinLen = 0</c>.
+    /// </param>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_InitPIN</c>.</exception>
+    internal void SendInitPin(ReadOnlySpan<byte> pin)
     {
-        using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(userPin);
+        using var _ = AcquireForRecord();
 
+        Log.SessionTrace(_logger, (ulong)_sessionId, pin.IsEmpty ? "InitPin (protected authentication path)" : "InitPin");
 
-        Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin");
-
-        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, userPin.Pin);
+        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, pin);
         ThrowIfError(rv, OpInitPIN);
     }
 
     /// <summary>
-    /// Initializes the normal user's PIN via the token's own pinpad, for tokens advertising
-    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. PKCS#11 signals this by calling
-    /// <c>C_InitPIN</c> with <c>pPin = NULL_PTR</c>, <c>ulPinLen = 0</c> — this overload passes an
-    /// empty span, which the interop layer marshals to a null pointer.
+    /// Asks the module for this session's state (<c>C_GetSessionInfo</c>), for the login record: whether its anchor
+    /// still holds the login, and which user the module has logged in. Never waits for the session's lock:
+    /// <see langword="null"/> when another thread holds it (<see cref="TryAcquireForRecord"/>). A lost session is
+    /// reported through <see cref="ThrowIfError"/>, which ends the login when this is the anchor.
     /// </summary>
-    public void InitPin()
+    /// <returns>The session's state, or <see langword="null"/> when the session is busy.</returns>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSessionInfo</c>.</exception>
+    internal CKS? TrySendProbe()
     {
-        using var _ = AcquireExclusive();
+        using ExclusiveLease? lease = TryAcquireForRecord();
+        if (lease is null)
+            return null;
 
-        Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin (protected authentication path)");
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetSessionInfo (login probe)");
 
-        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, default);
-        ThrowIfError(rv, OpInitPIN);
+        CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out CK_SESSION_INFO info);
+        ThrowIfError(rv, OpGetSessionInfo);
+        return (CKS)(ulong)info.State;
     }
 
     // -----------------------------------------------------------------------
@@ -136,67 +146,147 @@ internal sealed partial class Pkcs11SessionCore
     }
 
     // -----------------------------------------------------------------------
-    // Login — SecurePin overload (canonical) + obsolete legacy overloads
+    // Login — sent by the token login record (TokenLoginRecord), never by a session of its own
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// Logs a user into a token
+    /// Sends <c>C_Login</c> on this session. Login state belongs to the application and the token, not
+    /// to this session, so this is meant for the anchor session of the token's login record (see
+    /// <see cref="TokenLoginRecord"/>).
     /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    public void Login(CKU userType, SecurePin pin)
+    /// <param name="userType">Type of user.</param>
+    /// <param name="pin">
+    /// The PIN, straight from the pinned buffer its owner holds, with no transient copy; empty for the
+    /// protected authentication path, which the interop layer marshals to <c>pPin = NULL_PTR</c>,
+    /// <c>ulPinLen = 0</c>.
+    /// </param>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_Login</c>.</exception>
+    internal void SendLogin(CKU userType, ReadOnlySpan<byte> pin)
     {
-        using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(pin);
-
+        using var _ = AcquireForRecord();
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
-        Log.LoggingIn(_logger, userType, (ulong)_sessionId);
+        if (pin.IsEmpty)
+            Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
+        else
+            Log.LoggingIn(_logger, userType, (ulong)_sessionId);
 
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
+        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin);
         ThrowIfError(rv, OpLogin);
     }
 
+    // -----------------------------------------------------------------------
+    // Context-specific login (CKA_ALWAYS_AUTHENTICATE) — sent by this session, inside one of its operations
+    // -----------------------------------------------------------------------
+
     /// <summary>
-    /// Logs a user into a token via the token's own pinpad, for tokens advertising
-    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. PKCS#11 signals this by calling
-    /// <c>C_Login</c> with <c>pPin = NULL_PTR</c>, <c>ulPinLen = 0</c> — this overload passes an
-    /// empty span, which the interop layer marshals to a null pointer.
+    /// The source to authenticate an operation with <paramref name="key"/> by, read before its <c>C_*Init</c>:
+    /// <see langword="null"/> when the key has no <c>CKA_ALWAYS_AUTHENTICATE</c> (or no key is known, a call by
+    /// handle), the session's <see cref="ContextAuthentication"/> otherwise. Read once, so a source set on another
+    /// thread meanwhile does not change an operation halfway. The caller holds the lease.
     /// </summary>
-    /// <param name="userType">Type of user.</param>
-    public void Login(CKU userType)
+    /// <exception cref="InvalidOperationException">
+    /// The key needs a context login and the session has no source: refused before the module, which would let the
+    /// operation start and answer <c>CKR_USER_NOT_LOGGED_IN</c> only at its end.
+    /// </exception>
+    private ContextAuthentication? ContextAuthenticationFor(Pkcs11Key? key)
     {
-        using var _ = AcquireExclusive();
+        if (key is null || !key.NeedsContextLogin)
+            return null;
+        ContextAuthentication source = ContextAuthentication ?? throw new InvalidOperationException(
+            "This key has CKA_ALWAYS_AUTHENTICATE, so the token wants the PIN again for each use, and its session has " +
+            "no ContextAuthentication. Set Pkcs11Session.ContextAuthentication, or Pkcs11Login.ContextAuthentication " +
+            "before opening the session, to ContextAuthentication.FromPin(...) or ContextAuthentication.Pinpad.");
+        if (ReferenceEquals(source, _rejectedContextSource))
+        {
+            throw new Pkcs11AuthenticationException(CKR.CKR_PIN_INCORRECT, OpLogin,
+                "The token refused the PIN this session's ContextAuthentication gave for a key with " +
+                "CKA_ALWAYS_AUTHENTICATE, so it is not asked again: each wrong PIN costs one of the user PIN's retries, " +
+                "and repeating it would lock the PIN. Fix the PIN's source, then set Pkcs11Session.ContextAuthentication " +
+                "again.");
+        }
+        return source;
+    }
 
-        Log.SessionTrace(_logger, (ulong)_sessionId, "Login (protected authentication path)");
+    /// <summary>
+    /// Re-authenticates the operation just begun with <paramref name="key"/> (<c>C_Login(CKU_CONTEXT_SPECIFIC)</c>,
+    /// PKCS#11 v3.2 private_key_objects.md), with a PIN from <paramref name="source"/>: called after a successful
+    /// <c>C_*Init</c> and before the operation, under the same lease. Nothing when <paramref name="source"/> is
+    /// <see langword="null"/> (<see cref="ContextAuthenticationFor"/> found the key needs none).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Not a token login: no gate, no holder, no anchor; it is sent on this session and authenticates only the
+    /// operation in progress. The PIN the caller's code returns is disposed as soon as it has been sent.
+    /// </para>
+    /// <para>
+    /// On any failure the operation is left active (a wrong PIN leaves it "as if no login happened"), so the caller's
+    /// <see cref="OperationScope"/> cancels it while this exception unwinds. <c>CKR_PIN_LOCKED</c> also logged the
+    /// user out of the token (rule 7), so it ends the token login (<see cref="TokenLoginRecord.MarkEnded"/>, which never
+    /// waits). No other code ends it: <c>CKR_PIN_INCORRECT</c> and the rest only
+    /// propagate.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The caller's PIN callback returned no PIN.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_Login</c>.</exception>
+    private void AuthenticateContext(ContextAuthentication? source, Pkcs11Key? key)
+    {
+        if (source is null || key is null)
+            return;
 
-        Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
+        // Until the login succeeds, a failure leaves the operation unauthenticated: CancelAbandoned may end it.
+        _contextLoginFailed = true;
+        if (source.IsPinpad)
+        {
+            Log.LoggingInProtectedPath(_logger, CKU.CKU_CONTEXT_SPECIFIC, (ulong)_sessionId);
+            SendContextLogin(default, source);
+            _contextLoginFailed = false;
+            return;
+        }
 
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, default);
+        SecurePin pin;
+        // Caller code, run on the library's behalf: nothing it does on this thread is the library's own read-back.
+        using (CallOutScope.Enter())
+            pin = source.PinFor(key);
+        using (pin)
+        {
+            Log.LoggingIn(_logger, CKU.CKU_CONTEXT_SPECIFIC, (ulong)_sessionId);
+            SendContextLogin(pin.Pin, source);
+        }
+        _contextLoginFailed = false;
+    }
+
+    private void SendContextLogin(ReadOnlySpan<byte> pin, ContextAuthentication source)
+    {
+        CKR rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pin);
+        if (rv == CKR.CKR_PIN_LOCKED)
+            _record.MarkEnded(rv);
+        // A PIN from a source that the token refused is not asked for again (ContextAuthenticationFor). A pinpad PIN is
+        // typed afresh each time, so its source stays usable.
+        if (rv is CKR.CKR_PIN_INCORRECT or CKR.CKR_PIN_INVALID or CKR.CKR_PIN_LEN_RANGE && !source.IsPinpad)
+            _rejectedContextSource = source;
         ThrowIfError(rv, OpLogin);
     }
 
     /// <summary>
-    /// Logs a user into a token by user type plus a free-form username (PKCS#11 v3.0).
-    /// Use this overload for HSMs that support named user accounts beyond SO/User.
+    /// Sends <c>C_LoginUser</c> (PKCS#11 v3.0) on this session: a user type plus a username, for tokens
+    /// with named user accounts. Meant for the login record's anchor session, as <see cref="SendLogin"/> is.
     /// </summary>
     /// <param name="userType">Type of user.</param>
-    /// <param name="pin">User's PIN. Caller retains ownership; its bytes go to the native
-    /// call straight out of the pinned buffer it owns, with no transient copy.</param>
-    /// <param name="username">Account username (UTF-8 encoded). Must not be null or empty.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="pin"/> or <paramref name="username"/> is null.</exception>
+    /// <param name="pin">The PIN; empty for the protected authentication path, as for <see cref="SendLogin"/>.</param>
+    /// <param name="username">Account username, sent UTF-8 encoded. Must not be null or empty. Never logged.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="username"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="username"/> is empty.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from C_LoginUser. <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> indicates the loaded library is v2.40 or otherwise does not export C_LoginUser.</exception>
-    public void LoginUser(CKU userType, SecurePin pin, string username)
+    internal void SendLoginUser(CKU userType, ReadOnlySpan<byte> pin, string username)
     {
-        using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(pin);
+        using var _ = AcquireForRecord();
         ArgumentNullException.ThrowIfNull(username);
         if (username.Length == 0)
             throw new ArgumentException("Username must not be empty.", nameof(username));
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfUnusable();
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "LoginUser");
 
@@ -205,7 +295,7 @@ internal sealed partial class Pkcs11SessionCore
         byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try
         {
-            CKR rv = _pkcs11Library.C_LoginUser(_sessionId, userType, pin.Pin, usernameBytes);
+            CKR rv = _pkcs11Library.C_LoginUser(_sessionId, userType, pin, usernameBytes);
             ThrowIfError(rv, OpLoginUser);
         }
         finally

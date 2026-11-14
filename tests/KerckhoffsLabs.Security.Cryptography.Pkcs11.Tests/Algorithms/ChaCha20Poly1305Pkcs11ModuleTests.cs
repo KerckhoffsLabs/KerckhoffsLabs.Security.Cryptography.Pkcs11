@@ -97,7 +97,7 @@ public sealed class ChaCha20Poly1305Pkcs11ModuleTests
         using Pkcs11Library library = module.Load();
         LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1);
-        using var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core);
+        using var session = new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core);
         using var key = new Pkcs11Key(session, new ObjectHandle(1), ObjectHandle.Invalid, CKK.CKK_CHACHA20, "chacha", []);
         using var chacha = new ChaCha20Poly1305Pkcs11(key);
         body(chacha);

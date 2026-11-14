@@ -72,13 +72,13 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
         using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
         using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-logout-{Guid.NewGuid():N}");
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         ObjectHandle handle = session.CreateObject([attrClass, attrToken, attrPrivate, attrLabel]);
-        session.Logout();
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogout();
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         Exception? ex;
         try { ex = Record.Exception(() => { using var read = session.GetAttributeValue(handle, [CKA.CKA_CLASS]); }); }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is null,
             "A private session object no longer outlives C_Logout " +
@@ -92,13 +92,13 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
         Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
         using var session = slot.OpenSessionCore(readWrite: false);
         using var pin = new SecurePin(_backend.UserPin.Span);
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
         using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-ro-{Guid.NewGuid():N}");
         Exception? ex;
         try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrToken, attrLabel]))); }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_SESSION_READ_ONLY },
             "Craton HSM no longer refuses a session object in a read-only session with CKR_SESSION_READ_ONLY " +

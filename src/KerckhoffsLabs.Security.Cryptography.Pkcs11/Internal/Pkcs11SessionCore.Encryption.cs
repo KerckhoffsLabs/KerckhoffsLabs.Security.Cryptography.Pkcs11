@@ -340,7 +340,11 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="keyHandle">Handle of the key to decrypt with.</param>
     /// <param name="encryptedData">Ciphertext to decrypt.</param>
     /// <param name="checkInput">Refuses a ciphertext the key cannot have produced; see <see cref="InputCheck"/>.</param>
-    internal byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData, InputCheck? checkInput)
+    /// <param name="contextKey">
+    /// The key <paramref name="keyHandle"/> belongs to, when known: one with <c>CKA_ALWAYS_AUTHENTICATE</c> is
+    /// re-authenticated between <c>C_DecryptInit</c> and <c>C_Decrypt</c> (see <see cref="AuthenticateContext"/>).
+    /// </param>
+    internal byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData, InputCheck? checkInput, Pkcs11Key? contextKey = null)
     {
         using var _ = AcquireExclusive();
 
@@ -351,12 +355,15 @@ internal sealed partial class Pkcs11SessionCore
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
 
+        ContextAuthentication? context = ContextAuthenticationFor(contextKey);
+
         using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Decrypt");
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, in ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
+        AuthenticateContext(context, contextKey);
 
         // Use input length as the initial output buffer size — avoids a null-probe call
         // that causes AEAD tokens (e.g. SoftHSM2) to run full tag verification and return
@@ -500,13 +507,18 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="associatedData">Optional AAD that was bound at encrypt time.</param>
     /// <param name="ciphertext">Ciphertext bytes (without the tag).</param>
     /// <returns>Plaintext.</returns>
+    /// <param name="contextKey">
+    /// The key <paramref name="keyHandle"/> belongs to, when known: one with <c>CKA_ALWAYS_AUTHENTICATE</c> is
+    /// re-authenticated after <c>C_MessageDecryptInit</c> (see <see cref="AuthenticateContext"/>).
+    /// </param>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> on tag-verification failure.</exception>
     public byte[] MessageDecrypt(
         Mechanism mechanism,
         ObjectHandle keyHandle,
         MechanismParameters messageParams,
         ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> ciphertext)
+        ReadOnlySpan<byte> ciphertext,
+        Pkcs11Key? contextKey = null)
     {
         using var _ = AcquireExclusive();
 
@@ -516,6 +528,8 @@ internal sealed partial class Pkcs11SessionCore
         EnforceMessage(mechanism, messageParams, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageDecrypt");
+
+        ContextAuthentication? context = ContextAuthenticationFor(contextKey);
 
         // One scope for the whole operation: it owns the mechanism's parameter block and the
         // per-message block below, and outlives every native call that reads or writes them.
@@ -528,6 +542,9 @@ internal sealed partial class Pkcs11SessionCore
 
         try
         {
+            // Inside the try, so a failed context login still ends the message operation below.
+            AuthenticateContext(context, contextKey);
+
             Pkcs11ParameterBlock messageBlock = messageParams.BuildMarshalable(scope);
 
             byte[] pt = CallWithLengthProbe(associatedData, ciphertext,

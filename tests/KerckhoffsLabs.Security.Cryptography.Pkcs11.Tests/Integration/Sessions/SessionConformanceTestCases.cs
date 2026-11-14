@@ -410,7 +410,7 @@ internal static class SessionConformanceTestCases
 
         using var user = TestKeys.OpenLoggedInSession(backend);
         try { Assert.Empty(user.FindAllObjects([attrClass, attrLabel])); }
-        finally { user.Logout(); }
+        finally { user.SendLogout(); }
     }
 
     /// <summary>Who makes the object, and by which call: "<c>SO|public; generate|derive|unwrap|copy</c>".</summary>
@@ -534,30 +534,90 @@ internal static class SessionConformanceTestCases
         }
     }
 
-    // The login belongs to the application, not to a session (PKCS#11 v3.2 §5.6): while one Pkcs11Session is logged
-    // in, a second OpenSessionWithPin to the token is refused with CKR_USER_ALREADY_LOGGED_IN, raised as
-    // Pkcs11AuthenticationException, and the refusal leaves the first session logged in. Once the first session is
-    // disposed, a new login succeeds. Getting started's "load and log in once" section rests on this.
-    internal static void Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(IPkcs11Backend backend)
+    // The login belongs to the application, not to a session (PKCS#11 v3.2 §5.6): while the user is logged in, a
+    // second Login of the same user is refused before the module (CKR_USER_ALREADY_LOGGED_IN), with no PIN sent, since
+    // PKCS#11 cannot check a PIN against a login already made. The login held is shared explicitly instead, without a
+    // PIN. Releasing a share leaves the first login's session logged in; the last holder's release logs the token out.
+    // Getting started's "load and log in once" section rests on this.
+    internal static void Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(IPkcs11Backend backend)
     {
         if (!backend.RequiresUserLogin)
             Assert.Skip("The backend has no login.");
         LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
         LogOutTheToken(lowLevel, backend.SlotId);
+        Pkcs11Slot slot = Slot(backend);
 
         using (var pin = new SecurePin(backend.UserPin.Span))
-        using (Pkcs11Session first = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin))
+        using (Pkcs11Login first = slot.Login(TokenUser.User, pin))
+        using (Pkcs11Session session = first.OpenSession())
         {
-            using var again = new SecurePin(backend.UserPin.Span);
-            var refused = Assert.ThrowsAny<Pkcs11AuthenticationException>(
-                () => backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, again));
-            Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, refused.ReturnValue);
-            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, first.GetSessionInfo().State);
+            // Refused before the module, whatever the PIN: no PIN is sent, so no retry is counted.
+            using (var wrong = new SecurePin("0000000000"u8))
+            {
+                var refused = Assert.Throws<Pkcs11AuthenticationException>(() => slot.Login(TokenUser.User, wrong));
+                Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, refused.ReturnValue);
+            }
+
+            // Taken without a PIN instead: a share of the same login, from the hold or from the slot.
+            using (Pkcs11Login second = first.Share())
+                Assert.True(second.IsActive);
+            Assert.True(slot.TryShareLogin(TokenUser.User, out Pkcs11Login? third));
+            third.Dispose();
+
+            Assert.True(first.IsActive);
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
         }
 
-        using var next = new SecurePin(backend.UserPin.Span);
-        using Pkcs11Session second = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, next);
-        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, second.GetSessionInfo().State);
+        using Pkcs11Session after = slot.OpenSession(SessionAccess.ReadWrite);
+        Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, after.GetSessionInfo().State);
+    }
+
+    // ShareOrLogin logs in once: the PIN source is asked for the first login only, a second call shares it, and the
+    // token is logged out when both holds are gone.
+    internal static void Assert_ShareOrLogin_LogsInOnce_AndSharesAfter(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+        Pkcs11Slot slot = Slot(backend);
+        int asked = 0;
+        SecurePin Pin()
+        {
+            asked++;
+            return new SecurePin(backend.UserPin.Span);
+        }
+
+        using (Pkcs11Login first = slot.ShareOrLogin(Pin))
+        using (Pkcs11Login second = slot.ShareOrLogin(Pin))
+        using (Pkcs11Session session = second.OpenSession())
+        {
+            Assert.Equal(1, asked);
+            Assert.True(first.IsActive);
+            Assert.True(second.IsActive);
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
+        }
+
+        using Pkcs11Session after = slot.OpenSession(SessionAccess.ReadWrite);
+        Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, after.GetSessionInfo().State);
+    }
+
+    // The token's own URI finds its slot again. Modules whose tokens share every URI field (two empty tokens of the
+    // same make, say) are refused as ambiguous rather than picked from; the backend's slot is then among the matches.
+    internal static void Assert_TokenUri_FindsItsSlotAgain(IPkcs11Backend backend)
+    {
+        Pkcs11Slot slot = Slot(backend);
+        Pkcs11Uri uri = slot.GetTokenUri();
+        Assert.Equal(uri, Pkcs11Uri.Parse(uri.ToString()));
+        try
+        {
+            Pkcs11Slot found = backend.Library.GetSlotByUri(uri.ToString());
+            Assert.Equal(slot.SlotId, found.SlotId);
+        }
+        catch (Pkcs11AmbiguousTokenException ambiguous)
+        {
+            Assert.Contains(slot.SlotId, ambiguous.SlotIds);
+        }
     }
 
     // CKF_USER_PIN_COUNT_LOW means "an incorrect user login PIN has been entered at least once since the last
@@ -609,8 +669,7 @@ internal static class SessionConformanceTestCases
             Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, session).State);
         }
         finally { lowLevel.C_CloseSession(session); }
-        using var pin = new SecurePin(backend.UserPin.Span);
-        using var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin);
+        using var opened = backend.OpenSession();
         Assert.Equal(16, opened.GenerateRandom(16).Length);
     }
 
@@ -634,13 +693,12 @@ internal static class SessionConformanceTestCases
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
         {
             using var pin = new SecurePin(wrong);
-            using var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin);
+            using Pkcs11Login login = Slot(backend).Login(TokenUser.User, pin);
         });
         Assert.Equal(CKR.CKR_PIN_INCORRECT, ex.ReturnValue);
         Assert.DoesNotContain(System.Text.Encoding.UTF8.GetString(wrong), ex.ToString(), StringComparison.Ordinal);
-        using (var pin = new SecurePin(backend.UserPin.Span))
-        using (var opened = backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, pin))
-            Assert.Equal(16, opened.GenerateRandom(16).Length);
+        using var opened = backend.OpenSession();
+        Assert.Equal(16, opened.GenerateRandom(16).Length);
     }
 
     // A PIN shorter than ulMinPinLen or longer than ulMaxPinLen (§3.2, CK_TOKEN_INFO) logs nobody in, and C_SetPIN
@@ -905,7 +963,7 @@ internal static class SessionConformanceTestCases
 
         using var session = Slot(backend).OpenSessionCore();
         using var pin = new SecurePin(backend.UserPin.Span);
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         bool loggedIn = true;
         try
         {
@@ -975,7 +1033,7 @@ internal static class SessionConformanceTestCases
                     }
             }
 
-            session.Logout();
+            session.SendLogout();
             loggedIn = false;
             Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, (CKS)(ulong)SessionInfo(lowLevel, (NativeCULong)session.SessionId).State);
 
@@ -992,14 +1050,14 @@ internal static class SessionConformanceTestCases
                 Assert.True(ex.ReturnValue == CKR.CKR_USER_NOT_LOGGED_IN, $"{call} of a private object with nobody logged in returned {ex.ReturnValue}.");
             }
 
-            session.Login(CKU.CKU_USER, pin);
+            session.SendLogin(CKU.CKU_USER, pin.Pin);
             loggedIn = true;
             Assert.Empty(session.FindAllObjects([attrLabel]));
         }
         finally
         {
             if (loggedIn)
-                session.Logout();
+                session.SendLogout();
         }
     }
 
@@ -1023,7 +1081,7 @@ internal static class SessionConformanceTestCases
         if (backend.RequiresUserLogin)
         {
             using var pin = new SecurePin(backend.UserPin.Span);
-            session.Login(CKU.CKU_USER, pin);
+            session.SendLogin(CKU.CKU_USER, pin.Pin);
         }
         try
         {
@@ -1234,7 +1292,7 @@ internal static class SessionConformanceTestCases
         using var session = Slot(backend).OpenSessionCore();
         var sid = (NativeCULong)session.SessionId;
         using var pin = new SecurePin(backend.UserPin.Span);
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         bool loggedIn = true;
         try
         {
@@ -1249,7 +1307,7 @@ internal static class SessionConformanceTestCases
                 Assert.True(read[0].GetValueAsBool(), "The data object reads the CKA_PRIVATE = FALSE it was made with: drop the pin.");
             }
 
-            session.Logout();
+            session.SendLogout();
             loggedIn = false;
 
             if (tokenKey is { } key)
@@ -1281,7 +1339,7 @@ internal static class SessionConformanceTestCases
                 Assert.Equal([publicSessionObject.ObjectId], session.FindAllObjects([attrLabel]).Select(h => h.ObjectId));
             }
 
-            session.Login(CKU.CKU_USER, pin);
+            session.SendLogin(CKU.CKU_USER, pin.Pin);
             loggedIn = true;
             AssertRv(CKR.CKR_OBJECT_HANDLE_INVALID, ClassOf(lowLevel, sid, privateSessionObject), "C_GetAttributeValue on a destroyed private session object after a new login");
             Assert.DoesNotContain(session.FindAllObjects([attrData, attrLabel]), h => h.ObjectId != publicSessionObject.ObjectId);
@@ -1289,11 +1347,11 @@ internal static class SessionConformanceTestCases
         finally
         {
             if (!loggedIn)
-                session.Login(CKU.CKU_USER, pin);
+                session.SendLogin(CKU.CKU_USER, pin.Pin);
             // Found again by label: the token key's handle may have changed with the new login.
             foreach (ObjectHandle handle in session.FindAllObjects([attrLabel]))
                 session.DestroyObject(handle);
-            session.Logout();
+            session.SendLogout();
         }
     }
 

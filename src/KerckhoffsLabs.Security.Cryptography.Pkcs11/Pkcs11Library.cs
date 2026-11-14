@@ -58,6 +58,28 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     internal LowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
 
+    /// <summary>Whether <see cref="Dispose"/> has run.</summary>
+    internal bool IsDisposed => Volatile.Read(ref _disposed);
+
+    // Set first thing in Dispose, before this library's login holds are released, so a hold cannot be added after
+    // that release (see TokenLoginRecord.AddHolderLocked).
+    private int _disposing;
+
+    /// <summary>
+    /// Whether <see cref="Dispose"/> has started: from then on no login hold can be taken through this library.
+    /// </summary>
+    internal bool IsDisposingOrDisposed => Volatile.Read(ref _disposing) != 0 || IsDisposed;
+
+    /// <summary>
+    /// Test seam: marks this library disposing, as the first step of <see cref="Dispose"/> does, without going on to
+    /// release anything, so a test can stand in the instant between that mark and the release of the library's holds.
+    /// A later <see cref="Dispose"/> runs in full.
+    /// </summary>
+    internal void BeginDisposingForTest() => Volatile.Write(ref _disposing, 1);
+
+    /// <summary>The logger factory from <see cref="Pkcs11LibraryOptions.LoggerFactory"/>, for what this library opens.</summary>
+    internal ILoggerFactory? LoggerFactory => _loggerFactory;
+
     /// <summary>
     /// Cached per-token quirk for ML-KEM decapsulation: whether the shared-secret template must
     /// omit <c>CKA_VALUE_LEN</c>. Tokens disagree on the unwrap-created key — SoftHSM rejects
@@ -405,7 +427,7 @@ public sealed class Pkcs11Library : IDisposable
 
         List<Pkcs11Slot> list = [];
         foreach (NativeCULong slot in slotList)
-            list.Add(new Pkcs11Slot(LowLevel, (ulong)slot, _loggerFactory));
+            list.Add(new Pkcs11Slot(this, (ulong)slot, _loggerFactory));
 
         return list;
     }
@@ -575,11 +597,11 @@ public sealed class Pkcs11Library : IDisposable
                 "(see SupportsConcurrentAccess). Poll with TryGetSlotEvent instead.");
 
         Log.LibraryTrace(_logger, _libraryPath, "WaitForSlotEvent");
-        LowLevelPkcs11Library lowLevel = LowLevel;
+        _ = LowLevel;
         return Core(SlotEvents.WaitAsync(cancellationToken));
 
         async Task<Pkcs11Slot> Core(Task<ulong> wait)
-            => new(lowLevel, await wait.ConfigureAwait(false), _loggerFactory);
+            => new(this, await wait.ConfigureAwait(false), _loggerFactory);
     }
 
     /// <summary>
@@ -614,123 +636,201 @@ public sealed class Pkcs11Library : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.LibraryTrace(_logger, _libraryPath, "TryGetSlotEvent");
-        LowLevelPkcs11Library lowLevel = LowLevel;
+        _ = LowLevel;
         if (!SlotEvents.TryTake(out ulong slotId))
         {
             slot = null;
             return false;
         }
-        slot = new Pkcs11Slot(lowLevel, slotId, _loggerFactory);
+        slot = new Pkcs11Slot(this, slotId, _loggerFactory);
         return true;
     }
 
     private SlotEventSubscription SlotEvents => _slotEvents ?? throw new ObjectDisposedException(nameof(Pkcs11Library));
 
     /// <summary>
-    /// Opens an authenticated session against the slot whose token label matches
-    /// <paramref name="slotLabel"/>.
+    /// Finds the one slot whose token's label is <paramref name="tokenLabel"/>, among the slots with a token
+    /// present. The comparison is ordinal (case-sensitive), after removing the trailing spaces PKCS#11 pads a
+    /// label with. Finding the slot neither opens a session nor logs in.
     /// </summary>
-    /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing
-    /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
-    /// <param name="userType">The PKCS#11 user type to log in as.</param>
-    /// <param name="pin">The PIN. The session does not retain the PIN past construction.</param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> or <paramref name="pin"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Session OpenSessionWithPin(string slotLabel, CKU userType, SecurePin pin, ICryptoPolicy? policy = null)
+    /// <remarks>
+    /// PKCS#11 does not make labels unique: two tokens may share one (a cloned card, two HSM partitions given the same
+    /// name). When more than one does, this refuses rather than picking one, which would let whoever can initialize a
+    /// token decide which one the application uses: select the token by its serial number
+    /// (<see cref="GetSlotByTokenSerial"/>), a PKCS#11 URI (<see cref="GetSlotByUri(string)"/>) or a predicate
+    /// (<see cref="GetSlot"/>) instead. A slot ID is no substitute: the module assigns it, and it can change between
+    /// runs or name another token after a card is swapped. A token removed while the slots are being read is passed
+    /// over.
+    /// </remarks>
+    /// <param name="tokenLabel">The token label, without its padding.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="tokenLabel"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">No present token has the label (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).</exception>
+    /// <exception cref="Pkcs11AmbiguousTokenException">More than one present token has the label; it names their slots.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSlotList</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlotByTokenLabel(string tokenLabel)
     {
-        ArgumentNullException.ThrowIfNull(slotLabel);
-        ArgumentNullException.ThrowIfNull(pin);
+        ArgumentNullException.ThrowIfNull(tokenLabel);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSessionCore(policy: policy);
-        try
-        {
-            session.Login(userType, pin);
-            return new Pkcs11Session(this, matched, session);
-        }
-        catch
-        {
-            session.Dispose();
-            throw;
-        }
+        return SelectOneSlot((_, token) => string.Equals(token.Label.TrimEnd(' '), tokenLabel, StringComparison.Ordinal),
+            $"the label '{tokenLabel}'");
     }
 
     /// <summary>
-    /// Opens an authenticated session against the slot whose token label matches
-    /// <paramref name="slotLabel"/>, logging in via the token's own pinpad rather than an
-    /// application-supplied PIN. For tokens advertising <see cref="TokenFlags.ProtectedAuthenticationPath"/>
-    /// — the PIN is entered on the device itself, and PKCS#11 signals this to the token by calling
-    /// <c>C_Login</c> with <c>pPin = NULL_PTR</c>. Calling this on a token without that flag typically
-    /// fails with <see cref="CKR.CKR_ARGUMENTS_BAD"/> or <see cref="CKR.CKR_PIN_INCORRECT"/>.
+    /// Finds the one slot whose token's serial number (<c>CK_TOKEN_INFO.serialNumber</c>) is
+    /// <paramref name="serialNumber"/>, among the slots with a token present: the way to tell apart tokens that share a
+    /// label. The comparison is ordinal (case-sensitive), after removing the padding. Finding the slot neither opens a
+    /// session nor logs in.
     /// </summary>
-    /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing
-    /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
-    /// <param name="userType">The PKCS#11 user type to log in as.</param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Session OpenSessionWithPinpad(string slotLabel, CKU userType, ICryptoPolicy? policy = null)
+    /// <remarks>
+    /// A serial number is unique for a manufacturer and model, not across them: two tokens of different makes may report
+    /// the same one, and this then refuses rather than picking one. Add the manufacturer or model with
+    /// <see cref="GetSlotByUri(string)"/> (<c>pkcs11:manufacturer=…;serial=…</c>) or <see cref="GetSlot"/>.
+    /// </remarks>
+    /// <param name="serialNumber">The token's serial number, without its padding.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="serialNumber"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">No present token has the serial number (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).</exception>
+    /// <exception cref="Pkcs11AmbiguousTokenException">More than one present token has it; it names their slots.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSlotList</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlotByTokenSerial(string serialNumber)
     {
-        ArgumentNullException.ThrowIfNull(slotLabel);
+        ArgumentNullException.ThrowIfNull(serialNumber);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSessionCore(policy: policy);
-        try
-        {
-            session.Login(userType);
-            return new Pkcs11Session(this, matched, session);
-        }
-        catch
-        {
-            session.Dispose();
-            throw;
-        }
+        return SelectOneSlot(
+            (_, token) => string.Equals(token.SerialNumber.TrimEnd(' '), serialNumber, StringComparison.Ordinal),
+            $"the serial number '{serialNumber}'");
     }
 
     /// <summary>
-    /// Opens a session against the slot whose token label matches <paramref name="slotLabel"/>
-    /// <em>without</em> logging in. For tokens that do not require authentication — the token's
-    /// <c>CKF_LOGIN_REQUIRED</c> flag is clear (e.g. a software token's public crypto services) —
-    /// where a <c>C_Login</c> call would be rejected with <see cref="CKR.CKR_USER_TYPE_INVALID"/>.
-    /// Only public and session objects are reachable, which is sufficient for stateless crypto
-    /// (hashing, and operations on session-lifetime keys).
+    /// Finds the one slot whose token <paramref name="match"/> accepts, among the slots with a token present: for a
+    /// selection the other lookups do not express (a label and a model, a manufacturer prefix, a flag). Finding the slot
+    /// neither opens a session nor logs in.
     /// </summary>
-    /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing spaces).</param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_OpenSession</c> call.</exception>
-    public Pkcs11Session OpenSessionWithoutLogin(string slotLabel, ICryptoPolicy? policy = null)
+    /// <remarks>
+    /// <paramref name="match"/> sees each present token's <see cref="TokenInfo"/> (its text fields without their
+    /// padding, and its <see cref="TokenInfo.SlotId"/>), and must accept exactly one: none, or more than one, is
+    /// refused rather than resolved by picking one. A token removed while the slots are being read is passed over.
+    /// </remarks>
+    /// <param name="match">Whether a token is the one wanted. An exception it throws propagates.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="match"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">No present token matches (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).</exception>
+    /// <exception cref="Pkcs11AmbiguousTokenException">More than one present token matches; it names their slots.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSlotList</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlot(Func<TokenInfo, bool> match)
     {
-        ArgumentNullException.ThrowIfNull(slotLabel);
+        ArgumentNullException.ThrowIfNull(match);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSessionCore(policy: policy);
-        try
-        {
-            return new Pkcs11Session(this, matched, session);
-        }
-        catch
-        {
-            session.Dispose();
-            throw;
-        }
+        return SelectOneSlot((_, token) => match(token), "the properties asked for");
     }
 
-    private Pkcs11Slot MatchSlotByLabel(string slotLabel)
-        => GetSlotList()
-            .FirstOrDefault(slot => slot.GetTokenInfo().Label.TrimEnd() == slotLabel)
-            ?? throw new ArgumentException(
-                $"No slot found with token label '{slotLabel}'.", nameof(slotLabel));
+    /// <summary>
+    /// Finds the one slot holding the token a PKCS#11 URI (RFC 7512) names, among the slots with a token present: for
+    /// instance <c>pkcs11:token=signing-prod;serial=0123456789abcdef</c>, or
+    /// <c>pkcs11:manufacturer=SoftHSM%20project;model=SoftHSM%20v2;token=signing-prod</c>. Finding the slot neither
+    /// opens a session nor logs in. See <see cref="GetSlotByUri(Pkcs11Uri)"/>.
+    /// </summary>
+    /// <param name="uri">The URI; see <see cref="Pkcs11Uri"/> for what is taken and what is refused.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="uri"/> is not a PKCS#11 URI this library takes (see <see cref="Pkcs11Uri"/>).</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">
+    /// No present token matches, or the module is not the one the <c>library-*</c> attributes name
+    /// (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).
+    /// </exception>
+    /// <exception cref="Pkcs11AmbiguousTokenException">More than one present token matches; it names their slots.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetInfo</c>, <c>C_GetSlotList</c>, <c>C_GetSlotInfo</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlotByUri(string uri) => GetSlotByUri(Pkcs11Uri.Parse(uri));
+
+    /// <summary>
+    /// Finds the one slot holding the token <paramref name="uri"/> names, among the slots with a token present. Finding
+    /// the slot neither opens a session nor logs in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The module (<c>library-*</c>, checked against <see cref="GetInfo"/>), the slot (<c>slot-*</c>) and the token
+    /// (<c>token</c>, <c>manufacturer</c>, <c>serial</c>, <c>model</c>) attributes select; an attribute left out matches
+    /// anything, so <c>pkcs11:</c> alone names every token. The object attributes (<c>object</c>, <c>type</c>,
+    /// <c>id</c>) do not take part: a key's URI selects the token it is on, and
+    /// <see cref="Pkcs11Session.OpenKey(Pkcs11Uri)"/> then opens the key.
+    /// </para>
+    /// <para>
+    /// As with the other lookups, the URI must name exactly one present token: none, or more than one, is refused rather
+    /// than resolved by picking one. A <c>slot-id</c> pins the slot, which the module may renumber between runs; prefer
+    /// the token's own attributes (<see cref="Pkcs11Slot.GetTokenUri"/>) in configuration.
+    /// </para>
+    /// </remarks>
+    /// <param name="uri">The URI.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">
+    /// No present token matches, or the module is not the one the <c>library-*</c> attributes name
+    /// (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).
+    /// </exception>
+    /// <exception cref="Pkcs11AmbiguousTokenException">More than one present token matches; it names their slots.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetInfo</c>, <c>C_GetSlotList</c>, <c>C_GetSlotInfo</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlotByUri(Pkcs11Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (uri.NamesLibrary && !uri.Matches(GetInfo()))
+        {
+            throw new Pkcs11TokenException(CKR.CKR_TOKEN_NOT_PRESENT, Pkcs11Operations.OpGetInfo,
+                "No present token matches the PKCS#11 URI: its library-* attributes do not describe this module.");
+        }
+
+        return SelectOneSlot(uri.Matches, "the attributes of the PKCS#11 URI");
+    }
+
+    // The one present token match accepts. A token removed while the slots are read is passed over. None is
+    // CKR_TOKEN_NOT_PRESENT; more than one is refused, naming the slots, rather than resolved by picking one.
+    private Pkcs11Slot SelectOneSlot(Func<Pkcs11Slot, TokenInfo, bool> match, string what)
+    {
+        List<(Pkcs11Slot Slot, TokenInfo Token)> matches = [];
+        foreach (Pkcs11Slot slot in GetSlotList())
+        {
+            TokenInfo token;
+            try
+            {
+                token = slot.GetTokenInfo();
+                if (!match(slot, token))
+                    continue;
+            }
+            catch (Pkcs11TokenException ex) when (ex.ReturnValue is CKR.CKR_TOKEN_NOT_PRESENT or CKR.CKR_DEVICE_REMOVED)
+            {
+                continue;
+            }
+
+            matches.Add((slot, token));
+        }
+
+        // The slot remembers the token it was selected by: a login through it checks the slot still holds that token
+        // before sending the PIN.
+        return matches.Count switch
+        {
+            1 => matches[0].Slot.SelectedBy(matches[0].Token),
+            0 => throw new Pkcs11TokenException(
+                CKR.CKR_TOKEN_NOT_PRESENT,
+                Pkcs11Operations.OpGetTokenInfo,
+                $"No present token has {what}."),
+            _ => throw new Pkcs11AmbiguousTokenException(
+                Pkcs11Operations.OpGetTokenInfo,
+                $"More than one token has {what}: slots {string.Join(", ", matches.Select(m => m.Slot.SlotId))}. "
+                + "Select the token by what tells them apart: its serial number (GetSlotByTokenSerial), a PKCS#11 URI "
+                + "with its manufacturer or model (GetSlotByUri), or a predicate (GetSlot).",
+                [.. matches.Select(m => m.Slot.SlotId)]),
+        };
+    }
 
     #region IDisposable
 
@@ -750,6 +850,7 @@ public sealed class Pkcs11Library : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        Volatile.Write(ref _disposing, 1);
         Log.LibraryTrace(_logger, _libraryPath, "Dispose");
 
         // First: ends this library's slot-event waits at once, whatever else still uses the module.
@@ -757,6 +858,47 @@ public sealed class Pkcs11Library : IDisposable
         _slotEvents = null;
 
         if (_pkcs11Library != null)
+        {
+            // This library's holds of token logins (its Pkcs11Login objects and their sessions) are released
+            // first: a login it alone held is logged out, while its anchor is still there to send C_Logout on (or, with
+            // operations in flight on the token, as the last of them ends; the anchor holds off C_Finalize until then).
+            // A login another load of the module still holds stays, with its anchor (see CloseAllTrackedSessions),
+            // which holds off this load's C_Finalize until that login's last holder goes.
+            // Every record is released, and the rest of the disposal runs, even when one release throws (a logger's
+            // exception, say): that exception is reported once the library is disposed.
+            try
+            {
+                ReleaseHoldersFrom(TokenLoginRegistry.Of(_pkcs11Library.Module).Records(), 0);
+            }
+            finally
+            {
+                CloseAndRelease();
+            }
+        }
+
+        _disposed = true;
+    }
+
+    // Releases this library's holds in records[index..], each even if the one before it threw.
+    private void ReleaseHoldersFrom(TokenLoginRecord[] records, int index)
+    {
+        if (index == records.Length)
+            return;
+        try
+        {
+            records[index].ReleaseHoldersOf(this);
+        }
+        finally
+        {
+            ReleaseHoldersFrom(records, index + 1);
+        }
+    }
+
+    // The end of Dispose, once the login holds are released.
+    private void CloseAndRelease()
+    {
+        if (_pkcs11Library is null)
+            return;
         {
             // Close any session handles still alive against this library before
             // C_Finalize tears down the cryptoki state — otherwise a stray
@@ -782,8 +924,6 @@ public sealed class Pkcs11Library : IDisposable
             // After the state change, so a logger that throws cannot leave the library half disposed.
             LogFinalizeStatus(loaded.FinalizeStatus);
         }
-
-        _disposed = true;
     }
 
     // C_Finalize runs on whichever thread releases the module last (see Pkcs11ModuleHandle), which

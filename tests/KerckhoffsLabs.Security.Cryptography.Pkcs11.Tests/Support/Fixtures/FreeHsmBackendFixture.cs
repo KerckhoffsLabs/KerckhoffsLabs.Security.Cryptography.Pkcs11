@@ -152,9 +152,12 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
 
             slot.InitTokenWithPin(new SecurePin(SoPin.Span), TokenLabel);
 
-            using (Pkcs11Session so = Library.OpenSessionWithPin(TokenLabel, CKU.CKU_SO, new SecurePin(SoPin.Span)))
+            // The SO sets the user PIN (C_InitPIN on its login's own read/write session); disposing the login logs out.
+            using (var soPin = new SecurePin(SoPin.Span))
+            using (Pkcs11Login so = slot.Login(TokenUser.SecurityOfficer, soPin))
+            using (var userPin = new SecurePin(UserPin.Span))
             {
-                so.InitPinWithPin(new SecurePin(UserPin.Span));
+                so.InitUserPinWithPin(userPin);
             }
 
             SlotId = (NativeCULong)slot.SlotId.Value;

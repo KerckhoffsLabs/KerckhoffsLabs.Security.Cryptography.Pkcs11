@@ -112,7 +112,7 @@ public sealed class AesGcmPkcs11ModuleTests
         using Pkcs11Library library = module.Load();
         LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1);
-        using var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core);
+        using var session = new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core);
         using var key = new Pkcs11Key(session, new ObjectHandle(1), ObjectHandle.Invalid, CKK.CKK_AES, "aes", []);
         using var aesGcm = new AesGcmPkcs11(key, TagSize);
         body(aesGcm);

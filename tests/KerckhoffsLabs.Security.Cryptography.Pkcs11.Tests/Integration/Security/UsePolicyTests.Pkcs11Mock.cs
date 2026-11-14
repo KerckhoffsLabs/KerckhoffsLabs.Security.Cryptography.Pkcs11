@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security;
@@ -12,8 +11,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
 {
     private readonly MockBackendFixture _backend = backend;
 
-    private Pkcs11Session Open(ICryptoPolicy? policy) =>
-        _backend.Library.OpenSessionWithPin(_backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span), policy);
+    private Pkcs11Session Open(ICryptoPolicy? policy) => _backend.OpenSession(policy);
 
     [Fact]
     public void NullPolicy_MeansRecommended()

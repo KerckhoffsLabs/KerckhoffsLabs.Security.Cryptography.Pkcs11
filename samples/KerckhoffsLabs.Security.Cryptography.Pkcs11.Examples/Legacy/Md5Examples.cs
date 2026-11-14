@@ -21,9 +21,9 @@ public static class Md5Examples
 
         // 1. Load the module (its path from configuration) and open a session on the token. Hashing
         //    uses no key, so no login: a public session will do. Where a token wants a login for every
-        //    operation, open it with OpenSessionWithPin, as on the key pages.
+        //    operation, open the session from a login instead, as on the key pages.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
-        using Pkcs11Session session = library.OpenSessionWithoutLogin(tokenLabel);
+        using Pkcs11Session session = library.GetSlotByTokenLabel(tokenLabel).OpenSession();
 
         // 2. Hash, with the policy lifted for this block only.
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))

@@ -43,6 +43,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// would reach the token throws <see cref="ObjectDisposedException"/> rather than send a handle the
 /// module may have given to another object.
 /// </para>
+/// <para>
+/// <b>Private keys and logout.</b> A half that is a private object (<c>CKA_PRIVATE</c>: a private or secret key,
+/// as a rule) is tied to the token login it was found or made under, through whichever session. When that login
+/// ends (its last holder is disposed, or the module reports it gone), PKCS#11 invalidates its handle for good, even
+/// after a new login: every member that would send it (<see cref="Sign"/>, <see cref="Decrypt"/>, ...) throws
+/// <see cref="ObjectDisposedException"/>. A public half is unaffected, so <see cref="Verify"/> and
+/// <see cref="Encrypt"/> through it keep working. Open the key again under the new login to sign or decrypt.
+/// </para>
 /// </remarks>
 public sealed partial class Pkcs11Key : IDisposable
 {
@@ -56,6 +64,15 @@ public sealed partial class Pkcs11Key : IDisposable
     private readonly byte[] _id;
     private bool _disposed;
     private bool _destroyed;
+
+    // For each half that is a private object (CKA_PRIVATE), the login state it was found or made under (see
+    // PrivateObjectLogin); null for a half that is public, or not known yet. C_Logout invalidates only private
+    // handles, so each half is checked on its own when it is selected for a call. Set at construction, and when the
+    // other half is found later (under the session's lease); a reference, so a read never tears.
+    private HalfLogin? _privateHalfLogin;
+    private HalfLogin? _publicHalfLogin;
+
+    private sealed record HalfLogin(LoginStamp Stamp);
 
     internal Pkcs11Key(
         Pkcs11Session session,
@@ -80,6 +97,34 @@ public sealed partial class Pkcs11Key : IDisposable
         Label = label;
         _id = id ?? [];
     }
+
+    /// <summary>
+    /// Ties each half that is a private object to the login state it was found or made under (see
+    /// <see cref="PrivateObjectLogin"/>). Called once, by the session that built the key, before the key is handed out.
+    /// </summary>
+    /// <param name="privateHalfIsPrivate">Whether the private-key or secret-key half is a private object.</param>
+    /// <param name="publicHalfIsPrivate">Whether the public-key half is a private object.</param>
+    /// <param name="loginStamp">The token's login state when the halves were found or made.</param>
+    /// <returns>This key.</returns>
+    internal Pkcs11Key WithLoginStamp(bool privateHalfIsPrivate, bool publicHalfIsPrivate, LoginStamp loginStamp)
+    {
+        _privateHalfLogin = privateHalfIsPrivate && !_knownPrivateHandle.IsInvalid ? new HalfLogin(loginStamp) : null;
+        _publicHalfLogin = publicHalfIsPrivate && !_knownPublicHandle.IsInvalid ? new HalfLogin(loginStamp) : null;
+        return this;
+    }
+
+    /// <summary>
+    /// Whether a half this key carries is a private object (<c>CKA_PRIVATE</c>, or by class when the token does not
+    /// report it): that half is then usable only while the login it was found or made under lasts.
+    /// </summary>
+    internal bool IsPrivate => Volatile.Read(ref _privateHalfLogin) is not null || Volatile.Read(ref _publicHalfLogin) is not null;
+
+    /// <summary>
+    /// The generation of the token login this key's private object was found or made under (see
+    /// <see cref="LoginStamp"/>); the private-key or secret-key half's when both are private.
+    /// </summary>
+    internal long LoginGeneration
+        => (Volatile.Read(ref _privateHalfLogin) ?? Volatile.Read(ref _publicHalfLogin))?.Stamp.Generation ?? 0;
 
     /// <summary>The PKCS#11 key type (e.g. <see cref="CKK.CKK_AES"/>, <see cref="CKK.CKK_RSA"/>).</summary>
     public CKK KeyType => _keyType;
@@ -110,9 +155,72 @@ public sealed partial class Pkcs11Key : IDisposable
             // compute the same value.
             int bits = _keySizeBits;
             if (bits == KeySizeNotRead)
+            {
+                using var use = Use();
                 _keySizeBits = bits = ReadKeySizeBits() ?? KeySizeUnknown;
+            }
             return bits == KeySizeUnknown ? null : bits;
         }
+    }
+
+    /// <summary>
+    /// Whether the token wants the PIN again for each use of this key: <c>CKA_ALWAYS_AUTHENTICATE</c> on its private
+    /// key (PKCS#11 v3.2 private_key_objects.md). Read once, on first access or first sign or decrypt, and cached.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see langword="false"/> for a secret key or a key with no private half (the attribute exists only on private
+    /// keys, so neither is read), and when the token does not report the attribute or it cannot be read.
+    /// </para>
+    /// <para>
+    /// When <see langword="true"/>, every sign and decrypt with the key re-authenticates inside the operation with
+    /// the PIN from its session's <see cref="Pkcs11Session.ContextAuthentication"/>, and is refused before it starts
+    /// when that is <see langword="null"/>. See <see cref="ContextAuthentication"/>.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">The key is disposed or destroyed, or, on the first read, the login its private key was found under has ended.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetAttributeValue</c> call; nothing is cached then.</exception>
+    public bool AlwaysAuthenticate
+    {
+        get
+        {
+            ThrowIfUnusable();
+            if (Volatile.Read(ref _alwaysAuthenticate) is var known && known != AlwaysAuthenticateNotRead)
+                return known == 1;
+            using var use = Use();
+            return NeedsContextLogin;
+        }
+    }
+
+    private const int AlwaysAuthenticateNotRead = -1;
+    private int _alwaysAuthenticate = AlwaysAuthenticateNotRead;
+
+    /// <summary>
+    /// <see cref="AlwaysAuthenticate"/>, for the session core, which holds the lease: read on the private half through
+    /// <see cref="PrivateHandle"/>, so a private key whose login has ended is refused here as everywhere else.
+    /// </summary>
+    internal bool NeedsContextLogin
+    {
+        get
+        {
+            int known = Volatile.Read(ref _alwaysAuthenticate);
+            if (known != AlwaysAuthenticateNotRead)
+                return known == 1;
+            bool value = ReadAlwaysAuthenticate();
+            Volatile.Write(ref _alwaysAuthenticate, value ? 1 : 0);
+            return value;
+        }
+    }
+
+    private bool ReadAlwaysAuthenticate()
+    {
+        if (!IsAsymmetricKeyType(_keyType))
+            return false;
+        ObjectHandle handle = PrivateHandle;
+        if (handle.IsInvalid)
+            return false;
+        using var attrs = _session.Core.GetAttributeValue(handle, [CKA.CKA_ALWAYS_AUTHENTICATE]);
+        return Decode(attrs[0], static a => a.GetValueAsBool(), false);
     }
 
     private const int KeySizeNotRead = -1;
@@ -248,7 +356,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key exposes no readable handle; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
     public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(params ReadOnlySpan<CKA> types)
     {
-        ThrowIfUnusable();
+        using var use = Use();
 
         ObjectHandle handle = (IsAsymmetricKeyType(_keyType) && !PublicHandle.IsInvalid)
             ? PublicHandle
@@ -283,7 +391,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// underlying <c>C_GetAttributeValue</c> call.</exception>
     public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(KeyHandlePart part, params ReadOnlySpan<CKA> types)
     {
-        ThrowIfUnusable();
+        using var use = Use();
 
         ObjectHandle handle = part switch
         {
@@ -311,7 +419,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// </summary>
     internal ExportKeyInfo ReadExportKeyInfo()
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ObjectHandle handle = PrivateHandle;
         if (handle.IsInvalid)
             return ExportKeyInfo.Unread;
@@ -370,13 +478,21 @@ public sealed partial class Pkcs11Key : IDisposable
     /// Internal accessor for the private handle. <see cref="ObjectHandle.Invalid"/> for public-only keys.
     /// Looks up a pending private companion first.
     /// </summary>
+    /// <remarks>
+    /// This is where a member selects the half it sends, so this is where a private half whose login has ended is
+    /// refused (<see cref="ObjectDisposedException"/>). Members read it under the session's lease (<see cref="Use"/>),
+    /// which holds the login gate, so no logout lands between this check and the native call.
+    /// </remarks>
     internal ObjectHandle PrivateHandle
     {
         get
         {
             if (_knownPrivateHandle.IsInvalid)
                 ResolveCompanion();
-            return _knownPrivateHandle;
+            ObjectHandle handle = _knownPrivateHandle;
+            if (!handle.IsInvalid)
+                ThrowIfLoginEnded(Volatile.Read(ref _privateHalfLogin));
+            return handle;
         }
     }
 
@@ -384,13 +500,20 @@ public sealed partial class Pkcs11Key : IDisposable
     /// Internal accessor for the public handle. <see cref="ObjectHandle.Invalid"/> when no companion
     /// exists and synthesis is unavailable. Looks up a pending public companion first.
     /// </summary>
+    /// <remarks>
+    /// Refuses the half when it is itself a private object whose login has ended, as <see cref="PrivateHandle"/> does;
+    /// a public half (the usual case) stays usable after logout.
+    /// </remarks>
     internal ObjectHandle PublicHandle
     {
         get
         {
             if (_knownPublicHandle.IsInvalid)
                 ResolveCompanion();
-            return _knownPublicHandle;
+            ObjectHandle handle = _knownPublicHandle;
+            if (!handle.IsInvalid)
+                ThrowIfLoginEnded(Volatile.Read(ref _publicHalfLogin));
+            return handle;
         }
     }
 
@@ -419,10 +542,25 @@ public sealed partial class Pkcs11Key : IDisposable
         if (!_companionPending)
             return;
 
-        if (_knownPublicHandle.IsInvalid)
-            _knownPublicHandle = _session.FindCompanion(CKO.CKO_PUBLIC_KEY, _id, _keyType);
+        CKO companionClass = _knownPublicHandle.IsInvalid ? CKO.CKO_PUBLIC_KEY : CKO.CKO_PRIVATE_KEY;
+        ObjectHandle companion = _session.FindCompanion(companionClass, _id, _keyType);
+
+        // A private companion is tied to the login state it was found under: the lease holds the gate, so that is
+        // the state now. One CKA_PRIVATE read per found companion.
+        HalfLogin? companionLogin = !companion.IsInvalid && _session.IsPrivateObject(companion, companionClass)
+            ? new HalfLogin(_session.CurrentLoginStamp())
+            : null;
+
+        if (companionClass == CKO.CKO_PUBLIC_KEY)
+        {
+            Volatile.Write(ref _publicHalfLogin, companionLogin);
+            _knownPublicHandle = companion;
+        }
         else
-            _knownPrivateHandle = _session.FindCompanion(CKO.CKO_PRIVATE_KEY, _id, _keyType);
+        {
+            Volatile.Write(ref _privateHalfLogin, companionLogin);
+            _knownPrivateHandle = companion;
+        }
 
         Volatile.Write(ref _companionPending, false);
     }
@@ -498,6 +636,7 @@ public sealed partial class Pkcs11Key : IDisposable
     internal System.Security.Cryptography.RSAParameters? GetSynthesizedRsaParameters()
     {
         if (_keyType != CKK.CKK_RSA) return null;
+        using var lease = _session.Core.AcquireExclusive();
         if (!PublicHandle.IsInvalid) return null;
         if (PrivateHandle.IsInvalid) return null;
 
@@ -513,6 +652,7 @@ public sealed partial class Pkcs11Key : IDisposable
     internal System.Security.Cryptography.ECParameters? GetSynthesizedEcParameters()
     {
         if (_keyType != CKK.CKK_EC) return null;
+        using var lease = _session.Core.AcquireExclusive();
         if (!PublicHandle.IsInvalid) return null;
         if (PrivateHandle.IsInvalid) return null;
         return PublicKeySynthesis.TrySynthesizeEc(_session.Core, PrivateHandle);
@@ -549,7 +689,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call — for example <see cref="CKR.CKR_ACTION_PROHIBITED"/> when the object is not destroyable.</exception>
     public void Destroy()
     {
-        ThrowIfUnusable();
+        using var use = Use();
         // Reading both accessors resolves a pending companion first, so the pair is complete before
         // anything is destroyed, and _companionPending is false by the time a half is cleared below: a
         // cleared half is never looked up again (a fresh lookup by CKA_ID could find an unrelated object).
@@ -570,13 +710,33 @@ public sealed partial class Pkcs11Key : IDisposable
 
     /// <summary>
     /// The guard on every member that reaches the token: refuses a disposed key, and a key whose own
-    /// <see cref="Destroy"/> completed, whose handles may since name other objects.
+    /// <see cref="Destroy"/> completed, whose handles may since name other objects. A private half whose login has
+    /// ended is refused where it is selected (<see cref="PrivateHandle"/>, <see cref="PublicHandle"/>).
     /// </summary>
     private void ThrowIfUnusable()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_destroyed)
             throw DestroyedObject.Exception(nameof(Pkcs11Key));
+    }
+
+    // Refuses a half that is a private object whose login has ended: PKCS#11 v3.2 C_Logout invalidates every handle
+    // to a private object for good, even after a new login, and the module may give the number to another object.
+    private void ThrowIfLoginEnded(HalfLogin? half)
+        => PrivateObjectLogin.ThrowIfEnded(half is not null, half?.Stamp ?? default, _session.Core.LoginRecord, nameof(Pkcs11Key));
+
+    /// <summary>
+    /// The guard on every member that sends this key's handles: <see cref="ThrowIfUnusable"/>, then the session's
+    /// lease, which the caller holds until it is done. The lease holds the token's login gate, so a half's login check
+    /// (made when the member selects it) and the native calls that follow see the same login; the session's own calls
+    /// re-enter it.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The key is disposed or destroyed, or the session is disposed.</exception>
+    /// <exception cref="InvalidOperationException">Another thread is using the session.</exception>
+    private Pkcs11SessionCore.ExclusiveLease Use([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
+    {
+        ThrowIfUnusable();
+        return _session.Core.AcquireExclusive(caller);
     }
 
     /// <inheritdoc/>
@@ -600,14 +760,14 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Sign</c> call.</exception>
     public byte[] Sign(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Sign (no private handle)");
 
-        return _session.Core.Sign(mechanism, PrivateHandle, data);
+        return _session.Core.Sign(mechanism, PrivateHandle, data, this);
     }
 
     /// <summary>
@@ -634,7 +794,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/> when the managed fallback is taken for a <c>CKM_SHA*_RSA_PKCS_PSS</c> mechanism whose parameters are not the profile the BCL verifies (see remarks); <see cref="CKR.CKR_ATTRIBUTE_VALUE_INVALID"/> when the token's RSA modulus or public exponent, read for managed verification, is empty or zero; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public bool Verify(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         // A secret key (HMAC, CMAC) verifies with the same object it signs with: it has no public half.
@@ -673,13 +833,13 @@ public sealed partial class Pkcs11Key : IDisposable
     /// </summary>
     internal byte[] SignPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest)
     {
-        ThrowIfUnusable();
+        using var use = Use();
 
         if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.SignPkcs1Digest (no private handle)");
 
-        return _session.Core.SignPkcs1Digest(hash, PrivateHandle, digest);
+        return _session.Core.SignPkcs1Digest(hash, PrivateHandle, digest, this);
     }
 
     /// <summary>
@@ -689,7 +849,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// </summary>
     internal bool VerifyPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest, ReadOnlySpan<byte> signature)
     {
-        ThrowIfUnusable();
+        using var use = Use();
 
         if (!PublicHandle.IsInvalid)
             return _session.Core.VerifyPkcs1Digest(hash, PublicHandle, digest, signature);
@@ -720,7 +880,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_Encrypt</c> call.</exception>
     public byte[] Encrypt(Mechanism mechanism, ReadOnlySpan<byte> plaintext)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         ObjectHandle handle = IsAsymmetricKeyType(_keyType)
@@ -750,14 +910,14 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Decrypt</c> call.</exception>
     public byte[] Decrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
 
         if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Decrypt (no private handle)");
 
-        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext, RsaCiphertextCheckFor(mechanism));
+        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext, RsaCiphertextCheckFor(mechanism), this);
     }
 
     /// <summary>
@@ -795,7 +955,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> plaintext)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
@@ -821,7 +981,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> ciphertext)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
@@ -829,7 +989,7 @@ public sealed partial class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.MessageDecrypt (no private handle)");
 
-        return _session.Core.MessageDecrypt(mechanism, PrivateHandle, messageParams, associatedData, ciphertext);
+        return _session.Core.MessageDecrypt(mechanism, PrivateHandle, messageParams, associatedData, ciphertext, this);
     }
 
     /// <summary>
@@ -839,21 +999,26 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <param name="mechanism">The wrap mechanism (e.g. <see cref="CKM.CKM_AES_KEY_WRAP"/>).</param>
     /// <param name="targetKey">The key being wrapped. Must carry a private/symmetric handle.</param>
     /// <returns>The wrapped key bytes — opaque blob to be transported / stored.</returns>
-    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if this key or <paramref name="targetKey"/> has been disposed or destroyed (<see cref="Destroy"/>), before the token is reached.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="targetKey"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's wrapping handle or <paramref name="targetKey"/>'s handle is unavailable; otherwise propagated from the underlying <c>C_WrapKey</c> call.</exception>
     public byte[] Wrap(Mechanism mechanism, Pkcs11Key targetKey)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(targetKey);
+
+        // The target's handle is sent too: once its own Destroy succeeded it may name another key, and wrapping that
+        // would export a key the caller never chose. Refused before the token, as for this key.
+        targetKey.ThrowIfUnusable();
 
         ObjectHandle wrapHandle = IsAsymmetricKeyType(_keyType) ? PublicHandle : PrivateHandle;
         if (wrapHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Wrap (wrapping-key handle unavailable)");
 
+        // The target's half goes in this call too: its accessor refuses it once its login has ended.
         ObjectHandle targetHandle = targetKey.PrivateHandle.IsInvalid
             ? targetKey.PublicHandle
             : targetKey.PrivateHandle;
@@ -882,7 +1047,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
     public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
@@ -986,7 +1151,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ObjectTemplate sharedSecretTemplate,
         int expectedCiphertextLen = 0)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
 
@@ -1013,7 +1178,7 @@ public sealed partial class Pkcs11Key : IDisposable
         ReadOnlySpan<byte> ciphertext,
         ObjectTemplate sharedSecretTemplate)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
 
@@ -1100,7 +1265,7 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the token does not expose the derived value.</exception>
     public byte[] DeriveBytes(Mechanism mechanism, int length)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
         RequireKdfOutputMechanism(mechanism);
@@ -1133,7 +1298,7 @@ public sealed partial class Pkcs11Key : IDisposable
 
     private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 

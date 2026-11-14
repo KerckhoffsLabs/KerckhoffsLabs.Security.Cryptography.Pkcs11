@@ -46,7 +46,7 @@ public sealed partial class Pkcs11Key
     /// </exception>
     public byte[] Export(Pkcs11KeyBlobFormat format)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         if (format is not (Pkcs11KeyBlobFormat.SubjectPublicKeyInfo or Pkcs11KeyBlobFormat.RawPublicKey))
             throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown key blob format.");
 
@@ -203,7 +203,7 @@ public sealed partial class Pkcs11Key
     public byte[] DeriveRawSecret(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
         const string operation = "Pkcs11Key.DeriveRawSecret";
-        ThrowIfUnusable();
+        using var use = Use();
         RequireAgreementKeyType(operation);
         // The export check comes before the peer is examined, and it is what a policy that allows extractable
         // templates but not a plaintext shared secret relies on. Inside the read-back, the derivation's
@@ -288,7 +288,7 @@ public sealed partial class Pkcs11Key
     public Pkcs11Key DeriveSecretAgreement(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
         const string operation = "Pkcs11Key.DeriveSecretAgreement";
-        ThrowIfUnusable();
+        using var use = Use();
         RequireAgreementKeyType(operation);
 
         AgreementPeer peer = ValidateAgreementPeer(peerSubjectPublicKeyInfo, operation);

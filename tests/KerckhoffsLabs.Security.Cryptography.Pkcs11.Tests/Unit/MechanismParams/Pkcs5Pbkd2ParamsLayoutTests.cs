@@ -197,7 +197,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         Assert.False(module.SentByReference);
         Assert.Equal(1, module.GetSlotInfoCalls);
         Assert.Equal(1, module.GetInfoCalls);
-        Assert.False(module.LowLevel.Pbkdf2PasswordLengthByReferenceBySlot[1]);
+        Assert.False(module.Library.LowLevelLibrary!.Pbkdf2PasswordLengthByReferenceBySlot[1]);
     }
 
     /// <summary>
@@ -218,7 +218,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => GenerateKey(session, "correct horse"u8));
         Assert.Equal(error, ex.ReturnValue);
         Assert.Null(module.SentByReference);
-        Assert.Empty(module.LowLevel.Pbkdf2PasswordLengthByReferenceBySlot);
+        Assert.Empty(module.Library.LowLevelLibrary!.Pbkdf2PasswordLengthByReferenceBySlot);
 
         GenerateKey(session, "correct horse"u8);
         Assert.True(module.SentByReference);
@@ -236,7 +236,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => GenerateKey(session, "correct horse"u8));
         Assert.Equal(CKR.CKR_DEVICE_ERROR, ex.ReturnValue);
         Assert.Null(module.SentByReference);
-        Assert.Empty(module.LowLevel.Pbkdf2PasswordLengthByReferenceBySlot);
+        Assert.Empty(module.Library.LowLevelLibrary!.Pbkdf2PasswordLengthByReferenceBySlot);
 
         GenerateKey(session, "correct horse"u8);
         Assert.True(module.SentByReference);
@@ -270,7 +270,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
     {
         using var module = new Pbkd2Module(P11Kit, cryptokiMajor: 2, cryptokiMinor: 20);
         module.Slots[1] = (slotManufacturer, 3, 51);
-        module.LowLevel.Pbkdf2PasswordLengthByReference = byReference;
+        module.Library.LowLevelLibrary!.Pbkdf2PasswordLengthByReference = byReference;
         using var session = module.OpenSession(slot: 1);
 
         GenerateKey(session, "correct horse"u8);
@@ -393,7 +393,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
 
         /// <summary>A session on <paramref name="slot"/>, opened through <see cref="Pkcs11Slot"/> as an application does.</summary>
         public Pkcs11SessionCore OpenSession(ulong slot, ILoggerFactory? loggerFactory = null)
-            => new Pkcs11Slot(LowLevel, slot, loggerFactory).OpenSessionCore(policy: CryptoPolicy.AllowInsecure);
+            => new Pkcs11Slot(Library, slot, loggerFactory).OpenSessionCore(policy: CryptoPolicy.AllowInsecure);
 
         protected override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
         {

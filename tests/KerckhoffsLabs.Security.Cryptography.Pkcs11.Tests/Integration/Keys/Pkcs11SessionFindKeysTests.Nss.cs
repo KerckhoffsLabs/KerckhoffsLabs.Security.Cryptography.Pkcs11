@@ -11,7 +11,7 @@ public sealed class Pkcs11SessionFindKeysTests_Nss(NssBackendFixture backend)
     // Finding a freshly *generated* key needs a writable token; NSS's generic token is write-protected.
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void OpenKey_NotFound_Throws()

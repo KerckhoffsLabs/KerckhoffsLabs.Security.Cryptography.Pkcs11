@@ -66,7 +66,9 @@ static void Report(string mode, LibraryInfo info)
 
 static void RunSession(Pkcs11Library lib, string token, string pin)
 {
-    using Pkcs11Session session = lib.OpenSessionWithPin(token, CKU.CKU_USER, new SecurePin(Encoding.UTF8.GetBytes(pin)));
+    using var securePin = new SecurePin(Encoding.UTF8.GetBytes(pin));
+    using Pkcs11Login login = lib.GetSlotByTokenLabel(token).Login(TokenUser.User, securePin);
+    using Pkcs11Session session = login.OpenSession();
     Console.WriteLine($"token={token}");
 
     // Attribute templates into C_GenerateKeyPair and C_FindObjectsInit, then the multi-pass read.

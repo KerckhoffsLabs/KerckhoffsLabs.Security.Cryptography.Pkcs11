@@ -10,7 +10,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
     [Fact]
     public void ConcurrentCall_FromDifferentThread_Throws_InvalidOperationException()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
             using var startGate = new System.Threading.ManualResetEventSlim(false);
@@ -57,8 +57,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
         }
         finally
         {
-            session.Logout();
-            session.Dispose();
+            TestKeys.LogoutIfRequired(_backend, session);
         }
     }
 
@@ -67,7 +66,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
     {
         // Same-thread reentrancy is required by secure helpers (e.g. GenerateAesKey calls
         // public GenerateKey internally). The lock is reentrant on the same thread.
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
             using var outerLease = session.AcquireExclusive(nameof(ReentrantCall_FromSameThread_Succeeds));
@@ -76,8 +75,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
         }
         finally
         {
-            session.Logout();
-            session.Dispose();
+            TestKeys.LogoutIfRequired(_backend, session);
         }
     }
 }

@@ -88,7 +88,7 @@ public sealed class Pkcs11SessionCoreLifecycleTests
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("1234");
 
-        s.Login(CKU.CKU_USER, pin);
+        s.SendLogin(CKU.CKU_USER, pin.Pin);
 
         Assert.Equal(CKU.CKU_USER, fake.CapturedUserType);
         Assert.Equal("1234"u8.ToArray(), fake.CapturedPin);
@@ -100,7 +100,7 @@ public sealed class Pkcs11SessionCoreLifecycleTests
         using var fake = new LifecycleFake { LoginRv = CKR.CKR_PIN_INCORRECT };
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("0000");
-        Assert.ThrowsAny<Pkcs11Exception>(() => s.Login(CKU.CKU_USER, pin));
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.SendLogin(CKU.CKU_USER, pin.Pin));
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class Pkcs11SessionCoreLifecycleTests
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("1234");
 
-        s.LoginUser(CKU.CKU_USER, pin, "operator-1");
+        s.SendLoginUser(CKU.CKU_USER, pin.Pin, "operator-1");
 
         Assert.Equal(Encoding.UTF8.GetBytes("operator-1"), fake.CapturedUsername);
         Assert.Equal("1234"u8.ToArray(), fake.CapturedPin);
@@ -122,7 +122,7 @@ public sealed class Pkcs11SessionCoreLifecycleTests
         using var fake = new LifecycleFake();
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("1234");
-        Assert.Throws<ArgumentException>(() => s.LoginUser(CKU.CKU_USER, pin, ""));
+        Assert.Throws<ArgumentException>(() => s.SendLoginUser(CKU.CKU_USER, pin.Pin, ""));
     }
 
     [Fact]
@@ -131,30 +131,30 @@ public sealed class Pkcs11SessionCoreLifecycleTests
         using var fake = new LifecycleFake { LoginUserRv = CKR.CKR_FUNCTION_NOT_SUPPORTED };
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("1234");
-        Assert.ThrowsAny<Pkcs11Exception>(() => s.LoginUser(CKU.CKU_USER, pin, "alice"));
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.SendLoginUser(CKU.CKU_USER, pin.Pin, "alice"));
     }
 
     // === PIN management =====================================================
 
     [Fact]
-    public void InitPin_Ok_PassesPin()
+    public void SendInitPin_Ok_PassesPin()
     {
         using var fake = new LifecycleFake();
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("9876");
 
-        s.InitPin(pin);
+        s.SendInitPin(pin.Pin);
 
         Assert.Equal("9876"u8.ToArray(), fake.CapturedPin);
     }
 
     [Fact]
-    public void InitPin_Error_Throws()
+    public void SendInitPin_Error_Throws()
     {
         using var fake = new LifecycleFake { InitPinRv = CKR.CKR_USER_NOT_LOGGED_IN };
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("9876");
-        Assert.ThrowsAny<Pkcs11Exception>(() => s.InitPin(pin));
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.SendInitPin(pin.Pin));
     }
 
     [Fact]

@@ -22,8 +22,7 @@ public sealed class FindObjectsTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture f)
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         // A self-signed X.509 cert to store on the token.
         using var rsa = RSA.Create(2048);
@@ -67,8 +66,7 @@ public sealed class FindObjectsTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture f)
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SignOnlyKeyPairsAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-pkcs11 maps CKA_VERIFY onto the TPM decrypt attribute, so a sign-only key pair is refused")]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         string baseLabel = $"certkey-{Guid.NewGuid():N}";
         byte[] id = Guid.NewGuid().ToByteArray();

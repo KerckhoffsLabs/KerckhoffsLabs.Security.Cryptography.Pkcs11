@@ -18,15 +18,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Construction is exclusively via <see cref="Pkcs11Library.OpenSessionWithPin(string, CKU, SecurePin, ICryptoPolicy?)"/>,
-/// <see cref="Pkcs11Library.OpenSessionWithPinpad(string, CKU, ICryptoPolicy?)"/>, or
-/// <see cref="Pkcs11Library.OpenSessionWithoutLogin(string, ICryptoPolicy?)"/>, which open the
-/// session (<c>C_OpenSession</c>) and, for the first two, log in (<c>C_Login</c>).
-/// The session does not own the library — callers continue to own and dispose the
-/// <see cref="Pkcs11Library"/>. On <see cref="Dispose"/> it logs the user out (<c>C_Logout</c>,
-/// best-effort — a token-wide state change, since PKCS#11 login state is per-application/slot) and
-/// then closes the session (<c>C_CloseSession</c>), so the HSM audit log records an explicit logout,
-/// not just a session close. A logout that fails because no user was logged in is ignored.
+/// Opened by <see cref="Pkcs11Login.OpenSession"/>, a session that keeps that login while it is open, or by
+/// <see cref="Pkcs11Slot.OpenSession"/>, one that keeps none but sees whatever login the application has on
+/// the token (PKCS#11 login state belongs to the application and the token, not to a session). The session
+/// does not own the library — callers continue to own and dispose the <see cref="Pkcs11Library"/>.
+/// <see cref="Dispose"/> closes the session (<c>C_CloseSession</c>) and releases its hold of the login, if it has
+/// one; it logs out only when it was the login's last holder (see <see cref="Pkcs11Login"/>).
 /// </para>
 /// <para>
 /// Keys obtained via the session's factory methods hold a non-owning reference to the
@@ -36,17 +33,78 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 public sealed partial class Pkcs11Session : IDisposable
 {
     private readonly Pkcs11SessionCore _core;
+
+    // This session's hold of Login, released once the session is closed; null for a slot session.
+    private readonly LoginHold? _hold;
     private bool _disposed;
 
-    internal Pkcs11Session(Pkcs11Library library, Pkcs11Slot slot, Pkcs11SessionCore core)
+    internal Pkcs11Session(Pkcs11Library library, Pkcs11Slot slot, Pkcs11SessionCore core,
+        SessionAccess access = SessionAccess.ReadWrite, Pkcs11Login? login = null, LoginHold? hold = null)
     {
         Library = library;
         Slot = slot;
         _core = core;
+        Access = access;
+        Login = login is null || hold is null ? null : new Pkcs11LoginInfo(login.Slot, login.User, login.Username, hold);
+        _hold = hold;
     }
 
-    /// <summary>The slot this session is authenticated against.</summary>
+    /// <summary>The slot this session is open on.</summary>
     public Pkcs11Slot Slot { get; }
+
+    /// <summary>Whether this session may change the token: read-only or read/write.</summary>
+    /// <remarks>
+    /// For a session a login lent its own session as (see <see cref="Pkcs11Login.OpenSession"/>), the access of that
+    /// session: a <see cref="SessionAccess.ReadOnly"/> request served by a read/write one reads
+    /// <see cref="SessionAccess.ReadWrite"/>.
+    /// </remarks>
+    public SessionAccess Access { get; }
+
+    /// <summary>
+    /// The login this session was opened through and keeps while open (<see cref="Pkcs11Login.OpenSession"/>), as a
+    /// read-only view, or <see langword="null"/> for a session from <see cref="Pkcs11Slot.OpenSession"/>, which keeps
+    /// none. <see cref="GetSessionInfo"/> gives the module's own answer on the session's state.
+    /// </summary>
+    /// <remarks>
+    /// A view, not the <see cref="Pkcs11Login"/> itself: code handed this session cannot release the opener's hold,
+    /// share the login, or set a user PIN through a Security Officer login.
+    /// </remarks>
+    public Pkcs11LoginInfo? Login { get; }
+
+    /// <summary>
+    /// Whether this session is the login's own session, lent because the token allows this application no other (see
+    /// <see cref="Pkcs11Login.OpenSession"/>). A lent session works like any other, except that the login lends it to
+    /// one session at a time, that it shares an operation it could not cancel with the next borrower, that its
+    /// <see cref="Access"/> is the login session's, and that it refuses every call once the login ends
+    /// (<see cref="Exceptions.Pkcs11LoginEndedException"/>), where an ordinary session goes public. Code tested on a
+    /// token that allows many sessions sees <see langword="false"/> here.
+    /// </summary>
+    public bool IsLent => _core.IsBorrower;
+
+    /// <summary>
+    /// Where this session's keys with <c>CKA_ALWAYS_AUTHENTICATE</c> (<see cref="Pkcs11Key.AlwaysAuthenticate"/>) get
+    /// the PIN the token wants again for each sign or decrypt, or <see langword="null"/> for none, in which case such a
+    /// key is refused before the operation starts. See <see cref="Pkcs11.ContextAuthentication"/>.
+    /// </summary>
+    /// <remarks>
+    /// A session from <see cref="Pkcs11Login.OpenSession"/> starts with that login's
+    /// <see cref="Pkcs11Login.ContextAuthentication"/>, copied when it opens; one from
+    /// <see cref="Pkcs11Slot.OpenSession"/> starts with none. Setting it affects the operations that start afterwards.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">The session is disposed.</exception>
+    public ContextAuthentication? ContextAuthentication
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _core.ContextAuthentication;
+        }
+        set
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _core.ContextAuthentication = value;
+        }
+    }
 
     /// <summary>The library that hosts this session. The session does not own the library.</summary>
     public Pkcs11Library Library { get; }
@@ -155,17 +213,29 @@ public sealed partial class Pkcs11Session : IDisposable
         return _core.GetSessionInfo();
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Closes the session (<c>C_CloseSession</c>), waiting for an operation in flight on it, and then
+    /// releases its hold of <see cref="Login"/>, if any. Never sends <c>C_Logout</c> itself: when this was the
+    /// last holder of the login, releasing the hold logs out. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// A session the login lent its own session as (see <see cref="Pkcs11Login.OpenSession"/>) is not closed: it is
+    /// handed back to the login, for the next <see cref="Pkcs11Login.OpenSession"/>. As closing would, this destroys the
+    /// session objects (<c>CKA_TOKEN</c> false) created through it; token objects stay. An operation the module could
+    /// not cancel (it has no <c>C_SessionCancel</c>) stays active on the login's session, and the next session it is
+    /// lent to is told so when it starts one of that kind. If the login ended while the session was lent, the login's
+    /// session is already closed, and this only releases the hold. From inside an operation on the same token (code the
+    /// library calls back during one), the logout the release of the last hold sends waits for the operations in
+    /// flight, and is sent as the last of them ends.
+    /// </remarks>
     public void Dispose()
     {
         if (_disposed) return;
 
-        // Explicitly log out before closing the session so the token's audit log records a logout, not
-        // just a session close. Both happen under one hold of the session's lock, so no call on another
-        // thread can reach the session once logged out but not yet closed; the logout is best-effort, the
-        // close always happens. See Pkcs11SessionCore.LogoutAndDispose.
-        _core.LogoutAndDispose();
+        // The close waits for this session's operation lease, so the hold is released after it.
+        _core.Dispose();
         _disposed = true;
+        _hold?.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -219,6 +289,43 @@ public sealed partial class Pkcs11Session : IDisposable
         if (id.IsEmpty) throw new ArgumentException(EmptyIdMessage, nameof(id));
         using var filter = ObjectTemplate.Empty().Id(id).Build();
         return OpenKeyCore(filter, $"with CKA_ID ({id.Length} bytes)");
+    }
+
+    /// <summary>
+    /// Opens the one key a PKCS#11 URI (RFC 7512) names on this session's token: for instance
+    /// <c>pkcs11:token=signing-prod;object=release-key;type=private</c>. See <see cref="OpenKey(string)"/> for which
+    /// objects match and when the lookup is ambiguous.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The object attributes select: <c>object</c> (<c>CKA_LABEL</c>), <c>id</c> (<c>CKA_ID</c>) and <c>type</c>
+    /// (<c>public</c>, <c>private</c> or <c>secret-key</c>; with <c>private</c> or <c>public</c>, that half is found and
+    /// the other found by <c>CKA_ID</c> on first use, as for any key). The URI must name the object, by <c>object</c> or
+    /// <c>id</c>: one with neither would open whichever key is alone on the token.
+    /// </para>
+    /// <para>
+    /// The URI's token, slot and module attributes, when it has some, must describe this session's token, so a URI meant
+    /// for another token is refused rather than looked up here, where a key of the same label may exist. Find the
+    /// token from the same URI with <see cref="Pkcs11Library.GetSlotByUri(Pkcs11Uri)"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="uri">The URI; see <see cref="Pkcs11Uri"/> for what it may carry.</param>
+    /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// The URI names no object (no <c>object</c> or <c>id</c>), an empty <c>id</c>, a <c>type</c> that is not a key, or
+    /// another token than this session's.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no key matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetInfo</c>, <c>C_GetSlotInfo</c>, <c>C_GetTokenInfo</c>, <c>C_FindObjects</c> or <c>C_GetAttributeValue</c>.</exception>
+    public Pkcs11Key OpenKey(Pkcs11Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ObjectTemplate filter = UriFilter(uri, Keys, "a key");
+        return OpenKeyCore(filter, "named by the PKCS#11 URI");
     }
 
     /// <summary>
@@ -339,6 +446,10 @@ public sealed partial class Pkcs11Session : IDisposable
 
         _ = ClassesToSearch(filter, Keys); // refuses a CKA_CLASS that is not a key class
 
+        // The search and the reads that wrap each key run under one lease, which holds the login gate: a private
+        // key is tied to the login state the search ran under.
+        using var lease = _core.AcquireExclusive();
+
         // One search, not one per key class: the class comes with the attribute read each found object
         // gets anyway, and objects of other classes are dropped there.
         var handles = _core.FindAllObjects([.. filter.Attributes]);
@@ -369,6 +480,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         var handles = _core.FindAllObjects([.. filter.Attributes]);
         var result = new List<Pkcs11Object>(handles.Count);
         foreach (var handle in handles)
@@ -459,6 +571,7 @@ public sealed partial class Pkcs11Session : IDisposable
         if (Array.IndexOf(Keys.Classes, objectClass) >= 0)
             throw new ArgumentException($"{objectClass} is a key class: import keys with ImportKey.", nameof(template));
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         ObjectHandle handle = _core.CreateObject([.. template.Attributes]);
         return HydrateObjectFromHandle(handle);
     }
@@ -498,8 +611,12 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <c>CKA_VALUE</c> cannot be read; also propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public ReadOnlyDisposableList<Pkcs11Certificate> FindCertificates(ObjectTemplate filter)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
 
+        // The search and the reads that wrap each certificate run under one lease, which holds the login gate: a
+        // private certificate is tied to the login state the search ran under (see FindKeys).
+        using var lease = _core.AcquireExclusive();
         var result = new List<Pkcs11Certificate>();
         try
         {
@@ -574,6 +691,63 @@ public sealed partial class Pkcs11Session : IDisposable
     {
         ArgumentNullException.ThrowIfNull(filter);
         return OpenCertificateCore(filter, "matching the filter");
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate a PKCS#11 URI (RFC 7512) names on this session's token: for instance
+    /// <c>pkcs11:token=signing-prod;object=release-key;type=cert</c>. As <see cref="OpenKey(Pkcs11Uri)"/>: the URI
+    /// must name the object (<c>object</c> or <c>id</c>), its <c>type</c>, if any, must be <c>cert</c>, and its token,
+    /// slot and module attributes, if any, must describe this session's token. See <see cref="OpenCertificate(string)"/>
+    /// for which objects match.
+    /// </summary>
+    /// <param name="uri">The URI; see <see cref="Pkcs11Uri"/> for what it may carry.</param>
+    /// <returns>A new <see cref="Pkcs11Certificate"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// The URI names no object, an empty <c>id</c>, a <c>type</c> other than <c>cert</c>, or another token than this
+    /// session's.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no certificate matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from <c>C_GetInfo</c>, <c>C_GetSlotInfo</c>, <c>C_GetTokenInfo</c>, <c>C_FindObjects</c> or <c>C_GetAttributeValue</c>.</exception>
+    public Pkcs11Certificate OpenCertificate(Pkcs11Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ObjectTemplate filter = UriFilter(uri, Certificates, "a certificate");
+        return OpenCertificateCore(filter, "named by the PKCS#11 URI");
+    }
+
+    // The search filter of an object URI for family: its label, id and class. Refuses a URI that names no object, an
+    // empty id, a class outside family, or another token than this session's.
+    private ObjectTemplate UriFilter(Pkcs11Uri uri, ObjectFamily family, string what)
+    {
+        if (uri.Object is null && uri.Id is null)
+        {
+            throw new ArgumentException(
+                "The PKCS#11 URI names no object: give the object's label ('object') or its CKA_ID ('id').", nameof(uri));
+        }
+        if (uri.Id is { IsEmpty: true })
+            throw new ArgumentException("The PKCS#11 URI's 'id' is empty.", nameof(uri));
+        if (uri.Type is { } type && Array.IndexOf(family.Classes, type) < 0)
+            throw new ArgumentException($"The PKCS#11 URI's 'type' names {type}, which is not {what}.", nameof(uri));
+
+        Pkcs11Library library = Slot.Library;
+        if ((uri.NamesLibrary && !uri.Matches(library.GetInfo())) || !uri.Matches(Slot, Slot.GetTokenInfo()))
+        {
+            throw new ArgumentException("The PKCS#11 URI names another token than this session's: find the token from " +
+                "the same URI (Pkcs11Library.GetSlotByUri) and open the session there.", nameof(uri));
+        }
+
+        GenericTemplateBuilder builder = ObjectTemplate.Empty();
+        if (uri.Object is not null)
+            builder.Label(uri.Object);
+        if (uri.Id is { } id)
+            builder.Id(id.Span);
+        if (uri.Type is { } objectClass)
+            builder.Attribute(CKA.CKA_CLASS, (ulong)objectClass);
+        return builder.Build();
     }
 
     /// <summary>
@@ -677,6 +851,7 @@ public sealed partial class Pkcs11Session : IDisposable
             .SerialNumber(EncodedSerialNumber(certificate.RawData))
             .Value(certificate.RawData)
             .Build();
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         ObjectHandle handle = _core.CreateObject([.. template.Attributes]);
         return HydrateCertificateFromHandle(handle);
     }
@@ -694,7 +869,7 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private Pkcs11Certificate HydrateCertificateFromHandle(ObjectHandle handle)
     {
-        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID]);
+        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID, CKA.CKA_PRIVATE]);
         if (attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 "Pkcs11Certificate (CKA_VALUE unreadable)");
@@ -702,7 +877,8 @@ public sealed partial class Pkcs11Session : IDisposable
         var certificate = X509CertificateLoader.LoadCertificate(attrs[0].GetValueAsByteArray());
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
         byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
-        return new Pkcs11Certificate(this, handle, label, id, certificate);
+        bool isPrivate = PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[3]), CKO.CKO_CERTIFICATE);
+        return new Pkcs11Certificate(this, handle, label, id, certificate, isPrivate, CurrentLoginStamp());
     }
 
     /// <summary>
@@ -735,13 +911,17 @@ public sealed partial class Pkcs11Session : IDisposable
     {
         // One round trip when the token answers cleanly; the generic two-call read otherwise.
         if (_core.TryReadIdentity(handle, withKeyType: false, out ObjectIdentity identity))
-            return new Pkcs11Object(this, handle, identity.ObjectClass, identity.Label, identity.Id);
+        {
+            return new Pkcs11Object(this, handle, identity.ObjectClass, identity.Label, identity.Id,
+                identity.IsPrivate, CurrentLoginStamp());
+        }
 
-        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID]);
+        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID, CKA.CKA_PRIVATE]);
         var objectClass = (CKO)attrs[0].GetValueAsUlong();
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
         byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
-        return new Pkcs11Object(this, handle, objectClass, label, id);
+        bool isPrivate = PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[3]), objectClass);
+        return new Pkcs11Object(this, handle, objectClass, label, id, isPrivate, CurrentLoginStamp());
     }
 
     /// <summary>
@@ -761,6 +941,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(template);
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         var handle = _core.CreateObject([.. template.Attributes]);
         return HydrateKeyFromHandle(handle);
     }
@@ -780,6 +961,7 @@ public sealed partial class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         var handle = _core.GenerateKey(mechanism, [.. template.Attributes]);
         return HydrateKeyFromHandle(handle);
     }
@@ -816,6 +998,7 @@ public sealed partial class Pkcs11Session : IDisposable
         RequireClassIfSet(publicKeyTemplate, CKO.CKO_PUBLIC_KEY, nameof(publicKeyTemplate));
         RequireClassIfSet(privateKeyTemplate, CKO.CKO_PRIVATE_KEY, nameof(privateKeyTemplate));
 
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         _core.GenerateKeyPair(
             mechanism,
             [.. publicKeyTemplate.Attributes],
@@ -830,10 +1013,15 @@ public sealed partial class Pkcs11Session : IDisposable
             CKA.CKA_KEY_TYPE,
             CKA.CKA_LABEL,
             CKA.CKA_ID,
+            CKA.CKA_PRIVATE,
         ]);
         var keyType = (CKK)attrs[0].GetValueAsUlong();
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
         byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
+
+        // The public half's CKA_PRIVATE takes one read of its own: a token may make it private too.
+        bool privateHalfIsPrivate = PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[3]), CKO.CKO_PRIVATE_KEY);
+        bool publicHalfIsPrivate = PrivateObjectLogin.IsPrivate(_core.TryReadPrivate(publicHandle), CKO.CKO_PUBLIC_KEY);
 
         return new Pkcs11Key(
             session: this,
@@ -841,7 +1029,8 @@ public sealed partial class Pkcs11Session : IDisposable
             publicHandle: publicHandle,
             keyType: keyType,
             label: label,
-            id: id);
+            id: id)
+            .WithLoginStamp(privateHalfIsPrivate, publicHalfIsPrivate, CurrentLoginStamp());
     }
 
     private static void RequireClassIfSet(ObjectTemplate template, CKO expected, string paramName)
@@ -1009,63 +1198,50 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Changes the logged-in user's PIN via <c>C_SetPIN</c>. The session must be authenticated as
-    /// the user (or SO) whose PIN is being changed.
+    /// Changes a PIN via <c>C_SetPIN</c>: the PIN of the user this application is logged in to the token as, or the
+    /// normal user's PIN when it is not logged in (PKCS#11 v3.2). Needs a read/write session. To set the normal
+    /// user's PIN as the Security Officer, use <see cref="Pkcs11Login.InitUserPinWithPin"/>.
     /// </summary>
     /// <param name="oldPin">The current PIN.</param>
     /// <param name="newPin">The replacement PIN.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="oldPin"/> or <paramref name="newPin"/> is <see langword="null"/>.</exception>
+    /// <exception cref="Pkcs11SessionException">A read-only session (<c>CKR_SESSION_READ_ONLY</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change (e.g. wrong old PIN, policy violation).</exception>
     public void SetPinWithPin(SecurePin oldPin, SecurePin newPin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(oldPin);
         ArgumentNullException.ThrowIfNull(newPin);
+        ThrowIfReadOnlyForSetPin();
         _core.SetPin(oldPin, newPin);
     }
 
     /// <summary>
-    /// Changes the logged-in user's PIN via the token's own pinpad, for tokens advertising
+    /// Changes a PIN, as <see cref="SetPinWithPin"/> does, via the token's own pinpad, for tokens advertising
     /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. Both the old and new PIN are entered on
     /// the device; PKCS#11 signals this by calling <c>C_SetPIN</c> with both PIN pointers
-    /// <c>NULL_PTR</c>.
+    /// <c>NULL_PTR</c>. Needs a read/write session.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="Pkcs11SessionException">A read-only session (<c>CKR_SESSION_READ_ONLY</c>, refused before the module).</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change.</exception>
     public void SetPinWithPinpad()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfReadOnlyForSetPin();
         _core.SetPin();
     }
 
-    /// <summary>
-    /// Initializes the normal user's PIN via <c>C_InitPIN</c>. Requires a session authenticated as
-    /// the Security Officer (SO).
-    /// </summary>
-    /// <param name="userPin">The user PIN to set.</param>
-    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <see langword="null"/>.</exception>
-    /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
-    public void InitPinWithPin(SecurePin userPin)
+    // PKCS#11 v3.2 C_SetPIN: only in the "R/W Public", "R/W SO Functions" or "R/W User Functions" states, else
+    // CKR_SESSION_READ_ONLY. The library opened this session and knows its access, so it answers for the module.
+    private void ThrowIfReadOnlyForSetPin()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        ArgumentNullException.ThrowIfNull(userPin);
-        _core.InitPin(userPin);
-    }
-
-    /// <summary>
-    /// Initializes the normal user's PIN via the token's own pinpad, for tokens advertising
-    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. Requires a session authenticated as the
-    /// Security Officer (SO); PKCS#11 signals on-device entry by calling <c>C_InitPIN</c> with
-    /// <c>pPin = NULL_PTR</c>.
-    /// </summary>
-    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
-    /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
-    public void InitPinWithPinpad()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        _core.InitPin();
+        if (Access != SessionAccess.ReadOnly)
+            return;
+        throw Pkcs11Exception.Create(CKR.CKR_SESSION_READ_ONLY, Pkcs11Operations.OpSetPIN,
+            $"{Pkcs11Operations.OpSetPIN}: this is a read-only session, and PKCS#11 changes a PIN only in a read/write " +
+            "one. Open a read/write session to change it.");
     }
 
     /// <summary>
@@ -1087,7 +1263,8 @@ public sealed partial class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Hydrates an existing object handle into a Pkcs11Key (used after operations that
-    /// produce a new on-token object — Unwrap, Derive).
+    /// produce a new on-token object — Unwrap, Derive). Call it under the lease the operation ran in, so the key
+    /// is tied to the login state the object was made under.
     /// </summary>
     internal Pkcs11Key HydrateExistingHandleAsKey(ObjectHandle handle)
         => HydrateKeyFromHandle(handle);
@@ -1099,6 +1276,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// </summary>
     internal ObjectHandle FindCompanion(CKO companionClass, byte[] id, CKK keyType)
     {
+        using var lease = _core.AcquireExclusive();
         using var filter = ObjectTemplate.Empty()
             .Attribute(CKA.CKA_CLASS, (ulong)companionClass)
             .Attribute(CKA.CKA_KEY_TYPE, (ulong)keyType)
@@ -1107,6 +1285,19 @@ public sealed partial class Pkcs11Session : IDisposable
         var handles = _core.FindAllObjects([.. filter.Attributes]);
         return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
     }
+
+    /// <summary>
+    /// Whether a key half the library found without reading its identity (a key's other half) is a private object:
+    /// one <c>CKA_PRIVATE</c> read, or by class when the token does not report it.
+    /// </summary>
+    internal bool IsPrivateObject(ObjectHandle handle, CKO objectClass)
+        => PrivateObjectLogin.IsPrivate(_core.TryReadPrivate(handle), objectClass);
+
+    /// <summary>
+    /// The token's login state now, for a private object found or made under it. Call it under the lease the
+    /// lookup or creation ran in.
+    /// </summary>
+    internal LoginStamp CurrentLoginStamp() => _core.LoginRecord.CurrentStamp();
 
     // The lookups by CKA_ID refuse an empty id: it matches every object that has no CKA_ID.
     private const string EmptyIdMessage = "Id must not be empty.";
@@ -1123,6 +1314,39 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private static readonly ObjectFamily Certificates =
         new("certificate", [CKO.CKO_CERTIFICATE], CKA.CKA_CERTIFICATE_TYPE, (ulong)CKC.CKC_X_509);
+
+    // A found object's class, key type, label, id and privacy: in one round trip when the token answers cleanly, the
+    // generic two-call read otherwise. Null with keysOnly when the object is not a key, read before CKA_KEY_TYPE,
+    // which such an object does not have.
+    private KeyIdentity? ReadKeyIdentity(ObjectHandle handle, bool keysOnly)
+    {
+        if (_core.TryReadIdentity(handle, withKeyType: true, out ObjectIdentity identity))
+        {
+            return keysOnly && !IsKeyClass(identity.ObjectClass)
+                ? null
+                : new KeyIdentity(identity.ObjectClass, identity.KeyType, identity.Label, identity.Id, identity.IsPrivate);
+        }
+
+        using var attrs = _core.GetAttributeValue(handle,
+        [
+            CKA.CKA_CLASS,
+            CKA.CKA_KEY_TYPE,
+            CKA.CKA_LABEL,
+            CKA.CKA_ID,
+            CKA.CKA_PRIVATE,
+        ]);
+        var objectClass = (CKO)attrs[0].GetValueAsUlong();
+        if (keysOnly && !IsKeyClass(objectClass))
+            return null;
+        return new KeyIdentity(
+            objectClass,
+            (CKK)attrs[1].GetValueAsUlong(),
+            attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString(),
+            attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray(),
+            PrivateObjectLogin.IsPrivate(PrivateObjectLogin.Reported(attrs[4]), objectClass));
+    }
+
+    private readonly record struct KeyIdentity(CKO ObjectClass, CKK KeyType, string? Label, byte[] Id, bool IsPrivate);
 
     private static bool IsKeyClass(CKO objectClass) => Array.IndexOf(Keys.Classes, objectClass) >= 0;
 
@@ -1161,7 +1385,7 @@ public sealed partial class Pkcs11Session : IDisposable
         => FindUnique(filter, Certificates, EachOnItsOwn, matched => HydrateCertificateFromHandle(matched[0].Handle));
 
     /// <summary>An object a lookup matched, with the attributes that decide which result it belongs to.</summary>
-    private sealed record ObjectCandidate(ObjectHandle Handle, CKO Class, CKK? KeyType, byte[] Id, string? Label);
+    private sealed record ObjectCandidate(ObjectHandle Handle, CKO Class, CKK? KeyType, byte[] Id, string? Label, bool? Private);
 
     /// <summary>
     /// Runs a lookup that must identify one object of <paramref name="family"/>: searches with
@@ -1176,6 +1400,7 @@ public sealed partial class Pkcs11Session : IDisposable
         Func<List<ObjectCandidate>, List<List<ObjectCandidate>>> group, Func<List<ObjectCandidate>, T> hydrate)
         where T : class
     {
+        using var lease = _core.AcquireExclusive(); // see FindKeys
         List<ObjectCandidate> candidates =
             [.. SearchFamily(filter, family).Select(match => ReadCandidate(match.Handle, match.Class))];
 
@@ -1248,11 +1473,11 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private ObjectCandidate ReadCandidate(ObjectHandle handle, CKO objectClass)
     {
-        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL]);
+        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_PRIVATE]);
         CKK? keyType = attrs[0].CannotBeRead ? null : (CKK)attrs[0].GetValueAsUlong();
         byte[] id = attrs[1].CannotBeRead ? [] : attrs[1].GetValueAsByteArray();
         string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
-        return new ObjectCandidate(handle, objectClass, keyType, id, label);
+        return new ObjectCandidate(handle, objectClass, keyType, id, label, PrivateObjectLogin.Reported(attrs[3]));
     }
 
     /// <summary>
@@ -1299,11 +1524,15 @@ public sealed partial class Pkcs11Session : IDisposable
             publicHandle: publicHalf.Handle,
             keyType: privateHalf.KeyType!.Value,
             label: privateHalf.Label ?? publicHalf.Label,
-            id: privateHalf.Id);
+            id: privateHalf.Id)
+            .WithLoginStamp(
+                privateHalfIsPrivate: PrivateObjectLogin.IsPrivate(privateHalf.Private, CKO.CKO_PRIVATE_KEY),
+                publicHalfIsPrivate: PrivateObjectLogin.IsPrivate(publicHalf.Private, CKO.CKO_PUBLIC_KEY),
+                loginStamp: CurrentLoginStamp());
     }
 
     /// <summary>
-    /// Reads CKA_CLASS, CKA_KEY_TYPE, CKA_LABEL, CKA_ID off the handle and constructs a
+    /// Reads CKA_CLASS, CKA_KEY_TYPE, CKA_LABEL, CKA_ID, CKA_PRIVATE off the handle and constructs a
     /// <see cref="Pkcs11Key"/>. A private or public key with a non-empty CKA_ID is marked to look up
     /// its other half the first time an operation needs it; nothing is searched here.
     /// </summary>
@@ -1318,34 +1547,9 @@ public sealed partial class Pkcs11Session : IDisposable
     /// </summary>
     private Pkcs11Key? HydrateKeyFromHandle(ObjectHandle handle, bool keysOnly)
     {
-        CKO objectClass;
-        CKK keyType;
-        string? label;
-        byte[] id;
-
-        // One round trip when the token answers cleanly; the generic two-call read otherwise.
-        if (_core.TryReadIdentity(handle, withKeyType: true, out ObjectIdentity identity))
-        {
-            (objectClass, keyType, label, id) = identity;
-            if (keysOnly && !IsKeyClass(objectClass))
-                return null;
-        }
-        else
-        {
-            using var attrs = _core.GetAttributeValue(handle,
-            [
-                CKA.CKA_CLASS,
-                CKA.CKA_KEY_TYPE,
-                CKA.CKA_LABEL,
-                CKA.CKA_ID,
-            ]);
-            objectClass = (CKO)attrs[0].GetValueAsUlong();
-            if (keysOnly && !IsKeyClass(objectClass))
-                return null;
-            keyType = (CKK)attrs[1].GetValueAsUlong();
-            label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
-            id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
-        }
+        if (ReadKeyIdentity(handle, keysOnly) is not { } identity)
+            return null;
+        (CKO objectClass, CKK keyType, string? label, byte[] id, bool isPrivate) = identity;
 
         ObjectHandle privateHandle = ObjectHandle.Invalid;
         ObjectHandle publicHandle = ObjectHandle.Invalid;
@@ -1377,6 +1581,10 @@ public sealed partial class Pkcs11Session : IDisposable
             keyType: keyType,
             label: label,
             id: id,
-            companionPending: companionPending);
+            companionPending: companionPending)
+            .WithLoginStamp(
+                privateHalfIsPrivate: isPrivate && objectClass != CKO.CKO_PUBLIC_KEY,
+                publicHalfIsPrivate: isPrivate && objectClass == CKO.CKO_PUBLIC_KEY,
+                loginStamp: CurrentLoginStamp());
     }
 }

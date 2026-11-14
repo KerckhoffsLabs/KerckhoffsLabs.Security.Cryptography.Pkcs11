@@ -42,7 +42,7 @@ public sealed class SessionParallelTests(MockBackendFixture f)
                 sessionSlot.Wait(TestContext.Current.CancellationToken);
                 try
                 {
-                    var session = TestKeys.OpenLoggedInSession(_backend);
+                    using var session = TestKeys.OpenLoggedInSession(_backend);
                     try
                     {
                         for (int i = 0; i < opsPerThread; i++)
@@ -56,8 +56,7 @@ public sealed class SessionParallelTests(MockBackendFixture f)
                     }
                     finally
                     {
-                        session.Logout();
-                        session.Dispose();
+                        TestKeys.LogoutIfRequired(_backend, session);
                     }
                 }
                 catch (Exception ex)

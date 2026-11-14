@@ -1,5 +1,4 @@
 using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -22,8 +21,7 @@ public sealed class PinManagementTests_CratonHsm(CratonHsmBackendFixture f)
         // fixture PINs do.
         byte[] temp = Encoding.UTF8.GetBytes("craton-temp-8765");
 
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original));
+        using var session = _backend.OpenSession();
 
         bool atTemp = false;
         try

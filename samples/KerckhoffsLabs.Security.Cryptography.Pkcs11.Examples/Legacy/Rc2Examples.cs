@@ -26,10 +26,11 @@ public static class Rc2Examples
         //    The module path, token label and options come from configuration.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath, options);
 
-        // 2. Open a session without a login: the token takes none. On a token that does (CKF_LOGIN_REQUIRED),
-        //    log in instead, with library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin) and the PIN from
-        //    your secret store, as on the other pages; without the login its private objects stay hidden.
-        using Pkcs11Session session = library.OpenSessionWithoutLogin(tokenLabel);
+        // 2. Open a read-only session without a login: the token takes none. On a token that does
+        //    (CKF_LOGIN_REQUIRED), log in instead, with slot.Login(TokenUser.User, pin) and the PIN from your
+        //    secret store, and open the session from that login, as on the other pages; without the login its
+        //    private objects stay hidden.
+        using Pkcs11Session session = library.GetSlotByTokenLabel(tokenLabel).OpenSession();
 
         // 3. Open the RC2 key that is already on the token, by its CKA_LABEL (OpenKey(id) finds it by
         //    CKA_ID instead). It throws if no key, or more than one, matches.

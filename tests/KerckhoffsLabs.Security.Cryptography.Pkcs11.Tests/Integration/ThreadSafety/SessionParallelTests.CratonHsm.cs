@@ -3,11 +3,21 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.ThreadSafety;
 
 /// <summary>Cross-session concurrency over Craton HSM — thin wrapper over <see cref="SessionParallelTestCases"/>.</summary>
-/// <remarks>Only the single-session case runs here: the multi-session ones need several sessions logged in at once, but <c>OpenSession</c> logs every session in, and on a login-required token login state is shared by all of an application's sessions (PKCS#11 v3.2 §5.6), so the second C_Login returns CKR_USER_ALREADY_LOGGED_IN.</remarks>
 [Collection("CratonHsm")]
 public sealed class SessionParallelTests_CratonHsm(CratonHsmBackendFixture backend)
 {
     private readonly CratonHsmBackendFixture _backend = backend;
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void ParallelSessions_GenerateFindAndDestroyOwnKeys() =>
+        SessionParallelTestCases.Assert_ParallelSessions_GenerateFindAndDestroyOwnKeys(_backend);
+
+    // Craton keeps session objects past C_CloseSession: see CratonHsmBackendFixture.CratonHsmDestroysSessionObjectsOnCloseSession.
+    // Closing a session never destroys its session objects, concurrent or not.
+    // Reported upstream: https://github.com/craton-co/craton-hsm-core/issues/98
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.SessionCloseCleanupAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM: session objects survive C_CloseSession (a closed session's key is still found)")]
+    public void ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind() =>
+        SessionParallelTestCases.Assert_ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind(_backend);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public async Task Dispose_RacingInFlightCallsOnTheSameSession_NeverReachesAClosedSession() =>

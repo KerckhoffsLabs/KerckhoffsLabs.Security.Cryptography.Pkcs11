@@ -133,6 +133,24 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool OaepBlobLengthRefusalAvailable => SoftHsmAvailable && SoftHsmRefusesAnOaepBlobByItsLength;
 
     /// <summary>
+    /// False while freeing one session's objects (its <c>C_CloseSession</c>) while another session of the application
+    /// searches for or reads them is not safe: observed in CI on the parallel close-while-searching case, a read of a
+    /// key whose owning session had just closed answered <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (linux x64), and the test
+    /// host crashed outright on macOS, ubuntu-arm (SIGSEGV, exit 139) and Windows x64, arm64 and x86. PKCS#11 v3.2
+    /// §5.6 frees a closed session's objects, and a concurrent reader may get only
+    /// <c>CKR_OBJECT_HANDLE_INVALID</c>. A use-after-free in SoftHSM's session close path, reported upstream as
+    /// <see href="https://github.com/softhsm/SoftHSMv2/issues/924"/>; no tripwire, since reproducing it can end the
+    /// test process.
+    /// </summary>
+    public const bool SoftHsmSurvivesClosingASessionWhileAnotherReadsItsObjects = false;
+
+    /// <summary>
+    /// Gate for the parallel close-while-searching case: see
+    /// <see cref="SoftHsmSurvivesClosingASessionWhileAnotherReadsItsObjects"/>.
+    /// </summary>
+    public static bool SessionCloseRaceAvailable => SoftHsmAvailable && SoftHsmSurvivesClosingASessionWhileAnotherReadsItsObjects;
+
+    /// <summary>
     /// False while <c>C_Verify(CKM_RSA_X_509)</c> with more data than the modulus has bytes ends the test process:
     /// <c>AsymVerify</c> in <c>src/lib/SoftHSM.cpp</c> zero-pads the data to the modulus's length with
     /// <c>data.wipe(size - ulDataLen)</c>, which wraps around for <c>ulDataLen &gt; size</c>. PKCS#11 v3.2 §6.1.12

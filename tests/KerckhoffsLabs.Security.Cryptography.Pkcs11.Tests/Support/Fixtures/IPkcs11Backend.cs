@@ -55,13 +55,20 @@ public interface IPkcs11Backend
     /// that means for <see cref="Policy.KdfBaseKeyScope.NeverProtected"/> instead.</summary>
     bool KeepsAlwaysSensitiveOnDerive => true;
 
-    /// <summary>Opens a session over the fixture's token using the backend's authentication model:
-    /// a normal-user login when <see cref="RequiresUserLogin"/> is set, otherwise no login. Shared,
-    /// backend-agnostic test cases call this instead of hard-coding the login path.</summary>
-    Pkcs11Session OpenSession() =>
-        RequiresUserLogin
-            ? Library.OpenSessionWithPin(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span))
-            : Library.OpenSessionWithoutLogin(TokenLabel);
+    /// <summary>Opens a read/write session over the fixture's token using the backend's authentication model:
+    /// when <see cref="RequiresUserLogin"/> is set, a session of a normal-user login (a share of the login held, if
+    /// another session of the test holds one), so the token is logged out again when the last such session is disposed
+    /// (and every test starts from the public state); otherwise a session without a login. Shared, backend-agnostic test cases call this instead of
+    /// hard-coding the login path.</summary>
+    /// <param name="policy">The crypto policy the session enforces; <see langword="null"/> for the default.</param>
+    Pkcs11Session OpenSession(ICryptoPolicy? policy = null)
+    {
+        if (!RequiresUserLogin)
+            return this.Slot.OpenSession(SessionAccess.ReadWrite, policy);
+
+        using Pkcs11Login login = this.Slot.ShareOrLogin(() => new SecurePin(this.UserPin.Span));
+        return login.OpenSession(SessionAccess.ReadWrite, policy);
+    }
 
     /// <summary>True if the backend can generate and operate ML-DSA (FIPS 204) keys. Defaults to the
     /// advertised <see cref="CKM.CKM_ML_DSA"/>; SoftHSM overrides this with a build marker because the

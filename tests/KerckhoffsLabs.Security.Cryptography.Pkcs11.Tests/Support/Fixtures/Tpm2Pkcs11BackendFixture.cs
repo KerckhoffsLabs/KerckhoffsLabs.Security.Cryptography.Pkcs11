@@ -159,7 +159,8 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
     /// writes by default, gets a TPM key without decrypt, so the <c>CKA_VERIFY</c> tpm2-pkcs11 then derives
     /// is false and contradicts the template: <c>C_GenerateKeyPair</c> answers <c>CKR_GENERAL_ERROR</c>
     /// ("User specified and TPM specified attr mismatch"). Verifying is a public-key operation and needs no
-    /// TPM attribute. Not reported upstream.
+    /// TPM attribute. Fixed upstream in
+    /// <see href="https://github.com/tpm2-software/tpm2-pkcs11/pull/953">PR #953</see>, not yet released.
     /// </summary>
     public const bool Tpm2Pkcs11AcceptsSignOnlyKeyPairs = false;
 
@@ -322,9 +323,12 @@ public sealed class Tpm2Pkcs11BackendFixture : IPkcs11Backend, IDisposable
 
                 slot.InitTokenWithPin(new SecurePin(SoPin.Span), TokenLabel);
 
-                using (Pkcs11Session so = Library.OpenSessionWithPin(TokenLabel, CKU.CKU_SO, new SecurePin(SoPin.Span)))
+                // The SO sets the user PIN (C_InitPIN on its login's own read/write session); disposing the login logs out.
+                using (var soPin = new SecurePin(SoPin.Span))
+                using (Pkcs11Login so = slot.Login(TokenUser.SecurityOfficer, soPin))
+                using (var userPin = new SecurePin(UserPin.Span))
                 {
-                    so.InitPinWithPin(new SecurePin(UserPin.Span));
+                    so.InitUserPinWithPin(userPin);
                 }
 
                 SlotId = (NativeCULong)slot.SlotId.Value;

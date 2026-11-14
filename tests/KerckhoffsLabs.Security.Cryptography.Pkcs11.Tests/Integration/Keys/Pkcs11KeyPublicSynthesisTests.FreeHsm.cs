@@ -14,8 +14,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_FreeHsm(FreeHsmBackendFixture 
 
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()

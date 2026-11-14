@@ -38,11 +38,17 @@ What each step does:
 
 1. **`Pkcs11Library.Load`** maps the module and initializes it. Dispose it last: the library calls
    `C_Finalize` when it is disposed, if it was the one that initialized the module.
-2. **`OpenSessionWithPin`** finds the token by label, opens a session and logs in. (A token that takes
-   no login, such as a software crypto token, is opened with `OpenSessionWithoutLogin` instead.) The session enforces
-   the default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
-   `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it as
-   the last argument; see [Using crypto policies](crypto-policies.md).
+2. **`GetSlotByTokenLabel`** finds the slot holding the token with that label. It throws
+   `Pkcs11TokenException` (`CKR_TOKEN_NOT_PRESENT`) when no token has the label, and refuses with
+   `InvalidOperationException`, naming the slots, when more than one does (see *Choosing the token* below).
+   **`slot.Login(TokenUser.User, pin)`** logs the normal user in and returns a
+   `Pkcs11Login`, and **`login.OpenSession()`** opens a read/write session of that login. (A token that takes
+   no login, such as a software crypto token, is used through `slot.OpenSession()` instead, which opens a
+   read-only session by default. A read-only session creates session objects, such as the key below; pass
+   `SessionAccess.ReadWrite` to create or change token objects.) The session enforces the
+   default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
+   `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it to
+   `OpenSession`; see [Using crypto policies](crypto-policies.md).
 3. **`GenerateAesKey`** creates the key on the token, sensitive and non-extractable, and allowed only to
    encrypt and decrypt. Each key-generation helper grants exactly one role; see
    [Key role separation](security-model.md#key-role-separation). The key is a **session object** and
@@ -51,17 +57,57 @@ What each step does:
 4. **`AesGcmPkcs11`** gives the key the shape of `System.Security.Cryptography.AesGcm`: the same
    constructor arguments (with a `Pkcs11Key` instead of key bytes) and the same `Encrypt` and `Decrypt`.
    The token does the work.
-5. **Disposal** releases everything in reverse order. Dispose sessions and keys deterministically
-   (`using`), rather than leaving them to the garbage collector.
+5. **Disposal** releases everything in reverse order. Dispose sessions, logins and keys deterministically
+   (`using`), rather than leaving them to the garbage collector. The token is logged out when the login and
+   every session opened from it have been disposed, in whatever order: disposing one of them logs out only
+   when it is the last.
+
+### Choosing the token
+
+Every lookup finds exactly one present token, or throws: `Pkcs11TokenException` (`CKR_TOKEN_NOT_PRESENT`) when
+none matches, `InvalidOperationException` naming the slots when more than one does. None picks one for you,
+which would let whoever can initialize a token decide which one the application uses. None opens a session or
+logs in.
+
+| Lookup | Selects by | Example |
+|---|---|---|
+| `GetSlotByTokenLabel("signing-prod")` | the label given when the token was initialized | `signing-prod`, `NSS Certificate DB` |
+| `GetSlotByTokenSerial("0123456789abcdef")` | the token's serial number, which tells apart tokens sharing a label | |
+| `GetSlotByUri("pkcs11:token=signing-prod;serial=0123456789abcdef")` | a PKCS#11 URI (RFC 7512): token, manufacturer, serial, model, slot and library attributes | `pkcs11:manufacturer=SoftHSM%20project;token=signing-prod` |
+| `FindSlot(t => t.Label == "signing-prod" && t.Model == "SoftHSM v2")` | any test on the token's `TokenInfo` | |
+
+`slot.GetTokenUri()` gives the URI of a token (its manufacturer, model, serial number and label) to put in
+configuration. A URI can also name a key or certificate on the token, by label (`object`), `id` and `type`
+(`public`, `private`, `secret-key`, `cert`): find the token and open the key from the same URI.
+
+```csharp
+var uri = Pkcs11Uri.Parse(config["Pkcs11:SigningKey"]);   // pkcs11:serial=0123456789abcdef;object=release-key;type=private
+Pkcs11Slot slot = library.GetSlotByUri(uri);
+using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+using Pkcs11Session session = login.OpenSession();
+using Pkcs11Key key = session.OpenKey(uri);   // refused if the URI names another token
+```
+
+Labels are not unique (a cloned card, two HSM partitions with the same name); a serial number is unique for a
+manufacturer and model. Keep the slot ID out of configuration: the module assigns it, may renumber it between
+runs, and a swapped card puts another token behind the same ID. A URI is read strictly: values are
+percent-encoded (`%20` for a space); vendor (`x-…`) or unknown attributes, and query attributes, are refused
+rather than ignored. A URI only selects: a PIN is never taken from one (`pin-value`, `pin-source`), nor a module
+loaded from one (`module-name`, `module-path`).
 
 ### In an application: load and log in once
 
 The example runs the whole flow in one method so you can read it in one place. An application doesn't
 load the module and log in for every operation. In PKCS#11 the login belongs to the application, not to
-the session: while one session is logged in, a second `OpenSessionWithPin` to the same token fails with
-`CKR_USER_ALREADY_LOGGED_IN`, which the library raises as `Pkcs11AuthenticationException`. Load the module
-and log in once at startup, keep the library and the session for the application's lifetime, and give the
-session to the code that opens keys and uses them. The example pages show the same full flow per method,
+the session: once the user is logged in, every session the application has on the token sees the login.
+Load the module and log in once at startup, keep the library and the `Pkcs11Login` for the application's
+lifetime, and open sessions from the login (`login.OpenSession()`) for the code that opens keys and uses
+them. A second `slot.Login` while the login is held is refused with `Pkcs11AuthenticationException`
+(`CKR_USER_ALREADY_LOGGED_IN` for the same user, `CKR_USER_ANOTHER_ALREADY_LOGGED_IN` for another), before the
+module and with no PIN sent: PKCS#11 cannot check a PIN against a login already made, so a second login that
+succeeded would succeed with any PIN. A component that should work under the login takes a share of it
+instead, without a PIN: `login.Share()` from a `Pkcs11Login` it was given, or `slot.TryShareLogin(TokenUser.User,
+out Pkcs11Login? shared)` for the login held on the slot. The example pages show the same full flow per method,
 for the same reason.
 
 ## Handling errors
