@@ -97,6 +97,28 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
     public static bool NullOaepLabelRefusalAvailable => OpenCryptokiAvailable && OpenCryptokiRefusesANullOaepLabel;
 
     /// <summary>
+    /// False while a single-part <c>C_Encrypt</c> or <c>C_Decrypt</c> with <c>CKM_AES_OFB</c>, <c>CKM_AES_CFB8</c>,
+    /// <c>CKM_AES_CFB64</c> or <c>CKM_AES_CFB128</c> leaves <c>*pulEncryptedDataLen</c> / <c>*pulDataLen</c> as the caller
+    /// passed it: <c>aes_ofb_encrypt</c>, <c>aes_ofb_decrypt</c>, <c>aes_cfb_encrypt</c> and <c>aes_cfb_decrypt</c>
+    /// (<c>usr/lib/common/mech_aes.c</c>, vendor/opencryptoki at fd0753b8) set it only on the length query. The output
+    /// itself is right; the caller is told its buffer's size, so 32 bytes come back as 48 with zeros after them. CI run
+    /// 43527188047.
+    /// </summary>
+    public const bool OpenCryptokiReportsTheFeedbackModeOutputLength = false;
+
+    /// <summary>
+    /// False while opencryptoki gives <c>CKM_AES_CMAC_GENERAL</c> the value 0x1089 (<c>usr/include/pkcs11types.h</c>), which
+    /// PKCS#11 assigns to <c>CKM_AES_CTS</c> (0x108B is <c>CKM_AES_CMAC_GENERAL</c>; see vendor/pkcs11/published). The soft
+    /// token lists 0x1089 with <c>CKF_SIGN | CKF_VERIFY</c>, so a standard caller sees <c>CKM_AES_CTS</c> advertised and
+    /// refused (<c>CKR_MECHANISM_INVALID</c> from <c>C_EncryptInit</c>), and cannot reach opencryptoki's CMAC-general by its
+    /// standard value. Still so on opencryptoki master (4f4eb76c). CI run 43527188047.
+    /// </summary>
+    public const bool OpenCryptokiUsesTheStandardAesCtsValue = false;
+
+    /// <summary>Gate for the CKM_AES_CTS cases: see <see cref="OpenCryptokiUsesTheStandardAesCtsValue"/>.</summary>
+    public static bool AesCtsAvailable => OpenCryptokiAvailable && OpenCryptokiUsesTheStandardAesCtsValue;
+
+    /// <summary>
     /// False while a key derived with <c>CKM_ECDH1_DERIVE</c> from a generated, sensitive base reads
     /// <c>CKA_ALWAYS_SENSITIVE</c> FALSE: <c>ecdh_pkcs_derive</c> (<c>usr/lib/common/mech_ec.c:1073-1300</c>) never calls
     /// <c>key_mgr_derive_always_sensitive_never_extractable_attrs</c> (<c>key_mgr.c:139</c>, which only the SHA and SSL3

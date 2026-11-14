@@ -1024,6 +1024,36 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No (additive)
 - **Raised by:** `WaitForSlotEvent` design review (PR #331)
 
+### [BL-183] Lift the five BouncyHsm mechanism-coverage gates once BouncyHsm fixes them
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmRecordsTheHmacKeyGenMechanism`, `BouncyHsmDerivesShakeKeysOfAnyLength`, `BouncyHsmExtractsFromTheBitGiven`, `BouncyHsmRunsCfb1WithAOneBitSegment`, `BouncyHsmTakesSha512THmacKeys`); `Integration/Mechanisms/MechanismCoverageTests.BouncyHsm.cs`; `Integration/Compat/BouncyHsmQuirkTests.cs`
+- **Problem:** `MechanismCoverageTestCases`, which drives every mechanism BouncyHsm lists, found five places where the pinned BouncyHsm (8592a1d1) answers differently from PKCS#11 v3.2. (1) Every HMAC key generator (`CKM_SHA256_KEY_GEN`, `CKM_SHA3_256_KEY_GEN`, `CKM_BLAKE2B_256_KEY_GEN`, `CKM_SHA512_T_KEY_GEN` and the rest) records `CKA_KEY_GEN_MECHANISM` as `CKM_GENERIC_SECRET_KEY_GEN`. (2) `CKM_SHAKE_128_KEY_DERIVATION` and `CKM_SHAKE_256_KEY_DERIVATION` derive no more than 32 and 64 bytes and refuse a longer `CKA_VALUE_LEN` with `CKR_TEMPLATE_INCONSISTENT`. (3) `CKM_EXTRACT_KEY_FROM_KEY` reads `CK_EXTRACT_PARAMS` as a number of bits to keep, not as the bit the derived key starts at. (4) `CKM_AES_CFB1` encrypts with a 128-bit segment. (5) `CKM_SHA512_224_HMAC` and `CKM_SHA512_256_HMAC` refuse the keys their own key generators make, with `CKR_KEY_HANDLE_INVALID`. Each gate's doc comment names the BouncyHsm source line responsible; all five are in BouncyHsm's code, not in BouncyCastle 2.7.0, which it uses (BouncyCastle has no 1-bit CFB, and its SHAKE gives any output length). Reported upstream as harrison314/BouncyHsm#146 (1), #150 (2), #148 (3), #149 (4) and #147 (5).
+- **Proposed action:** After a `vendor/bouncyhsm` bump with a fix, the matching `BouncyHsmQuirkTests.*_QuirkStillPresent` test fails; then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-184] `MechanismFlags` has no `Encapsulate` / `Decapsulate` properties
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/MechanismFlags.cs`
+- **Problem:** `MechanismFlags` exposes a property for every `CKF_*` operation flag up to the message-based ones, but none for `CKF_ENCAPSULATE` and `CKF_DECAPSULATE` (v3.2), although `Common/CKF.cs` defines both and the library implements `C_EncapsulateKey` and `C_DecapsulateKey`. A caller who wants to know whether a token encapsulates with a mechanism has to test the raw `Flags` bits, as `MechanismCoverageTestCases.Assert_RsaPkcs_EncapsulatesAPkcs1EncryptedSecret` does.
+- **Proposed action:** Add `Encapsulate` and `Decapsulate` properties beside the others, with the PublicAPI entries, and use them in that test case.
+- **Breaks public API?** No (additive)
+- **Raised by:** BouncyHsm mechanism-coverage tests
+
+### [BL-185] Lift the NSS and opencryptoki mechanism-coverage gates once they are fixed upstream
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/NssBackendFixture.cs` (`NssRunsMd2HmacOverItsBlockSize`, `NssReadsAGeneratedCamelliaKeysLength`, `NssExtractsAroundTheEndOfTheKey`, `NssRecordsAGeneratedKeysMechanism`); `Support/Fixtures/OpenCryptokiBackendFixture.cs` (`OpenCryptokiReportsTheFeedbackModeOutputLength`, `OpenCryptokiUsesTheStandardAesCtsValue`); `Integration/Mechanisms/MechanismCoverageTests.Nss.cs`, `.OpenCryptoki.cs`; `Integration/Compat/NssQuirkTests.cs`
+- **Problem:** `MechanismCoverageTestCases` found six more departures, each confirmed in the module's source. NSS softoken (3.51 and the pinned release): HMAC-MD2 pads the key to a 64-byte block where MD2's is 16; a generated Camellia key has no readable `CKA_VALUE_LEN`; `CKM_EXTRACT_KEY_FROM_KEY` refuses an extraction that wraps around the end of the base key; a generated session key has no `CKA_KEY_GEN_MECHANISM`. opencryptoki: single-part OFB/CFB `C_Encrypt`/`C_Decrypt` never set the output length, so the caller is told its buffer's size; and `CKM_AES_CMAC_GENERAL` is defined as 0x1089, which PKCS#11 assigns to `CKM_AES_CTS` (still so on opencryptoki master). None is reported upstream yet.
+- **Proposed action:** Report them (Mozilla Bugzilla, opencryptoki/opencryptoki). The NSS gates have quirk tests that fail once fixed; the opencryptoki ones, like the fixture's others, have none, so check them on each `vendor/opencryptoki` bump.
+- **Breaks public API?** No
+- **Raised by:** Mechanism-coverage tests (CI run 43527188047)
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Session` expose no `Stream` overload at all. See BL-087 and BL-099.

@@ -437,6 +437,42 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the general-length MAC case: see <see cref="NssRunsTheGeneralLengthMacs"/>.</summary>
     public static bool GeneralLengthMacAvailable => NssAvailable && NssRunsTheGeneralLengthMacs;
 
+    /// <summary>
+    /// False while <c>CKM_MD2_HMAC</c> is RFC 2104 with a 64-byte block where MD2's is 16 (RFC 1319): freebl defines
+    /// <c>MD2_BLOCK_LENGTH</c> as 64 (<c>lib/freebl/blapit.h</c>), and softoken's HMAC pads the key to it. Seen on NSS 3.51
+    /// and the pinned NSS (CI run 43527188047). NssQuirkTests.Md2HmacBlockLength_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool NssRunsMd2HmacOverItsBlockSize = false;
+
+    /// <summary>Why NSS's HMAC of a hash family departs from RFC 2104: see <see cref="NssRunsMd2HmacOverItsBlockSize"/>.</summary>
+    public static string? HmacNotRfc2104Because(string family) =>
+        !NssRunsMd2HmacOverItsBlockSize && family == "MD2" ? "NSS pads an HMAC-MD2 key to a 64-byte block, not MD2's 16" : null;
+
+    /// <summary>
+    /// False while <c>CKA_VALUE_LEN</c> of a key <c>CKM_CAMELLIA_KEY_GEN</c> makes cannot be read (<c>C_GetAttributeValue</c>
+    /// refuses it), where an AES or generic secret key made the same way gives its length. Softoken takes the length from
+    /// the template without keeping it as an attribute (<c>lib/softoken/pkcs11c.c</c>, <c>NSC_GenerateKey</c>). PKCS#11
+    /// v3.2 lists <c>CKA_VALUE_LEN</c> among a Camellia key's attributes. Seen on NSS 3.51 and the pinned NSS (CI run
+    /// 43527188047). NssQuirkTests.CamelliaValueLen_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool NssReadsAGeneratedCamelliaKeysLength = false;
+
+    /// <summary>
+    /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> refuses, with <c>CKR_MECHANISM_PARAM_INVALID</c>, an extraction that runs
+    /// past the end of the base key: softoken requires the start byte plus the derived length (plus one byte when the
+    /// start bit is not on a byte boundary) to fit in the base key (<c>lib/softoken/pkcs11c.c</c>). PKCS#11 v3.2 wraps around
+    /// the end of the base key. NssQuirkTests.ExtractKeyFromKeyWrap_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool NssExtractsAroundTheEndOfTheKey = false;
+
+    /// <summary>
+    /// False while a session key softoken generates has no <c>CKA_KEY_GEN_MECHANISM</c>: <c>C_GetAttributeValue</c> refuses
+    /// it, as softoken keeps the attribute only as a column of its token database (<c>lib/softoken/sdb.c</c>,
+    /// <c>sftkdb.c</c>) and never sets it on a key it makes. PKCS#11 v3.2: the attribute names the mechanism that generated
+    /// the key. NssQuirkTests.GeneratedKeyMechanism_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool NssRecordsAGeneratedKeysMechanism = false;
+
     /// <summary>Gate for the short attribute buffer case: see <see cref="NssChecksTheAttributeBufferLength"/>.</summary>
     public static bool AttributeBufferLengthAvailable => NssAvailable && NssChecksTheAttributeBufferLength;
 
