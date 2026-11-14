@@ -1056,6 +1056,26 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** Mechanism-coverage tests (CI run 43527188047)
 
+### [BL-186] Lift the BouncyHsm HKDF derived-key sensitivity gate once CKM_HKDF_DERIVE takes the template's CKA_SENSITIVE and CKA_EXTRACTABLE
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmHkdfTakesTheTemplatesSensitivity`, `HkdfReadbackAvailable`); the HKDF read-back cases in `HkdfTests.BouncyHsm.cs`, `HkdfPkcs11Tests.BouncyHsm.cs`, `AlgorithmLawTests.BouncyHsm.cs` and `BclDifferentialTests.BouncyHsm.cs`
+- **Problem:** Since harrison314/BouncyHsm 976634e, the fix for harrison314/BouncyHsm#141, `DeriveKeyGeneratorBase` sets a derived key's `CKA_SENSITIVE` and `CKA_EXTRACTABLE` from the base key after applying the template. That is §6.43's rule for the byte-operation mechanisms #141 was about, but `HkdfDeriveKeyGenerator` shares the base class, so an HKDF output derived from a sensitive base key cannot be read back. PKCS#11 v3.2 §6.62.3 lets the template set either value; the base key decides only `CKA_ALWAYS_SENSITIVE` and `CKA_NEVER_EXTRACTABLE` (the same rule as BL-169's wolfPKCS11 quirk). The `*ViaSignProbe` HKDF cases still run on BouncyHsm. Found by the bump to development ebfefd60; not yet reported upstream.
+- **Proposed action:** Report it upstream as a follow-up to #141. After a `vendor/bouncyhsm` bump with the fix, `BouncyHsmQuirkTests.HkdfDerivedKeySensitivity_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Breaks public API?** No
+- **Raised by:** BouncyHsm backend
+
+### [BL-187] Decide how the library supports HSS (CKM_HSS_KEY_PAIR_GEN, CKM_HSS)
+- **Area:** API
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Policy` (the Recommended allow-list); `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Objects/ObjectTemplateBuilderBase.cs`; `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Sign/HssTestCases.cs`
+- **Problem:** `HssTestCases` (run on BouncyHsm since the bump to development ebfefd60) shows three gaps. The Recommended policy does not list `CKM_HSS_KEY_PAIR_GEN` or `CKM_HSS` ("not reviewed"), so the cases opt in with their own policy. The template builder takes no `CK_ULONG` array, so `CKA_HSS_LMS_TYPES` and `CKA_HSS_LMOTS_TYPES` need the internal `ObjectTemplate` constructor and `ObjectAttribute(CKA, IReadOnlyList<ulong>)`. And the RFC 8554 `CK_LMS_TYPE` / `CK_LMOTS_TYPE` codes have no names. `Pkcs11Key` treating `CKK_HSS`, `CKK_XMSS` and `CKK_XMSSMT` as secret keys (verifying with the private handle), which the cases also found, was fixed in #357.
+- **Proposed action:** Review HSS for the Recommended policy (stateful: one-time keys must never be reused, so a key must not be copied, backed up or restored; SP 800-208 requires generation and signing in hardware cryptographic modules). If it is admitted, add a `CK_ULONG`-array `Attribute` overload (or HSS-specific builder methods) and named LMS / LM-OTS type constants, and move the test cases onto them.
+- **Breaks public API?** No (additions only)
+- **Raised by:** HSS tests
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Session` expose no `Stream` overload at all. See BL-087 and BL-099.
@@ -1119,23 +1139,3 @@ Positive findings worth preserving. Items marked **(re-verified 2026-08-11)** we
 - **CI/publish hygiene is modern (re-verified 2026-08-11).** Every `uses:` in all four workflows is SHA-pinned with a version comment; `GITHUB_TOKEN` is least-privilege per job; `persist-credentials: false` everywhere; no `pull_request_target` anywhere; concurrency groups correctly asymmetric (cancel PRs, never cancel `main`); OIDC trusted publishing with build-provenance attestation; package source mapping; enforced `.editorconfig` + `dotnet format` gate; docfx pinned in `dotnet-tools.json`; analyzer release tracking (`AnalyzerReleases.Shipped/Unshipped.md`) correctly staged for all three diagnostic ids. Source integrity is good where it exists — the OpenSSL tarball is SHA-256 verified and the SoftHSM 2.5 `.deb`s come from content-addressed snapshot URLs with pinned digests and a post-extract version assertion.
 - **Deliberately evaluated and not raised:** cache poisoning via the native/OpenSSL caches (GitHub cache scoping makes it require push access to `main`, at which point the workflow is writable); NuGet author signing (nuget.org repository-signs, and OIDC + provenance attestation is stronger); the unversioned `analyzers/dotnet/cs` folder (a `net10.0`-only package can only be consumed by Roslyn ≥ 4.14, so the 4.11-built analyzer cannot bite); `tests/AotSmoke` being outside the solution (cosmetic — the job still builds it); and the pack(1)-on-Unix ambiguity, which is inherent to PKCS#11 rather than a defect here (NSS applies `pragma pack(1)` unconditionally, so its view of `CK_TLS12_KEY_MAT_PARAMS` differs from the standard OASIS convention this library correctly follows; affects only SSL3/TLS12 key-material mechanisms, unreachable from any public API — worth a documented vendor-quirk note).
 - **Deliberate design notes:** no async surface anywhere, which is the correct default for a synchronous P/Invoke wrapper — the real cancellation primitive is `C_SessionCancel` (BL-099), and a `Task`-returning façade would be worse; `CK_NOTIFY` is unsupported (BL-151); `[Experimental]` propagation is handled correctly where it applies (`SlhDsaPkcs11` re-declares `SYSLIB5006`); vendor extensibility is genuinely available via `VendorMechanismParameters` + `Mechanism`'s `ulong` constructors; XML-doc completeness is structurally enforced by `GenerateDocumentationFile` + `TreatWarningsAsErrors`, so CS1591 is a build error and no undocumented public member exists; and `LangVersion` is pinned to 14.0 in every project, as `CLAUDE.md` says.
-
-### [BL-183] Lift the BouncyHsm HKDF derived-key sensitivity gate once CKM_HKDF_DERIVE takes the template's CKA_SENSITIVE and CKA_EXTRACTABLE
-- **Area:** QA
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmHkdfTakesTheTemplatesSensitivity`, `HkdfReadbackAvailable`); the HKDF read-back cases in `HkdfTests.BouncyHsm.cs`, `HkdfPkcs11Tests.BouncyHsm.cs`, `AlgorithmLawTests.BouncyHsm.cs` and `BclDifferentialTests.BouncyHsm.cs`
-- **Problem:** Since harrison314/BouncyHsm 976634e, the fix for harrison314/BouncyHsm#141, `DeriveKeyGeneratorBase` sets a derived key's `CKA_SENSITIVE` and `CKA_EXTRACTABLE` from the base key after applying the template. That is §6.43's rule for the byte-operation mechanisms #141 was about, but `HkdfDeriveKeyGenerator` shares the base class, so an HKDF output derived from a sensitive base key cannot be read back. PKCS#11 v3.2 §6.62.3 lets the template set either value; the base key decides only `CKA_ALWAYS_SENSITIVE` and `CKA_NEVER_EXTRACTABLE` (the same rule as BL-169's wolfPKCS11 quirk). The `*ViaSignProbe` HKDF cases still run on BouncyHsm. Found by the bump to development ebfefd60; not yet reported upstream.
-- **Proposed action:** Report it upstream as a follow-up to #141. After a `vendor/bouncyhsm` bump with the fix, `BouncyHsmQuirkTests.HkdfDerivedKeySensitivity_QuirkStillPresent` fails. Then set the flag to true and delete the test.
-- **Breaks public API?** No
-- **Raised by:** BouncyHsm backend
-
-### [BL-184] Decide how the library supports HSS (CKM_HSS_KEY_PAIR_GEN, CKM_HSS)
-- **Area:** API
-- **Severity:** Low
-- **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Policy` (the Recommended allow-list); `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Objects/ObjectTemplateBuilderBase.cs`; `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Sign/HssTestCases.cs`
-- **Problem:** `HssTestCases` (run on BouncyHsm since the bump to development ebfefd60) shows three gaps. The Recommended policy does not list `CKM_HSS_KEY_PAIR_GEN` or `CKM_HSS` ("not reviewed"), so the cases opt in with their own policy. The template builder takes no `CK_ULONG` array, so `CKA_HSS_LMS_TYPES` and `CKA_HSS_LMOTS_TYPES` need the internal `ObjectTemplate` constructor and `ObjectAttribute(CKA, IReadOnlyList<ulong>)`. And the RFC 8554 `CK_LMS_TYPE` / `CK_LMOTS_TYPE` codes have no names. `Pkcs11Key` treating `CKK_HSS`, `CKK_XMSS` and `CKK_XMSSMT` as secret keys (verifying with the private handle), which the cases also found, was fixed in #357.
-- **Proposed action:** Review HSS for the Recommended policy (stateful: one-time keys must never be reused, so a key must not be copied, backed up or restored; SP 800-208 requires generation and signing in hardware cryptographic modules). If it is admitted, add a `CK_ULONG`-array `Attribute` overload (or HSS-specific builder methods) and named LMS / LM-OTS type constants, and move the test cases onto them.
-- **Breaks public API?** No (additions only)
-- **Raised by:** HSS tests
