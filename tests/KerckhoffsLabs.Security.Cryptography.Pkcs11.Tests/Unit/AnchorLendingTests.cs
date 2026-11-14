@@ -25,7 +25,6 @@ public sealed class AnchorLendingTests : IDisposable
     private static readonly TimeSpan Bounded = TimeSpan.FromSeconds(5);
 
     // How long a thread that should be blocked is watched for not having returned.
-    private static readonly TimeSpan Watch = TimeSpan.FromMilliseconds(200);
 
     private readonly LoginTokenModule _module = new() { MaxSessions = 1 };
     private readonly Pkcs11Library _library;
@@ -131,7 +130,8 @@ public sealed class AnchorLendingTests : IDisposable
         AssertLent(session, AnchorId);
         Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
         Assert.Equal(SessionAccess.ReadWrite, session.Access);
-        Assert.Same(login, session.Login);
+        Assert.Equal(login.User, session.Login!.User);
+        Assert.True(session.IsLent);
         Assert.Equal(CKR.CKR_SESSION_COUNT, _module.OpenSessionResults[^1]);
     }
 
@@ -474,8 +474,11 @@ public sealed class AnchorLendingTests : IDisposable
         Assert.False(_module.HasObject(handle));
     }
 
+    // K18. A context login that failed leaves the sign "as if C_Login had not been called" (PKCS#11 v3.2 section 4.10);
+    // on a module without C_SessionCancel the library ends it by finishing the call, which the module answers
+    // CKR_USER_NOT_LOGGED_IN (section 5.2). The lent session is not left holding an operation the next borrower inherits.
     [Fact]
-    public void AbandonedOperation_WithoutSessionCancel_NextBorrowerGetsClearError()
+    public void AbandonedContextLogin_WithoutSessionCancel_OperationEnded_NextBorrowerSigns()
     {
         _module.SupportsSessionCancel = false;
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
@@ -484,20 +487,15 @@ public sealed class AnchorLendingTests : IDisposable
         using (Pkcs11Key key = session.OpenKey(AlwaysAuthenticateEc))
         {
             Assert.ThrowsAny<Exception>(() => key.Sign(Ecdsa, "data"u8));
-            Assert.True(_module.HasActiveOperation(AnchorId));
+            Assert.False(_module.HasActiveOperation(AnchorId));
         }
         login.ContextAuthentication = null;
 
         using Pkcs11Session next = login.OpenSession();
         using Pkcs11Key ordinary = next.OpenKey(SigningKey);
-        var ex = Assert.Throws<Pkcs11UnclassifiedException>(() => ordinary.Sign(Ecdsa, "data"u8));
-
         AssertLent(next, AnchorId);
-        Assert.Equal(CKR.CKR_OPERATION_ACTIVE, ex.ReturnValue);
-        Assert.Contains("log in again", ex.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("Open a new session", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(LoginTokenModule.SignatureLength, ordinary.Sign(Ecdsa, "data"u8).Length);
     }
-
     [Fact]
     public void AbandonedOperation_CancelledBySessionCancel_NextBorrowerSigns()
     {
@@ -518,10 +516,11 @@ public sealed class AnchorLendingTests : IDisposable
 
     // ---- Concurrency on the lent anchor --------------------------------------------------------------------------
 
-    // Review Focus 1. A second login probes the anchor (C_GetSessionInfo) before refusing; the probe waits for the
-    // anchor's lock, which the lent session holds for its sign: it runs once the sign is over, never inside it.
+    // Review Focus 1 and K5. A second login probes the anchor before refusing, but never waits for its lock: the lent
+    // session holds it for its sign, so the login is refused at once, and nothing is sent inside the sign. A probe that
+    // waited would deadlock against a callback inside that sign calling Login.
     [Fact]
-    public void SecondLogin_WhileLentSessionSigns_ProbeWaits_ThenRefuses()
+    public void SecondLogin_WhileLentSessionSigns_RefusedWithoutWaiting()
     {
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Session session = login.OpenSession();
@@ -529,35 +528,28 @@ public sealed class AnchorLendingTests : IDisposable
         using var signing = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
         _module.DuringSign = () => { signing.Set(); release.Wait(Bounded); };
-        IReadOnlyList<string>? callsAtProbe = null;
-        _module.DuringGetSessionInfo = _ => callsAtProbe = _module.CallLog;
-        _module.ClearCallLog();
 
         byte[]? signature = null;
         var (signer, signFailure) = Start(() => signature = key.Sign(Ecdsa, "data"u8));
         Assert.True(signing.Wait(Bounded, TestContext.Current.CancellationToken), "the sign never reached the module");
-        var (sharer, shareFailure) = Start(() => Slot.Login(TokenUser.User, _pin));
+        int probes = _module.CallCount("C_GetSessionInfo");
         try
         {
-            Assert.False(SpinWait.SpinUntil(() => !sharer.IsAlive || callsAtProbe is not null, Watch),
-                $"the probe did not wait for the lent session's sign: {shareFailure()}");
+            var ex = Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, _pin));
+            Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, ex.ReturnValue);
+            Assert.Equal(probes, _module.CallCount("C_GetSessionInfo")); // nothing sent inside the sign
         }
         finally
         {
             release.Set();
             Assert.True(signer.Join(Bounded), "the sign did not finish");
-            Assert.True(sharer.Join(Bounded), "the share did not finish after the sign");
         }
 
         Assert.Null(signFailure());
-        Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN,
-            Assert.IsType<Pkcs11AuthenticationException>(shareFailure()).ReturnValue);
         Assert.Equal(LoginTokenModule.SignatureLength, signature!.Length);
         Assert.Equal(1, _module.LoginCalls);
         Assert.True(login.IsActive);
-        Assert.Contains("C_Sign", callsAtProbe!);
     }
-
     [Fact]
     public void LentSessionOperation_WhileProbeInFlight_WaitsNotThrows()
     {
@@ -575,7 +567,7 @@ public sealed class AnchorLendingTests : IDisposable
         var (signer, signFailure) = Start(() => signature = key.Sign(Ecdsa, "data"u8));
         try
         {
-            Assert.False(SpinWait.SpinUntil(() => !signer.IsAlive, Watch),
+            Assert.True(signer.WaitUntilBlocked(Bounded),
                 $"the lent session's sign did not wait for the probe: {signFailure()}");
         }
         finally
@@ -650,13 +642,14 @@ public sealed class AnchorLendingTests : IDisposable
         }
     }
 
-    // The borrower shares the anchor's count of record sends: with a second login's probe queued on the lock, a second
-    // user thread of the lent session waits (concurrent use is detected only best-effort then; see AcquireExclusive).
+    // The borrower shares the anchor's count of record sends: with a record send (an SO login's C_InitPIN) queued on the
+    // lock, a second user thread of the lent session waits (concurrent use is detected only best-effort then; see
+    // AcquireExclusive).
     [Fact]
     public void LentSession_WhileRecordSendQueued_SecondUserThreadWaits()
     {
-        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
-        using Pkcs11Session session = login.OpenSession();
+        using Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
+        using Pkcs11Session session = login.OpenSession(SessionAccess.ReadWrite);
         Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(Record.Anchor);
         using var held = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
@@ -669,31 +662,30 @@ public sealed class AnchorLendingTests : IDisposable
             }
         });
         Assert.True(held.Wait(Bounded, TestContext.Current.CancellationToken), "the lease was never taken");
-        var (sharer, shareFailure) = Start(() => Slot.Login(TokenUser.User, _pin).Dispose());
+        using var newPin = new SecurePin("4321"u8);
+        var (sender, sendFailure) = Start(() => login.InitUserPinWithPin(newPin));
         BackgroundWork? second = null;
         Func<Exception?>? secondFailure = null;
         try
         {
-            // The probe is queued on the anchor's lock while the second login has not finished.
-            Assert.False(SpinWait.SpinUntil(() => !sharer.IsAlive, Watch),
-                $"the second login's probe did not wait for the lent session: {shareFailure()}");
+            // The send is queued on the anchor's lock once it counts itself there.
+            Assert.True(SpinWait.SpinUntil(() => anchor.RecordSendsWaiting > 0, Bounded), "the send never queued");
             (second, secondFailure) = Start(() => session.GetSessionInfo());
-            Assert.False(SpinWait.SpinUntil(() => !second.IsAlive, Watch),
+            Assert.True(second.WaitUntilBlocked(Bounded),
                 $"the second user thread did not wait behind the queued send: {secondFailure()}");
         }
         finally
         {
             release.Set();
             Assert.True(holder.Join(Bounded), "the holder did not finish");
-            Assert.True(sharer.Join(Bounded), "the share did not finish");
+            Assert.True(sender.Join(Bounded), "the send did not finish");
             Assert.True(second is null || second.Join(Bounded), "the second user thread did not finish");
         }
 
-        Assert.IsType<Pkcs11AuthenticationException>(shareFailure());
+        Assert.Null(sendFailure());
         Assert.Null(secondFailure?.Invoke());
         Assert.Same(anchor, Record.Anchor);
     }
-
     [Fact]
     public void ConcurrentOpenSession_OneLends_OtherGetsSessionCount()
     {
@@ -728,7 +720,7 @@ public sealed class AnchorLendingTests : IDisposable
         TokenLoginRecord record = Record;
         record.BetweenLendPhases = () => record.MarkEnded(CKR.CKR_DEVICE_REMOVED);
 
-        var ex = Assert.Throws<ObjectDisposedException>(() => login.OpenSession());
+        var ex = Assert.Throws<Pkcs11LoginEndedException>(() => login.OpenSession());
 
         Assert.Contains("login has ended", ex.Message, StringComparison.Ordinal);
         Assert.Null(record.Loan);
@@ -844,7 +836,7 @@ public sealed class AnchorLendingTests : IDisposable
         Assert.False(login.IsActive);
         Assert.Empty(_module.OpenSessions);
         Assert.Null(Record.Loan);
-        var refused = Assert.Throws<ObjectDisposedException>(() => session.GetSessionInfo());
+        var refused = Assert.Throws<Pkcs11LoginEndedException>(() => session.GetSessionInfo());
         Assert.Contains("lent", refused.Message, StringComparison.Ordinal);
         Assert.Contains("log in again", refused.Message, StringComparison.Ordinal);
         session.Dispose();
@@ -865,7 +857,7 @@ public sealed class AnchorLendingTests : IDisposable
 
         Assert.False(login.IsActive);
         Assert.Empty(_module.OpenSessions);
-        Assert.Throws<ObjectDisposedException>(() => session.GetSessionInfo());
+        Assert.Throws<Pkcs11LoginEndedException>(() => session.GetSessionInfo());
         using Pkcs11Login again = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Session next = again.OpenSession();
         AssertLent(next, AnchorId);
@@ -883,7 +875,7 @@ public sealed class AnchorLendingTests : IDisposable
 
         Assert.True(again.IsActive);
         Assert.False(login.IsActive);
-        var refused = Assert.Throws<ObjectDisposedException>(() => session.GetSessionInfo());
+        var refused = Assert.Throws<Pkcs11LoginEndedException>(() => session.GetSessionInfo());
         Assert.Contains("lent", refused.Message, StringComparison.Ordinal);
         Assert.Single(_module.OpenSessions);
         using Pkcs11Session next = again.OpenSession();
@@ -934,8 +926,9 @@ public sealed class AnchorLendingTests : IDisposable
         var (disposer, disposeFailure) = Start(_library.Dispose);
         try
         {
-            Assert.False(SpinWait.SpinUntil(() => !disposer.IsAlive || _module.LogoutCalls != 0, Watch),
+            Assert.True(disposer.WaitUntilBlocked(Bounded),
                 $"the library's disposal did not wait for the lent session's sign: {disposeFailure()}");
+            Assert.Equal(0, _module.LogoutCalls);
         }
         finally
         {

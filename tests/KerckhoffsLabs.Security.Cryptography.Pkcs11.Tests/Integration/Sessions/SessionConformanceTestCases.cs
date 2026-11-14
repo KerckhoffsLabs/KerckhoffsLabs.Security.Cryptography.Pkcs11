@@ -572,6 +572,54 @@ internal static class SessionConformanceTestCases
         Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, after.GetSessionInfo().State);
     }
 
+    // ShareOrLogin logs in once: the PIN source is asked for the first login only, a second call shares it, and the
+    // token is logged out when both holds are gone.
+    internal static void Assert_ShareOrLogin_LogsInOnce_AndSharesAfter(IPkcs11Backend backend)
+    {
+        if (!backend.RequiresUserLogin)
+            Assert.Skip("The backend has no login.");
+        LowLevelPkcs11Library lowLevel = backend.Library.LowLevelLibrary!;
+        LogOutTheToken(lowLevel, backend.SlotId);
+        Pkcs11Slot slot = Slot(backend);
+        int asked = 0;
+        SecurePin Pin()
+        {
+            asked++;
+            return new SecurePin(backend.UserPin.Span);
+        }
+
+        using (Pkcs11Login first = slot.ShareOrLogin(Pin))
+        using (Pkcs11Login second = slot.ShareOrLogin(Pin))
+        using (Pkcs11Session session = second.OpenSession())
+        {
+            Assert.Equal(1, asked);
+            Assert.True(first.IsActive);
+            Assert.True(second.IsActive);
+            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
+        }
+
+        using Pkcs11Session after = slot.OpenSession(SessionAccess.ReadWrite);
+        Assert.Equal(CKS.CKS_RW_PUBLIC_SESSION, after.GetSessionInfo().State);
+    }
+
+    // The token's own URI finds its slot again. Modules whose tokens share every URI field (two empty tokens of the
+    // same make, say) are refused as ambiguous rather than picked from; the backend's slot is then among the matches.
+    internal static void Assert_TokenUri_FindsItsSlotAgain(IPkcs11Backend backend)
+    {
+        Pkcs11Slot slot = Slot(backend);
+        Pkcs11Uri uri = slot.GetTokenUri();
+        Assert.Equal(uri, Pkcs11Uri.Parse(uri.ToString()));
+        try
+        {
+            Pkcs11Slot found = backend.Library.GetSlotByUri(uri.ToString());
+            Assert.Equal(slot.SlotId, found.SlotId);
+        }
+        catch (Pkcs11AmbiguousTokenException ambiguous)
+        {
+            Assert.Contains(slot.SlotId, ambiguous.SlotIds);
+        }
+    }
+
     // CKF_USER_PIN_COUNT_LOW means "an incorrect user login PIN has been entered at least once since the last
     // successful authentication" (CK_TOKEN_INFO's flags): after a wrong PIN and then the right one, it is clear again,
     // and the token is at neither its final try nor locked. Whether a module sets the flag after the wrong PIN is not

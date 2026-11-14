@@ -263,8 +263,7 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
         {
             try
             {
-                using var pin = new SecurePin(UserPin.Span);
-                using Pkcs11Login login = this.Slot.ShareOrLogIn(TokenUser.User, pin);
+                using Pkcs11Login login = this.Slot.ShareOrLogin(() => new SecurePin(UserPin.Span));
                 return login.OpenSession(SessionAccess.ReadWrite, policy);
             }
             catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_GENERAL_ERROR && attempt < maxAttempts)

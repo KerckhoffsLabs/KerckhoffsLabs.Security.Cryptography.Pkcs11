@@ -81,7 +81,7 @@ public sealed class Pkcs11LibrarySlotByLabelTests
         using var fake = new LabelledSlotsModule((3, "shared"), (8, "other"), (17, "shared"));
         using Pkcs11Library library = fake.Load();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => library.GetSlotByTokenLabel("shared"));
+        var ex = Assert.Throws<Pkcs11AmbiguousTokenException>(() => library.GetSlotByTokenLabel("shared"));
 
         Assert.Contains("3", ex.Message, StringComparison.Ordinal);
         Assert.Contains("17", ex.Message, StringComparison.Ordinal);

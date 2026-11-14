@@ -60,6 +60,12 @@ public sealed class SessionConformanceTests_OpenCryptoki(OpenCryptokiBackendFixt
     public void SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(_backend);
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void ShareOrLogin_LogsInOnce_AndSharesAfter() => SessionConformanceTestCases.Assert_ShareOrLogin_LogsInOnce_AndSharesAfter(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void TokenUri_FindsItsSlotAgain() => SessionConformanceTestCases.Assert_TokenUri_FindsItsSlotAgain(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void WrongPin_ThenTheRightOne_ResetsTheRetryCounter() => SessionConformanceTestCases.Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(_backend);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]

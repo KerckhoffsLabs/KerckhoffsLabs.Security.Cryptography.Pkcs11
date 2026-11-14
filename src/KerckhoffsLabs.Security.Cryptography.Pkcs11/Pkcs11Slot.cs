@@ -79,6 +79,17 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         _slotId = (NativeCULong)(slotId);
     }
 
+    // The token a lookup selected this slot by (GetSlotByUri, GetSlotByTokenSerial, ...), or null: a login checks the
+    // slot still holds it before sending the PIN.
+    private TokenInfo? _selectedToken;
+
+    /// <summary>
+    /// This slot, remembering <paramref name="token"/> as the one it was selected by: a login through it checks the
+    /// slot still holds that token (label, serial number, manufacturer, model) before sending the PIN.
+    /// </summary>
+    internal Pkcs11Slot SelectedBy(TokenInfo token)
+        => new(_library, (ulong)_slotId, _loggerFactory) { _selectedToken = token };
+
     /// <summary>The library this slot was listed by.</summary>
     internal Pkcs11Library Library => _library;
 
@@ -345,15 +356,25 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <c>CKR_USER_ALREADY_LOGGED_IN</c> for the same user, <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c> for anyone else.
     /// PKCS#11 has no way to check a PIN against a login already made, so a second login that succeeded would succeed
     /// with any PIN. To use the login held, take a share of it without a PIN: <see cref="Pkcs11Login.Share"/> on a
-    /// <see cref="Pkcs11Login"/> you were given, or <see cref="TryShareLogin(TokenUser, out Pkcs11Login?)"/> for the
-    /// login held on this slot. A login whose own session was lost (a token pulled and put back, an HSM failover) has
-    /// ended: the refusal checks that session first (<c>C_GetSessionInfo</c>), and logs in afresh instead.
+    /// <see cref="Pkcs11Login"/> you were given, <see cref="TryShareLogin(TokenUser, out Pkcs11Login?)"/> for the
+    /// normal user's login held on this slot, or <see cref="ShareOrLogin(Func{SecurePin})"/>, which shares or logs in in
+    /// one step. A login whose own session was lost (a token pulled and put back, an HSM failover), or that the module
+    /// dropped, has ended: the refusal checks that session's state first (<c>C_GetSessionInfo</c>), and logs in afresh
+    /// instead.
     /// </para>
     /// <para>
     /// When the token answers that a user is logged in already although this application holds no login, the login is
-    /// one the library left behind (its <c>C_Logout</c> failed, or its session was lost while others stayed open): it
-    /// is logged out and the login sent once more, so the PIN is checked. A login made outside the library (another
-    /// component calling the module directly) is never taken over: <see cref="Pkcs11AuthenticationException"/>.
+    /// either one the library left behind (its <c>C_Logout</c> failed, or its session was lost while others stayed
+    /// open), which is logged out before the login is sent once more, so the PIN is checked; or a login made outside the
+    /// library (another component calling the module directly), which is never taken over or logged out:
+    /// <see cref="Pkcs11ForeignLoginException"/>.
+    /// </para>
+    /// <para>
+    /// A slot found by a lookup (<see cref="Pkcs11Library.GetSlotByUri(string)"/>,
+    /// <see cref="Pkcs11Library.GetSlotByTokenSerial"/>, ...) remembers the token it was selected by: the login checks
+    /// the slot still holds that token (label, serial number, manufacturer, model) before the PIN is sent, so a token
+    /// swapped in meanwhile does not receive it (<see cref="Pkcs11TokenException"/>, <c>CKR_TOKEN_NOT_RECOGNIZED</c>). A
+    /// token reports its own identity: this does not tell a genuine token from one made to look like it.
     /// </para>
     /// <para>
     /// A logout waits for the operations in flight on the token (see <see cref="Pkcs11Login.Dispose"/>); a login while
@@ -385,8 +406,11 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     /// <exception cref="Pkcs11AuthenticationException">This application holds a login on the token already
-    /// (<c>CKR_USER_ALREADY_LOGGED_IN</c> or <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>, refused before the module); the
-    /// token is logged in outside the library; or the token refused the login.</exception>
+    /// (<c>CKR_USER_ALREADY_LOGGED_IN</c> or <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>, refused before the module); or
+    /// the token refused the login.</exception>
+    /// <exception cref="Pkcs11ForeignLoginException">The token is logged in outside the library.</exception>
+    /// <exception cref="Pkcs11TokenException">The slot no longer holds the token it was selected by
+    /// (<c>CKR_TOKEN_NOT_RECOGNIZED</c>); no PIN is sent.</exception>
     /// <exception cref="Pkcs11SessionException">A Security Officer login while this application has a read-only
     /// session open on the token (<c>CKR_SESSION_READ_ONLY_EXISTS</c>, refused before the module); or the login's
     /// own session could not open because the token allows this application no more sessions
@@ -463,12 +487,16 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <remarks>
     /// Sharing is not authentication: it hands out what this application already has. A login made with a username
     /// (<see cref="LoginUser"/>) is shared through <see cref="TryShareLogin(TokenUser, string, out Pkcs11Login?)"/>.
-    /// A login whose last holder has gone (its logout pending) is not shared.
+    /// A login whose last holder has gone (its logout pending) is not shared. Only the normal user's login is shared
+    /// from the slot: a Security Officer login, which can set the user's PIN, is shared only by handing its
+    /// <see cref="Pkcs11Login"/> on (<see cref="Pkcs11Login.Share"/>). To share or log in in one step, use
+    /// <see cref="ShareOrLogin(Func{SecurePin})"/>.
     /// </remarks>
     /// <param name="user">Whose login to share.</param>
     /// <param name="login">The share, or <see langword="null"/> when no such login is held.</param>
     /// <returns>Whether a login was shared.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="user"/> is not a defined value.</exception>
+    /// <exception cref="ArgumentException"><paramref name="user"/> is <see cref="TokenUser.SecurityOfficer"/>.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     public bool TryShareLogin(TokenUser user, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Pkcs11Login? login)
         => TryShareLoginCore(user, username: null, out login);
@@ -498,6 +526,13 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     private bool TryShareLoginCore(TokenUser user, string? username, out Pkcs11Login? login)
     {
         ThrowIfUndefined(user);
+        if (user == TokenUser.SecurityOfficer)
+        {
+            // Sharing the SO login would hand any code in the process C_InitPIN, with no PIN.
+            throw new ArgumentException(
+                "A Security Officer login is not shared from the slot: hand its Pkcs11Login on (Pkcs11Login.Share()) to " +
+                "the code that should use it.", nameof(user));
+        }
         ObjectDisposedException.ThrowIf(_library.IsDisposed, _library);
 
         LoginHold? hold = LoginRecord.TryShare(_library, user, username);
@@ -511,8 +546,81 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         ObjectDisposedException.ThrowIf(_library.IsDisposed, _library);
 
         Log.SlotTrace(_logger, (ulong)_slotId, username is null ? "Login" : "LoginUser");
-        LoginHold hold = LoginRecord.Login(_library, user, pin, username);
+        LoginHold hold = LoginRecord.Login(_library, user, pin, username, _selectedToken);
         return new Pkcs11Login(this, user, username, hold);
+    }
+
+    /// <summary>
+    /// Shares the normal user's login this application holds on the token, or logs the normal user in when none is
+    /// held, in one step: for components that each need the login and must not race into a refusal. The PIN is fetched
+    /// from <paramref name="pinSource"/> only when a login is made, and disposed once sent.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A share checks no PIN: PKCS#11 cannot check one against a login already made. So the PIN is used only when this
+    /// call makes the login; a component that must prove it knows the PIN cannot do so here, or anywhere while the
+    /// login is held. For the normal user only: a Security Officer login is shared only by handing its
+    /// <see cref="Pkcs11Login"/> on (<see cref="Pkcs11Login.Share"/>).
+    /// </para>
+    /// <para>
+    /// A logout pending or in flight is waited for, then the login made afresh. A login of another user is refused
+    /// (<c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>); a login made outside the library is refused with
+    /// <see cref="Pkcs11ForeignLoginException"/>, never taken over.
+    /// </para>
+    /// </remarks>
+    /// <param name="pinSource">Returns the PIN, from a secret store; called at most once. The library disposes the PIN.</param>
+    /// <returns>The caller's hold of the login; dispose it once done.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="pinSource"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11AuthenticationException">Another user is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11ForeignLoginException">The token is logged in outside the library.</exception>
+    /// <exception cref="Pkcs11Exception">As for <see cref="Login"/>.</exception>
+    public Pkcs11Login ShareOrLogin(Func<SecurePin> pinSource)
+    {
+        ArgumentNullException.ThrowIfNull(pinSource);
+        return ShareOrLoginCore(username: null, pinSource);
+    }
+
+    /// <summary>
+    /// As <see cref="ShareOrLogin(Func{SecurePin})"/>, for a named normal user (<c>C_LoginUser</c>): shares that user's
+    /// login, or logs that user in.
+    /// </summary>
+    /// <param name="username">The account name, sent UTF-8 encoded; compared ordinally with the login held.</param>
+    /// <param name="pinSource">Returns the PIN; called at most once. The library disposes the PIN.</param>
+    /// <returns>The caller's hold of the login; dispose it once done.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="username"/> or <paramref name="pinSource"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="username"/> is empty.</exception>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11AuthenticationException">Another user is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11ForeignLoginException">The token is logged in outside the library.</exception>
+    /// <exception cref="Pkcs11Exception">As for <see cref="LoginUser"/>.</exception>
+    public Pkcs11Login ShareOrLogin(string username, Func<SecurePin> pinSource)
+    {
+        ArgumentNullException.ThrowIfNull(username);
+        ArgumentNullException.ThrowIfNull(pinSource);
+        if (username.Length == 0)
+            throw new ArgumentException("Username must not be empty.", nameof(username));
+        return ShareOrLoginCore(username, pinSource);
+    }
+
+    /// <summary>
+    /// As <see cref="ShareOrLogin(Func{SecurePin})"/>, logging in through the token's protected authentication path (a
+    /// pinpad) when no login is held: the pinpad is used only then.
+    /// </summary>
+    /// <returns>The caller's hold of the login; dispose it once done.</returns>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11AuthenticationException">Another user is logged in, or the token refused the login.</exception>
+    /// <exception cref="Pkcs11ForeignLoginException">The token is logged in outside the library.</exception>
+    /// <exception cref="Pkcs11Exception">As for <see cref="LoginWithPinpad"/>.</exception>
+    public Pkcs11Login ShareOrLoginWithPinpad() => ShareOrLoginCore(username: null, pinSource: null);
+
+    private Pkcs11Login ShareOrLoginCore(string? username, Func<SecurePin>? pinSource)
+    {
+        ObjectDisposedException.ThrowIf(_library.IsDisposed, _library);
+
+        Log.SlotTrace(_logger, (ulong)_slotId, "ShareOrLogin");
+        LoginHold hold = LoginRecord.ShareOrLogin(_library, TokenUser.User, username, _selectedToken, pinSource);
+        return new Pkcs11Login(this, TokenUser.User, username, hold);
     }
 
     // PKCS#11 v3.2 C_InitToken: CKR_SESSION_EXISTS while the application has a session open with the token. From

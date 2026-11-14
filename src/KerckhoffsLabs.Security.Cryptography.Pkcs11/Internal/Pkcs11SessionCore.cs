@@ -73,8 +73,22 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     internal ContextAuthentication? ContextAuthentication
     {
         get => _contextAuthentication;
-        set => _contextAuthentication = value;
+        set
+        {
+            _contextAuthentication = value;
+            // Set again, even to the same source: its PIN is asked for once more.
+            _rejectedContextSource = null;
+        }
     }
+
+    // The source whose PIN the module refused (CKR_PIN_INCORRECT and the like) for a context login on this session: not
+    // asked again until ContextAuthentication is set, so one stale PIN costs one retry of the user PIN, not one per
+    // operation until the PIN locks.
+    private volatile ContextAuthentication? _rejectedContextSource;
+
+    // Set when a context login failed inside the operation being abandoned: CancelAbandoned may then end it the way
+    // PKCS#11 v3.2 section 4.10 gives, where C_SessionCancel is missing. Under the lease.
+    private bool _contextLoginFailed;
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -145,6 +159,9 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// it instead of throwing: the holder is the record, not a second user of the session. Shared with a borrower.
     /// </summary>
     private ref int _recordSends => ref _lockState.RecordSends;
+
+    /// <summary>How many of the login record's sends wait for or hold this session's lock. A test seam.</summary>
+    internal int RecordSendsWaiting => Volatile.Read(ref _lockState.RecordSends);
 
     /// <summary>
     /// The managed thread id of the application lease (an anchor-side <see cref="AcquireExclusive"/>, not a record
@@ -263,20 +280,40 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             if (_released) return;
             _released = true;
             // In the reverse of the order taken. An ordinary core: the gate, then the reference, then the lock. An
-            // anchor-side core: the reference, then the lock, then the gate.
-            if (!_gateFirst)
-                _operation?.Dispose();
-            _handle?.DangerousRelease();
-            if (_lockTaken)
+            // anchor-side core: the reference, then the lock, then the gate. Each step runs whatever the one before it
+            // threw: giving the gate back may send a deferred logout, and a logger that throws there must not leave the
+            // lock held or the handle referenced.
+            try
             {
-                if (_clearsApplicationMark)
-                    Volatile.Write(ref _state.ApplicationHolder, 0);
-                Monitor.Exit(_state.Lock);
+                if (!_gateFirst)
+                    _operation?.Dispose();
             }
-            if (_countsRecordSend)
-                Interlocked.Decrement(ref _state.RecordSends);
-            if (_gateFirst)
-                _operation?.Dispose();
+            finally
+            {
+                try
+                {
+                    _handle?.DangerousRelease();
+                }
+                finally
+                {
+                    try
+                    {
+                        if (_lockTaken)
+                        {
+                            if (_clearsApplicationMark)
+                                Volatile.Write(ref _state.ApplicationHolder, 0);
+                            Monitor.Exit(_state.Lock);
+                        }
+                    }
+                    finally
+                    {
+                        if (_countsRecordSend)
+                            Interlocked.Decrement(ref _state.RecordSends);
+                        if (_gateFirst)
+                            _operation?.Dispose();
+                    }
+                }
+            }
         }
     }
 
@@ -370,6 +407,34 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         {
             lease.EnterOperation(_record);
             lease.TakeLock();
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
+
+        return Enter(lease, caller);
+    }
+
+    /// <summary>
+    /// As <see cref="AcquireForRecord"/>, but never waits for the lock: <see langword="null"/> when another thread holds
+    /// it (an operation on a lent session, say). For the login record's probe, which runs holding the record's
+    /// transition semaphore and so must not wait for a lock whose holder may be waiting for that semaphore.
+    /// </summary>
+    internal ExclusiveLease? TryAcquireForRecord([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
+    {
+        var lease = new ExclusiveLease(_lockState, gateFirst: _isAnchorSide);
+        try
+        {
+            if (_isAnchorSide)
+                lease.EnterOperation(_record);
+            if (!Monitor.TryEnter(_busyLock))
+            {
+                lease.Dispose();
+                return null;
+            }
+            lease.LockTaken();
         }
         catch
         {
@@ -950,12 +1015,15 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
             return; // the library is gone, and the session with it
         }
 
+        bool contextLoginFailed = _contextLoginFailed;
+        _contextLoginFailed = false;
         switch (rv)
         {
             case CKR.CKR_OK:
             case CKR.CKR_OPERATION_NOT_INITIALIZED: // the error that started the unwind had already ended it
                 return;
             case CKR.CKR_FUNCTION_NOT_SUPPORTED:
+                operations = contextLoginFailed ? FinishUnauthenticated(operations) : operations;
                 _operationsAbandoned |= operations;
                 return;
             default:
@@ -963,6 +1031,40 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
                 Log.SessionCancelFailed(_logger, (ulong)_sessionId, operationName, rv);
                 return;
         }
+    }
+
+    /// <summary>
+    /// Ends a sign or decrypt whose context login failed, on a module without <c>C_SessionCancel</c> (before v3.0):
+    /// PKCS#11 v3.2 section 4.10 has the operation then carry on "as if C_Login had not been called", so the call that
+    /// finishes it answers <c>CKR_USER_NOT_LOGGED_IN</c>, which ends it (section 5.2). Called on empty input, with a
+    /// buffer large enough for any signature or block, and its output, should a module produce any, is discarded.
+    /// Returns the operations still active.
+    /// </summary>
+    private ulong FinishUnauthenticated(ulong operations)
+    {
+        byte[] discard = new byte[16 * 1024];
+        try
+        {
+            if ((operations & CKF.CKF_SIGN) != 0
+                && _pkcs11Library.C_Sign(_sessionId, ReadOnlySpan<byte>.Empty, discard, false, out _) != CKR.CKR_BUFFER_TOO_SMALL)
+            {
+                operations &= ~(ulong)CKF.CKF_SIGN;
+            }
+            if ((operations & CKF.CKF_DECRYPT) != 0
+                && _pkcs11Library.C_Decrypt(_sessionId, ReadOnlySpan<byte>.Empty, discard, false, out _) != CKR.CKR_BUFFER_TOO_SMALL)
+            {
+                operations &= ~(ulong)CKF.CKF_DECRYPT;
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            return 0; // the library is gone, and the session with it
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(discard);
+        }
+        return operations;
     }
 
     /// <summary>

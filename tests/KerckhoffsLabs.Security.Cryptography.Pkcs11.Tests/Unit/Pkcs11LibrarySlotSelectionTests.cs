@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
-/// <see cref="Pkcs11Library.GetSlotByTokenSerial"/>, <see cref="Pkcs11Library.FindSlot"/> and
+/// <see cref="Pkcs11Library.GetSlotByTokenSerial"/>, <see cref="Pkcs11Library.GetSlot"/> and
 /// <see cref="Pkcs11Library.GetSlotByUri(string)"/>: exactly one present token, matched ordinally on fields with their padding
 /// removed; none is <c>CKR_TOKEN_NOT_PRESENT</c>, more than one is refused naming the slots. The URI is RFC 7512's,
 /// read strictly.
@@ -96,7 +96,7 @@ public sealed class Pkcs11LibrarySlotSelectionTests
         using TokensModule fake = TwoSigningTokens();
         using Pkcs11Library library = fake.Load();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => library.GetSlotByTokenSerial("0001"));
+        var ex = Assert.Throws<Pkcs11AmbiguousTokenException>(() => library.GetSlotByTokenSerial("0001"));
 
         Assert.Contains("3", ex.Message, StringComparison.Ordinal);
         Assert.Contains("12", ex.Message, StringComparison.Ordinal);
@@ -118,45 +118,45 @@ public sealed class Pkcs11LibrarySlotSelectionTests
         using TokensModule fake = TwoSigningTokens();
         using Pkcs11Library library = fake.Load();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => library.GetSlotByTokenLabel("signing-prod"));
+        var ex = Assert.Throws<Pkcs11AmbiguousTokenException>(() => library.GetSlotByTokenLabel("signing-prod"));
 
         Assert.Contains("GetSlotByTokenSerial", ex.Message, StringComparison.Ordinal);
         Assert.Contains("GetSlotByUri", ex.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("by its ID", ex.Message, StringComparison.Ordinal);
     }
 
-    // ---- FindSlot ------------------------------------------------------------------------------------------------
+    // ---- GetSlot ------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void FindSlot_SeesUnpaddedFields_AndSelectsOne()
+    public void GetSlot_SeesUnpaddedFields_AndSelectsOne()
     {
         using TokensModule fake = TwoSigningTokens();
         using Pkcs11Library library = fake.Load();
 
-        Pkcs11Slot slot = library.FindSlot(t => t.Label == "signing-prod" && t.Model == "Model A");
+        Pkcs11Slot slot = library.GetSlot(t => t.Label == "signing-prod" && t.Model == "Model A");
 
         Assert.Equal(new SlotId(3), slot.SlotId);
     }
 
     [Fact]
-    public void FindSlot_MoreThanOne_IsRefused_None_IsTokenNotPresent()
+    public void GetSlot_MoreThanOne_IsRefused_None_IsTokenNotPresent()
     {
         using TokensModule fake = TwoSigningTokens();
         using Pkcs11Library library = fake.Load();
 
-        Assert.Throws<InvalidOperationException>(() => library.FindSlot(t => t.Label == "signing-prod"));
-        Assert.Throws<Pkcs11TokenException>(() => library.FindSlot(_ => false));
-        Assert.Throws<ArgumentNullException>(() => library.FindSlot(null!));
+        Assert.Throws<Pkcs11AmbiguousTokenException>(() => library.GetSlot(t => t.Label == "signing-prod"));
+        Assert.Throws<Pkcs11TokenException>(() => library.GetSlot(_ => false));
+        Assert.Throws<ArgumentNullException>(() => library.GetSlot(null!));
     }
 
     [Fact]
-    public void FindSlot_PredicateException_Propagates()
+    public void GetSlot_PredicateException_Propagates()
     {
         using TokensModule fake = TwoSigningTokens();
         using Pkcs11Library library = fake.Load();
         var boom = new InvalidCastException("boom");
 
-        Assert.Same(boom, Assert.Throws<InvalidCastException>(() => library.FindSlot(_ => throw boom)));
+        Assert.Same(boom, Assert.Throws<InvalidCastException>(() => library.GetSlot(_ => throw boom)));
     }
 
     // ---- GetSlotByUri ----------------------------------------------------------------------------------------------
@@ -170,6 +170,8 @@ public sealed class Pkcs11LibrarySlotSelectionTests
     [InlineData("pkcs11:library-manufacturer=SoftHSM;library-version=2.6;token=backup", 12)]
     [InlineData("pkcs11:library-description=Implementation%20of%20PKCS11;serial=0002", 9)]
     [InlineData("pkcs11:token=backup;slot-manufacturer=Reader%20Co", 12)]
+    [InlineData("pkcs11:serial=0002?", 9)]                      // an empty query (RFC 7512 allows it)
+    [InlineData("pkcs11:serial=0002?x-vendor=1&other=2", 9)]   // unknown query attributes select nothing: ignored
     public void Uri_SelectsTheToken(string uri, ulong slotId)
     {
         using TokensModule fake = TwoSigningTokens();
@@ -188,7 +190,7 @@ public sealed class Pkcs11LibrarySlotSelectionTests
         using TokensModule fake = TwoSigningTokens();
         using Pkcs11Library library = fake.Load();
 
-        Assert.Throws<InvalidOperationException>(() => library.GetSlotByUri(uri));
+        Assert.Throws<Pkcs11AmbiguousTokenException>(() => library.GetSlotByUri(uri));
     }
 
     [Theory]
@@ -225,7 +227,6 @@ public sealed class Pkcs11LibrarySlotSelectionTests
     [InlineData("pkcs11:library-version=256", "major.minor")]
     [InlineData("pkcs11:token=signing-prod?module-path=/usr/lib/softhsm/libsofthsm2.so", "never loads a module")]
     [InlineData("pkcs11:token=signing-prod?module-name=softhsm2", "never loads a module")]
-    [InlineData("pkcs11:token=signing-prod?x-vendor=1", "query attributes")]
     public void Uri_Malformed_IsRefused_NamingWhy(string uri, string why)
     {
         using TokensModule fake = TwoSigningTokens();
@@ -308,7 +309,7 @@ public sealed class Pkcs11LibrarySlotSelectionTests
         library.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => library.GetSlotByTokenSerial("0002"));
-        Assert.Throws<ObjectDisposedException>(() => library.FindSlot(_ => true));
+        Assert.Throws<ObjectDisposedException>(() => library.GetSlot(_ => true));
         Assert.Throws<ObjectDisposedException>(() => library.GetSlotByUri("pkcs11:serial=0002"));
     }
 }

@@ -27,7 +27,7 @@ public sealed class Pkcs11UriTests
         Assert.Equal(new Version(2, 6), uri.LibraryVersion);
         Assert.Equal("Reader Co", uri.SlotManufacturer);
         Assert.Equal("Reader 0", uri.SlotDescription);
-        Assert.Equal(7UL, uri.SlotId);
+        Assert.Equal(new SlotId(7), uri.SlotId);
         Assert.Equal("Acme", uri.Manufacturer);
         Assert.Equal("Model A", uri.Model);
         Assert.Equal("0001", uri.Serial);
@@ -102,6 +102,54 @@ public sealed class Pkcs11UriTests
         Assert.Equal(new byte[] { 1, 2, 3 }, uri.Id!.Value.ToArray());
     }
 
+    // K15. Matches(TokenInfo) cannot satisfy slot or module attributes: a URI that has some matches no token on its own.
+    [Fact]
+    public void MatchesTokenInfo_WithSlotOrLibraryAttributes_MatchesNothing()
+    {
+        Assert.False(Pkcs11Uri.Parse("pkcs11:slot-description=Reader%200").NamesToken);
+        Assert.True(Pkcs11Uri.Parse("pkcs11:slot-description=Reader%200").NamesSlot);
+        Assert.True(Pkcs11Uri.Parse("pkcs11:token=a").NamesToken);
+        Assert.True(Pkcs11Uri.Parse("pkcs11:slot-id=3").NamesSlot);
+    }
+
+    // K16. Values set in code are checked as Parse checks them: a version that is not a CK_VERSION, a serial number that
+    // is not printable ASCII.
+    [Fact]
+    public void Init_InvalidVersionOrSerial_IsRefused()
+    {
+        Assert.Throws<ArgumentException>(() => new Pkcs11Uri { LibraryVersion = new Version(1, 300) });
+        Assert.Throws<ArgumentException>(() => new Pkcs11Uri { LibraryVersion = new Version(1, 2, 3) });
+        Assert.Throws<ArgumentException>(() => new Pkcs11Uri { Serial = "caf\u00e9" });
+        var ex = Assert.Throws<ArgumentException>(() => new Pkcs11Uri { Token = new string('a', 33) });
+        Assert.Equal(nameof(Pkcs11Uri.Token), ex.ParamName);
+        _ = new Pkcs11Uri { LibraryVersion = new Version(2, 40), Serial = "0123-ABCD" };
+    }
+
+    [Theory]
+    [InlineData("pkcs11:serial=caf%C3%A9", "printable ASCII")]
+    [InlineData("pkcs11:token=a;bad%0Aname=x", "not a valid attribute name")]
+    public void Parse_InvalidSerialOrName_IsRefused_WithoutEchoingThem(string text, string why)
+    {
+        var ex = Assert.Throws<ArgumentException>(() => Pkcs11Uri.Parse(text));
+        Assert.Contains(why, ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("pkcs11:token=a?")]
+    [InlineData("pkcs11:token=a?x-vendor=1&other")]
+    public void Parse_EmptyOrUnknownQuery_IsIgnored(string text)
+        => Assert.Equal("pkcs11:token=a", Pkcs11Uri.Parse(text).ToString());
+
+    [Fact]
+    public void Id_ReturnsACopy()
+    {
+        Pkcs11Uri uri = Pkcs11Uri.Parse("pkcs11:id=%01%02");
+        Assert.True(System.Runtime.InteropServices.MemoryMarshal.TryGetArray(uri.Id!.Value, out ArraySegment<byte> segment));
+        segment.Array![0] = 9;
+        Assert.Equal("pkcs11:id=%01%02", uri.ToString());
+    }
+
     [Fact]
     public void Init_LongerThanTheField_IsRefused()
     {
@@ -120,6 +168,7 @@ public sealed class Pkcs11UriTests
     [InlineData("pkcs11:token=a;token=b")]
     [InlineData("pkcs11:token=a b")]
     [InlineData("pkcs11:token=a?pin-value=1234")]
+    [InlineData("pkcs11:token=a?module-path=/x.so")]
     [InlineData("pkcs11:x-vendor=1")]
     public void TryParse_Refuses_WithoutThrowing(string? text)
     {

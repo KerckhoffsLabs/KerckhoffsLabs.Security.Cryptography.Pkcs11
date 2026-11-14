@@ -42,14 +42,20 @@ public abstract class ContextAuthentication
     /// is abandoned.
     /// </para>
     /// <para>
-    /// It runs while the operation holds the key's session, and the token's login open. A slow prompt delays a login
-    /// or the final logout on that token; while one of those is waiting, it also delays every new operation on the
-    /// token, from any session, until the prompt returns.
+    /// It runs while the operation holds the key's session, and the token's login open: a slow prompt delays the final
+    /// logout on that token (which waits for operations in flight), never other operations or logins.
     /// </para>
     /// <para>
     /// It must not use the key's session: that is not allowed, and not enforced, so doing it interleaves calls
-    /// inside the operation in progress. It must not release a login on that token either; that one is refused
-    /// with <see cref="InvalidOperationException"/>.
+    /// inside the operation in progress. It may release a login on that token (the logout then waits for the
+    /// operation), and may log in, except while the previous login's logout waits for this very operation, which is
+    /// refused with <see cref="InvalidOperationException"/>. It must not wait for another thread's work on the same
+    /// token: that thread may be waiting for this operation.
+    /// </para>
+    /// <para>
+    /// When the token refuses the PIN it returns (<c>CKR_PIN_INCORRECT</c>), the session does not ask this source again:
+    /// later operations with such a key are refused (<see cref="Exceptions.Pkcs11AuthenticationException"/>) until
+    /// <see cref="Pkcs11Session.ContextAuthentication"/> is set again, so a stale PIN costs one retry, not every one.
     /// </para>
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="pinFor"/> is <see langword="null"/>.</exception>

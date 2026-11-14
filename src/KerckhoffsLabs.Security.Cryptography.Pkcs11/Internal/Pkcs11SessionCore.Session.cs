@@ -36,20 +36,24 @@ internal sealed partial class Pkcs11SessionCore
     }
 
     /// <summary>
-    /// Asks the module whether this session is still open (<c>C_GetSessionInfo</c>), for the login record checking
-    /// that its anchor still holds the login before it refuses a second login. Sent as the record's other sends are
-    /// (<see cref="AcquireForRecord"/>); a lost session is reported through <see cref="ThrowIfError"/>, which ends the
-    /// login when this is the anchor.
+    /// Asks the module for this session's state (<c>C_GetSessionInfo</c>), for the login record: whether its anchor
+    /// still holds the login, and which user the module has logged in. Never waits for the session's lock:
+    /// <see langword="null"/> when another thread holds it (<see cref="TryAcquireForRecord"/>). A lost session is
+    /// reported through <see cref="ThrowIfError"/>, which ends the login when this is the anchor.
     /// </summary>
+    /// <returns>The session's state, or <see langword="null"/> when the session is busy.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSessionInfo</c>.</exception>
-    internal void SendProbe()
+    internal CKS? TrySendProbe()
     {
-        using var _ = AcquireForRecord();
+        using ExclusiveLease? lease = TryAcquireForRecord();
+        if (lease is null)
+            return null;
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetSessionInfo (login probe)");
 
-        CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out CK_SESSION_INFO _);
+        CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out CK_SESSION_INFO info);
         ThrowIfError(rv, OpGetSessionInfo);
+        return (CKS)(ulong)info.State;
     }
 
     // -----------------------------------------------------------------------
@@ -190,10 +194,19 @@ internal sealed partial class Pkcs11SessionCore
     {
         if (key is null || !key.NeedsContextLogin)
             return null;
-        return ContextAuthentication ?? throw new InvalidOperationException(
+        ContextAuthentication source = ContextAuthentication ?? throw new InvalidOperationException(
             "This key has CKA_ALWAYS_AUTHENTICATE, so the token wants the PIN again for each use, and its session has " +
             "no ContextAuthentication. Set Pkcs11Session.ContextAuthentication, or Pkcs11Login.ContextAuthentication " +
             "before opening the session, to ContextAuthentication.FromPin(...) or ContextAuthentication.Pinpad.");
+        if (ReferenceEquals(source, _rejectedContextSource))
+        {
+            throw new Pkcs11AuthenticationException(CKR.CKR_PIN_INCORRECT, OpLogin,
+                "The token refused the PIN this session's ContextAuthentication gave for a key with " +
+                "CKA_ALWAYS_AUTHENTICATE, so it is not asked again: each wrong PIN costs one of the user PIN's retries, " +
+                "and repeating it would lock the PIN. Fix the PIN's source, then set Pkcs11Session.ContextAuthentication " +
+                "again.");
+        }
+        return source;
     }
 
     /// <summary>
@@ -222,10 +235,13 @@ internal sealed partial class Pkcs11SessionCore
         if (source is null || key is null)
             return;
 
+        // Until the login succeeds, a failure leaves the operation unauthenticated: CancelAbandoned may end it.
+        _contextLoginFailed = true;
         if (source.IsPinpad)
         {
             Log.LoggingInProtectedPath(_logger, CKU.CKU_CONTEXT_SPECIFIC, (ulong)_sessionId);
-            SendContextLogin(default);
+            SendContextLogin(default, source);
+            _contextLoginFailed = false;
             return;
         }
 
@@ -236,15 +252,20 @@ internal sealed partial class Pkcs11SessionCore
         using (pin)
         {
             Log.LoggingIn(_logger, CKU.CKU_CONTEXT_SPECIFIC, (ulong)_sessionId);
-            SendContextLogin(pin.Pin);
+            SendContextLogin(pin.Pin, source);
         }
+        _contextLoginFailed = false;
     }
 
-    private void SendContextLogin(ReadOnlySpan<byte> pin)
+    private void SendContextLogin(ReadOnlySpan<byte> pin, ContextAuthentication source)
     {
         CKR rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pin);
         if (rv == CKR.CKR_PIN_LOCKED)
             _record.MarkEnded(rv);
+        // A PIN from a source that the token refused is not asked for again (ContextAuthenticationFor). A pinpad PIN is
+        // typed afresh each time, so its source stays usable.
+        if (rv is CKR.CKR_PIN_INCORRECT or CKR.CKR_PIN_INVALID or CKR.CKR_PIN_LEN_RANGE && !source.IsPinpad)
+            _rejectedContextSource = source;
         ThrowIfError(rv, OpLogin);
     }
 

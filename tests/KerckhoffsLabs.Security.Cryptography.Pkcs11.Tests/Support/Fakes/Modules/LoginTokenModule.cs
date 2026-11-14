@@ -172,6 +172,49 @@ internal sealed class LoginTokenModule : FakeModule
     public Action<NativeCULong>? DuringGetSessionInfo { get; set; }
 
     /// <summary>
+    /// Runs at the start of every <c>C_Logout</c>, before the token's lock, with the session handle: lets a test hold a
+    /// logout in flight.
+    /// </summary>
+    public Action<NativeCULong>? DuringLogout { get; set; }
+
+    /// <summary>The label <c>C_GetTokenInfo</c> reports; <see cref="TokenLabel"/> unless a test swaps the token.</summary>
+    public string Label { get; set; } = TokenLabel;
+
+    // Results the next calls of a function answer instead of doing anything, in order (FailNext).
+    private readonly Dictionary<string, Queue<CKR>> _failNext = [];
+
+    /// <summary>
+    /// Makes the next call of <paramref name="function"/> (<c>"C_OpenSession"</c>, <c>"C_Login"</c>, <c>"C_Logout"</c>
+    /// or <c>"C_GetSessionInfo"</c>) answer <paramref name="rv"/> and do nothing else; queued, one call each.
+    /// </summary>
+    public void FailNext(string function, CKR rv)
+    {
+        lock (_lock)
+        {
+            if (!_failNext.TryGetValue(function, out Queue<CKR>? queue))
+                _failNext[function] = queue = new Queue<CKR>();
+            queue.Enqueue(rv);
+        }
+    }
+
+    // Under _lock. The queued failure for function, if any.
+    private bool FailsNextLocked(string function, out CKR rv)
+    {
+        rv = CKR.CKR_OK;
+        return _failNext.TryGetValue(function, out Queue<CKR>? queue) && queue.TryDequeue(out rv);
+    }
+
+    /// <summary>
+    /// The module drops the application's login on its own (an idle timeout, another component's <c>C_Logout</c>):
+    /// logged out, its private handles renumbered, every session left open.
+    /// </summary>
+    public void DropLogin()
+    {
+        lock (_lock)
+            LogOutLocked();
+    }
+
+    /// <summary>
     /// Runs inside every <c>C_Sign</c> that produces a signature (not a length probe), before the token's
     /// lock: lets a test hold an operation in flight. <c>C_SignInit</c> accepts any mechanism and key.
     /// </summary>
@@ -302,7 +345,7 @@ internal sealed class LoginTokenModule : FakeModule
     {
         if ((ulong)slotId != SlotId)
             return CKR.CKR_SLOT_ID_INVALID;
-        NativeTestStructs.FillPadded(info.Label, TokenLabel);
+        NativeTestStructs.FillPadded(info.Label, Label);
         ulong flags = CKF.CKF_LOGIN_REQUIRED | CKF.CKF_USER_PIN_INITIALIZED | CKF.CKF_TOKEN_INITIALIZED;
         if (WriteProtected)
             flags |= CKF.CKF_WRITE_PROTECTED;
@@ -321,7 +364,7 @@ internal sealed class LoginTokenModule : FakeModule
     {
         lock (_lock)
         {
-            CKR rv = OpenSessionLocked(slotId, flags, ref session);
+            CKR rv = FailsNextLocked("C_OpenSession", out CKR failure) ? failure : OpenSessionLocked(slotId, flags, ref session);
             _openSessionResults.Add(rv);
             return rv;
         }
@@ -379,6 +422,8 @@ internal sealed class LoginTokenModule : FakeModule
         lock (_lock)
         {
             _loginCalls++;
+            if (FailsNextLocked("C_Login", out CKR next))
+                return next;
             if ((CKU)(ulong)userType == CKU.CKU_CONTEXT_SPECIFIC)
                 _callLog.Add(ContextLogin);
             if (_failing.TryGetValue((ulong)session, out CKR failure))
@@ -451,9 +496,12 @@ internal sealed class LoginTokenModule : FakeModule
 
     protected override CKR C_Logout(NativeCULong session)
     {
+        DuringLogout?.Invoke(session);
         lock (_lock)
         {
             _logoutCalls++;
+            if (FailsNextLocked("C_Logout", out CKR next))
+                return next;
             if (_failing.TryGetValue((ulong)session, out CKR failure))
                 return failure;
             if (!IsOpen(session))
@@ -858,6 +906,8 @@ internal sealed class LoginTokenModule : FakeModule
         DuringGetSessionInfo?.Invoke(session);
         lock (_lock)
         {
+            if (FailsNextLocked("C_GetSessionInfo", out CKR next))
+                return next;
             if (_failing.TryGetValue((ulong)session, out CKR failure))
                 return failure;
             int index = _sessions.FindIndex(s => s.Handle == (ulong)session);

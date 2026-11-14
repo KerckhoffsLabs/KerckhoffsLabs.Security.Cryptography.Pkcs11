@@ -80,7 +80,7 @@ public sealed record Pkcs11Uri
 
     /// <summary>The token's serial number (<c>serial</c>), at most 16 UTF-8 bytes.</summary>
     /// <exception cref="ArgumentException">Set to a value longer than the field.</exception>
-    public string? Serial { get => _serial; init => _serial = Checked(value, SerialAttribute, SerialLength); }
+    public string? Serial { get => _serial; init => _serial = CheckedSerial(Checked(value, SerialAttribute, SerialLength)); }
 
     /// <summary>The token's model (<c>model</c>), at most 16 UTF-8 bytes.</summary>
     /// <exception cref="ArgumentException">Set to a value longer than the field.</exception>
@@ -106,7 +106,13 @@ public sealed record Pkcs11Uri
     /// The slot ID (<c>slot-id</c>). The module assigns it and may renumber it between runs: prefer the token's own
     /// attributes in configuration.
     /// </summary>
-    public ulong? SlotId { get; init; }
+    public SlotId? SlotId
+    {
+        get;
+        init => field = value is { } id && OperatingSystem.IsWindows() && id.Value > uint.MaxValue
+            ? throw new ArgumentException("'slot-id' is wider than a CK_SLOT_ID on Windows (32 bits).", nameof(SlotId))
+            : value;
+    }
 
     /// <summary>The module's description (<c>library-description</c>), at most 32 UTF-8 bytes.</summary>
     /// <exception cref="ArgumentException">Set to a value longer than the field.</exception>
@@ -128,7 +134,16 @@ public sealed record Pkcs11Uri
     /// The module's version (<c>library-version</c>): major and minor, each 0 to 255 (<c>CK_VERSION</c>). Written
     /// "major" or "major.minor"; a missing minor is 0, so <c>2</c> is 2.0, and <c>2.40</c> is 2.40.
     /// </summary>
-    public Version? LibraryVersion { get; init; }
+    /// <exception cref="ArgumentException">Set to a version whose major or minor is above 255, or that has a build or revision.</exception>
+    public Version? LibraryVersion
+    {
+        get;
+        init => field = value is null || (value.Major <= byte.MaxValue && value.Minor <= byte.MaxValue && value.Build < 0
+            && value.Revision < 0)
+            ? value
+            : throw new ArgumentException("'library-version' is a CK_VERSION: a major and a minor from 0 to 255, nothing more.",
+                nameof(LibraryVersion));
+    }
 
     /// <summary>The object's label (<c>object</c>, its <c>CKA_LABEL</c>).</summary>
     public string? Object { get; init; }
@@ -155,7 +170,8 @@ public sealed record Pkcs11Uri
         {
             if (_id is null)
                 return null;
-            return new ReadOnlyMemory<byte>(_id);
+            // A copy: the caller cannot change this URI's id, its text, or its equality.
+            return new ReadOnlyMemory<byte>([.. _id]);
         }
         init => _id = value?.ToArray();
     }
@@ -164,7 +180,13 @@ public sealed record Pkcs11Uri
     public bool NamesLibrary => LibraryDescription is not null || LibraryManufacturer is not null || LibraryVersion is not null;
 
     /// <summary>Whether the URI says anything about an object (<c>object</c>, <c>type</c> or <c>id</c>).</summary>
-    public bool NamesObject => Object is not null || Type is not null || Id is not null;
+    public bool NamesObject => Object is not null || Type is not null || _id is not null;
+
+    /// <summary>Whether the URI says anything about the token (<c>token</c>, <c>manufacturer</c>, <c>serial</c>, <c>model</c>).</summary>
+    public bool NamesToken => Token is not null || Manufacturer is not null || Serial is not null || Model is not null;
+
+    /// <summary>Whether the URI says anything about the slot (<c>slot-description</c>, <c>slot-manufacturer</c>, <c>slot-id</c>).</summary>
+    public bool NamesSlot => NamesSlotInfo || SlotId is not null;
 
     private bool NamesSlotInfo => SlotDescription is not null || SlotManufacturer is not null;
 
@@ -210,7 +232,7 @@ public sealed record Pkcs11Uri
             : string.Create(CultureInfo.InvariantCulture, $"{LibraryVersion.Major}.{LibraryVersion.Minor}"));
         Add(SlotManufacturerAttribute, Encode(SlotManufacturer));
         Add(SlotDescriptionAttribute, Encode(SlotDescription));
-        Add(SlotIdAttribute, SlotId?.ToString(CultureInfo.InvariantCulture));
+        Add(SlotIdAttribute, SlotId?.Value.ToString(CultureInfo.InvariantCulture));
         Add(ManufacturerAttribute, Encode(Manufacturer));
         Add(ModelAttribute, Encode(Model));
         Add(SerialAttribute, Encode(Serial));
@@ -243,23 +265,44 @@ public sealed record Pkcs11Uri
         ArgumentNullException.ThrowIfNull(info);
         return Same(SlotDescription, info.SlotDescription)
             && Same(SlotManufacturer, info.ManufacturerId)
-            && (SlotId is null || SlotId == info.SlotId.Value);
+            && (SlotId is null || SlotId == info.SlotId);
     }
 
-    /// <summary>Whether the token described by <paramref name="info"/> is one the URI names (its slot ID included).</summary>
+    /// <summary>
+    /// Whether the token described by <paramref name="info"/> is one the URI names (its slot ID included). A URI that
+    /// also names the slot's description or manufacturer, or the module, matches no token on its own: a
+    /// <see cref="TokenInfo"/> cannot satisfy those attributes, and ignoring them would select more than the URI names.
+    /// Use <see cref="Matches(Pkcs11Slot)"/> for the whole URI.
+    /// </summary>
     public bool Matches(TokenInfo info)
     {
         ArgumentNullException.ThrowIfNull(info);
-        return Same(Token, info.Label)
+        return !NamesSlot && !NamesLibrary && MatchesToken(info);
+    }
+
+    /// <summary>
+    /// Whether the token in <paramref name="slot"/> is one the whole URI names: its module (<c>library-*</c>, from
+    /// <see cref="Pkcs11Library.GetInfo"/>), its slot (<c>slot-*</c>) and its token attributes. Queries the module.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="slot"/> is <see langword="null"/>.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from <c>C_GetInfo</c>, <c>C_GetSlotInfo</c> or <c>C_GetTokenInfo</c>.</exception>
+    public bool Matches(Pkcs11Slot slot)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        return (!NamesLibrary || Matches(slot.Library.GetInfo())) && Matches(slot, slot.GetTokenInfo());
+    }
+
+    private bool MatchesToken(TokenInfo info)
+        => Same(Token, info.Label)
             && Same(Manufacturer, info.ManufacturerId)
             && Same(Serial, info.SerialNumber)
             && Same(Model, info.Model)
-            && (SlotId is null || SlotId == info.SlotId.Value);
-    }
+            && (SlotId is null || SlotId == info.SlotId);
 
-    // The token half of a selection on slot: the token attributes, and the slot attributes when the URI has some.
+    // The token half of a selection on slot (the module is checked once, by the caller): the token attributes, and the
+    // slot attributes when the URI has some.
     internal bool Matches(Pkcs11Slot slot, TokenInfo token)
-        => Matches(token) && (!NamesSlotInfo || Matches(slot.GetSlotInfo()));
+        => MatchesToken(token) && (!NamesSlotInfo || Matches(slot.GetSlotInfo()));
 
     /// <summary>The URI of the token <paramref name="info"/> describes: its manufacturer, model, serial number and label.</summary>
     internal static Pkcs11Uri ForToken(TokenInfo info) => new()
@@ -273,16 +316,27 @@ public sealed record Pkcs11Uri
     private static bool Same(string? wanted, string actual)
         => wanted is null || string.Equals(wanted, actual.TrimEnd(' '), StringComparison.Ordinal);
 
-    private static string? Checked(string? value, string name, int maxBytes)
+    private static string? Checked(string? value, string name, int maxBytes,
+        [System.Runtime.CompilerServices.CallerMemberName] string property = "")
     {
         if (value is not null && Encoding.UTF8.GetByteCount(value) > maxBytes)
         {
             throw new ArgumentException(
                 $"'{name}' is longer than the {maxBytes} bytes the PKCS#11 field it is compared with holds: it can match nothing.",
-                nameof(value));
+                property);
         }
         return value;
     }
+
+    // A serial number is a CK_CHAR field (PKCS#11 v3.2 CK_TOKEN_INFO), printable ASCII: anything else matches nothing.
+    private static string? CheckedSerial(string? value, [System.Runtime.CompilerServices.CallerMemberName] string property = "")
+    {
+        if (value is not null && !IsPrintableAscii(value))
+            throw new ArgumentException("'serial' must be printable ASCII, as the PKCS#11 field (CK_CHAR) is.", property);
+        return value;
+    }
+
+    private static bool IsPrintableAscii(string value) => value.All(c => c is >= ' ' and <= '~');
 
     // A field as the module reported it, padding removed. It came from a field of maxBytes, but a module's invalid
     // UTF-8 decodes to replacement characters, which take more bytes: those are cut off rather than refused.
@@ -336,7 +390,7 @@ public sealed record Pkcs11Uri
         string rest = uri[Scheme.Length..];
         int query = rest.IndexOf('?', StringComparison.Ordinal);
         if (query >= 0)
-            ThrowForQuery(rest[(query + 1)..]);
+            CheckQuery(rest[(query + 1)..]);
         string path = query >= 0 ? rest[..query] : rest;
 
         var values = new Dictionary<string, byte[]>(StringComparer.Ordinal);
@@ -401,6 +455,8 @@ public sealed record Pkcs11Uri
             throw new UriFormatException(
                 $"'{name}' is longer than the {max} bytes the PKCS#11 field it is compared with holds: it can match nothing.");
         }
+        if (name == SerialAttribute && !bytes.All(b => b is >= 0x20 and <= 0x7E))
+            throw new UriFormatException("'serial' must be printable ASCII, as the PKCS#11 field (CK_CHAR) is.");
         try
         {
             return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(bytes);
@@ -415,12 +471,19 @@ public sealed record Pkcs11Uri
     {
         if (Taken.Contains(name))
             return;
-        throw new UriFormatException($"the attribute '{name}' is not one this library takes (token, manufacturer, serial, " +
+        // Named in the message only when it is a well-formed attribute name: anything else could forge log lines.
+        string shown = name.Length <= 64 && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_')
+            ? $"the attribute '{name}'"
+            : "an attribute whose name is not a valid attribute name";
+        throw new UriFormatException($"{shown} is not one this library takes (token, manufacturer, serial, " +
             "model, slot-description, slot-manufacturer, slot-id, library-description, library-manufacturer, " +
             "library-version, object, type, id). It is refused rather than ignored, which could select something else.");
     }
 
-    private static void ThrowForQuery(string query)
+    // RFC 7512 section 2.4: query attributes do not select. Unknown ones are ignored (section 2.5) and so is an empty
+    // query; the ones that would hand the library a PIN or a module are refused, as the library never takes either from
+    // a URI.
+    private static void CheckQuery(string query)
     {
         // Only the names are looked at: a pin-value must not reach a message.
         foreach (string name in query.Split('&').Select(attribute => attribute.Split('=', 2)[0]))
@@ -436,7 +499,6 @@ public sealed record Pkcs11Uri
                     "is the one Pkcs11Library.Load loaded.");
             }
         }
-        throw new UriFormatException("it has query attributes (after '?'), which this library does not take. Remove them.");
     }
 
     // RFC 7512 pk-pchar: unreserved, percent-encoded, and ":[]@!$'()*+,=&". Anything else (a space included) must be
@@ -489,14 +551,16 @@ public sealed record Pkcs11Uri
         return text.ToString();
     }
 
-    private static ulong ParseSlotId(string value)
+    private static SlotId ParseSlotId(string value)
     {
         if (value.Length == 0 || !value.All(char.IsAsciiDigit)
             || !ulong.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out ulong id))
         {
             throw new UriFormatException("'slot-id' must be a decimal number.");
         }
-        return id;
+        if (OperatingSystem.IsWindows() && id > uint.MaxValue)
+            throw new UriFormatException("'slot-id' is wider than a CK_SLOT_ID on Windows (32 bits).");
+        return new SlotId(id);
     }
 
     private static Version ParseVersion(string value)

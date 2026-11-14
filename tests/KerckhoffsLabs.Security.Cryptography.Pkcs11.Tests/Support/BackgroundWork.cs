@@ -10,9 +10,19 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 /// instead of catching everything on the worker's. Every wait is bounded by the caller (<see cref="Join"/>), so a
 /// deadlock shows as a timeout, not a hung run.
 /// </remarks>
-internal sealed class BackgroundWork(Action work)
+internal sealed class BackgroundWork
 {
-    private readonly Task _task = new(work, TaskCreationOptions.LongRunning);
+    private readonly Task _task;
+    private Thread? _thread;
+
+    public BackgroundWork(Action work)
+    {
+        _task = new Task(() =>
+        {
+            Volatile.Write(ref _thread, Thread.CurrentThread);
+            work();
+        }, TaskCreationOptions.LongRunning);
+    }
 
     /// <summary>Creates the work and starts it at once.</summary>
     public static BackgroundWork Run(Action work)
@@ -31,6 +41,22 @@ internal sealed class BackgroundWork(Action work)
 
     /// <summary>Waits at most <paramref name="timeout"/> for the work to finish; whether it did.</summary>
     public bool Join(TimeSpan timeout) => ((IAsyncResult)_task).AsyncWaitHandle.WaitOne(timeout);
+
+    /// <summary>
+    /// Waits at most <paramref name="timeout"/> for the work to block (its thread in a wait, a lock or a sleep) while it
+    /// still runs; whether it did. A negative check without a timing guess: the work is seen waiting, not merely slow.
+    /// </summary>
+    public bool WaitUntilBlocked(TimeSpan timeout)
+    {
+        bool blocked = false;
+        SpinWait.SpinUntil(() =>
+        {
+            Thread? thread = Volatile.Read(ref _thread);
+            blocked = thread is not null && (thread.ThreadState & ThreadState.WaitSleepJoin) != 0 && IsAlive;
+            return blocked || _task.IsCompleted;
+        }, timeout);
+        return blocked && IsAlive;
+    }
 
     /// <summary>What the work threw, or <see langword="null"/> while it runs or once it returned.</summary>
     public Exception? Failure => _task.Exception?.InnerException;

@@ -19,20 +19,22 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// </para>
 /// <para>
 /// <b>Which objects are private.</b> <c>CKA_PRIVATE</c> as the token reports it. When the token does not report
-/// it (the attribute is invalid or unreadable for the object), a private key or secret key counts as private and
-/// any other class as public: keys are where the spec's defaults and every real token make objects private, and
-/// guessing "private" for a key costs at most a refusal after logout, while guessing "public" could send a stale
-/// handle.
+/// it (the attribute is invalid or unreadable for the object), the object counts as private, whatever its class:
+/// guessing "private" costs at most a refusal after logout, while guessing "public" could send a stale handle to an
+/// object the module has since given that number to.
 /// </para>
 /// </remarks>
 internal static class PrivateObjectLogin
 {
     /// <summary>
-    /// Whether an object counts as private: <paramref name="reported"/> <c>CKA_PRIVATE</c>, or by class when the
-    /// token did not report it.
+    /// Whether an object counts as private: <paramref name="reported"/> <c>CKA_PRIVATE</c>, or private when the token
+    /// did not report it, whatever <paramref name="objectClass"/>.
     /// </summary>
     internal static bool IsPrivate(bool? reported, CKO objectClass)
-        => reported ?? objectClass is CKO.CKO_PRIVATE_KEY or CKO.CKO_SECRET_KEY;
+    {
+        _ = objectClass; // Kept for the call sites, which name the class the object was looked up as.
+        return reported ?? true;
+    }
 
     /// <summary>
     /// <c>CKA_PRIVATE</c> as read through the generic attribute reader, or <see langword="null"/> when the token did
@@ -55,7 +57,7 @@ internal static class PrivateObjectLogin
     /// <summary>
     /// Throws when <paramref name="isPrivate"/> and the login state <paramref name="stamp"/> recorded has ended.
     /// </summary>
-    /// <exception cref="ObjectDisposedException">The object is private and its login has ended.</exception>
+    /// <exception cref="Pkcs11LoginEndedException">The object is private and its login has ended.</exception>
     internal static void ThrowIfEnded(bool isPrivate, LoginStamp stamp, TokenLoginRecord record, string objectName)
     {
         if (isPrivate && !record.IsStillCurrent(stamp))
@@ -63,10 +65,10 @@ internal static class PrivateObjectLogin
     }
 
     /// <summary>The refusal of a private object's handle after its login ended.</summary>
-    /// <remarks>An <see cref="ObjectDisposedException"/>, like a destroyed object's: the wrapper is spent.</remarks>
-    internal static ObjectDisposedException Ended(string objectName) => new(
-        objectName,
-        "The login this private object was found or made under has ended (logged out, or reported gone by the " +
+    /// <remarks>A <see cref="Pkcs11LoginEndedException"/>: a token event, not a programming error; the wrapper is spent.</remarks>
+    internal static Pkcs11LoginEndedException Ended(string objectName) => new(
+        Pkcs11Operations.OpLogin,
+        $"{objectName}: the login this private object was found or made under has ended (logged out, or reported gone by the " +
         "module). PKCS#11 invalidates its handle for good, even after logging in again, so this wrapper can no " +
         "longer reach the token. Log in and open the object again.");
 }

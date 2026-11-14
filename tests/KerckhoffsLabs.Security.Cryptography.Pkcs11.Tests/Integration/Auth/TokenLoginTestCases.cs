@@ -228,7 +228,8 @@ internal static class TokenLoginTestCases
         using Pkcs11Login login = LogIn(backend);
         using Pkcs11Session session = login.OpenSession();
 
-        Assert.Same(login, session.Login);
+        Assert.Equal(login.User, session.Login!.User);
+        Assert.True(session.IsLent);
         Assert.Equal(SessionAccess.ReadWrite, session.Access);
         Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
     }

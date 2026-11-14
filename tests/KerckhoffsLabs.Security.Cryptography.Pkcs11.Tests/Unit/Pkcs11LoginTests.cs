@@ -48,7 +48,8 @@ public sealed class Pkcs11LoginTests : IDisposable
 
         Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, first.GetSessionInfo().State);
         Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, second.GetSessionInfo().State);
-        Assert.Same(login, first.Login);
+        Assert.Equal(login.User, first.Login!.User);
+        Assert.True(first.Login.IsActive);
         Assert.Equal(1, _module.LoginCalls);
     }
 
@@ -143,7 +144,7 @@ public sealed class Pkcs11LoginTests : IDisposable
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         login.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => login.OpenSession());
+        Assert.Throws<Pkcs11LoginEndedException>(() => login.OpenSession());
         Assert.Empty(_module.OpenSessions);
     }
 
@@ -318,5 +319,68 @@ public sealed class Pkcs11LoginTests : IDisposable
 
         Assert.Equal(1, _module.LogoutCalls);
         Assert.Empty(_module.OpenSessions);
+    }
+
+    // K9. The Security Officer's login is not shared from the slot (it can set the user PIN): only by handing its
+    // Pkcs11Login on. A session exposes its login as a read-only view.
+    [Fact]
+    public void TryShareLogin_SecurityOfficer_IsRefused_ShareThroughTheLoginWorks()
+    {
+        using Pkcs11Login so = Slot.Login(TokenUser.SecurityOfficer, _pin);
+
+        Assert.Throws<ArgumentException>(() => Slot.TryShareLogin(TokenUser.SecurityOfficer, out _));
+        using Pkcs11Login shared = so.Share();
+        Assert.True(shared.IsActive);
+
+        using Pkcs11Session session = so.OpenSession(SessionAccess.ReadWrite);
+        Pkcs11LoginInfo info = Assert.IsType<Pkcs11LoginInfo>(session.Login);
+        Assert.Equal(TokenUser.SecurityOfficer, info.User);
+        Assert.True(info.IsActive);
+        Assert.False(session.IsLent);
+    }
+
+    // Q5. ShareOrLogin through the slot: the first call logs in (PIN source called once), the next shares.
+    [Fact]
+    public void ShareOrLogin_FirstLogsIn_NextShares()
+    {
+        int asked = 0;
+        using Pkcs11Login first = Slot.ShareOrLogin(() => { asked++; return new SecurePin(_module.ExpectedPin); });
+        using Pkcs11Login second = Slot.ShareOrLogin(() => { asked++; return new SecurePin(_module.ExpectedPin); });
+
+        Assert.Equal(1, asked);
+        Assert.Equal(1, _module.LoginCalls);
+        Assert.True(second.IsActive);
+        Assert.Equal(TokenUser.User, second.User);
+    }
+
+    // K13. A slot found by a lookup remembers its token: a token swapped in before the login does not receive the PIN.
+    [Fact]
+    public void SlotSelectedByLabel_TokenSwappedBeforeLogin_RefusedWithNoPinSent()
+    {
+        Pkcs11Slot slot = _library.GetSlotByTokenLabel(LoginTokenModule.TokenLabel);
+        _module.Label = "another-token";
+
+        var ex = Assert.Throws<Pkcs11TokenException>(() => slot.Login(TokenUser.User, _pin));
+
+        Assert.Equal(CKR.CKR_TOKEN_NOT_RECOGNIZED, ex.ReturnValue);
+        Assert.Equal(0, _module.LoginCalls);
+        Assert.Empty(_module.OpenSessions);
+    }
+
+    // Q2. Pkcs11Login.LoggedOut completes once the token is logged out: Dispose may return before, while an operation is
+    // in flight.
+    [Fact]
+    public void LoggedOut_CompletesWhenTheDeferredLogoutIsSent()
+    {
+        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        Task loggedOut = login.LoggedOut;
+        TokenLoginRecord record = Slot.LoginRecord;
+        using (record.EnterOperation())
+        {
+            login.Dispose();
+            Assert.False(loggedOut.IsCompleted);
+        }
+        Assert.True(loggedOut.IsCompletedSuccessfully);
+        Assert.Equal(1, _module.LogoutCalls);
     }
 }

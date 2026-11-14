@@ -18,8 +18,8 @@ internal static class ManagedToken
     /// </summary>
     public static Pkcs11Session OpenSession(Pkcs11Library library, ICryptoPolicy? policy = null)
     {
-        using var pin = new SecurePin("1234");
-        using Pkcs11Login login = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel).ShareOrLogIn(TokenUser.User, pin);
+        using Pkcs11Login login = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel)
+            .ShareOrLogin(() => new SecurePin("1234"));
         return login.OpenSession(SessionAccess.ReadWrite, policy);
     }
 }

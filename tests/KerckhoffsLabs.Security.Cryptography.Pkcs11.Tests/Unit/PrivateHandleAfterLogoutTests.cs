@@ -63,10 +63,10 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
         int signInits = _module.CallCount("C_SignInit");
         int reads = _module.CallCount("C_GetAttributeValue");
 
-        var ex = Assert.Throws<ObjectDisposedException>(() => key.Sign(Hmac, "data"u8));
+        var ex = Assert.Throws<Pkcs11LoginEndedException>(() => key.Sign(Hmac, "data"u8));
         Assert.Contains("login", ex.Message, StringComparison.Ordinal);
-        Assert.Throws<ObjectDisposedException>(() => key.GetAttributeValue(CKA.CKA_LABEL));
-        Assert.Throws<ObjectDisposedException>(() => key.Destroy());
+        Assert.Throws<Pkcs11LoginEndedException>(() => key.GetAttributeValue(CKA.CKA_LABEL));
+        Assert.Throws<Pkcs11LoginEndedException>(() => key.Destroy());
 
         Assert.Equal(signInits, _module.CallCount("C_SignInit"));
         Assert.Equal(reads, _module.CallCount("C_GetAttributeValue"));
@@ -104,10 +104,10 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
         Assert.Equal(1, _module.CallCount("C_VerifyInit"));
         Assert.Equal(1, _module.CallCount("C_EncryptInit"));
 
-        var sign = Assert.Throws<ObjectDisposedException>(() => pair.Sign(Pss, "data"u8));
+        var sign = Assert.Throws<Pkcs11LoginEndedException>(() => pair.Sign(Pss, "data"u8));
         Assert.Contains("login", sign.Message, StringComparison.Ordinal);
-        Assert.Throws<ObjectDisposedException>(() => pair.Decrypt(Oaep, new byte[256]));
-        Assert.Throws<ObjectDisposedException>(() => pair.GetAttributeValue(KeyHandlePart.Private, CKA.CKA_LABEL));
+        Assert.Throws<Pkcs11LoginEndedException>(() => pair.Decrypt(Oaep, new byte[256]));
+        Assert.Throws<Pkcs11LoginEndedException>(() => pair.GetAttributeValue(KeyHandlePart.Private, CKA.CKA_LABEL));
         Assert.Equal(signInits, _module.CallCount("C_SignInit"));
         Assert.Equal(decryptInits, _module.CallCount("C_DecryptInit"));
         Assert.Equal(reads, _module.CallCount("C_GetAttributeValue"));
@@ -127,10 +127,10 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         login.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => pair.Verify(Pss, "data"u8, new byte[256]));
-        Assert.Throws<ObjectDisposedException>(() => pair.Encrypt(Oaep, [1, 2, 3]));
-        Assert.Throws<ObjectDisposedException>(() => pair.Sign(Pss, "data"u8));
-        Assert.Throws<ObjectDisposedException>(() => pair.Decrypt(Oaep, new byte[256]));
+        Assert.Throws<Pkcs11LoginEndedException>(() => pair.Verify(Pss, "data"u8, new byte[256]));
+        Assert.Throws<Pkcs11LoginEndedException>(() => pair.Encrypt(Oaep, [1, 2, 3]));
+        Assert.Throws<Pkcs11LoginEndedException>(() => pair.Sign(Pss, "data"u8));
+        Assert.Throws<Pkcs11LoginEndedException>(() => pair.Decrypt(Oaep, new byte[256]));
         Assert.Equal(0, _module.CallCount("C_VerifyInit"));
         Assert.Equal(0, _module.CallCount("C_EncryptInit"));
         Assert.Equal(0, _module.CallCount("C_SignInit"));
@@ -178,7 +178,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         Pkcs11Certificate certificate = Assert.Single(certificates);
         Assert.True(certificate.IsPrivate);
-        var ex = Assert.Throws<ObjectDisposedException>(certificate.Destroy);
+        var ex = Assert.Throws<Pkcs11LoginEndedException>(certificate.Destroy);
         Assert.Contains("login", ex.Message, StringComparison.Ordinal);
     }
 
@@ -232,7 +232,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         using (key)
         {
-            var ex = Assert.Throws<ObjectDisposedException>(() => key.Sign(Hmac, "data"u8));
+            var ex = Assert.Throws<Pkcs11LoginEndedException>(() => key.Sign(Hmac, "data"u8));
             Assert.Contains("login", ex.Message, StringComparison.Ordinal);
         }
         Assert.Equal(signInits, _module.CallCount("C_SignInit"));
@@ -257,9 +257,9 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         using (data)
         {
-            var ex = Assert.Throws<ObjectDisposedException>(() => data.GetValue());
+            var ex = Assert.Throws<Pkcs11LoginEndedException>(() => data.GetValue());
             Assert.Contains("login", ex.Message, StringComparison.Ordinal);
-            Assert.Throws<ObjectDisposedException>(() => data.Destroy());
+            Assert.Throws<Pkcs11LoginEndedException>(() => data.Destroy());
         }
         Assert.Equal(reads, _module.CallCount("C_GetAttributeValue"));
     }
@@ -276,7 +276,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         login.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => created.GetValue());
+        Assert.Throws<Pkcs11LoginEndedException>(() => created.GetValue());
     }
 
     [Fact]
@@ -293,7 +293,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
 
-        Assert.Throws<ObjectDisposedException>(() => key.Sign(Hmac, "data"u8));
+        Assert.Throws<Pkcs11LoginEndedException>(() => key.Sign(Hmac, "data"u8));
     }
 
     [Fact]
@@ -321,7 +321,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
         first.Dispose();
         Assert.Equal(logouts, _module.LogoutCalls);
         Assert.True(second.IsActive);
-        Assert.Throws<ObjectDisposedException>(() => key.Sign(Hmac, "data"u8));
+        Assert.Throws<ObjectDisposedException>(() => key.Sign(Hmac, "data"u8)); // its session was disposed
     }
 
     [Fact]
@@ -347,9 +347,9 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         // The old login, its sessions and its private handles stay ended.
         Assert.False(first.IsActive);
-        Assert.Throws<ObjectDisposedException>(() => first.OpenSession());
+        Assert.Throws<Pkcs11LoginEndedException>(() => first.OpenSession());
         int signInits = _module.CallCount("C_SignInit");
-        Assert.Throws<ObjectDisposedException>(() => oldKey.Sign(Hmac, "data"u8));
+        Assert.Throws<Pkcs11LoginEndedException>(() => oldKey.Sign(Hmac, "data"u8));
         Assert.Equal(signInits, _module.CallCount("C_SignInit"));
 
         // The new login works.
@@ -380,5 +380,18 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
 
         Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, ex.ReturnValue);
         Assert.True(login.IsActive);
+    }
+
+    // K12. When the token does not report CKA_PRIVATE, an object counts as private whatever its class: a stale handle is
+    // then refused after logout rather than sent to an object the module may have given that number to.
+    [Theory]
+    [InlineData(CKO.CKO_CERTIFICATE)]
+    [InlineData(CKO.CKO_DATA)]
+    [InlineData(CKO.CKO_PUBLIC_KEY)]
+    [InlineData(CKO.CKO_PRIVATE_KEY)]
+    public void UnreportedPrivateAttribute_CountsAsPrivate(CKO objectClass)
+    {
+        Assert.True(PrivateObjectLogin.IsPrivate(null, objectClass));
+        Assert.False(PrivateObjectLogin.IsPrivate(false, objectClass));
     }
 }

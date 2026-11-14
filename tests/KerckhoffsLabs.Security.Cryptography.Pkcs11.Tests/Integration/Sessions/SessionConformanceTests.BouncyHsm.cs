@@ -68,6 +68,12 @@ public sealed class SessionConformanceTests_BouncyHsm(BouncyHsmBackendFixture ba
     public void SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void ShareOrLogin_LogsInOnce_AndSharesAfter() => SessionConformanceTestCases.Assert_ShareOrLogin_LogsInOnce_AndSharesAfter(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void TokenUri_FindsItsSlotAgain() => SessionConformanceTestCases.Assert_TokenUri_FindsItsSlotAgain(_backend);
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void WrongPin_ThenTheRightOne_ResetsTheRetryCounter() => SessionConformanceTestCases.Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(_backend);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]

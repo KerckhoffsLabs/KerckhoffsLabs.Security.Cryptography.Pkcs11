@@ -113,6 +113,30 @@ public sealed class ContextAuthenticationTests : IDisposable
         AssertContextLoginBetween(_module.CallLog, "C_DecryptInit", "C_Decrypt");
     }
 
+    // K11. A PIN the token refused is not asked for again: each wrong context PIN costs one of the user PIN's retries,
+    // and repeating it on every operation would lock the PIN application-wide. Setting the source again re-arms it.
+    [Fact]
+    public void WrongContextPin_IsNotResent_UntilTheSourceIsSetAgain()
+    {
+        _module.LockAfter = 5;
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session session = login.OpenSession();
+        session.ContextAuthentication = WrongPin();
+        using Pkcs11Key key = session.OpenKey(AlwaysAuthenticateEc);
+        _module.ClearCallLog();
+
+        var first = Assert.Throws<Pkcs11AuthenticationException>(() => key.Sign(Ecdsa, "data"u8));
+        Assert.Equal(CKR.CKR_PIN_INCORRECT, first.ReturnValue);
+        var second = Assert.Throws<Pkcs11AuthenticationException>(() => key.Sign(Ecdsa, "data"u8));
+        Assert.Equal(CKR.CKR_PIN_INCORRECT, second.ReturnValue);
+        Assert.Contains("not asked again", second.Message, StringComparison.Ordinal);
+        Assert.Single(_module.CallLog, LoginTokenModule.ContextLogin); // one retry used, not two
+        Assert.True(login.IsActive);
+
+        session.ContextAuthentication = RightPin();
+        Assert.NotEmpty(key.Sign(Ecdsa, "data"u8));
+    }
+
     [Fact]
     public void Sign_OrdinaryKey_NoContextLogin()
     {

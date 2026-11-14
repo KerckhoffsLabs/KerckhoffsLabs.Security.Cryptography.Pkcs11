@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -44,11 +45,14 @@ internal sealed partial class Pkcs11SessionCore
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_loan is { IsEnded: true })
         {
-            throw new ObjectDisposedException(nameof(Pkcs11Session),
+            throw new Pkcs11LoginEndedException(Pkcs11Operations.OpLogin,
                 "This session was the login's own session, lent because the token allows no other; the login ended, " +
                 "which closed it. Dispose it, and log in again.");
         }
     }
+
+    /// <summary>Whether this core works on the login's own session, lent to it (see <see cref="Borrow"/>).</summary>
+    internal bool IsBorrower => _loan is not null;
 
     /// <summary>
     /// Builds a borrowing core for <paramref name="loan"/>: a session on <paramref name="anchor"/>'s session handle,

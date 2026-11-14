@@ -54,6 +54,12 @@ public sealed class SessionConformanceTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(_backend);
 
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void ShareOrLogin_LogsInOnce_AndSharesAfter() => SessionConformanceTestCases.Assert_ShareOrLogin_LogsInOnce_AndSharesAfter(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void TokenUri_FindsItsSlotAgain() => SessionConformanceTestCases.Assert_TokenUri_FindsItsSlotAgain(_backend);
+
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(SessionConformanceTestCases.ReadOnlySessionWrites), MemberType = typeof(SessionConformanceTestCases))]
     public void ReadOnlySession_RefusesTokenObjectWrites(string call) => SessionConformanceTestCases.Assert_ReadOnlySession_RefusesTokenObjectWrites(_backend, call);

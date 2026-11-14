@@ -20,7 +20,6 @@ public sealed class AnchorLockOrderTests : IDisposable
     private static readonly TimeSpan Bounded = TimeSpan.FromSeconds(5);
 
     // How long a thread that should be blocked is watched for not having returned.
-    private static readonly TimeSpan Watch = TimeSpan.FromMilliseconds(200);
 
     private readonly LoginTokenModule _module = new();
     private readonly Pkcs11Library _library;
@@ -62,8 +61,11 @@ public sealed class AnchorLockOrderTests : IDisposable
         return holder;
     }
 
+    // K5. The second login's probe only tries the anchor's lock: with another thread holding it, the login is refused at
+    // once (the anchor is in use, so the login holds), never queued behind that thread, which may itself be waiting for
+    // the transition semaphore the login holds.
     [Fact]
-    public void SecondLogin_WhileAnchorLeasedOnAnotherThread_ProbeWaitsInsteadOfThrowing()
+    public void SecondLogin_WhileAnchorLeasedOnAnotherThread_RefusedWithoutWaiting()
     {
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(Record.Anchor);
@@ -71,26 +73,20 @@ public sealed class AnchorLockOrderTests : IDisposable
         using var held = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
         Thread holder = HoldLease(anchor, held, release);
-
-        BackgroundWork sharing = BackgroundWork.Run(() => Slot.Login(TokenUser.User, _pin));
         try
         {
-            // The second login's probe waits for the anchor: it does not return.
-            Assert.False(SpinWait.SpinUntil(() => !sharing.IsAlive, Watch),
-                $"the probe did not wait for the anchor: {sharing.Failure}");
+            BackgroundWork sharing = BackgroundWork.Run(() => Slot.Login(TokenUser.User, _pin));
+            Assert.True(sharing.Join(Bounded), "the second login waited for the anchor");
+            Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN,
+                Assert.IsType<Pkcs11AuthenticationException>(sharing.Failure).ReturnValue);
         }
         finally
         {
             release.Set();
             Assert.True(holder.Join(Bounded), "the anchor's holder did not finish");
-            Assert.True(sharing.Join(Bounded), "the share did not finish after the anchor was released");
         }
-
-        Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN,
-            Assert.IsType<Pkcs11AuthenticationException>(sharing.Failure).ReturnValue);
         Assert.Equal(1, _module.LoginCalls);
     }
-
     [Fact]
     public void InitUserPin_WhileAnchorLeasedOnAnotherThread_Waits()
     {
@@ -104,8 +100,8 @@ public sealed class AnchorLockOrderTests : IDisposable
         BackgroundWork initializing = BackgroundWork.Run(() => so.InitUserPinWithPin(userPin));
         try
         {
-            Assert.False(SpinWait.SpinUntil(() => _module.LastInitPin is not null || !initializing.IsAlive, Watch),
-                $"C_InitPIN did not wait for the anchor: {initializing.Failure}");
+            Assert.True(initializing.WaitUntilBlocked(Bounded), $"C_InitPIN did not wait for the anchor: {initializing.Failure}");
+            Assert.Null(_module.LastInitPin);
         }
         finally
         {
@@ -214,7 +210,7 @@ public sealed class AnchorLockOrderTests : IDisposable
             Assert.True(inLogin.Wait(Bounded, TestContext.Current.CancellationToken), "the probe never reached the module");
 
             leasing.Start();
-            Assert.False(SpinWait.SpinUntil(() => !leasing.IsAlive, Watch),
+            Assert.True(leasing.WaitUntilBlocked(Bounded),
                 $"the anchor's lease did not wait for the record's send: {leasing.Failure}");
         }
         finally

@@ -77,6 +77,14 @@ public sealed class Pkcs11Login : IDisposable
     public bool IsActive => _hold.IsActive;
 
     /// <summary>
+    /// A task that completes once the login this hold keeps has ended: logged out (<c>C_Logout</c> sent) after its last
+    /// holder went, or reported gone by the module. <see cref="Dispose"/> may return before the logout, which waits for
+    /// the operations in flight on the token; await this for the guarantee that the token is logged out. Completed
+    /// already when this hold's login is not the current one.
+    /// </summary>
+    public Task LoggedOut => _hold.Record.WhenEnded(_hold.Generation);
+
+    /// <summary>
     /// Opens a session with the token that keeps this login while it is open, even once this
     /// <see cref="Pkcs11Login"/> is disposed.
     /// </summary>
@@ -111,7 +119,8 @@ public sealed class Pkcs11Login : IDisposable
     /// releases its hold: it logs out only when it is the login's last holder.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
-    /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    /// <exception cref="Pkcs11LoginEndedException">This login is no longer active (see <see cref="IsActive"/>): released, or ended.</exception>
+    /// <exception cref="ObjectDisposedException">The library this login came through is disposed.</exception>
     /// <exception cref="Pkcs11SessionException">
     /// A read-only session under a Security Officer login (<c>CKR_SESSION_READ_WRITE_SO_EXISTS</c>, refused before the
     /// module). Or <c>CKR_SESSION_COUNT</c>, from the module, when the token allows no more sessions and the login's
@@ -168,7 +177,8 @@ public sealed class Pkcs11Login : IDisposable
     /// is never asked about another's keys.
     /// </remarks>
     /// <returns>The new hold.</returns>
-    /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    /// <exception cref="Pkcs11LoginEndedException">This login is no longer active (see <see cref="IsActive"/>): released, or ended.</exception>
+    /// <exception cref="ObjectDisposedException">The library this login came through is disposed.</exception>
     public Pkcs11Login Share()
     {
         Pkcs11Library library = Slot.Library;
@@ -186,11 +196,12 @@ public sealed class Pkcs11Login : IDisposable
     /// neither keeps nor logs it.
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <see langword="null"/>.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// This login is not the Security Officer's (<see cref="User"/>); refused before the module, which would answer
-    /// <c>CKR_USER_NOT_LOGGED_IN</c>.
+    /// <exception cref="Pkcs11AuthenticationException">
+    /// This login is not the Security Officer's (<see cref="User"/>): <c>CKR_USER_NOT_LOGGED_IN</c>, refused before the
+    /// module, which would answer the same.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    /// <exception cref="Pkcs11LoginEndedException">This login is no longer active (see <see cref="IsActive"/>): released, or ended.</exception>
+    /// <exception cref="ObjectDisposedException">The library this login came through is disposed.</exception>
     /// <exception cref="Pkcs11Exception">
     /// Propagated from <c>C_InitPIN</c> (a PIN the token's policy refuses, for instance). A lost session or token
     /// also ends the login.
@@ -207,10 +218,12 @@ public sealed class Pkcs11Login : IDisposable
     /// with <c>pPin = NULL_PTR</c>. Sent on the login's own read/write session, as
     /// <see cref="InitUserPinWithPin"/> is.
     /// </summary>
-    /// <exception cref="InvalidOperationException">
-    /// This login is not the Security Officer's (<see cref="User"/>); refused before the module.
+    /// <exception cref="Pkcs11AuthenticationException">
+    /// This login is not the Security Officer's (<see cref="User"/>): <c>CKR_USER_NOT_LOGGED_IN</c>, refused before the
+    /// module.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    /// <exception cref="Pkcs11LoginEndedException">This login is no longer active (see <see cref="IsActive"/>): released, or ended.</exception>
+    /// <exception cref="ObjectDisposedException">The library this login came through is disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_InitPIN</c>. A lost session or token also ends the login.</exception>
     public void InitUserPinWithPinpad() => InitUserPin(null);
 
@@ -219,8 +232,8 @@ public sealed class Pkcs11Login : IDisposable
         // PKCS#11 v3.2 C_InitPIN: only in the "R/W SO Functions" state, else CKR_USER_NOT_LOGGED_IN.
         if (User != TokenUser.SecurityOfficer)
         {
-            throw new InvalidOperationException(
-                "Only a Security Officer login can set the normal user's PIN (C_InitPIN). Log in with " +
+            throw Pkcs11Exception.Create(CKR.CKR_USER_NOT_LOGGED_IN, Pkcs11Operations.OpInitPIN,
+                $"{Pkcs11Operations.OpInitPIN}: only a Security Officer login can set the normal user's PIN. Log in with " +
                 "TokenUser.SecurityOfficer; to change the PIN of the user logged in, use Pkcs11Session.SetPinWithPin.");
         }
 

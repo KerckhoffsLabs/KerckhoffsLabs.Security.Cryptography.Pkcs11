@@ -355,7 +355,7 @@ public sealed class TokenLoginRecordTests : IDisposable
         using LoginHold login = Record.Login(_library, TokenUser.User, _pin, username: null);
         login.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => Record.Share(login, _library));
+        Assert.Throws<Pkcs11LoginEndedException>(() => Record.Share(login, _library));
     }
 
     [Fact]
@@ -435,27 +435,51 @@ public sealed class TokenLoginRecordTests : IDisposable
         Assert.Empty(_module.OpenSessions);
     }
 
-    // The logout is sent by the last operation to end, whichever thread it is on.
+    // The logout is sent by the last operation to end, whichever thread it is on. Each operation ends on the thread
+    // that began it, as the lease requires.
     [Fact]
     public void PendingLogout_IsSentByTheLastOperationToEnd()
     {
         LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
         IDisposable first = Record.EnterOperation();
-        IDisposable? second = null;
-        var other = new Thread(() => second = Record.EnterOperation());
+        using var entered = new ManualResetEventSlim();
+        using var end = new ManualResetEventSlim();
+        var other = new Thread(() =>
+        {
+            using (Record.EnterOperation())
+            {
+                entered.Set();
+                end.Wait(TimeSpan.FromSeconds(30));
+            }
+        });
         other.Start();
-        Assert.True(other.Join(TimeSpan.FromSeconds(30)));
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
 
         hold.Dispose();
         first.Dispose();
         Assert.Equal(0, _module.LogoutCalls);
         Assert.True(Record.IsLogoutPending);
 
-        var ender = new Thread(() => second!.Dispose());
-        ender.Start();
-        Assert.True(ender.Join(TimeSpan.FromSeconds(30)));
+        end.Set();
+        Assert.True(other.Join(TimeSpan.FromSeconds(30)));
         Assert.Equal(1, _module.LogoutCalls);
         Assert.False(Record.IsLoggedIn);
+    }
+
+    // An operation's count is given back on the thread that took it: anywhere else it is refused, and the count kept.
+    [Fact]
+    public void OperationLease_DisposedOnAnotherThread_IsRefused()
+    {
+        IDisposable operation = Record.EnterOperation();
+        Exception? failure = null;
+        var other = new Thread(() => failure = Xunit.Record.Exception(operation.Dispose));
+        other.Start();
+        Assert.True(other.Join(TimeSpan.FromSeconds(30)));
+
+        Assert.IsType<InvalidOperationException>(failure);
+        Assert.Equal(1, Record.ActiveOperations);
+        operation.Dispose();
+        Assert.Equal(0, Record.ActiveOperations);
     }
 
     // A login while the previous login's logout is pending waits for it, then logs in afresh: the PIN is checked.
@@ -469,9 +493,8 @@ public sealed class TokenLoginRecordTests : IDisposable
         Assert.True(Record.IsLogoutPending);
 
         LoginHold? fresh = null;
-        var login = new Thread(() => fresh = Record.Login(_library, TokenUser.User, _pin, username: null));
-        login.Start();
-        Assert.False(login.Join(TimeSpan.FromMilliseconds(100)));
+        BackgroundWork login = BackgroundWork.Run(() => fresh = Record.Login(_library, TokenUser.User, _pin, username: null));
+        Assert.True(login.WaitUntilBlocked(TimeSpan.FromSeconds(30)), $"the login did not wait for the logout: {login.Failure}");
         Assert.Equal(1, _module.LoginCalls);
 
         operation.Dispose();
@@ -605,24 +628,44 @@ public sealed class TokenLoginRecordTests : IDisposable
         Assert.Null(_module.LoggedIn);
     }
 
-    // A C_Logout that fails leaves the module logged in (here another session keeps it); the next first login logs
-    // that login out and logs in again.
+    // K8. A C_Logout that fails leaves the module logged in (here another session keeps it): that login is logged out
+    // at once, on a session opened for it, once its state shows the same user. No login is left with no holder.
     [Fact]
-    public void FailedLogout_NextLogin_LogsTheLeftLoginOutAndLogsInAgain()
+    public void FailedLogout_LeftLoginIsLoggedOutAtOnce_OnASessionOpenedForIt()
     {
         using Pkcs11Session other = Assert.Single(_library.GetSlotList()).OpenSession();
         LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
-        _module.FailSession(_module.OpenSessions[^1].Handle, CKR.CKR_DEVICE_ERROR);
+        _module.FailNext("C_Logout", CKR.CKR_DEVICE_ERROR);
+
+        first.Dispose();
+
+        Assert.False(Record.MayStillBeLoggedIn);
+        Assert.False(Record.IsLoggedIn);
+        Assert.Null(_module.LoggedIn);
+        Assert.Equal(2, _module.LogoutCalls); // the failed one, then the one on the session opened for it
+        Assert.Single(_module.OpenSessions);   // that session closed again; `other` stays
+    }
+
+    // When that session cannot be opened, the login stays recorded, and the next first login (the module answering that
+    // the user is logged in) checks the new anchor's state for the same user, logs it out, and logs in again with the
+    // PIN checked.
+    [Fact]
+    public void FailedLogout_NoSessionForTheLogout_NextLoginLogsTheLeftLoginOutAndLogsInAgain()
+    {
+        using Pkcs11Session other = Assert.Single(_library.GetSlotList()).OpenSession();
+        LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        _module.FailNext("C_Logout", CKR.CKR_DEVICE_ERROR);
+        _module.FailNext("C_OpenSession", CKR.CKR_SESSION_COUNT);
 
         first.Dispose();
         Assert.True(Record.MayStillBeLoggedIn);
-        Assert.False(Record.IsLoggedIn);
         Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
 
         using LoginHold second = Record.Login(_library, TokenUser.User, _pin, username: null);
         Assert.True(second.IsActive);
         Assert.False(Record.MayStillBeLoggedIn);
         Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        Assert.Equal(2, _module.LogoutCalls);
     }
 
     // A login made outside the library (straight through the module) is never taken over: the first login is refused
@@ -634,7 +677,7 @@ public sealed class TokenLoginRecordTests : IDisposable
         Assert.Equal(CKR.CKR_OK, _library.LowLevelLibrary!.C_Login((NativeCULong)other.Core.SessionId, CKU.CKU_USER,
             _module.ExpectedPin));
 
-        var ex = Assert.Throws<Pkcs11AuthenticationException>(() => Record.Login(_library, TokenUser.User, _pin, username: null));
+        var ex = Assert.Throws<Pkcs11ForeignLoginException>(() => Record.Login(_library, TokenUser.User, _pin, username: null));
 
         Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, ex.ReturnValue);
         Assert.Contains("not through this library", ex.Message, StringComparison.Ordinal);
@@ -642,6 +685,259 @@ public sealed class TokenLoginRecordTests : IDisposable
         Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
         Assert.False(Record.IsLoggedIn);
         Assert.Single(_module.OpenSessions); // the anchor opened for the attempt was closed
+    }
+
+    // K1. The last holder released during a second login's probe, on the probing thread itself: the logout that falls
+    // due is handed to that thread (it holds the transition semaphore), run before it releases it, and the login then
+    // waits for it and logs in afresh. Before the fix this thread waited on its own semaphore for good.
+    [Fact]
+    public void SecondLogin_LastHolderReleasedDuringProbe_OnTheProbingThread_DoesNotDeadlock()
+    {
+        LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
+        _module.DuringGetSessionInfo = _ =>
+        {
+            _module.DuringGetSessionInfo = null;
+            hold.Dispose();
+        };
+
+        LoginHold? fresh = null;
+        var login = new Thread(() => fresh = Record.Login(_library, TokenUser.User, _pin, username: null));
+        login.Start();
+        Assert.True(login.Join(TimeSpan.FromSeconds(30)), "the second login deadlocked");
+
+        using LoginHold held = Assert.IsType<LoginHold>(fresh);
+        Assert.Equal(1, _module.LogoutCalls);
+        Assert.Equal(2, _module.LoginCalls);
+        Assert.True(held.IsActive);
+    }
+
+    // K1, from another thread: the last holder released during the probe. Its logout waits for the transition semaphore
+    // the probing login holds; the login sees the logout in flight, lets it go, then logs in afresh.
+    [Fact]
+    public void SecondLogin_LastHolderReleasedDuringProbe_OnAnotherThread_DoesNotDeadlock()
+    {
+        LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
+        Thread? releaser = null;
+        _module.DuringGetSessionInfo = _ =>
+        {
+            _module.DuringGetSessionInfo = null;
+            releaser = new Thread(hold.Dispose);
+            releaser.Start();
+            // Until the logout has taken the anchor (it then waits for the semaphore this thread holds).
+            Assert.True(SpinWait.SpinUntil(() => !Record.IsLoggedIn, TimeSpan.FromSeconds(30)));
+        };
+
+        LoginHold? fresh = null;
+        var login = new Thread(() => fresh = Record.Login(_library, TokenUser.User, _pin, username: null));
+        login.Start();
+        Assert.True(login.Join(TimeSpan.FromSeconds(30)), "the second login deadlocked");
+        Assert.True(releaser!.Join(TimeSpan.FromSeconds(30)), "the release deadlocked");
+
+        using LoginHold held = Assert.IsType<LoginHold>(fresh);
+        Assert.Equal(1, _module.LogoutCalls);
+        Assert.Equal(2, _module.LoginCalls);
+    }
+
+    // K2. Inside an operation, an object is stamped with the login state when the operation began: a logout and a new
+    // login landing during its lookup make that stamp stale, never current.
+    [Fact]
+    public void CurrentStamp_InsideAnOperation_IsTheStateWhenItBegan()
+    {
+        LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        LoginStamp stamp;
+        using (Record.EnterOperation())
+        {
+            Record.MarkEnded(CKR.CKR_DEVICE_REMOVED);
+            using LoginHold second = Record.Login(_library, TokenUser.User, _pin, username: null);
+            stamp = Record.CurrentStamp();
+            Assert.False(Record.IsStillCurrent(stamp));
+        }
+        first.Dispose();
+        Assert.Equal(first.Generation, stamp.Generation);
+    }
+
+    // K3. Once the last holder has gone with operations in flight, the login is ending: not current (private handles
+    // refused), not shared, and operations that start then are not counted, so the logout waits only for those already
+    // in flight.
+    [Fact]
+    public void EndingLogin_NotCurrent_NewOperationsNotCounted_LogoutWaitsOnlyForThoseInFlight()
+    {
+        LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
+        long generation = hold.Generation;
+        IDisposable inFlight = Record.EnterOperation();
+        hold.Dispose();
+
+        Assert.True(Record.IsLogoutPending);
+        Assert.False(Record.IsCurrent(generation));
+        Assert.Null(Record.TryShare(_library, TokenUser.User, username: null));
+        using (Record.EnterOperation())
+        {
+            Assert.Equal(1, Record.ActiveOperations);
+            inFlight.Dispose();
+            Assert.Equal(1, _module.LogoutCalls); // sent although an operation that started later still runs
+        }
+    }
+
+    // LoggedOut: completes when the logout is sent, which waits for the operation in flight.
+    [Fact]
+    public void WhenEnded_CompletesOnceTheDeferredLogoutIsSent()
+    {
+        LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
+        Task ended = Record.WhenEnded(hold.Generation);
+        using (Record.EnterOperation())
+        {
+            hold.Dispose();
+            Assert.False(ended.IsCompleted);
+        }
+        Assert.True(ended.IsCompletedSuccessfully);
+        Assert.True(Record.WhenEnded(hold.Generation).IsCompleted);
+    }
+
+    // K6. The module dropped the login while the anchor stays open: the probe reads a public state, ends the login (with
+    // nothing left on the token), and the call logs in afresh.
+    [Fact]
+    public void ModuleDroppedLogin_AnchorOpen_NextLogin_LogsInAfresh()
+    {
+        using LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        _module.DropLogin();
+
+        using LoginHold second = Record.Login(_library, TokenUser.User, _pin, username: null);
+
+        Assert.False(first.IsActive);
+        Assert.True(second.IsActive);
+        Assert.False(Record.MayStillBeLoggedIn);
+        Assert.Equal(2, _module.LoginCalls);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+    }
+
+    // K7. CKR_PIN_LOCKED logs the user out (PKCS#11 v3.2 section 4.10): nothing is left behind, so a login another
+    // component makes afterwards is refused as foreign, never logged out.
+    [Fact]
+    public void PinLocked_ThenForeignLogin_FirstLogin_IsRefused_NothingLoggedOut()
+    {
+        using Pkcs11Session other = Assert.Single(_library.GetSlotList()).OpenSession();
+        using LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        Record.MarkEnded(CKR.CKR_PIN_LOCKED);
+        Assert.False(Record.MayStillBeLoggedIn);
+
+        var ex = Assert.Throws<Pkcs11ForeignLoginException>(() => Record.Login(_library, TokenUser.User, _pin, username: null));
+
+        Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, ex.ReturnValue);
+        Assert.Equal(0, _module.LogoutCalls);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+    }
+
+    // K7. A login left behind is the user's; the module holds the Security Officer instead (another component logged
+    // in after it ended): the recovery reads the new anchor's state, sees another user, and refuses without logging
+    // the SO out.
+    [Fact]
+    public void LeftLogin_ButModuleHoldsAnotherUser_FirstLogin_IsRefused_SoNotLoggedOut()
+    {
+        using Pkcs11Session other = Assert.Single(_library.GetSlotList()).OpenSession(SessionAccess.ReadWrite);
+        LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        _module.FailNext("C_Logout", CKR.CKR_DEVICE_ERROR);
+        _module.FailNext("C_OpenSession", CKR.CKR_SESSION_COUNT);
+        first.Dispose();
+        Assert.True(Record.MayStillBeLoggedIn);
+        _module.DropLogin();
+        Assert.Equal(CKR.CKR_OK, _library.LowLevelLibrary!.C_Login((NativeCULong)other.Core.SessionId, CKU.CKU_SO,
+            _module.ExpectedPin));
+
+        var ex = Assert.Throws<Pkcs11ForeignLoginException>(() => Record.Login(_library, TokenUser.User, _pin, username: null));
+
+        Assert.Equal(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, ex.ReturnValue);
+        Assert.Equal(CKU.CKU_SO, _module.LoggedIn);
+    }
+
+    // K8. The anchor lost on its own while an operation is in flight and another session keeps the module logged in:
+    // the login left behind is logged out as soon as the operation ends, on a session opened for it.
+    [Fact]
+    public void AnchorLostDuringAnOperation_LeftLoginLoggedOutWhenTheOperationEnds()
+    {
+        using Pkcs11Session other = Assert.Single(_library.GetSlotList()).OpenSession();
+        using LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(Record.Anchor);
+        using (Record.EnterOperation())
+        {
+            Record.AnchorLost(anchor, CKR.CKR_SESSION_HANDLE_INVALID);
+            Assert.True(Record.MayStillBeLoggedIn);
+            Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+            // Meanwhile a private object found now is stamped as of a login that is never current.
+            Assert.False(Record.IsStillCurrent(new LoginStamp(Record.Generation, LoggedIn: false)));
+        }
+
+        Assert.False(Record.MayStillBeLoggedIn);
+        Assert.Null(_module.LoggedIn);
+        Assert.Equal(1, _module.LogoutCalls);
+    }
+
+    // S4. A login whose owner was disposed while it was sent is logged back out; if that fails, it is left behind, and
+    // the next first login recovers it rather than refusing it as foreign.
+    [Fact]
+    public void OwnerDisposedRollback_LogoutFails_LeftBehind_NextLoginRecovers()
+    {
+        using Pkcs11Session other = Assert.Single(_library.GetSlotList()).OpenSession();
+        Pkcs11Library disposing = _module.Load();
+        _module.DuringLogin = _ =>
+        {
+            _module.DuringLogin = null;
+            var disposer = new Thread(disposing.Dispose);
+            disposer.Start();
+            disposer.Join();
+            _module.FailNext("C_Logout", CKR.CKR_DEVICE_ERROR);
+        };
+
+        Assert.Throws<ObjectDisposedException>(() => Record.Login(disposing, TokenUser.User, _pin, username: null));
+        Assert.True(Record.MayStillBeLoggedIn);
+
+        using LoginHold next = Record.Login(_library, TokenUser.User, _pin, username: null);
+        Assert.True(next.IsActive);
+        Assert.False(Record.MayStillBeLoggedIn);
+    }
+
+    // Q5. ShareOrLogin logs in when no login is held (the PIN source called once), shares the login held without
+    // calling it, and refuses a login made outside the library with its own exception, so a retry loop never spins.
+    [Fact]
+    public void ShareOrLogin_LogsInOnce_SharesAfter_RefusesForeign()
+    {
+        int asked = 0;
+        SecurePin Source() { asked++; return new SecurePin(_module.ExpectedPin); }
+
+        using LoginHold first = Record.ShareOrLogin(_library, TokenUser.User, null, null, Source);
+        using LoginHold second = Record.ShareOrLogin(_library, TokenUser.User, null, null, Source);
+
+        Assert.Equal(1, asked);
+        Assert.Equal(1, _module.LoginCalls);
+        Assert.Equal(first.Generation, second.Generation);
+
+        first.Dispose();
+        second.Dispose();
+        using Pkcs11Session other = Assert.Single(_library.GetSlotList()).OpenSession();
+        _library.LowLevelLibrary!.C_Login((NativeCULong)other.Core.SessionId, CKU.CKU_USER, _module.ExpectedPin);
+        Assert.Throws<Pkcs11ForeignLoginException>(() => Record.ShareOrLogin(_library, TokenUser.User, null, null, Source));
+    }
+
+    [Fact]
+    public void ShareOrLogin_Concurrent_OneLogin_BothHold()
+    {
+        using var barrier = new Barrier(2);
+        var holds = new LoginHold?[2];
+        CancellationToken cancellation = TestContext.Current.CancellationToken;
+        Thread[] threads = [.. Enumerable.Range(0, 2).Select(i => new Thread(() =>
+        {
+            barrier.SignalAndWait(cancellation);
+            holds[i] = Record.ShareOrLogin(_library, TokenUser.User, null, null, () => new SecurePin(_module.ExpectedPin));
+        }))];
+        foreach (Thread thread in threads)
+            thread.Start();
+        foreach (Thread thread in threads)
+            Assert.True(thread.Join(TimeSpan.FromSeconds(30)));
+
+        Assert.All(holds, h => Assert.True(h!.IsActive));
+        Assert.Equal(1, _module.LoginCalls);
+        foreach (LoginHold? hold in holds)
+            hold!.Dispose();
+        Assert.Equal(1, _module.LogoutCalls);
     }
 
     [Fact]

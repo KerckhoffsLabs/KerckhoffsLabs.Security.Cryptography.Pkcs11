@@ -45,7 +45,7 @@ public sealed partial class Pkcs11Session : IDisposable
         Slot = slot;
         _core = core;
         Access = access;
-        Login = login;
+        Login = login is null || hold is null ? null : new Pkcs11LoginInfo(login.Slot, login.User, login.Username, hold);
         _hold = hold;
     }
 
@@ -61,11 +61,25 @@ public sealed partial class Pkcs11Session : IDisposable
     public SessionAccess Access { get; }
 
     /// <summary>
-    /// The login this session was opened through and keeps while open (<see cref="Pkcs11Login.OpenSession"/>),
-    /// or <see langword="null"/> for a session from <see cref="Pkcs11Slot.OpenSession"/>, which keeps none.
-    /// <see cref="GetSessionInfo"/> gives the module's own answer on the session's state.
+    /// The login this session was opened through and keeps while open (<see cref="Pkcs11Login.OpenSession"/>), as a
+    /// read-only view, or <see langword="null"/> for a session from <see cref="Pkcs11Slot.OpenSession"/>, which keeps
+    /// none. <see cref="GetSessionInfo"/> gives the module's own answer on the session's state.
     /// </summary>
-    public Pkcs11Login? Login { get; }
+    /// <remarks>
+    /// A view, not the <see cref="Pkcs11Login"/> itself: code handed this session cannot release the opener's hold,
+    /// share the login, or set a user PIN through a Security Officer login.
+    /// </remarks>
+    public Pkcs11LoginInfo? Login { get; }
+
+    /// <summary>
+    /// Whether this session is the login's own session, lent because the token allows this application no other (see
+    /// <see cref="Pkcs11Login.OpenSession"/>). A lent session works like any other, except that the login lends it to
+    /// one session at a time, that it shares an operation it could not cancel with the next borrower, that its
+    /// <see cref="Access"/> is the login session's, and that it refuses every call once the login ends
+    /// (<see cref="Exceptions.Pkcs11LoginEndedException"/>), where an ordinary session goes public. Code tested on a
+    /// token that allows many sessions sees <see langword="false"/> here.
+    /// </summary>
+    public bool IsLent => _core.IsBorrower;
 
     /// <summary>
     /// Where this session's keys with <c>CKA_ALWAYS_AUTHENTICATE</c> (<see cref="Pkcs11Key.AlwaysAuthenticate"/>) get

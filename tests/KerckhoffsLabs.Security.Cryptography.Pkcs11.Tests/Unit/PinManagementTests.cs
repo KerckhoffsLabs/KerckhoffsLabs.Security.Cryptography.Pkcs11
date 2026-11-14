@@ -42,7 +42,7 @@ public sealed class PinManagementTests : IDisposable
     {
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        var ex = Assert.Throws<Pkcs11AuthenticationException>(() =>
         {
             if (pinpad)
                 login.InitUserPinWithPinpad();
@@ -50,6 +50,7 @@ public sealed class PinManagementTests : IDisposable
                 login.InitUserPinWithPin(_newPin);
         });
 
+        Assert.Equal(CKR.CKR_USER_NOT_LOGGED_IN, ex.ReturnValue);
         Assert.Contains("Security Officer", ex.Message, StringComparison.Ordinal);
         Assert.Equal(0, _module.CallCount("C_InitPIN"));
         Assert.True(login.IsActive);
@@ -101,7 +102,7 @@ public sealed class PinManagementTests : IDisposable
         using Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
         login.Dispose();
 
-        var ex = Assert.Throws<ObjectDisposedException>(() =>
+        var ex = Assert.Throws<Pkcs11LoginEndedException>(() =>
         {
             if (pinpad)
                 login.InitUserPinWithPinpad();
@@ -136,7 +137,7 @@ public sealed class PinManagementTests : IDisposable
 
         Assert.Equal(CKR.CKR_DEVICE_REMOVED, ex.ReturnValue);
         Assert.False(login.IsActive);
-        Assert.Throws<ObjectDisposedException>(() => login.InitUserPinWithPin(_newPin));
+        Assert.Throws<Pkcs11LoginEndedException>(() => login.InitUserPinWithPin(_newPin));
     }
 
     [Fact]
@@ -156,13 +157,13 @@ public sealed class PinManagementTests : IDisposable
         try
         {
             Assert.True(inLogin.Wait(TimeSpan.FromSeconds(10), ct));
-            Task init = Task.Run(() => login.InitUserPinWithPin(_newPin), ct);
+            BackgroundWork init = BackgroundWork.Run(() => login.InitUserPinWithPin(_newPin));
 
             // Not refused as concurrent use of the anchor: it waits for the probe sent on it.
-            Task first = await Task.WhenAny(init, Task.Delay(TimeSpan.FromMilliseconds(200), ct));
-            Assert.NotSame(init, first);
+            Assert.True(init.WaitUntilBlocked(TimeSpan.FromSeconds(10)), $"C_InitPIN did not wait for the probe: {init.Failure}");
             release.Set();
-            await init.WaitAsync(TimeSpan.FromSeconds(10), ct);
+            Assert.True(init.Join(TimeSpan.FromSeconds(10)));
+            Assert.Null(init.Failure);
         }
         finally
         {
