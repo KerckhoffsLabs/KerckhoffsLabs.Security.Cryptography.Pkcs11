@@ -180,8 +180,8 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// length. PKCS#11 v3.2 §6.43: a key type given without a length must have a well-defined length, and a generic
     /// secret has none, so the call fails (the other backends make a key as long as the shorter of the base key and the
     /// data). The derived-key protection cases check an XOR key made in the clear first, so they skip XOR on BouncyHsm. Found
-    /// when the fix for harrison314/BouncyHsm#141 (976634e and 1483858, in ebfefd60) let those cases run. Not yet reported
-    /// upstream. BouncyHsmQuirkTests.XorKeyWithoutALength_QuirkStillPresent fails once it is fixed.
+    /// when the fix for harrison314/BouncyHsm#141 (976634e and 1483858, in ebfefd60) let those cases run. Reported upstream
+    /// as harrison314/BouncyHsm#151. BouncyHsmQuirkTests.XorKeyWithoutALength_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmRefusesAnXorKeyWithoutALength = false;
 
@@ -349,7 +349,8 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// (<c>ExtractKeyFromKeyDeriveKeyGenerator.Extract</c>), so an extraction that does not start on a byte boundary
     /// gives other bits: 0x329F84A9 from bit 4, one byte, is 0xF3, where PKCS#11 v3.2, which counts from the most
     /// significant bit of the first byte, gives 0x29. Since harrison314/BouncyHsm#148 was fixed (f7be50fb) the
-    /// <c>CK_EXTRACT_PARAMS</c> is the start bit, so a start on a byte boundary is right. Not yet reported upstream.
+    /// <c>CK_EXTRACT_PARAMS</c> is the start bit, so a start on a byte boundary is right. Reported upstream in #148,
+    /// reopened.
     /// BouncyHsmQuirkTests.ExtractKeyFromKeyBitOrder_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmExtractsBitsMostSignificantFirst = false;
@@ -357,7 +358,7 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>
     /// False while <c>CKM_EXTRACT_KEY_FROM_KEY</c> does not wrap around the end of the base key: it takes the bits from the
     /// start bit to the end, so 0x329F84A9 from bit 8, four bytes, is refused with <c>CKR_TEMPLATE_INCONSISTENT</c>
-    /// (PKCS#11 v3.2 wraps around, giving 0x9F84A932). Not yet reported upstream.
+    /// (PKCS#11 v3.2 wraps around, giving 0x9F84A932). Reported upstream in harrison314/BouncyHsm#148, reopened.
     /// BouncyHsmQuirkTests.ExtractKeyFromKeyWrap_QuirkStillPresent fails once it is fixed.
     /// </summary>
     public const bool BouncyHsmExtractsAroundTheEndOfTheKey = false;
