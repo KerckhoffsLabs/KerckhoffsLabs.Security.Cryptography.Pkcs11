@@ -29,5 +29,7 @@ public sealed class MechanismFlagsTests : FlagsContract<MechanismFlags>
         (nameof(MechanismFlags.EcNamedCurve), CKF.CKF_EC_NAMEDCURVE, f => f.EcNamedCurve),
         (nameof(MechanismFlags.EcUncompress), CKF.CKF_EC_UNCOMPRESS, f => f.EcUncompress),
         (nameof(MechanismFlags.EcCompress), CKF.CKF_EC_COMPRESS, f => f.EcCompress),
+        (nameof(MechanismFlags.Encapsulate), CKF.CKF_ENCAPSULATE, f => f.Encapsulate),
+        (nameof(MechanismFlags.Decapsulate), CKF.CKF_DECAPSULATE, f => f.Decapsulate),
     ];
 }

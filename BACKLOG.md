@@ -1034,7 +1034,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-184] `MechanismFlags` has no `Encapsulate` / `Decapsulate` properties
+### [BL-184] ✅ RESOLVED — `MechanismFlags` has no `Encapsulate` / `Decapsulate` properties
+- **Status:** Resolved 2026-11-13. `MechanismFlags.Encapsulate` and `MechanismFlags.Decapsulate` read `CKF_ENCAPSULATE` and `CKF_DECAPSULATE`, `MechanismFlagsTests` checks each toggles only its own property, and `MechanismCoverageTestCases.Assert_RsaPkcs_EncapsulatesAPkcs1EncryptedSecret` uses them instead of the raw bits.
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** S

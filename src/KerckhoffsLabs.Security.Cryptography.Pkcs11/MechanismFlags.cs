@@ -118,5 +118,13 @@ public sealed record MechanismFlags
     public bool MultiMessage
         => (Flags & CKF.CKF_MULTI_MESSAGE) == CKF.CKF_MULTI_MESSAGE;
 
+    /// <summary>True if the mechanism can be used with C_EncapsulateKey (PKCS#11 v3.2).</summary>
+    public bool Encapsulate
+        => (Flags & CKF.CKF_ENCAPSULATE) == CKF.CKF_ENCAPSULATE;
+
+    /// <summary>True if the mechanism can be used with C_DecapsulateKey (PKCS#11 v3.2).</summary>
+    public bool Decapsulate
+        => (Flags & CKF.CKF_DECAPSULATE) == CKF.CKF_DECAPSULATE;
+
     internal MechanismFlags(ulong flags) => Flags = flags;
 }
