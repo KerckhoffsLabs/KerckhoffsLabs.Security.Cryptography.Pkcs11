@@ -49,7 +49,7 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
     /// (and fails once it is closed); that handle holds a use of the module, holding off <c>C_Finalize</c>, from
     /// <c>C_OpenSession</c> until after its <c>C_CloseSession</c>. So while a call through this view can start,
     /// the module is still initialized and mapped. Proved by <c>Pkcs11LoginTests.DisposingTheFirstLibrary_KeepsTheSecondsLogin</c>
-    /// (a share's <c>C_Login</c> and the final <c>C_Logout</c> on the first library's anchor after that library is
+    /// (a second login's probe and the final <c>C_Logout</c> on the first library's anchor after that library is
     /// disposed).
     /// </remarks>
     internal LowLevelPkcs11Library ForSessionOutlivingItsLoad() => new(this);

@@ -56,9 +56,9 @@ public interface IPkcs11Backend
     bool KeepsAlwaysSensitiveOnDerive => true;
 
     /// <summary>Opens a read/write session over the fixture's token using the backend's authentication model:
-    /// when <see cref="RequiresUserLogin"/> is set, a session of a normal-user login that the session alone holds,
-    /// so the token is logged out again when the session is disposed (and every test starts from the public
-    /// state); otherwise a session without a login. Shared, backend-agnostic test cases call this instead of
+    /// when <see cref="RequiresUserLogin"/> is set, a session of a normal-user login (a share of the login held, if
+    /// another session of the test holds one), so the token is logged out again when the last such session is disposed
+    /// (and every test starts from the public state); otherwise a session without a login. Shared, backend-agnostic test cases call this instead of
     /// hard-coding the login path.</summary>
     /// <param name="policy">The crypto policy the session enforces; <see langword="null"/> for the default.</param>
     Pkcs11Session OpenSession(ICryptoPolicy? policy = null)
@@ -67,7 +67,7 @@ public interface IPkcs11Backend
             return this.Slot.OpenSession(SessionAccess.ReadWrite, policy);
 
         using var pin = new SecurePin(UserPin.Span);
-        using Pkcs11Login login = this.Slot.Login(TokenUser.User, pin);
+        using Pkcs11Login login = this.Slot.ShareOrLogIn(TokenUser.User, pin);
         return login.OpenSession(SessionAccess.ReadWrite, policy);
     }
 

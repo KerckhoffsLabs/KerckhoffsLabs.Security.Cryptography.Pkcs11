@@ -729,7 +729,8 @@ public sealed class Pkcs11Library : IDisposable
         if (_pkcs11Library != null)
         {
             // This library's holds of token logins (its Pkcs11Login objects and their sessions) are released
-            // first: a login it alone held is logged out, while its anchor is still there to send C_Logout on.
+            // first: a login it alone held is logged out, while its anchor is still there to send C_Logout on (or, with
+            // operations in flight on the token, as the last of them ends; the anchor holds off C_Finalize until then).
             // A login another load of the module still holds stays, with its anchor (see CloseAllTrackedSessions),
             // which holds off this load's C_Finalize until that login's last holder goes.
             foreach (TokenLoginRecord record in TokenLoginRegistry.Of(_pkcs11Library.Module).Records())

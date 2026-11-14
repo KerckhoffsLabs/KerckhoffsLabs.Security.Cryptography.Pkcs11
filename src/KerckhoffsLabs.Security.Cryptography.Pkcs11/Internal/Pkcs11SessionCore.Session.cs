@@ -35,6 +35,23 @@ internal sealed partial class Pkcs11SessionCore
         ThrowIfError(rv, OpInitPIN);
     }
 
+    /// <summary>
+    /// Asks the module whether this session is still open (<c>C_GetSessionInfo</c>), for the login record checking
+    /// that its anchor still holds the login before it refuses a second login. Sent as the record's other sends are
+    /// (<see cref="AcquireForRecord"/>); a lost session is reported through <see cref="ThrowIfError"/>, which ends the
+    /// login when this is the anchor.
+    /// </summary>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSessionInfo</c>.</exception>
+    internal void SendProbe()
+    {
+        using var _ = AcquireForRecord();
+
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetSessionInfo (login probe)");
+
+        CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, out CK_SESSION_INFO _);
+        ThrowIfError(rv, OpGetSessionInfo);
+    }
+
     // -----------------------------------------------------------------------
     // SetPin
     // -----------------------------------------------------------------------
@@ -193,8 +210,8 @@ internal sealed partial class Pkcs11SessionCore
     /// <para>
     /// On any failure the operation is left active (a wrong PIN leaves it "as if no login happened"), so the caller's
     /// <see cref="OperationScope"/> cancels it while this exception unwinds. <c>CKR_PIN_LOCKED</c> also logged the
-    /// user out of the token (rule 7), so it ends the token login (<see cref="TokenLoginRecord.MarkEnded"/>, which does
-    /// not take the gate this operation holds). No other code ends it: <c>CKR_PIN_INCORRECT</c> and the rest only
+    /// user out of the token (rule 7), so it ends the token login (<see cref="TokenLoginRecord.MarkEnded"/>, which never
+    /// waits). No other code ends it: <c>CKR_PIN_INCORRECT</c> and the rest only
     /// propagate.
     /// </para>
     /// </remarks>

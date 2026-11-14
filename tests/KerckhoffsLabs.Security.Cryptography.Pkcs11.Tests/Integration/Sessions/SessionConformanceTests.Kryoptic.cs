@@ -67,7 +67,7 @@ public sealed class SessionConformanceTests_Kryoptic(KryopticBackendFixture back
     }
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void SecondLogin_WhileLoggedIn_SharesTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_SharesTheLogin(_backend);
+    public void SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void WrongPin_ThenTheRightOne_ResetsTheRetryCounter() => SessionConformanceTestCases.Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(_backend);

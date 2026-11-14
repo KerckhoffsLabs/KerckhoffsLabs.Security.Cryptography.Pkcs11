@@ -63,7 +63,7 @@ public sealed class AnchorLockOrderTests : IDisposable
     }
 
     [Fact]
-    public void ShareLogin_WhileAnchorLeasedOnAnotherThread_WaitsInsteadOfThrowing()
+    public void SecondLogin_WhileAnchorLeasedOnAnotherThread_ProbeWaitsInsteadOfThrowing()
     {
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(Record.Anchor);
@@ -72,13 +72,12 @@ public sealed class AnchorLockOrderTests : IDisposable
         using var release = new ManualResetEventSlim();
         Thread holder = HoldLease(anchor, held, release);
 
-        Pkcs11Login? second = null;
-        BackgroundWork sharing = BackgroundWork.Run(() => second = Slot.Login(TokenUser.User, _pin));
+        BackgroundWork sharing = BackgroundWork.Run(() => Slot.Login(TokenUser.User, _pin));
         try
         {
-            // The share's C_Login waits for the anchor: it neither reaches the module nor returns.
-            Assert.False(SpinWait.SpinUntil(() => _module.LoginCalls != 1 || !sharing.IsAlive, Watch),
-                $"the share did not wait for the anchor: {sharing.Failure}");
+            // The second login's probe waits for the anchor: it does not return.
+            Assert.False(SpinWait.SpinUntil(() => !sharing.IsAlive, Watch),
+                $"the probe did not wait for the anchor: {sharing.Failure}");
         }
         finally
         {
@@ -87,10 +86,9 @@ public sealed class AnchorLockOrderTests : IDisposable
             Assert.True(sharing.Join(Bounded), "the share did not finish after the anchor was released");
         }
 
-        Assert.Null(sharing.Failure);
-        using Pkcs11Login shared = Assert.IsType<Pkcs11Login>(second);
-        Assert.True(shared.IsActive);
-        Assert.Equal(2, _module.LoginCalls);
+        Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN,
+            Assert.IsType<Pkcs11AuthenticationException>(sharing.Failure).ReturnValue);
+        Assert.Equal(1, _module.LoginCalls);
     }
 
     [Fact]
@@ -120,13 +118,13 @@ public sealed class AnchorLockOrderTests : IDisposable
         Assert.Equal("5678"u8.ToArray(), _module.LastInitPin?.Pin);
     }
 
-    // Review Focus 1. T1, inside an operation on a slot session (the gate shared), ends the login from its context
-    // login (CKR_PIN_LOCKED), which closes the anchor and so waits for the anchor's lock. W, the final logout, is
-    // queued on the gate. T2 asks for the anchor's lease. Taking the anchor's lock before the gate, T2 would hold the
-    // lock while queued behind W, W would wait for T1, and T1 for T2's lock. Taking the gate first, T2 queues holding
-    // nothing, T1 closes the anchor, and W finds the login already ended: no C_Logout.
+    // Review Focus 1, with the counted gate. T1, inside an operation on a slot session, ends the login from its context
+    // login (CKR_PIN_LOCKED), which closes the anchor. W, the last holder's release, comes while T1's operation is in
+    // flight: it returns at once, the logout left pending. T2 takes the anchor's lease meanwhile: entering the gate
+    // never waits, so it neither queues behind the pending logout nor holds the anchor's lock against T1. T1 then ends
+    // the login, which drops the pending logout: no C_Logout.
     [Fact]
-    public void EndLogin_FromAnotherSessionsOperation_WhileAnchorLeased_AndLogoutQueued_Completes()
+    public void EndLogin_FromAnotherSessionsOperation_WhileLogoutPending_SendsNoLogout()
     {
         _module.LockAfter = 1;
         Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
@@ -157,10 +155,11 @@ public sealed class AnchorLockOrderTests : IDisposable
             Assert.True(inContextLogin.Wait(Bounded, TestContext.Current.CancellationToken), "T1 never reached its context login");
 
             w.Start();
-            Assert.True(SpinWait.SpinUntil(() => record.WaitingForExclusiveGate == 1, Bounded), "the final logout never queued on the gate");
+            Assert.True(w.Join(Bounded), "W (the last holder's release) waited for the operation in flight");
+            Assert.True(record.IsLogoutPending, "the logout was not left pending for the operation in flight");
 
             t2.Start();
-            Assert.True(SpinWait.SpinUntil(() => record.WaitingForSharedGate == 1, Bounded), "T2 never queued on the gate");
+            Assert.True(t2.Join(Bounded), "T2 (the anchor's lease) waited behind the pending logout");
         }
         finally
         {
@@ -168,13 +167,11 @@ public sealed class AnchorLockOrderTests : IDisposable
         }
 
         Assert.True(t1.Join(Bounded), "T1 (the sign that ends the login) deadlocked");
-        Assert.True(w.Join(Bounded), "W (the final logout) deadlocked");
-        Assert.True(t2.Join(Bounded), "T2 (the anchor's lease) deadlocked");
 
         Assert.Equal(CKR.CKR_PIN_LOCKED, Assert.IsAssignableFrom<Pkcs11Exception>(t1.Failure).ReturnValue);
         Assert.Null(w.Failure);
-        // The login ended under T2's request, which closed the anchor: T2 finds it disposed.
-        Assert.IsType<ObjectDisposedException>(t2.Failure);
+        Assert.Null(t2.Failure);
+        Assert.False(record.IsLogoutPending);
         Assert.False(login.IsActive);
         Assert.False(record.IsLoggedIn);
         Assert.Equal(0, _module.LogoutCalls);
@@ -184,7 +181,7 @@ public sealed class AnchorLockOrderTests : IDisposable
         Assert.Empty(_module.OpenSessions);
     }
 
-    // The waiting branch: a record send (a share's C_Login, parked in the module) holds the anchor's lock, and the
+    // The waiting branch: a record send (a second login's probe, parked in the module) holds the anchor's lock, and the
     // anchor's lease, asked for on another thread, waits for it instead of reporting concurrent use.
     [Fact]
     public void AnchorLease_WhileRecordSendHoldsAnchor_WaitsInsteadOfThrowing()
@@ -194,7 +191,7 @@ public sealed class AnchorLockOrderTests : IDisposable
         ulong anchorId = anchor.SessionId;
         using var inLogin = new ManualResetEventSlim();
         using var proceed = new ManualResetEventSlim();
-        _module.DuringLogin = session =>
+        _module.DuringGetSessionInfo = session =>
         {
             if ((ulong)session != anchorId)
                 return;
@@ -202,8 +199,7 @@ public sealed class AnchorLockOrderTests : IDisposable
             proceed.Wait(Bounded);
         };
 
-        Pkcs11Login? second = null;
-        var sharing = new BackgroundWork(() => second = Slot.Login(TokenUser.User, _pin));
+        var sharing = new BackgroundWork(() => Slot.Login(TokenUser.User, _pin));
 
         bool leased = false;
         var leasing = new BackgroundWork(() =>
@@ -215,7 +211,7 @@ public sealed class AnchorLockOrderTests : IDisposable
         try
         {
             sharing.Start();
-            Assert.True(inLogin.Wait(Bounded, TestContext.Current.CancellationToken), "the share's C_Login never reached the module");
+            Assert.True(inLogin.Wait(Bounded, TestContext.Current.CancellationToken), "the probe never reached the module");
 
             leasing.Start();
             Assert.False(SpinWait.SpinUntil(() => !leasing.IsAlive, Watch),
@@ -228,11 +224,10 @@ public sealed class AnchorLockOrderTests : IDisposable
             Assert.True(leasing.Join(Bounded), "the anchor's lease did not finish after the send");
         }
 
-        Assert.Null(sharing.Failure);
+        Assert.IsType<Pkcs11AuthenticationException>(sharing.Failure);
         Assert.Null(leasing.Failure);
         Assert.True(leased);
-        using Pkcs11Login shared = Assert.IsType<Pkcs11Login>(second);
-        Assert.True(shared.IsActive);
+        Assert.True(login.IsActive);
     }
 
     // The throwing branch: with no record send waiting or holding, a second application thread on the anchor is
@@ -261,10 +256,11 @@ public sealed class AnchorLockOrderTests : IDisposable
 
         // Nothing was left behind: the application lease's mark is cleared (a leaked one would have every later
         // anchor lease that finds the lock taken refuse, with no application thread holding it), and the gate and
-        // the lock are free.
+        // the lock are free: the refused lease gave its count back.
         Assert.Equal(0, anchor.ApplicationHolderMark);
         using (anchor.AcquireExclusive())
-            Assert.Equal(0, Record.WaitingForExclusiveGate);
+            Assert.Equal(1, Record.ActiveOperations);
+        Assert.Equal(0, Record.ActiveOperations);
         Assert.Equal(0, anchor.ApplicationHolderMark);
     }
 

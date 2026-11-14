@@ -39,11 +39,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// final logout never meets one.
 /// </para>
 /// <para>
-/// <b>Shares.</b> A <see cref="Login"/> for the user already held still sends the PIN, and accepts
-/// <c>CKR_USER_ALREADY_LOGGED_IN</c> only because this record knows the application holds that user. A token
-/// need not check the PIN then, so such a login is a share of the existing login, not a second
-/// authentication. A login for anyone else (another user type, or another username) is refused before the
-/// module. When the last share of the current login goes, <c>C_Logout</c> is sent and the anchor closed.
+/// <b>Second logins.</b> A <see cref="Login"/> for the user already held is refused before the module
+/// (<c>CKR_USER_ALREADY_LOGGED_IN</c>), its PIN never sent: PKCS#11 has no way to check a PIN against a login that is
+/// already made, so a login that "shared" it would succeed with any PIN. A component that should use the login
+/// takes a share explicitly, without a PIN: <see cref="Share"/> from a hold it was given, or <see cref="TryShare"/>
+/// for the login held on the slot. Before refusing, the anchor is probed (<c>C_GetSessionInfo</c>): a login whose
+/// anchor was lost has ended, and the call logs in afresh. A login for anyone else (another user type, or another
+/// username) is refused before the module.
+/// </para>
+/// <para>
+/// <b>A login left on the token.</b> A login this record ends without a <c>C_Logout</c> reaching the module (the
+/// anchor lost while other sessions stay open, a <c>C_Logout</c> that failed) may still be held by the module. The
+/// next first login that the module answers <c>CKR_USER_ALREADY_LOGGED_IN</c> (or
+/// <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>) then logs that login out on its new anchor and logs in once more, so
+/// the PIN is checked. Without such a login of its own behind it, the answer is refused with a message saying the
+/// token is logged in outside this library: a login it never made is never adopted.
 /// </para>
 /// <para>
 /// <b>Generations.</b> Each first login starts a generation; a share remembers the one it was taken in. When
@@ -51,35 +61,39 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// shares become inactive, no longer count, and send no <c>C_Logout</c> when released.
 /// </para>
 /// <para>
-/// <b>Gate.</b> A slot-wide reader/writer lock orders logins and logouts against operations: an operation that
-/// relies on the login holds it shared (<see cref="EnterOperation"/>) for its whole duration; the first
-/// <c>C_Login</c> and the final <c>C_Logout</c> hold it exclusive. A login that shares the login already held
-/// holds it shared, like an operation. So a logout never lands inside an operation, as the spec asks ("before
-/// logging out, any active operations should be finished"); a slow pinpad on a first login or a final logout
-/// delays operations on the slot, a slow pinpad on a share delays other logins, and also every new operation once a
-/// first login or final logout is waiting behind it (the gate makes new shared holders wait for a waiting exclusive
-/// one). The gate is recursive, so
-/// a thread that holds it exclusive (sending a login on the anchor) can enter an operation; a thread inside an
-/// operation cannot release a share (<see cref="ThrowIfInsideOperation"/>), since the last one needs it
-/// exclusive.
+/// <b>Operations and the logout.</b> An operation that relies on the login is counted for its whole duration
+/// (<see cref="EnterOperation"/>); entering one never waits. The final <c>C_Logout</c> waits for them instead: when
+/// the last share goes while operations are in flight, the logout is left pending and sent by the thread whose
+/// operation ends last. So a logout never lands inside an operation, as the spec asks ("before logging out, any
+/// active operations should be finished"); releasing a share never blocks or throws, even from inside an
+/// operation; and a login or a pinpad prompt never stalls operations. The anchor leaves the record, and the
+/// login stops being current, in the same hold of the record's lock that finds no operation in flight, so an
+/// operation that starts after that finds its private handles refused rather than send them across the logout.
 /// </para>
 /// <para>
-/// Lock order: an ordinary session's lock, then the gate, then the send lock (the turns the sends on the anchor
-/// take), then the anchor's lock, then this record's lock; never the reverse. The anchor's own core takes the gate
-/// before its lock (<see cref="Pkcs11SessionCore.IsAnchorSide"/>), since this record closes the anchor while holding
-/// the gate. The sends on the anchor (<see cref="Pkcs11SessionCore.AcquireForRecord"/>) wait for its lock rather than
-/// refuse a thread that holds it, and the send lock is never held with the record's lock. No call into the module
-/// is made under the record's lock.
+/// <b>Transitions.</b> A first login and a logout are serialized (a semaphore, waited for outside every lock): a
+/// <c>C_Logout</c> in flight never lands after the next <c>C_Login</c>. A <see cref="Login"/> that finds a logout
+/// pending or in flight waits for it, and logs in afresh once it is done; from inside an operation it cannot wait
+/// (the pending logout waits for that operation) and throws.
+/// </para>
+/// <para>
+/// Lock order: the transition semaphore, then an ordinary session's lock, then the anchor's lock, then this record's
+/// lock; never the reverse. No call into the module is made under the record's lock.
 /// </para>
 /// </remarks>
 internal sealed class TokenLoginRecord
 {
     private readonly NativeCULong _slotId;
-    private readonly ReaderWriterLockSlim _gate = new(LockRecursionPolicy.SupportsRecursion);
     private readonly Lock _lock = new();
 
-    // Takes turns for the logins sent on the anchor, which shares send concurrently under the shared gate.
-    private readonly Lock _sendLock = new();
+    // Serializes the transitions: a first login and a logout, so a C_Logout in flight never lands after the next C_Login.
+    private readonly SemaphoreSlim _transition = new(1, 1);
+
+    // Set while no logout is pending or in flight: a Login that finds one waits on it.
+    private readonly ManualResetEventSlim _noLogoutUnderway = new(initialState: true);
+
+    // How many operations this thread is inside, on this record: a Login cannot wait for a pending logout from one.
+    private readonly ThreadLocal<int> _operationDepth = new();
     private readonly List<LoginHold> _holders = [];
 
     // All under _lock. Logged in exactly while _anchor is set; _loan only while _anchor is.
@@ -89,6 +103,13 @@ internal sealed class TokenLoginRecord
     private string? _username;
     private long _generation;
     private ILogger _logger = NullLogger.Instance;
+
+    // Under _lock as well. The operations in flight; the generation whose logout waits for them; whether a logout's
+    // C_Logout is being sent; and whether a login this record ended without a C_Logout may still be held by the module.
+    private int _activeOperations;
+    private long? _pendingLogout;
+    private bool _logoutInFlight;
+    private bool _mayStillBeLoggedIn;
 
     // The module's registry, whose session tally refuses an SO login while a read-only session is open; null for a
     // record made on its own, which then leaves that to the module.
@@ -127,17 +148,29 @@ internal sealed class TokenLoginRecord
         get { lock (_lock) return _username; }
     }
 
-    /// <summary>
-    /// How many threads are waiting to hold the gate exclusive (a first login or a final logout waiting for operations
-    /// in flight). A test seam: it lets a test wait until such a thread is blocked, instead of guessing with time.
-    /// </summary>
-    internal int WaitingForExclusiveGate => _gate.WaitingWriteCount;
+    /// <summary>How many operations are in flight on the token (<see cref="EnterOperation"/>). A test seam.</summary>
+    internal int ActiveOperations
+    {
+        get { lock (_lock) return _activeOperations; }
+    }
 
     /// <summary>
-    /// How many threads are waiting to hold the gate shared (an operation, or a share's login, queued behind a waiting
-    /// first login or final logout). A test seam, like <see cref="WaitingForExclusiveGate"/>.
+    /// Whether the last share has gone and the logout waits for operations in flight. A test seam: it lets a test see
+    /// the logout deferred, instead of guessing with time.
     /// </summary>
-    internal int WaitingForSharedGate => _gate.WaitingReadCount;
+    internal bool IsLogoutPending
+    {
+        get { lock (_lock) return _pendingLogout is not null; }
+    }
+
+    /// <summary>
+    /// Whether a login this record ended without a <c>C_Logout</c> reaching the module may still be held by it, so the
+    /// next first login may log it out and log in again. A test seam.
+    /// </summary>
+    internal bool MayStillBeLoggedIn
+    {
+        get { lock (_lock) return _mayStillBeLoggedIn; }
+    }
 
     /// <summary>The session the login was made on and is kept by, or <see langword="null"/> when not logged in.</summary>
     public Pkcs11SessionCore? Anchor
@@ -182,22 +215,28 @@ internal sealed class TokenLoginRecord
     }
 
     /// <summary>
-    /// Logs <paramref name="user"/> in, or shares the login already held for the same user, and returns the
-    /// caller's share of it.
+    /// Logs <paramref name="user"/> in, and returns the caller's share of the login. Refuses a login while one is held
+    /// (see the class remarks): the same user's with <c>CKR_USER_ALREADY_LOGGED_IN</c>, anyone else's with
+    /// <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>, both before the module and with no PIN sent.
     /// </summary>
     /// <param name="owner">The library the share comes through; its <c>Dispose</c> releases it.</param>
     /// <param name="user">Who logs in.</param>
     /// <param name="pin">The PIN, or <see langword="null"/> for the protected authentication path (a pinpad).</param>
     /// <param name="username">The username for <c>C_LoginUser</c>, or <see langword="null"/> for <c>C_Login</c>.</param>
     /// <exception cref="Pkcs11AuthenticationException">
-    /// Someone else is logged in through this record (<c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>, refused before
-    /// the module), or the module refused the login.
+    /// A login is held through this record (<c>CKR_USER_ALREADY_LOGGED_IN</c> for the same user,
+    /// <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c> for another; refused before the module); the token is logged in outside
+    /// this library (the module's own <c>CKR_USER_ALREADY_LOGGED_IN</c> or <c>CKR_USER_ANOTHER_ALREADY_LOGGED_IN</c>,
+    /// with no login of this record's left behind); or the module refused the login.
     /// </exception>
     /// <exception cref="Pkcs11SessionException">
     /// An SO login while the library has a read-only session open on the slot (<c>CKR_SESSION_READ_ONLY_EXISTS</c>,
     /// refused before the module); or the anchor could not open because the token allows the application no more
     /// sessions (<c>CKR_SESSION_COUNT</c> from <c>C_OpenSession</c>, with a message giving the library's session tally
     /// on the slot). No <c>C_Login</c> is sent then.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Called from inside an operation on the token while the previous login's logout waits for operations to finish.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c> or the login.</exception>
     /// <exception cref="ObjectDisposedException"><paramref name="owner"/> is disposed, or its disposal began before the hold was taken.</exception>
@@ -208,76 +247,31 @@ internal sealed class TokenLoginRecord
             throw new ArgumentException("Username must not be empty.", nameof(username));
         string method = username is null ? OpLogin : OpLoginUser;
 
-        // Created before the gate: it runs the caller's logger factory.
+        // Both made before anything changes: they run the caller's logger factory, and a throw then leaves nothing
+        // half done.
         ILoggerFactory? loggerFactory = owner.LoggerFactory;
+        ILogger logger = new CallOutFencedLogger((loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<TokenLoginRecord>());
 
-        // A share of the login already held only needs the login to stay put, so it holds the gate shared
-        // and leaves operations running; only a first login needs it exclusive.
-        _gate.EnterReadLock();
-        try
+        while (true)
         {
-            if (TryShareHeldLogin(owner, user, pin, username, method) is { } shared)
-                return shared;
-        }
-        finally
-        {
-            _gate.ExitReadLock();
-        }
-
-        _gate.EnterWriteLock();
-        try
-        {
-            // Another thread may have logged in between the two holds of the gate.
-            if (TryShareHeldLogin(owner, user, pin, username, method) is { } shared)
-                return shared;
-
-            ThrowIfReadOnlySessionBlocksSo(user, method);
-
-            // Closed on every way out of this scope but one: the record keeps it once the login is recorded. Closing
-            // the only session this record opened also leaves the token public again.
-            using var anchor = new Owned<Pkcs11SessionCore>(OpenAnchor(owner, user, loggerFactory));
-            lock (_sendLock)
-                Send(anchor.Value, user, pin, username);
-
-            lock (_lock)
-            {
-                // The owner's disposal began while the login was sent: its holds may already be released, so a
-                // hold taken now would never be. Checked before the login is recorded, and undone below.
-                if (!owner.IsDisposingOrDisposed)
-                {
-                    _anchor = anchor.Release();
-                    _user = user;
-                    _username = username;
-                    _generation++;
-                    _logger = new CallOutFencedLogger((loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<TokenLoginRecord>());
-                    return AddHolderLocked(owner);
-                }
-            }
-
-            // Still under the gate held exclusive: nothing else saw this login. Log it back out (other sessions of the
-            // application share it); the anchor is closed as this scope ends.
+            WaitForNoLogoutUnderway();
+            _transition.Wait();
             try
             {
-                anchor.Value.SendLogout();
+                if (!LogoutUnderwayOrRefuseHeldLogin(user, username, method))
+                    return FirstLogin(owner, user, pin, username, method, loggerFactory, logger);
             }
-            catch (Pkcs11Exception)
+            finally
             {
-                // Closing the anchor may end the login anyway; the owner's disposal is what is reported.
+                _transition.Release();
             }
-            throw OwnerDisposed();
-        }
-        finally
-        {
-            _gate.ExitWriteLock();
         }
     }
 
-    // The share half of Login, under the gate (shared or exclusive): null when no one is logged in, or when the
-    // send finds the login's anchor lost (the login then ended, and Login logs in afresh). Sends the
-    // login on the anchor and accepts CKR_USER_ALREADY_LOGGED_IN, then takes a hold only if the login it was
-    // sent for is still the current one: the module may have reported it ended meanwhile (MarkEnded does not
-    // take the gate), and a hold stamped with the next generation would keep that one from ever logging out.
-    private LoginHold? TryShareHeldLogin(Pkcs11Library owner, TokenUser user, SecurePin? pin, string? username, string method)
+    // Under the transition semaphore. Throws when a login is held: CKR_USER_ANOTHER_ALREADY_LOGGED_IN for another user,
+    // CKR_USER_ALREADY_LOGGED_IN for the same one once a probe of its anchor finds it still open. True when a logout is
+    // pending or in flight (the caller waits for it and looks again); false when no login is held, the probe included.
+    private bool LogoutUnderwayOrRefuseHeldLogin(TokenUser user, string? username, string method)
     {
         Pkcs11SessionCore? anchor;
         TokenUser? heldUser;
@@ -285,6 +279,8 @@ internal sealed class TokenLoginRecord
         long generation;
         lock (_lock)
         {
+            if (_pendingLogout is not null || _logoutInFlight)
+                return true;
             anchor = _anchor;
             heldUser = _user;
             heldUsername = _username;
@@ -292,7 +288,7 @@ internal sealed class TokenLoginRecord
         }
 
         if (anchor is null)
-            return null;
+            return false;
 
         if (heldUser != user || !string.Equals(heldUsername, username, StringComparison.Ordinal))
         {
@@ -303,30 +299,142 @@ internal sealed class TokenLoginRecord
                 "holds it before logging in as someone else.");
         }
 
-        // Shares run concurrently under the shared gate, so the sends on the anchor take turns here; the send then
-        // waits for the anchor's lock if another thread holds it.
+        // A lost anchor (a token pulled and put back, an HSM failover) ended the login: the probe reports it, the login
+        // ends (AnchorLost), and this call logs in afresh. The old generation stays ended: its holders inactive, its
+        // private handles refused.
+        if (!AnchorStillHolds(anchor, generation))
+        {
+            lock (_lock)
+                return _pendingLogout is not null || _logoutInFlight;
+        }
+
+        throw new Pkcs11AuthenticationException(CKR.CKR_USER_ALREADY_LOGGED_IN, method,
+            $"{method}: the token in slot {(ulong)_slotId} already has this {Describe(user, username)} logged in through " +
+            "this application, so the PIN was not sent: PKCS#11 cannot check a PIN against a login already made. Use " +
+            "that login: Pkcs11Login.Share() on a Pkcs11Login you were given, or Pkcs11Slot.TryShareLogin for the login " +
+            "held on the slot; or dispose every login and session that holds it, then log in again.");
+    }
+
+    // Whether the anchor of the login of generation is still open: C_GetSessionInfo on it, whose loss codes end the
+    // login (Pkcs11SessionCore.ThrowIfError, then AnchorLost). Any other failure is not evidence that it ended.
+    private bool AnchorStillHolds(Pkcs11SessionCore anchor, long generation)
+    {
         try
         {
-            lock (_sendLock)
-                Send(anchor, user, pin, username);
+            anchor.SendProbe();
         }
-        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_USER_ALREADY_LOGGED_IN)
+        catch (Pkcs11Exception)
         {
-            // Expected: this application holds the login, so the token says so. Not a PIN check.
+            // A loss ended the login, which IsCurrent sees.
         }
-        catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException && !IsCurrent(generation))
+        catch (ObjectDisposedException)
         {
-            // The anchor was lost (a token pulled and put back, an HSM failover): the send reported it and
-            // AnchorLost ended that login, or another thread did and closed the anchor under this send. The
-            // caller asked to log in, so log in from scratch: null sends Login on to a first login under the gate
-            // held exclusive. The old generation stays ended: its holders inactive, its private handles refused.
-            return null;
+            // The anchor was closed under the probe: the login ended, which IsCurrent sees.
         }
+        return IsCurrent(generation);
+    }
+
+    // Under the transition semaphore, with no login held: opens the anchor, sends the login on it, and records it.
+    private LoginHold FirstLogin(Pkcs11Library owner, TokenUser user, SecurePin? pin, string? username, string method,
+        ILoggerFactory? loggerFactory, ILogger logger)
+    {
+        ThrowIfReadOnlySessionBlocksSo(user, method);
+
+        // Closed on every way out of this scope but one: the record keeps it once the login is recorded. Closing
+        // the only session this record opened also leaves the token public again.
+        using var anchor = new Owned<Pkcs11SessionCore>(OpenAnchor(owner, user, loggerFactory));
+        SendFirstLogin(anchor.Value, user, pin, username, method);
 
         lock (_lock)
         {
-            if (!ReferenceEquals(_anchor, anchor) || _generation != generation)
-                throw LoginEnded();
+            // The owner's disposal began while the login was sent: its holds may already be released, so a
+            // hold taken now would never be. Checked before the login is recorded, and undone below.
+            if (!owner.IsDisposingOrDisposed)
+            {
+                _anchor = anchor.Release();
+                _user = user;
+                _username = username;
+                _generation++;
+                _logger = logger;
+                _mayStillBeLoggedIn = false;
+                return AddHolderLocked(owner);
+            }
+        }
+
+        // Still under the transition: nothing else saw this login. Log it back out (other sessions of the
+        // application share it); the anchor is closed as this scope ends.
+        try
+        {
+            anchor.Value.SendLogout();
+        }
+        catch (Pkcs11Exception)
+        {
+            // Closing the anchor may end the login anyway; the owner's disposal is what is reported.
+        }
+        throw OwnerDisposed();
+    }
+
+    // Sends the first login on anchor. The module answering that a user is logged in already means a login this record
+    // left on the token (MayStillBeLoggedIn), which is logged out on the new anchor before the login is sent once more,
+    // so the PIN is checked; or a login made outside this library, which is refused.
+    private void SendFirstLogin(Pkcs11SessionCore anchor, TokenUser user, SecurePin? pin, string? username, string method)
+    {
+        try
+        {
+            Send(anchor, user, pin, username);
+            return;
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_USER_ALREADY_LOGGED_IN
+            or CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN)
+        {
+            if (!MayStillBeLoggedIn)
+            {
+                throw new Pkcs11AuthenticationException(ex.ReturnValue, method,
+                    $"{method}: the token in slot {(ulong)_slotId} is logged in already, but not through this library " +
+                    "(another component calling the module directly, or another PKCS#11 wrapper in this process). The " +
+                    "library does not take over a login it did not make: log that login out where it was made, then log " +
+                    "in again.");
+            }
+            // This record's own login, ended without a C_Logout reaching the module: its generation is over and its
+            // handles refused already, so logging it out costs no holder anything.
+        }
+
+        anchor.SendLogout();
+        lock (_lock)
+            _mayStillBeLoggedIn = false;
+        Send(anchor, user, pin, username);
+    }
+
+    // Waits until no logout is pending or in flight; throws from inside an operation, which a pending logout waits for.
+    private void WaitForNoLogoutUnderway()
+    {
+        if (_noLogoutUnderway.IsSet)
+            return;
+        if (_operationDepth.Value > 0)
+        {
+            throw new InvalidOperationException(
+                "A login cannot be made from inside an operation on its token while the previous login's logout waits for " +
+                "the operations in flight to finish: log in outside the operation.");
+        }
+        _noLogoutUnderway.Wait();
+    }
+
+    /// <summary>
+    /// Takes a share of the login held on the token for <paramref name="user"/> (and <paramref name="username"/>),
+    /// without calling the module: for <see cref="Pkcs11Slot.TryShareLogin(TokenUser, out Pkcs11Login?)"/>. Null when
+    /// no such login is held, or it is on its way out (its last holder gone).
+    /// </summary>
+    /// <exception cref="ObjectDisposedException"><paramref name="owner"/> is being disposed.</exception>
+    internal LoginHold? TryShare(Pkcs11Library owner, TokenUser user, string? username)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        lock (_lock)
+        {
+            if (_anchor is null || _holders.Count == 0 || _pendingLogout is not null || _user != user
+                || !string.Equals(_username, username, StringComparison.Ordinal))
+            {
+                return null;
+            }
             return AddHolderLocked(owner);
         }
     }
@@ -365,34 +473,24 @@ internal sealed class TokenLoginRecord
     {
         ArgumentNullException.ThrowIfNull(hold);
 
-        // Shared, like an operation: the login cannot be logged out under the send. Lock order: the gate, then this
-        // record's lock (released before the send), then the send lock, then the anchor's own, waited for.
-        _gate.EnterReadLock();
+        // An operation: the login cannot be logged out under the send. The send waits for the anchor's lock.
+        using IDisposable operation = EnterOperation();
+        Pkcs11SessionCore anchor;
+        lock (_lock)
+        {
+            if (hold.IsReleased || _anchor is null || hold.Generation != _generation)
+                throw LoginEnded();
+            anchor = _anchor;
+        }
+
         try
         {
-            Pkcs11SessionCore anchor;
-            lock (_lock)
-            {
-                if (hold.IsReleased || _anchor is null || hold.Generation != _generation)
-                    throw LoginEnded();
-                anchor = _anchor;
-            }
-
-            try
-            {
-                // Shares send their login on the anchor concurrently under the shared gate; take turns with them.
-                lock (_sendLock)
-                    anchor.SendInitPin(pin is null ? default : pin.Pin);
-            }
-            catch (ObjectDisposedException) when (!IsCurrent(hold.Generation))
-            {
-                // The module reported the login gone (MarkEnded does not take the gate) and the anchor was closed.
-                throw LoginEnded();
-            }
+            anchor.SendInitPin(pin is null ? default : pin.Pin);
         }
-        finally
+        catch (ObjectDisposedException) when (!IsCurrent(hold.Generation))
         {
-            _gate.ExitReadLock();
+            // The module reported the login gone (MarkEnded) and the anchor was closed.
+            throw LoginEnded();
         }
     }
 
@@ -530,11 +628,10 @@ internal sealed class TokenLoginRecord
     /// if it is lent to a session that came through <paramref name="owner"/> (the borrower's return runs, and it is
     /// disposed), so the final logout never meets a lent anchor.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Called from inside an operation (<see cref="EnterOperation"/>).</exception>
+    /// <remarks>From inside an operation, the logout is left pending until the operations in flight end.</remarks>
     public void ReleaseHoldersOf(Pkcs11Library owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
-        ThrowIfInsideOperation();
 
         AnchorLoan? reclaimed;
         lock (_lock)
@@ -549,8 +646,8 @@ internal sealed class TokenLoginRecord
         // made through the borrower. It waits for an operation in flight on it.
         reclaimed?.Borrower.Dispose();
 
-        long generation;
-        bool last;
+        Pkcs11SessionCore? anchor = null;
+        ILogger logger;
         lock (_lock)
         {
             int released = 0;
@@ -562,12 +659,13 @@ internal sealed class TokenLoginRecord
                 _holders.RemoveAt(i);
                 released++;
             }
-            generation = _generation;
-            last = released > 0 && _holders.Count == 0 && _anchor is not null;
+            if (released > 0 && _holders.Count == 0 && _anchor is not null)
+                anchor = RequestLogoutLocked(_generation);
+            logger = _logger;
         }
 
-        if (last)
-            LogOutIfUnheld(generation);
+        if (anchor is not null)
+            LogOut(anchor, logger);
     }
 
     /// <summary>
@@ -577,7 +675,7 @@ internal sealed class TokenLoginRecord
     /// starts afresh.
     /// </summary>
     /// <param name="reason">The return code that reported it, for the log.</param>
-    /// <remarks>Does not take the gate, so an operation that holds it shared may call this.</remarks>
+    /// <remarks>Never waits, so an operation in flight may call this.</remarks>
     public void MarkEnded(CKR reason) => EndLogin(reason, onlyAnchor: null);
 
     // MarkEnded, or, with onlyAnchor, only while that session is the anchor (checked under the same hold of the
@@ -599,12 +697,18 @@ internal sealed class TokenLoginRecord
             _user = null;
             _username = null;
             logger = _logger;
+            // No C_Logout reaches the module: with other sessions of the application open, it may still hold the login.
+            if (anchor is not null)
+                _mayStillBeLoggedIn = true;
+            _pendingLogout = null;
+            SignalIfNoLogoutLocked();
         }
 
         if (anchor is null)
             return;
-        Log.TokenLoginEnded(logger, (ulong)_slotId, reason);
+        // Closed before the log: a logger that throws cannot leave the anchor open.
         anchor.Dispose();
+        Log.TokenLoginEnded(logger, (ulong)_slotId, reason);
     }
 
     /// <summary>
@@ -619,42 +723,74 @@ internal sealed class TokenLoginRecord
     }
 
     /// <summary>
-    /// Holds the gate shared for an operation that relies on the login, so no login or final logout on the
-    /// slot runs until the returned lease is disposed. Dispose it on the thread that took it.
+    /// Counts an operation that relies on the login until the returned lease is disposed: the final logout waits for
+    /// it (see the class remarks). Never waits. Dispose it on the thread that took it, once.
     /// </summary>
     public IDisposable EnterOperation()
     {
-        // The gate stays held shared after this returns, by design: the lease releases it (OperationLease.Dispose).
-#pragma warning disable S7133 // Release locks in the same method that acquired them
-        _gate.EnterReadLock();
-#pragma warning restore S7133
-        return new OperationLease(_gate);
+        lock (_lock)
+            _activeOperations++;
+        _operationDepth.Value++;
+        return new OperationLease(this);
+    }
+
+    // The end of an operation: the last one to end sends a logout left pending.
+    private void ExitOperation()
+    {
+        _operationDepth.Value--;
+        Pkcs11SessionCore? anchor = null;
+        ILogger logger;
+        lock (_lock)
+        {
+            _activeOperations--;
+            if (_activeOperations == 0 && _pendingLogout is { } generation)
+            {
+                _pendingLogout = null;
+                anchor = TakeAnchorForLogoutLocked(generation);
+                SignalIfNoLogoutLocked();
+            }
+            logger = _logger;
+        }
+
+        if (anchor is not null)
+            LogOut(anchor, logger);
     }
 
     /// <summary>
-    /// Refuses a release on a thread inside an operation, before anything changes: the final logout needs the
-    /// gate exclusive, which that thread cannot take while it holds it shared, and finding that out after the
-    /// share was dropped would leave the login with no share to log it out.
+    /// Releases one share, from <see cref="LoginHold.Dispose"/>; the last share of the current login logs out, at once,
+    /// or once the operations in flight end. Never throws for being inside an operation.
     /// </summary>
-    internal void ThrowIfInsideOperation()
-    {
-        // The thread's own counts: it holds the gate shared and not exclusive (an exclusive holder may re-enter it).
-        if (_gate.RecursiveReadCount > 0 && _gate.RecursiveWriteCount == 0)
-        {
-            throw new InvalidOperationException(
-                "A login cannot be released from inside an operation on its token: release the login outside the operation.");
-        }
-    }
-
-    /// <summary>Releases one share, from <see cref="LoginHold.Dispose"/>; the last share of the current login logs out.</summary>
     internal void Release(LoginHold hold)
     {
-        bool last;
+        Pkcs11SessionCore? anchor = null;
+        ILogger logger;
         lock (_lock)
-            last = _holders.Remove(hold) && _holders.Count == 0 && _anchor is not null && hold.Generation == _generation;
+        {
+            if (_holders.Remove(hold) && _holders.Count == 0 && _anchor is not null && hold.Generation == _generation)
+                anchor = RequestLogoutLocked(hold.Generation);
+            logger = _logger;
+        }
 
-        if (last)
-            LogOutIfUnheld(hold.Generation);
+        if (anchor is not null)
+            LogOut(anchor, logger);
+    }
+
+    // Under _lock, once the last share of the login of generation has gone: takes the anchor for the logout now, or,
+    // with operations in flight, leaves the logout pending for the last of them (ExitOperation).
+    private Pkcs11SessionCore? RequestLogoutLocked(long generation)
+    {
+        if (_activeOperations == 0)
+            return TakeAnchorForLogoutLocked(generation);
+        _pendingLogout = generation;
+        _noLogoutUnderway.Reset();
+        return null;
+    }
+
+    // Under _lock. Lets a waiting Login go on once no logout is pending or in flight.
+    private void SignalIfNoLogoutLocked()
+    {
+        if (_pendingLogout is null && !_logoutInFlight)
+            _noLogoutUnderway.Set();
     }
 
     // Under _lock. Ends the loan of the anchor, if any, before the anchor closes.
@@ -676,55 +812,67 @@ internal sealed class TokenLoginRecord
         return hold;
     }
 
-    // The final logout. Takes the gate exclusive, so it waits for operations in flight, and checks again under
-    // it: a login that shared the login, or a report that it ended, may have come in since the last share went.
-    private void LogOutIfUnheld(long generation)
+    // The final logout, of an anchor taken out of the record (TakeAnchorForLogoutLocked) with no operation in flight.
+    // Waits its turn with a first login, so this C_Logout never lands after the next C_Login. A failed C_Logout leaves
+    // the module possibly logged in, which the next first login deals with (SendFirstLogin); the anchor is closed
+    // regardless, and closing it may itself end the login (it can be the application's last session).
+    private void LogOut(Pkcs11SessionCore anchor, ILogger logger)
     {
-        _gate.EnterWriteLock();
+        _transition.Wait();
         try
         {
-            // Taken from the record, so this method's to close. Closing it may itself end the login (it can be the
-            // application's last session), so a failed C_Logout is logged and the anchor closed regardless.
-            using Pkcs11SessionCore? anchor = TakeAnchorForLogout(generation, out ILogger logger);
-            if (anchor is null)
-                return;
-            try
+            using (anchor)
             {
-                anchor.SendLogout();
-            }
-            catch (Pkcs11Exception ex)
-            {
-                Log.TokenLogoutFailed(logger, (ulong)_slotId, ex.ReturnValue);
-            }
-            catch (ObjectDisposedException)
-            {
-                Log.TokenLogoutAnchorClosed(logger, (ulong)_slotId);
+                try
+                {
+                    anchor.SendLogout();
+                }
+                catch (Pkcs11Exception ex)
+                {
+                    if (ex.ReturnValue != CKR.CKR_USER_NOT_LOGGED_IN)
+                        MarkMayStillBeLoggedIn();
+                    Log.TokenLogoutFailed(logger, (ulong)_slotId, ex.ReturnValue);
+                }
+                catch (ObjectDisposedException)
+                {
+                    MarkMayStillBeLoggedIn();
+                    Log.TokenLogoutAnchorClosed(logger, (ulong)_slotId);
+                }
             }
         }
         finally
         {
-            _gate.ExitWriteLock();
+            lock (_lock)
+            {
+                _logoutInFlight = false;
+                SignalIfNoLogoutLocked();
+            }
+            _transition.Release();
         }
     }
 
-    // Under the gate held exclusive, from LogOutIfUnheld. Takes the anchor out of the record, with the logger to report
-    // its logout through, if the login of generation is still current and unheld; else null, and the record is left
-    // as it was.
-    private Pkcs11SessionCore? TakeAnchorForLogout(long generation, out ILogger logger)
+    private void MarkMayStillBeLoggedIn()
     {
         lock (_lock)
-        {
-            logger = _logger;
-            if (_holders.Count != 0 || _anchor is null || _generation != generation)
-                return null;
-            // Not expected: a lent anchor has its borrower's hold. Should one be left, it is not lent any longer.
-            EndLoanLocked();
-            Pkcs11SessionCore anchor = _anchor;
-            _anchor = null;
-            _user = null;
-            _username = null;
-            return anchor;
-        }
+            _mayStillBeLoggedIn = true;
+    }
+
+    // Under _lock, with no operation in flight. Takes the anchor out of the record, for LogOut to close, if the login
+    // of generation is still current and unheld; else null, and the record is left as it was. From here on the login
+    // is not current, so an operation that starts now finds its private handles refused.
+    private Pkcs11SessionCore? TakeAnchorForLogoutLocked(long generation)
+    {
+        if (_holders.Count != 0 || _anchor is null || _generation != generation)
+            return null;
+        // Not expected: a lent anchor has its borrower's hold. Should one be left, it is not lent any longer.
+        EndLoanLocked();
+        Pkcs11SessionCore anchor = _anchor;
+        _anchor = null;
+        _user = null;
+        _username = null;
+        _logoutInFlight = true;
+        _noLogoutUnderway.Reset();
+        return anchor;
     }
 
     // PKCS#11 v3.2 C_Login: an SO login fails with CKR_SESSION_READ_ONLY_EXISTS while the application has a
@@ -809,15 +957,15 @@ internal sealed class TokenLoginRecord
     private static string Describe(TokenUser user, string? username)
         => (user == TokenUser.SecurityOfficer ? "Security Officer" : "normal user") + (username is null ? "" : " (named)");
 
-    /// <summary>The shared hold of the gate an operation takes; released once.</summary>
-    private sealed class OperationLease(ReaderWriterLockSlim gate) : IDisposable
+    /// <summary>The count an operation takes on the record; given back once.</summary>
+    private sealed class OperationLease(TokenLoginRecord record) : IDisposable
     {
         private int _released;
 
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _released, 1) == 0)
-                gate.ExitReadLock();
+                record.ExitOperation();
         }
     }
 }

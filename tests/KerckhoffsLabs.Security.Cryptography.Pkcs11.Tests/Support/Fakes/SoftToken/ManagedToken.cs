@@ -13,13 +13,13 @@ internal static class ManagedToken
     public static Pkcs11Library NewLibrary() => new ManagedSoftToken().Load();
 
     /// <summary>
-    /// A read/write session of a user login that the session alone holds: the token is logged out when the
-    /// session is disposed.
+    /// A read/write session of a user login (a share of the login held, if another session holds one): the token is
+    /// logged out when the last such session is disposed.
     /// </summary>
     public static Pkcs11Session OpenSession(Pkcs11Library library, ICryptoPolicy? policy = null)
     {
         using var pin = new SecurePin("1234");
-        using Pkcs11Login login = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel).Login(TokenUser.User, pin);
+        using Pkcs11Login login = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel).ShareOrLogIn(TokenUser.User, pin);
         return login.OpenSession(SessionAccess.ReadWrite, policy);
     }
 }

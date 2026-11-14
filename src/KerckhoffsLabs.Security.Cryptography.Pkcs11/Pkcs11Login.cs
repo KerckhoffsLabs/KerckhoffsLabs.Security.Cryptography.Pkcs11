@@ -91,8 +91,8 @@ public sealed class Pkcs11Login : IDisposable
     /// <see cref="Pkcs11Session.Access"/> is the login session's: a read-only request served by a read/write session
     /// reads <see cref="SessionAccess.ReadWrite"/>. Disposing it hands the session back to the login (see
     /// <see cref="Pkcs11Session.Dispose"/>), and a later call lends it again. While it is lent, the login's own sends on
-    /// it (another <see cref="Pkcs11Slot.Login"/> of the same user, <see cref="InitUserPinWithPin"/>) wait for the
-    /// operation in flight on it, and its operations wait for them; a pinpad login can so delay it.
+    /// it (<see cref="InitUserPinWithPin"/>, the final logout) wait for the
+    /// operation in flight on it, and its operations wait for them.
     /// </para>
     /// <para>
     /// On a module without <c>C_SessionCancel</c>, an operation a lent session abandoned (a failure partway through
@@ -160,6 +160,23 @@ public sealed class Pkcs11Login : IDisposable
     }
 
     /// <summary>
+    /// Takes another hold of this login, without a PIN and without calling the module: for handing the login to another
+    /// component, which disposes its hold once done. The login stays until its last holder goes.
+    /// </summary>
+    /// <remarks>
+    /// The new hold has no <see cref="ContextAuthentication"/> of its own until one is set: a component's PIN callback
+    /// is never asked about another's keys.
+    /// </remarks>
+    /// <returns>The new hold.</returns>
+    /// <exception cref="ObjectDisposedException">This login is no longer active (see <see cref="IsActive"/>).</exception>
+    public Pkcs11Login Share()
+    {
+        Pkcs11Library library = Slot.Library;
+        ObjectDisposedException.ThrowIf(library.IsDisposed, library);
+        return new Pkcs11Login(Slot, User, Username, _hold.Record.Share(_hold, library));
+    }
+
+    /// <summary>
     /// Sets the normal user's PIN (<c>C_InitPIN</c>), as the Security Officer this login is for. Sent on the
     /// login's own read/write session, the "R/W SO Functions" state PKCS#11 v3.2 requires, so no session need be
     /// open.
@@ -212,11 +229,13 @@ public sealed class Pkcs11Login : IDisposable
 
     /// <summary>
     /// Releases this hold of the login. The last holder to go logs out: if sessions opened through
-    /// <see cref="OpenSession"/> are still open, the login stays until they are disposed too. Idempotent.
+    /// <see cref="OpenSession"/> are still open, the login stays until they are disposed too. Idempotent, and never
+    /// throws.
     /// </summary>
-    /// <exception cref="InvalidOperationException">
-    /// Called from inside an operation on the same token (from code the library calls back during one): the
-    /// final logout waits for operations to finish, so it cannot run from one. Nothing is released then.
-    /// </exception>
+    /// <remarks>
+    /// The logout waits for operations in flight on the token: when there are some (this called from code the library
+    /// calls back during one, or another thread's), it is left pending and sent as the last of them ends, so this
+    /// returns before the token is logged out. A <see cref="Pkcs11Slot.Login"/> made meanwhile waits for it.
+    /// </remarks>
     public void Dispose() => _hold.Dispose();
 }

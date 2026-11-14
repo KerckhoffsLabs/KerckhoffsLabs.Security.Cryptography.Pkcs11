@@ -14,7 +14,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// user is later logged back into the token)". A module may then hand such a handle to another object, so a wrapper
 /// that kept sending it could sign with or read an object the caller never chose. The wrapper keeps the
 /// <see cref="LoginStamp"/> it was made under and checks it before every use, inside the session's lease, which
-/// holds the login gate: no logout or login can land between the check and the native call.
+/// counts the operation on the login gate: no logout can land between the check and the native call (a login does not
+/// invalidate handles).
 /// </para>
 /// <para>
 /// <b>Which objects are private.</b> <c>CKA_PRIVATE</c> as the token reports it. When the token does not report

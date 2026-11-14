@@ -154,11 +154,13 @@ public sealed class Pkcs11LoginTests : IDisposable
 
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Session other = SlotOf(second).OpenSession();
-        using Pkcs11Login shared = SlotOf(second).Login(TokenUser.User, _pin);
+        Assert.Throws<Pkcs11AuthenticationException>(() => SlotOf(second).Login(TokenUser.User, _pin));
+        Assert.True(SlotOf(second).TryShareLogin(TokenUser.User, out Pkcs11Login? share));
+        using Pkcs11Login shared = share;
 
         Assert.Equal(CKS.CKS_RO_USER_FUNCTIONS, other.GetSessionInfo().State);
         Assert.True(shared.IsActive);
-        Assert.Equal(2, _module.LoginCalls);
+        Assert.Equal(1, _module.LoginCalls);
         Assert.Equal(2, _module.OpenSessions.Count); // one anchor, one session
     }
 
@@ -169,7 +171,8 @@ public sealed class Pkcs11LoginTests : IDisposable
         using Pkcs11Library second = _module.Load();
 
         using Pkcs11Login firstLogin = SlotOf(first).Login(TokenUser.User, _pin);
-        using Pkcs11Login secondLogin = SlotOf(second).Login(TokenUser.User, _pin);
+        Assert.True(SlotOf(second).TryShareLogin(TokenUser.User, out Pkcs11Login? share));
+        using Pkcs11Login secondLogin = share;
         using Pkcs11Session secondSession = secondLogin.OpenSession();
         using Pkcs11Session observer = SlotOf(second).OpenSession();
 
@@ -180,9 +183,11 @@ public sealed class Pkcs11LoginTests : IDisposable
         Assert.Equal(0, _module.LogoutCalls);
         Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, secondSession.GetSessionInfo().State);
 
-        // Another share still goes through the anchor the first library opened.
-        using (SlotOf(second).Login(TokenUser.User, _pin))
-            Assert.Equal(3, _module.LoginCalls);
+        // Another share still takes the login the first library made; a second login is still refused, after
+        // probing the anchor the first library opened.
+        using (secondLogin.Share())
+            Assert.Equal(1, _module.LoginCalls);
+        Assert.Throws<Pkcs11AuthenticationException>(() => SlotOf(second).Login(TokenUser.User, _pin));
 
         secondLogin.Dispose();
         secondSession.Dispose();
@@ -237,7 +242,8 @@ public sealed class Pkcs11LoginTests : IDisposable
 
         using Pkcs11Login firstLogin = SlotOf(first).Login(TokenUser.User, _pin);
         ulong anchor = Assert.Single(_module.OpenSessions).Handle;
-        using Pkcs11Login secondLogin = SlotOf(second).Login(TokenUser.User, _pin);
+        Assert.True(SlotOf(second).TryShareLogin(TokenUser.User, out Pkcs11Login? share));
+        using Pkcs11Login secondLogin = share;
 
         first.Dispose();
 
@@ -282,34 +288,33 @@ public sealed class Pkcs11LoginTests : IDisposable
         Task signing = Task.Run(() => Sign(slotSession), TestContext.Current.CancellationToken);
         Assert.True(inSign.Wait(Generous, TestContext.Current.CancellationToken), "C_Sign was never reached");
 
-        Task loggingOut = Task.Run(login.Dispose, TestContext.Current.CancellationToken);
-        await Task.Delay(100, TestContext.Current.CancellationToken);
-        Assert.False(loggingOut.IsCompleted);
+        // The release returns at once, the logout left pending for the sign in flight.
+        login.Dispose();
+        TokenLoginRecord record = slotSession.Core.LoginRecord;
+        Assert.True(record.IsLogoutPending);
         Assert.Equal(0, _module.LogoutCalls);
 
         release.Set();
         await signing;
-        await loggingOut;
+        Assert.False(record.IsLogoutPending);
 
         Assert.Equal(0, logoutsWhileSigning);
         Assert.Equal(1, _module.LogoutCalls);
     }
 
     [Fact]
-    public void DisposingTheLastHolderSession_InsideAnOperation_IsRefused_ThenWorksAfterIt()
+    public void DisposingTheLastHolderSession_InsideAnOperation_DefersTheLogout()
     {
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Session session = login.OpenSession();
         login.Dispose();
 
         using (session.Core.AcquireExclusive())
-            Assert.Throws<InvalidOperationException>(session.Dispose);
-
-        Assert.Equal(0, _module.LogoutCalls);
-        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);
-
-        Sign(session);
-        session.Dispose();
+        {
+            session.Dispose();
+            Assert.Equal(0, _module.LogoutCalls);
+            Assert.True(session.Core.LoginRecord.IsLogoutPending);
+        }
 
         Assert.Equal(1, _module.LogoutCalls);
         Assert.Empty(_module.OpenSessions);

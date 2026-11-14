@@ -118,7 +118,7 @@ public sealed class PinManagementTests : IDisposable
     {
         using Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
         using Pkcs11Session session = login.OpenSession();
-        using Pkcs11Login second = Slot.Login(TokenUser.SecurityOfficer, _pin);
+        using Pkcs11Login second = login.Share();
         login.Dispose();
 
         second.InitUserPinWithPin(_newPin);
@@ -140,13 +140,13 @@ public sealed class PinManagementTests : IDisposable
     }
 
     [Fact]
-    public async Task InitUserPin_WhileAShareSendsItsLoginOnTheAnchor_WaitsItsTurn()
+    public async Task InitUserPin_WhileASecondLoginProbesTheAnchor_WaitsItsTurn()
     {
         CancellationToken ct = TestContext.Current.CancellationToken;
         using Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
         using var inLogin = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
-        _module.DuringLogin = _ =>
+        _module.DuringGetSessionInfo = _ =>
         {
             inLogin.Set();
             release.Wait(TimeSpan.FromSeconds(10), ct);
@@ -158,7 +158,7 @@ public sealed class PinManagementTests : IDisposable
             Assert.True(inLogin.Wait(TimeSpan.FromSeconds(10), ct));
             Task init = Task.Run(() => login.InitUserPinWithPin(_newPin), ct);
 
-            // Not refused as concurrent use of the anchor: it waits for the login sent on it.
+            // Not refused as concurrent use of the anchor: it waits for the probe sent on it.
             Task first = await Task.WhenAny(init, Task.Delay(TimeSpan.FromMilliseconds(200), ct));
             Assert.NotSame(init, first);
             release.Set();
@@ -167,7 +167,7 @@ public sealed class PinManagementTests : IDisposable
         finally
         {
             release.Set();
-            (await share).Dispose();
+            await Assert.ThrowsAsync<Pkcs11AuthenticationException>(() => share);
         }
         Assert.NotNull(_module.LastInitPin);
     }

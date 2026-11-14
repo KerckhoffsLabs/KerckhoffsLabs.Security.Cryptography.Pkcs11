@@ -129,10 +129,20 @@ using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
   The token is logged out (`C_Logout`) when the last holder is disposed, in whatever order they go: disposing
   the `Pkcs11Login` before its sessions leaves them working. Every `Pkcs11Library` loaded from the same module
   shares the login, as the module does.
-- **A second login of the same user shares the first; it is not a second authentication.** The PIN is still
-  sent, and the module's answer decides, but a token is not required to check the PIN of a user already
-  logged in. A login of another user (the security officer, or another `LoginUser` username) while one is
-  held is refused before the module.
+- **A second login is refused; sharing is explicit.** While the application holds a login on the token, a
+  `Login` is refused before the module, with no PIN sent: `CKR_USER_ALREADY_LOGGED_IN` for the same user,
+  `CKR_USER_ANOTHER_ALREADY_LOGGED_IN` for anyone else (the security officer, or another `LoginUser` username).
+  PKCS#11 has no way to check a PIN against a login already made, so a second login that "shared" the first
+  would succeed with any PIN, and resending the PIN could only cost retries on a token that does check it. Code
+  that should use the login takes a share without a PIN: `Pkcs11Login.Share()` on a login it was handed, or
+  `Pkcs11Slot.TryShareLogin` for the login held on the slot. A share is not an authentication: it hands out what
+  the application already has.
+- **A login made outside the library is never taken over.** When the token answers a first login with
+  `CKR_USER_ALREADY_LOGGED_IN` (or `CKR_USER_ANOTHER_ALREADY_LOGGED_IN`), the library checks whether the login is
+  one it left behind: a `C_Logout` that failed, or the login's own session lost while other sessions kept the
+  token logged in. If so, it logs that login out and sends the login once more, so the PIN is checked. If not
+  (another component called the module directly), the login is refused with `Pkcs11AuthenticationException`
+  and nothing is logged out.
 - **The library keeps a session of its own for each login**, on which it sends `C_Login` and `C_Logout`. It is
   what keeps a login alive while you have no session open. It is read/write for both users where the token
   allows. For the user it falls back to a read-only session where the token refuses a read/write one (a
@@ -154,12 +164,15 @@ using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
   the user logs out, even if the user logs in again. A `Pkcs11Key`, `Pkcs11Object` or `Pkcs11Certificate`
   found under a login that has since ended refuses to send its private handle (`ObjectDisposedException`):
   log in and open it again. A logout waits for operations in flight on the token, so none is cut off
-  halfway.
+  halfway: when the last holder is disposed while operations run (on another thread, or from code the library
+  calls back during one), the logout is left pending and sent as the last of them ends. Disposing never blocks
+  or throws for it, and a `Login` made meanwhile waits for that logout, then logs in afresh.
 - **A lost token or HSM session is noticed late; logging in again recovers.** After the token is pulled and
   put back, or a network HSM fails over, the module has dropped the login, but `Pkcs11Login.IsActive` may
   still read `true` and `login.OpenSession()` still succeed until the library next uses the login's own
-  session; operations meanwhile fail with `CKR_USER_NOT_LOGGED_IN`. Call `slot.Login(...)` again: it finds
-  that session lost, ends the old login and logs in afresh in the same call. The old `Pkcs11Login`, its
+  session; operations meanwhile fail with `CKR_USER_NOT_LOGGED_IN`. Call `slot.Login(...)` again: before
+  refusing a second login it checks that session (`C_GetSessionInfo`), finds it lost, ends the old login and
+  logs in afresh in the same call. The old `Pkcs11Login`, its
   sessions and its private handles stay ended; dispose them and use the new login.
 - **Sessions are read-only unless asked otherwise, where no login is needed.** `Pkcs11Slot.OpenSession()`
   opens a read-only session that holds no login (it sees the application's login while there is one), the

@@ -41,16 +41,13 @@ internal sealed class LoginHold : IDisposable
     /// <summary>Marks this share released; <see langword="true"/> only for the call that did.</summary>
     internal bool TryMarkReleased() => Interlocked.Exchange(ref _released, 1) == 0;
 
-    /// <summary>Releases this share, once; the last share of the current login logs it out.</summary>
-    /// <exception cref="InvalidOperationException">
-    /// Called from inside an operation on the token (<see cref="TokenLoginRecord.EnterOperation"/>). Nothing is
-    /// released then: the share stays held, and releasing it once the operation is over still logs out.
-    /// </exception>
+    /// <summary>
+    /// Releases this share, once; the last share of the current login logs it out, at once or, with operations in
+    /// flight on the token, as the last of them ends (<see cref="TokenLoginRecord.Release"/>). Never throws for being
+    /// called from inside an operation.
+    /// </summary>
     public void Dispose()
     {
-        if (IsReleased)
-            return;
-        Record.ThrowIfInsideOperation();
         if (TryMarkReleased())
             Record.Release(this);
     }

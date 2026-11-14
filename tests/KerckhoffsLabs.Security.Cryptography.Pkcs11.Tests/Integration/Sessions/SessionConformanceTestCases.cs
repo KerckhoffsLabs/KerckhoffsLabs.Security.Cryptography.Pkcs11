@@ -535,11 +535,11 @@ internal static class SessionConformanceTestCases
     }
 
     // The login belongs to the application, not to a session (PKCS#11 v3.2 §5.6): while the user is logged in, a
-    // second Login of the same user still sends C_Login, which the module answers CKR_USER_ALREADY_LOGGED_IN (or
-    // CKR_OK, re-verifying), and the library shares the login it holds instead of failing. Releasing that second
-    // hold leaves the first login's session logged in; the last holder's release logs the token out. Getting
-    // started's "load and log in once" section rests on this.
-    internal static void Assert_SecondLogin_WhileLoggedIn_SharesTheLogin(IPkcs11Backend backend)
+    // second Login of the same user is refused before the module (CKR_USER_ALREADY_LOGGED_IN), with no PIN sent, since
+    // PKCS#11 cannot check a PIN against a login already made. The login held is shared explicitly instead, without a
+    // PIN. Releasing a share leaves the first login's session logged in; the last holder's release logs the token out.
+    // Getting started's "load and log in once" section rests on this.
+    internal static void Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(IPkcs11Backend backend)
     {
         if (!backend.RequiresUserLogin)
             Assert.Skip("The backend has no login.");
@@ -551,9 +551,18 @@ internal static class SessionConformanceTestCases
         using (Pkcs11Login first = slot.Login(TokenUser.User, pin))
         using (Pkcs11Session session = first.OpenSession())
         {
-            using (var again = new SecurePin(backend.UserPin.Span))
-            using (Pkcs11Login second = slot.Login(TokenUser.User, again))
+            // Refused before the module, whatever the PIN: no PIN is sent, so no retry is counted.
+            using (var wrong = new SecurePin("0000000000"u8))
+            {
+                var refused = Assert.Throws<Pkcs11AuthenticationException>(() => slot.Login(TokenUser.User, wrong));
+                Assert.Equal(CKR.CKR_USER_ALREADY_LOGGED_IN, refused.ReturnValue);
+            }
+
+            // Taken without a PIN instead: a share of the same login, from the hold or from the slot.
+            using (Pkcs11Login second = first.Share())
                 Assert.True(second.IsActive);
+            Assert.True(slot.TryShareLogin(TokenUser.User, out Pkcs11Login? third));
+            third.Dispose();
 
             Assert.True(first.IsActive);
             Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State);

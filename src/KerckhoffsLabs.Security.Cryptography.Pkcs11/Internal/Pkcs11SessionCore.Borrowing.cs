@@ -109,7 +109,7 @@ internal sealed partial class Pkcs11SessionCore
 
     /// <summary>
     /// A borrower's disposal: returns the anchor to the login, without <c>C_CloseSession</c> or <c>C_Logout</c>. Under
-    /// the gate held shared and the anchor's lock (an anchor-side core's order, waited for like any disposal): destroys
+    /// the gate counted and the anchor's lock (an anchor-side core's order, waited for like any disposal): destroys
     /// the session objects made through it, unless the login ended (which closed the anchor, and them with it); leaves
     /// any operation it could not cancel with the anchor, for the next borrower to be told of; and returns the loan to
     /// the record, if it is still the current one. Never throws for the module's answers.

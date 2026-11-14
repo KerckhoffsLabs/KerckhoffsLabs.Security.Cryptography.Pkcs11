@@ -166,6 +166,12 @@ internal sealed class LoginTokenModule : FakeModule
     public Action<NativeCULong>? DuringLogin { get; set; }
 
     /// <summary>
+    /// Runs at the start of every <c>C_GetSessionInfo</c>, before the token's lock, with the session handle: lets a test
+    /// block the login record's probe of its anchor in flight.
+    /// </summary>
+    public Action<NativeCULong>? DuringGetSessionInfo { get; set; }
+
+    /// <summary>
     /// Runs inside every <c>C_Sign</c> that produces a signature (not a length probe), before the token's
     /// lock: lets a test hold an operation in flight. <c>C_SignInit</c> accepts any mechanism and key.
     /// </summary>
@@ -849,8 +855,11 @@ internal sealed class LoginTokenModule : FakeModule
 
     protected override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
     {
+        DuringGetSessionInfo?.Invoke(session);
         lock (_lock)
         {
+            if (_failing.TryGetValue((ulong)session, out CKR failure))
+                return failure;
             int index = _sessions.FindIndex(s => s.Handle == (ulong)session);
             if (index < 0)
                 return CKR.CKR_SESSION_HANDLE_INVALID;

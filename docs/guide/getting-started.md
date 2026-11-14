@@ -69,11 +69,13 @@ load the module and log in for every operation. In PKCS#11 the login belongs to 
 the session: once the user is logged in, every session the application has on the token sees the login.
 Load the module and log in once at startup, keep the library and the `Pkcs11Login` for the application's
 lifetime, and open sessions from the login (`login.OpenSession()`) for the code that opens keys and uses
-them. A second `slot.Login` of the same user while the login is held shares it rather than failing, but it
-is not a second authentication: a token is not required to check the PIN of a user who is already logged
-in. Logging in as another user (the security officer, say) while one is held is refused with
-`Pkcs11AuthenticationException`. The example pages show the same full flow per method, for the same
-reason.
+them. A second `slot.Login` while the login is held is refused with `Pkcs11AuthenticationException`
+(`CKR_USER_ALREADY_LOGGED_IN` for the same user, `CKR_USER_ANOTHER_ALREADY_LOGGED_IN` for another), before the
+module and with no PIN sent: PKCS#11 cannot check a PIN against a login already made, so a second login that
+succeeded would succeed with any PIN. A component that should work under the login takes a share of it
+instead, without a PIN: `login.Share()` from a `Pkcs11Login` it was given, or `slot.TryShareLogin(TokenUser.User,
+out Pkcs11Login? shared)` for the login held on the slot. The example pages show the same full flow per method,
+for the same reason.
 
 ## Handling errors
 

@@ -169,22 +169,22 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
 
     /// <summary>
     /// Disposable token returned by <see cref="AcquireExclusive"/> and <see cref="AcquireForRecord"/>. Holds the busy
-    /// lock, a reference on the session handle, and the token login's gate shared, and releases all three on dispose.
+    /// lock, a reference on the session handle, and a count on the token login's gate, and releases all three on dispose.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The gate (<see cref="TokenLoginRecord.EnterOperation"/>) is what keeps a first login or the final logout
-    /// on the slot from landing inside the operation: they wait for it to finish, as PKCS#11 v3.2 asks of a
-    /// logout ("any active operations should be finished").
+    /// The gate (<see cref="TokenLoginRecord.EnterOperation"/>) counts the operation, which keeps the final logout on
+    /// the slot from landing inside it: the logout waits for the count to drop to zero, as PKCS#11 v3.2 asks ("any
+    /// active operations should be finished"), and is sent by the thread whose operation ends last. Entering the gate
+    /// never waits.
     /// </para>
     /// <para>
-    /// Lock order: an ordinary session's lock, then the gate, then the record's send lock, then the anchor's lock,
-    /// then the record's lock. An ordinary core takes its lock, then the reference, then the gate. An anchor-side core
-    /// (<see cref="IsAnchorSide"/>) takes the gate first, then its lock, then the reference: its lock comes after the
-    /// gate, since the record closes the anchor while holding the gate (shared, from an operation that learns the login
-    /// ended; or exclusive, for the final logout). Were the anchor's lock taken first, a thread holding it and queued on
-    /// the gate behind a waiting final logout would wait for that logout, the logout for the operation in flight, and
-    /// the operation for the anchor's lock. Each kind releases in the reverse of the order it took.
+    /// Lock order: an ordinary session's lock, then the anchor's lock, then the record's lock. An ordinary core takes
+    /// its lock, then the reference, then the gate, and gives the gate back first, still under its lock (a logout it
+    /// then sends takes the anchor's lock, which comes after). An anchor-side core (<see cref="IsAnchorSide"/>) enters
+    /// the gate first, then its lock, then the reference, and gives the gate back last, after its lock: a logout it
+    /// sends as its operation ends then holds none of this core's locks. Each kind releases in the reverse of the order
+    /// it took.
     /// </para>
     /// <para>
     /// The reference is what keeps the session open for a whole operation, from <c>C_*Init</c> to the
@@ -252,7 +252,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
                 _handle = handle;
         }
 
-        /// <summary>Holds <paramref name="record"/>'s gate shared until this lease is disposed.</summary>
+        /// <summary>Counts this lease's operation on <paramref name="record"/>'s gate until this lease is disposed.</summary>
         internal void EnterOperation(TokenLoginRecord record) => _operation = record.EnterOperation();
 
         /// <summary>Whether this lease holds the gate yet.</summary>
@@ -288,7 +288,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     /// <remarks>
     /// <para>Usage: <c>using var _ = AcquireExclusive(); ...</c></para>
     /// <para>
-    /// An anchor-side core (<see cref="IsAnchorSide"/>) holds the gate shared before it tries its lock (see
+    /// An anchor-side core (<see cref="IsAnchorSide"/>) counts itself on the gate before it tries its lock (see
     /// <see cref="ExclusiveLease"/> for the order). Finding the lock taken, it throws only when another application
     /// lease holds it (<see cref="_applicationHolder"/>) and no record send is waiting for or holding it; otherwise it
     /// waits: the record's sends take turns with the session's user, which is not concurrent use of the session by the
@@ -346,14 +346,13 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
 
     /// <summary>
     /// Acquires this session for one of the login record's sends on its anchor (<c>C_Login</c>, <c>C_LoginUser</c>,
-    /// <c>C_Logout</c>, <c>C_InitPIN</c>): the gate shared, then the lock, waited for rather than refused, since
+    /// <c>C_Logout</c>, <c>C_InitPIN</c>, the probe): the gate counted, then the lock, waited for rather than refused, since
     /// another thread may hold the anchor for an operation. While it waits or holds, the anchor's
     /// <see cref="AcquireExclusive"/> waits too instead of throwing.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The record calls this holding the gate (shared or exclusive), so the gate taken here is a recursive hold, and
-    /// holding the record's send lock, which comes before the anchor's lock. It never holds the record's lock.
+    /// The record never calls this holding its own lock.
     /// </para>
     /// <para>
     /// On a core that is not anchor-side (a session the caller drives itself), this is <see cref="AcquireExclusive"/>:
@@ -1066,8 +1065,8 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         _sessionHandle.Dispose();
 
         // The anchor of the token's login lost: the login went with it (decision 5), so the record ends it now and
-        // a new login starts afresh. Last, since ending it disposes this session. Lock order holds: the gate (an
-        // anchor-side lease takes it first), this anchor's lock, then the record's lock.
+        // a new login starts afresh. Last, since ending it disposes this session. Lock order holds: this anchor's lock,
+        // then the record's lock.
         if (_isAnchorSide)
             _record.AnchorLost(this, rv);
     }

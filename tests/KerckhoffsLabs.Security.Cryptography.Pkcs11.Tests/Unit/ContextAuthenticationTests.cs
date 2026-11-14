@@ -240,8 +240,8 @@ public sealed class ContextAuthenticationTests : IDisposable
         Assert.Equal(["C_SignInit", "C_SessionCancel"], _module.CallLog);
         Assert.False(_module.HasActiveOperation(session.Core.SessionId));
 
-        // The gate is no longer held on this thread: a release here is not refused as one inside an operation.
-        Slot.Login(TokenUser.User, _pin).Dispose();
+        // The operation's count on the gate was given back: no operation is left in flight on the token.
+        Assert.Equal(0, session.Core.LoginRecord.ActiveOperations);
 
         // The session lock is released: another thread can use the session.
         session.ContextAuthentication = RightPin();
@@ -265,8 +265,10 @@ public sealed class ContextAuthenticationTests : IDisposable
         Assert.False(_module.HasActiveOperation(session.Core.SessionId));
     }
 
+    // The callback releases the last holder from inside the sign: never refused, the logout waits for the sign and is
+    // sent as it ends. The sign itself, made with the context login, succeeds.
     [Fact]
-    public void SourceDisposesTheLogin_ReleaseRefused_StateConsistent()
+    public void SourceDisposesTheLogin_LogoutDeferredUntilTheSignEnds()
     {
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Session session = Slot.OpenSession();
@@ -277,17 +279,16 @@ public sealed class ContextAuthenticationTests : IDisposable
         });
         using Pkcs11Key key = session.OpenKey(AlwaysAuthenticateEc);
 
-        Assert.Throws<InvalidOperationException>(() => key.Sign(Ecdsa, "data"u8));
+        int logoutsDuringSign = -1;
+        _module.DuringSign = () => logoutsDuringSign = _module.LogoutCalls;
 
-        // The release was refused before anything changed: the login is still held and still logged in.
-        Assert.True(login.IsActive);
-        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
-        Assert.False(_module.HasActiveOperation(session.Core.SessionId));
+        Assert.Equal(LoginTokenModule.SignatureLength, key.Sign(Ecdsa, "data"u8).Length);
 
-        session.ContextAuthentication = RightPin();
-        key.Sign(Ecdsa, "data"u8);
-        login.Dispose();
+        Assert.Equal(0, logoutsDuringSign);      // the sign ran logged in
+        Assert.Equal(1, _module.LogoutCalls);    // the logout went as it ended
         Assert.False(login.IsActive);
+        Assert.Null(_module.LoggedIn);
+        Assert.False(_module.HasActiveOperation(session.Core.SessionId));
     }
 
     [Fact]

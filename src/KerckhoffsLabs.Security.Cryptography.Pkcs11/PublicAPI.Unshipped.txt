@@ -2241,3 +2241,6 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.ContextAuthentication.ge
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.ContextAuthentication.set -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.ContextAuthentication.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ContextAuthentication?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.ContextAuthentication.set -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.Share() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.TryShareLogin(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login? login) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.TryShareLogin(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user, string! username, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login? login) -> bool

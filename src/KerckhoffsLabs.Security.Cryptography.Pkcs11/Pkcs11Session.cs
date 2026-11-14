@@ -210,21 +210,15 @@ public sealed partial class Pkcs11Session : IDisposable
     /// session objects (<c>CKA_TOKEN</c> false) created through it; token objects stay. An operation the module could
     /// not cancel (it has no <c>C_SessionCancel</c>) stays active on the login's session, and the next session it is
     /// lent to is told so when it starts one of that kind. If the login ended while the session was lent, the login's
-    /// session is already closed, and this only releases the hold.
+    /// session is already closed, and this only releases the hold. From inside an operation on the same token (code the
+    /// library calls back during one), the logout the release of the last hold sends waits for the operations in
+    /// flight, and is sent as the last of them ends.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">
-    /// Called from inside an operation on the same token, for a session that holds a login: the logout its
-    /// release may send waits for operations to finish, so it cannot run from one. Nothing is closed then.
-    /// </exception>
     public void Dispose()
     {
         if (_disposed) return;
 
-        // Refused before anything changes: once the session is closed its hold could no longer be released.
-        _hold?.Record.ThrowIfInsideOperation();
-
-        // The close waits for this session's operation lease, so the hold is released after it, outside any
-        // operation, and the logout the last holder sends can take the login's gate.
+        // The close waits for this session's operation lease, so the hold is released after it.
         _core.Dispose();
         _disposed = true;
         _hold?.Dispose();
