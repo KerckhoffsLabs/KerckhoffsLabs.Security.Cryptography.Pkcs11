@@ -1063,13 +1063,12 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
 
         // An operation's lease holds a reference on the handle, so the release (and, for a removed token, its one
         // C_CloseSession) runs when that operation lets go, still under the session lock.
-        Pkcs11SessionHandle handle = _sessionHandle;
-        handle.Dispose();
+        _sessionHandle.Dispose();
 
         // The anchor of the token's login lost: the login went with it (decision 5), so the record ends it now and
         // a new login starts afresh. Last, since ending it disposes this session. Lock order holds: the gate (an
         // anchor-side lease takes it first), this anchor's lock, then the record's lock.
-        if (handle.IsAnchor)
+        if (_isAnchorSide)
             _record.AnchorLost(this, rv);
     }
 

@@ -94,9 +94,9 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     // the shared Mock fixture would cascade into the other Mock-collection tests.
     private void WithSession(Action<Pkcs11SessionCore> body)
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var session = TestKeys.OpenLoggedInSession(_backend);
         try { body(session); }
-        finally { TestKeys.LogoutIfRequired(_backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(_backend, session); }
     }
 
     private static List<ObjectAttribute> SecretKeyTemplate(ObjectAttribute insecure) =>

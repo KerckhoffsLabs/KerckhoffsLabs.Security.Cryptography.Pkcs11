@@ -108,7 +108,7 @@ internal static class TokenLoginTestCases
         {
             AssertSigns(key);
 
-            Pkcs11Session disposed = login.OpenSession();
+            using Pkcs11Session disposed = login.OpenSession();
             disposed.Dispose();
 
             Assert.True(login.IsActive);
@@ -130,49 +130,55 @@ internal static class TokenLoginTestCases
     {
         RequireLoginAndEcdsa(backend);
 
-        Pkcs11Login login = LogIn(backend);
-        Pkcs11Session? first = null;
-        Pkcs11Session? second = null;
-        Pkcs11Key? firstKey = null;
-        Pkcs11Key? secondKey = null;
-        try
+        // Everything is disposed, in the test's own order, before the block ends; the using declarations only
+        // close what a failure partway left open (Dispose is idempotent). A key not yet destroyed is destroyed on
+        // the way out, so a token key (tokenKeys) never stays on the token; a session key would go with its session.
         {
-            first = login.OpenSession();
-            second = login.OpenSession();
-            firstKey = NewSigningKey(first, tokenKeys);
-            secondKey = NewSigningKey(second, tokenKeys);
+            using Pkcs11Login login = LogIn(backend);
+            using Pkcs11Session first = login.OpenSession();
+            using Pkcs11Session second = login.OpenSession();
+            bool firstDestroyed = false;
+            bool secondDestroyed = false;
+            using Pkcs11Key firstKey = NewSigningKey(first, tokenKeys);
+            try
+            {
+                using Pkcs11Key secondKey = NewSigningKey(second, tokenKeys);
+                try
+                {
+                    login.Dispose();
+                    Assert.False(login.IsActive); // this hold is released; the sessions' holds keep the login
 
-            login.Dispose();
-            Assert.False(login.IsActive); // this hold is released; the sessions' holds keep the login
+                    AssertSigns(firstKey);
+                    AssertSigns(secondKey);
 
-            AssertSigns(firstKey);
-            AssertSigns(secondKey);
+                    firstKey.Destroy();
+                    firstDestroyed = true;
+                    firstKey.Dispose();
+                    first.Dispose();
 
-            firstKey.Destroy();
-            firstKey.Dispose();
-            firstKey = null;
-            first.Dispose();
+                    Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, second.GetSessionInfo().State);
+                    AssertSigns(secondKey);
 
-            Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, second.GetSessionInfo().State);
-            AssertSigns(secondKey);
-
-            secondKey.Destroy();
-            secondKey.Dispose();
-            secondKey = null;
-            second.Dispose();
-
-            using Pkcs11Session after = Slot(backend).OpenSession();
-            Assert.Equal(CKS.CKS_RO_PUBLIC_SESSION, after.GetSessionInfo().State);
+                    secondKey.Destroy();
+                    secondDestroyed = true;
+                    secondKey.Dispose();
+                    second.Dispose();
+                }
+                finally
+                {
+                    if (!secondDestroyed)
+                        secondKey.Destroy();
+                }
+            }
+            finally
+            {
+                if (!firstDestroyed)
+                    firstKey.Destroy();
+            }
         }
-        finally
-        {
-            // On a failure: closing the sessions frees their session keys.
-            firstKey?.Dispose();
-            secondKey?.Dispose();
-            first?.Dispose();
-            second?.Dispose();
-            login.Dispose();
-        }
+
+        using Pkcs11Session after = Slot(backend).OpenSession();
+        Assert.Equal(CKS.CKS_RO_PUBLIC_SESSION, after.GetSessionInfo().State);
     }
 
     /// <summary>
@@ -190,20 +196,14 @@ internal static class TokenLoginTestCases
         Assert.Equal(SessionAccess.ReadOnly, observer.Access);
         Assert.Equal(CKS.CKS_RO_PUBLIC_SESSION, observer.GetSessionInfo().State);
 
-        Pkcs11Login login = LogIn(backend);
-        Pkcs11Session? session = null;
-        try
+        // The login and its session are both disposed when the block ends, the login first.
         {
-            session = login.OpenSession();
+            using Pkcs11Login login = LogIn(backend);
+            using Pkcs11Session session = login.OpenSession();
             Assert.Equal(CKS.CKS_RO_USER_FUNCTIONS, observer.GetSessionInfo().State);
 
             login.Dispose();
             Assert.Equal(CKS.CKS_RO_USER_FUNCTIONS, observer.GetSessionInfo().State); // the session still holds it
-        }
-        finally
-        {
-            session?.Dispose();
-            login.Dispose();
         }
 
         Assert.Equal(CKS.CKS_RO_PUBLIC_SESSION, observer.GetSessionInfo().State);
@@ -258,18 +258,12 @@ internal static class TokenLoginTestCases
     /// and a slot session opens read-only in "R/O Public Session".</summary>
     internal static void Assert_OneSessionToken_LastHolderFreesTheToken(IPkcs11Backend backend)
     {
-        Pkcs11Login login = LogIn(backend);
-        Pkcs11Session? session = null;
-        try
+        // The login and the lent session are both disposed when the block ends, the login first.
         {
-            session = login.OpenSession();
+            using Pkcs11Login login = LogIn(backend);
+            using Pkcs11Session session = login.OpenSession();
             login.Dispose();
             Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, session.GetSessionInfo().State); // the session still holds it
-        }
-        finally
-        {
-            session?.Dispose();
-            login.Dispose();
         }
 
         using Pkcs11Session slotSession = Slot(backend).OpenSession();

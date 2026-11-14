@@ -134,14 +134,20 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
             {
                 _released?.Invoke();
             }
-            catch
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
-                // A release never throws; see the constructor.
+                // Contained: a release may not throw (it can run on the finalizer thread, where an exception ends
+                // the process), so anything else the callback throws is dropped; see the constructor. The one
+                // callback passed (TokenLoginRegistry.SessionClosed) only updates a tally under a lock. An
+                // OutOfMemoryException is knowingly let through, as the process is failing anyway; the module's
+                // use is still released, once, by the finally below.
             }
-
-            // Release last: only after C_CloseSession has had its chance to run does the module
-            // become eligible for its own SafeHandle release.
-            if (_moduleRefAdded) _module.ReleaseUse();
+            finally
+            {
+                // Release last: only after C_CloseSession has had its chance to run does the module
+                // become eligible for its own SafeHandle release.
+                if (_moduleRefAdded) _module.ReleaseUse();
+            }
         }
     }
 }

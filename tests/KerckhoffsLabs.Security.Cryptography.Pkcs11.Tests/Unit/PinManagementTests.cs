@@ -98,7 +98,7 @@ public sealed class PinManagementTests : IDisposable
     [InlineData(true)]
     public void InitUserPin_AfterTheLoginIsDisposed_ThrowsObjectDisposed(bool pinpad)
     {
-        Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
         login.Dispose();
 
         var ex = Assert.Throws<ObjectDisposedException>(() =>
@@ -116,7 +116,7 @@ public sealed class PinManagementTests : IDisposable
     [Fact]
     public void InitUserPin_WhileASessionStillHoldsTheLogin_RunsOnTheAnchor()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.SecurityOfficer, _pin);
         using Pkcs11Session session = login.OpenSession();
         using Pkcs11Login second = Slot.Login(TokenUser.SecurityOfficer, _pin);
         login.Dispose();

@@ -81,10 +81,7 @@ public sealed partial class Pkcs11Key : IDisposable
         CKK keyType,
         string? label,
         byte[] id,
-        bool companionPending = false,
-        bool privateHalfIsPrivate = false,
-        bool publicHalfIsPrivate = false,
-        LoginStamp loginStamp = default)
+        bool companionPending = false)
     {
         ArgumentNullException.ThrowIfNull(session);
         if (privateHandle.IsInvalid && publicHandle.IsInvalid)
@@ -99,8 +96,21 @@ public sealed partial class Pkcs11Key : IDisposable
         _keyType = keyType;
         Label = label;
         _id = id ?? [];
-        _privateHalfLogin = privateHalfIsPrivate && !privateHandle.IsInvalid ? new HalfLogin(loginStamp) : null;
-        _publicHalfLogin = publicHalfIsPrivate && !publicHandle.IsInvalid ? new HalfLogin(loginStamp) : null;
+    }
+
+    /// <summary>
+    /// Ties each half that is a private object to the login state it was found or made under (see
+    /// <see cref="PrivateObjectLogin"/>). Called once, by the session that built the key, before the key is handed out.
+    /// </summary>
+    /// <param name="privateHalfIsPrivate">Whether the private-key or secret-key half is a private object.</param>
+    /// <param name="publicHalfIsPrivate">Whether the public-key half is a private object.</param>
+    /// <param name="loginStamp">The token's login state when the halves were found or made.</param>
+    /// <returns>This key.</returns>
+    internal Pkcs11Key WithLoginStamp(bool privateHalfIsPrivate, bool publicHalfIsPrivate, LoginStamp loginStamp)
+    {
+        _privateHalfLogin = privateHalfIsPrivate && !_knownPrivateHandle.IsInvalid ? new HalfLogin(loginStamp) : null;
+        _publicHalfLogin = publicHalfIsPrivate && !_knownPublicHandle.IsInvalid ? new HalfLogin(loginStamp) : null;
+        return this;
     }
 
     /// <summary>

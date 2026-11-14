@@ -1,4 +1,3 @@
-using System.Reflection;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -56,18 +55,11 @@ public sealed class AnchorLendingTests : IDisposable
 
     private static void AssertLent(Pkcs11Session session, ulong anchorId) => Assert.Equal(anchorId, session.Core.SessionId);
 
-    // Runs action on a background thread; the exception it threw, if any, is in the returned box once joined.
-    private static (Thread Thread, Func<Exception?> Failure) Start(Action action)
+    // Runs action on a thread of its own; what it threw, if anything, is read once it has finished.
+    private static (BackgroundWork Thread, Func<Exception?> Failure) Start(Action action)
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception ex) { failure = ex; }
-        })
-        { IsBackground = true };
-        thread.Start();
-        return (thread, () => failure);
+        BackgroundWork work = BackgroundWork.Run(action);
+        return (work, () => work.Failure);
     }
 
     [Fact]
@@ -207,8 +199,8 @@ public sealed class AnchorLendingTests : IDisposable
     [Fact]
     public void LentSessionLastHolder_LogsOutThenClosesTheAnchor()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
-        Pkcs11Session session = login.OpenSession();
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session session = login.OpenSession();
 
         login.Dispose();
         Assert.Equal(0, _module.LogoutCalls);
@@ -406,7 +398,7 @@ public sealed class AnchorLendingTests : IDisposable
         ulong handle;
         using (Pkcs11Session session = login.OpenSession())
         {
-            Pkcs11Object created = session.CreateObject(sessionTemplate);
+            using Pkcs11Object created = session.CreateObject(sessionTemplate);
             handle = created.Handle.ObjectId;
             session.Core.DestroyObject(created.Handle);
             created.Dispose();
@@ -441,6 +433,45 @@ public sealed class AnchorLendingTests : IDisposable
         Assert.Single(_module.DestroyObjectCalls, h => h == handle);
         Assert.True(_module.HasObject(handle));
         Assert.Single(_module.OpenSessions);
+    }
+
+    // A label longer than the reader's stack buffer (128 bytes) is still compared, in full: a reused handle whose new
+    // object has the same class and a different label of the same length is not destroyed.
+    [Fact]
+    public void LentSession_RecordedHandleReusedWithAnotherLongLabel_IsNotDestroyed()
+    {
+        string createdLabel = new('a', 200);
+        string reusedLabel = new string('a', 199) + "b";
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using ObjectTemplate sessionTemplate = ObjectTemplate.ForData().Label(createdLabel).Build();
+        Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(Record.Anchor);
+        ulong handle;
+        using (Pkcs11Session session = login.OpenSession())
+        {
+            using Pkcs11Object created = session.CreateObject(sessionTemplate);
+            handle = created.Handle.ObjectId;
+            anchor.DestroyObject(created.Handle);
+            ReuseHandle(handle, CKO.CKO_DATA, reusedLabel);
+        }
+
+        Assert.Single(_module.DestroyObjectCalls, h => h == handle);
+        Assert.True(_module.HasObject(handle));
+    }
+
+    // The same long label still matches: the session object made through the lent session is destroyed on return.
+    [Fact]
+    public void LentSession_SessionObjectWithLongLabel_DestroyedOnDispose()
+    {
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using ObjectTemplate sessionTemplate = ObjectTemplate.ForData().Label(new string('a', 200)).Build();
+        ulong handle;
+        using (Pkcs11Session session = login.OpenSession())
+        {
+            using Pkcs11Object created = session.CreateObject(sessionTemplate);
+            handle = created.Handle.ObjectId;
+        }
+
+        Assert.False(_module.HasObject(handle));
     }
 
     [Fact]
@@ -639,7 +670,7 @@ public sealed class AnchorLendingTests : IDisposable
         });
         Assert.True(held.Wait(Bounded, TestContext.Current.CancellationToken), "the lease was never taken");
         var (sharer, shareFailure) = Start(() => Slot.Login(TokenUser.User, _pin).Dispose());
-        Thread? second = null;
+        BackgroundWork? second = null;
         Func<Exception?>? secondFailure = null;
         try
         {
@@ -670,33 +701,23 @@ public sealed class AnchorLendingTests : IDisposable
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using var barrier = new Barrier(2);
         var sessions = new Pkcs11Session?[2];
-        var failures = new Exception?[2];
-        var threads = Enumerable.Range(0, 2).Select(i => new Thread(() =>
+        BackgroundWork[] threads = [.. Enumerable.Range(0, 2).Select(i => BackgroundWork.Run(() =>
         {
             barrier.SignalAndWait(Bounded);
-            try { sessions[i] = login.OpenSession(); }
-            catch (Exception ex) { failures[i] = ex; }
-        })
-        { IsBackground = true }).ToArray();
-        foreach (Thread thread in threads)
-            thread.Start();
-        foreach (Thread thread in threads)
+            sessions[i] = login.OpenSession();
+        }))];
+        foreach (BackgroundWork thread in threads)
             Assert.True(thread.Join(Bounded), "an OpenSession did not finish");
+        Exception?[] failures = [.. threads.Select(t => t.Failure)];
+        using Pkcs11Session? firstOpened = sessions[0];
+        using Pkcs11Session? secondOpened = sessions[1];
 
-        try
-        {
-            Pkcs11Session lent = Assert.Single(sessions, s => s is not null)!;
-            var refused = Assert.IsType<Pkcs11SessionException>(Assert.Single(failures, f => f is not null));
-            Assert.Equal(CKR.CKR_SESSION_COUNT, refused.ReturnValue);
-            Assert.Contains("lent", refused.Message, StringComparison.Ordinal);
-            AssertLent(lent, AnchorId);
-            Assert.Single(_module.OpenSessions);
-        }
-        finally
-        {
-            foreach (Pkcs11Session? session in sessions)
-                session?.Dispose();
-        }
+        Pkcs11Session lent = Assert.Single(sessions, s => s is not null)!;
+        var refused = Assert.IsType<Pkcs11SessionException>(Assert.Single(failures, f => f is not null));
+        Assert.Equal(CKR.CKR_SESSION_COUNT, refused.ReturnValue);
+        Assert.Contains("lent", refused.Message, StringComparison.Ordinal);
+        AssertLent(lent, AnchorId);
+        Assert.Single(_module.OpenSessions);
     }
 
     // ---- Races between building the borrower and recording the loan (TryLend's two phases) ------------------------
@@ -725,9 +746,7 @@ public sealed class AnchorLendingTests : IDisposable
         TokenLoginRecord record = Record;
         ulong anchor = AnchorId;
         // The instant inside Pkcs11Library.Dispose between its flag being set and the library's holds being released.
-        FieldInfo disposing = Assert.IsAssignableFrom<FieldInfo>(
-            typeof(Pkcs11Library).GetField("_disposing", BindingFlags.NonPublic | BindingFlags.Instance));
-        record.BetweenLendPhases = () => disposing.SetValue(_library, 1);
+        record.BetweenLendPhases = _library.BeginDisposingForTest;
 
         var ex = Assert.Throws<ObjectDisposedException>(() => login.OpenSession());
 
@@ -794,8 +813,8 @@ public sealed class AnchorLendingTests : IDisposable
     [Fact]
     public void InitToken_WhileLent_RefusedSessionExists_AfterwardsSucceeds()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
-        Pkcs11Session session = login.OpenSession();
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session session = login.OpenSession();
 
         var ex = Assert.Throws<Pkcs11SessionException>(() => Slot.InitTokenWithPin(_pin, "fresh"));
         Assert.Equal(CKR.CKR_SESSION_EXISTS, ex.ReturnValue);
@@ -816,7 +835,7 @@ public sealed class AnchorLendingTests : IDisposable
         _module.LockAfter = 1;
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         login.ContextAuthentication = ContextAuthentication.FromPin(_ => new SecurePin("9999"));
-        Pkcs11Session session = login.OpenSession();
+        using Pkcs11Session session = login.OpenSession();
         using (Pkcs11Key key = session.OpenKey(AlwaysAuthenticateEc))
         {
             var locked = Assert.ThrowsAny<Pkcs11Exception>(() => key.Sign(Ecdsa, "data"u8));
@@ -879,8 +898,8 @@ public sealed class AnchorLendingTests : IDisposable
     [Fact]
     public void LibraryDisposed_ReclaimsItsLentSession_ThenLogsOut()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
-        Pkcs11Session session = login.OpenSession();
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session session = login.OpenSession();
         using ObjectTemplate sessionTemplate = ObjectTemplate.ForData().Label("session").Build();
         ulong sessionObject;
         using (Pkcs11Object created = session.CreateObject(sessionTemplate))
@@ -903,9 +922,9 @@ public sealed class AnchorLendingTests : IDisposable
     [Fact]
     public void LibraryDisposed_WhileLentSessionSigns_WaitsForTheSign()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
-        Pkcs11Session session = login.OpenSession();
-        Pkcs11Key key = session.OpenKey(SigningKey);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session session = login.OpenSession();
+        using Pkcs11Key key = session.OpenKey(SigningKey);
         using var signing = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
         _module.DuringSign = () => { signing.Set(); release.Wait(Bounded); };
@@ -941,7 +960,7 @@ public sealed class AnchorLendingTests : IDisposable
     {
         using Pkcs11Library other = _module.Load();
         Pkcs11Slot otherSlot = Assert.Single(other.GetSlotList());
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Login otherLogin = otherSlot.Login(TokenUser.User, _pin);
         using Pkcs11Session session = otherLogin.OpenSession();
         TokenLoginRecord record = Record;

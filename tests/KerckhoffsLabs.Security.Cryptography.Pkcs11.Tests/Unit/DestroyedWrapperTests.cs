@@ -100,7 +100,7 @@ public sealed class DestroyedWrapperTests
         WithSession(module, session =>
         {
             using Pkcs11Key wrapping = new(session, new ObjectHandle(8UL), ObjectHandle.Invalid, CKK.CKK_AES, "kek", []);
-            Pkcs11Key target = Secret(session);
+            using Pkcs11Key target = Secret(session);
             if (destroyed)
                 target.Destroy();
             else

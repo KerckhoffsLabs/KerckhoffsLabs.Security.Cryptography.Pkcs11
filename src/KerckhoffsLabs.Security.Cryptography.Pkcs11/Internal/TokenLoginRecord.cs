@@ -233,18 +233,11 @@ internal sealed class TokenLoginRecord
 
             ThrowIfReadOnlySessionBlocksSo(user, method);
 
-            Pkcs11SessionCore anchor = OpenAnchor(owner, user, loggerFactory);
-            try
-            {
-                lock (_sendLock)
-                    Send(anchor, user, pin, username);
-            }
-            catch
-            {
-                // Closing the only session this record opened also leaves the token public again.
-                anchor.Dispose();
-                throw;
-            }
+            // Closed on every way out of this scope but one: the record keeps it once the login is recorded. Closing
+            // the only session this record opened also leaves the token public again.
+            using var anchor = new Owned<Pkcs11SessionCore>(OpenAnchor(owner, user, loggerFactory));
+            lock (_sendLock)
+                Send(anchor.Value, user, pin, username);
 
             lock (_lock)
             {
@@ -252,7 +245,7 @@ internal sealed class TokenLoginRecord
                 // hold taken now would never be. Checked before the login is recorded, and undone below.
                 if (!owner.IsDisposingOrDisposed)
                 {
-                    _anchor = anchor;
+                    _anchor = anchor.Release();
                     _user = user;
                     _username = username;
                     _generation++;
@@ -261,19 +254,15 @@ internal sealed class TokenLoginRecord
                 }
             }
 
-            // Still under the gate held exclusive: nothing else saw this login. Log it back out (other sessions of
-            // the application share it) and close the anchor.
+            // Still under the gate held exclusive: nothing else saw this login. Log it back out (other sessions of the
+            // application share it); the anchor is closed as this scope ends.
             try
             {
-                anchor.SendLogout();
+                anchor.Value.SendLogout();
             }
             catch (Pkcs11Exception)
             {
-                // Closing the anchor below may end the login anyway; the owner's disposal is what is reported.
-            }
-            finally
-            {
-                anchor.Dispose();
+                // Closing the anchor may end the login anyway; the owner's disposal is what is reported.
             }
             throw OwnerDisposed();
         }
@@ -549,15 +538,16 @@ internal sealed class TokenLoginRecord
 
         AnchorLoan? reclaimed;
         lock (_lock)
+        {
             reclaimed = _loan is { } loan && ReferenceEquals(loan.Owner, owner) ? loan : null;
+            // Marked as it is chosen, under the lock Return takes: a borrower disposed by its user before this point
+            // has already returned the loan and is not chosen, so its refusals never blame the library.
+            reclaimed?.MarkReclaimed();
+        }
 
         // Outside the record's lock: the return takes the gate and the anchor's lock, and destroys the session objects
         // made through the borrower. It waits for an operation in flight on it.
-        if (reclaimed is not null)
-        {
-            reclaimed.MarkReclaimed();
-            reclaimed.Borrower.Dispose();
-        }
+        reclaimed?.Borrower.Dispose();
 
         long generation;
         bool last;
@@ -634,7 +624,10 @@ internal sealed class TokenLoginRecord
     /// </summary>
     public IDisposable EnterOperation()
     {
+        // The gate stays held shared after this returns, by design: the lease releases it (OperationLease.Dispose).
+#pragma warning disable S7133 // Release locks in the same method that acquired them
         _gate.EnterReadLock();
+#pragma warning restore S7133
         return new OperationLease(_gate);
     }
 
@@ -645,7 +638,8 @@ internal sealed class TokenLoginRecord
     /// </summary>
     internal void ThrowIfInsideOperation()
     {
-        if (_gate.IsReadLockHeld && !_gate.IsWriteLockHeld)
+        // The thread's own counts: it holds the gate shared and not exclusive (an exclusive holder may re-enter it).
+        if (_gate.RecursiveReadCount > 0 && _gate.RecursiveWriteCount == 0)
         {
             throw new InvalidOperationException(
                 "A login cannot be released from inside an operation on its token: release the login outside the operation.");
@@ -689,23 +683,11 @@ internal sealed class TokenLoginRecord
         _gate.EnterWriteLock();
         try
         {
-            Pkcs11SessionCore anchor;
-            ILogger logger;
-            lock (_lock)
-            {
-                if (_holders.Count != 0 || _anchor is null || _generation != generation)
-                    return;
-                // Not expected: a lent anchor has its borrower's hold. Should one be left, it is not lent any longer.
-                EndLoanLocked();
-                anchor = _anchor;
-                _anchor = null;
-                _user = null;
-                _username = null;
-                logger = _logger;
-            }
-
-            // Closing the anchor may itself end the login (it can be the application's last session), so a
-            // failed C_Logout is logged and the anchor closed regardless.
+            // Taken from the record, so this method's to close. Closing it may itself end the login (it can be the
+            // application's last session), so a failed C_Logout is logged and the anchor closed regardless.
+            using Pkcs11SessionCore? anchor = TakeAnchorForLogout(generation, out ILogger logger);
+            if (anchor is null)
+                return;
             try
             {
                 anchor.SendLogout();
@@ -718,14 +700,30 @@ internal sealed class TokenLoginRecord
             {
                 Log.TokenLogoutAnchorClosed(logger, (ulong)_slotId);
             }
-            finally
-            {
-                anchor.Dispose();
-            }
         }
         finally
         {
             _gate.ExitWriteLock();
+        }
+    }
+
+    // Under the gate held exclusive, from LogOutIfUnheld. Takes the anchor out of the record, with the logger to report
+    // its logout through, if the login of generation is still current and unheld; else null, and the record is left
+    // as it was.
+    private Pkcs11SessionCore? TakeAnchorForLogout(long generation, out ILogger logger)
+    {
+        lock (_lock)
+        {
+            logger = _logger;
+            if (_holders.Count != 0 || _anchor is null || _generation != generation)
+                return null;
+            // Not expected: a lent anchor has its borrower's hold. Should one be left, it is not lent any longer.
+            EndLoanLocked();
+            Pkcs11SessionCore anchor = _anchor;
+            _anchor = null;
+            _user = null;
+            _username = null;
+            return anchor;
         }
     }
 
@@ -775,7 +773,7 @@ internal sealed class TokenLoginRecord
 
     // Decision F of the anchor-lending addendum: the anchor could not open because the token allows this application
     // no more sessions. From the library's tally on the slot, which never counts sessions opened outside it.
-    private Pkcs11Exception NoSessionForLogin(Pkcs11Exception moduleAnswer)
+    private Pkcs11SessionException NoSessionForLogin(Pkcs11Exception moduleAnswer)
     {
         int? open = _registry?.Sessions(_slotId) is { } tally ? tally.ReadOnly + tally.ReadWrite : null;
         string held = open switch

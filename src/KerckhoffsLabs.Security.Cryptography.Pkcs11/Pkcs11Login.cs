@@ -127,33 +127,35 @@ public sealed class Pkcs11Login : IDisposable
         Pkcs11Library library = Slot.Library;
         ObjectDisposedException.ThrowIf(library.IsDisposed, library);
 
-        // Taken first, so the login cannot go between the session opening and the session holding it.
-        LoginHold share = _hold.Record.Share(_hold, library);
-        Pkcs11SessionCore? core = null;
+        // Taken first, so the login cannot go between the session opening and the session holding it. Both the share
+        // and the core are released if anything fails (the core first), and handed to the session once it is built.
+        using var share = new Owned<LoginHold>(_hold.Record.Share(_hold, library));
+        using var core = new Owned<Pkcs11SessionCore>(OpenCore(share.Value, library, access, policy));
+
+        core.Value.ContextAuthentication = ContextAuthentication;
+        SessionAccess actual = core.Value.IsReadWrite ? SessionAccess.ReadWrite : SessionAccess.ReadOnly;
+        var session = new Pkcs11Session(library, Slot, core.Value, actual, this, share.Value);
+        core.Release();
+        share.Release();
+        return session;
+    }
+
+    // The new session's core: a session of its own; or, where the token allows no further session of the kind asked
+    // for, the login's own session, lent to it (Pkcs11SessionCore.Borrow). share is the new session's hold on the
+    // login, which the loan is recorded against.
+    private Pkcs11SessionCore OpenCore(LoginHold share, Pkcs11Library library, SessionAccess access, ICryptoPolicy? policy)
+    {
         try
         {
-            try
-            {
-                core = Slot.OpenSessionCore(access == SessionAccess.ReadWrite, policy);
-            }
-            catch (Pkcs11SessionException ex) when (ex.ReturnValue == CKR.CKR_SESSION_COUNT)
-            {
-                // The module's answer stays as the inner exception of a refusal. The token allows no further session
-                // of the kind asked for: the login lends its own, if it can.
-                core = _hold.Record.TryLend(share, library, access, policy, library.LoggerFactory, out string? refusal)
-                    ?? throw new Pkcs11SessionException(CKR.CKR_SESSION_COUNT, Pkcs11Operations.OpOpenSession,
-                        refusal!, ex);
-            }
-
-            core.ContextAuthentication = ContextAuthentication;
-            SessionAccess actual = core.IsReadWrite ? SessionAccess.ReadWrite : SessionAccess.ReadOnly;
-            return new Pkcs11Session(library, Slot, core, actual, this, share);
+            return Slot.OpenSessionCore(access == SessionAccess.ReadWrite, policy);
         }
-        catch
+        catch (Pkcs11SessionException ex) when (ex.ReturnValue == CKR.CKR_SESSION_COUNT)
         {
-            core?.Dispose();
-            share.Dispose();
-            throw;
+            // The module's answer stays as the inner exception of a refusal. The token allows no further session
+            // of the kind asked for: the login lends its own, if it can.
+            return _hold.Record.TryLend(share, library, access, policy, library.LoggerFactory, out string? refusal)
+                ?? throw new Pkcs11SessionException(CKR.CKR_SESSION_COUNT, Pkcs11Operations.OpOpenSession,
+                    refusal!, ex);
         }
     }
 

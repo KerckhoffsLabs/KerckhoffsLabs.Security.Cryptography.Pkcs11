@@ -220,7 +220,7 @@ public sealed class TokenLoginRecordTests : IDisposable
     [Fact]
     public void Share_ThroughALibraryBeingDisposed_IsRefused_AndTakesNoHold()
     {
-        LoginHold held = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold held = Record.Login(_library, TokenUser.User, _pin, username: null);
         Pkcs11Library other = _module.Load();
         _module.DuringLogin = _ =>
         {
@@ -259,8 +259,8 @@ public sealed class TokenLoginRecordTests : IDisposable
     [Fact]
     public void LastHolderReleased_LogsOut_ThenClosesAnchor()
     {
-        LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
-        LoginHold second = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold second = Record.Login(_library, TokenUser.User, _pin, username: null);
         long generation = Record.Generation;
 
         first.Dispose();
@@ -283,7 +283,7 @@ public sealed class TokenLoginRecordTests : IDisposable
     [Fact]
     public void MarkEnded_StartsNewGeneration_OldHoldsInactive_NoLogoutForThem()
     {
-        LoginHold old = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold old = Record.Login(_library, TokenUser.User, _pin, username: null);
         long generation = Record.Generation;
 
         Record.MarkEnded(CKR.CKR_DEVICE_REMOVED);
@@ -305,8 +305,8 @@ public sealed class TokenLoginRecordTests : IDisposable
     [Fact]
     public void Share_AddsAHolder_ThatKeepsTheLogin()
     {
-        LoginHold login = Record.Login(_library, TokenUser.User, _pin, username: null);
-        LoginHold session = Record.Share(login, _library);
+        using LoginHold login = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold session = Record.Share(login, _library);
 
         login.Dispose();
         Assert.Equal(0, _module.LogoutCalls);
@@ -320,7 +320,7 @@ public sealed class TokenLoginRecordTests : IDisposable
     [Fact]
     public void Share_OfAnInactiveHold_Throws()
     {
-        LoginHold login = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold login = Record.Login(_library, TokenUser.User, _pin, username: null);
         login.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => Record.Share(login, _library));
@@ -330,9 +330,9 @@ public sealed class TokenLoginRecordTests : IDisposable
     public void ReleaseHoldersOf_Library_DropsOnlyItsHolders()
     {
         using Pkcs11Library other = _module.Load();
-        LoginHold mine = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold mine = Record.Login(_library, TokenUser.User, _pin, username: null);
         LoginHold mineToo = Record.Share(mine, _library);
-        LoginHold theirs = Record.Login(other, TokenUser.User, _pin, username: null);
+        using LoginHold theirs = Record.Login(other, TokenUser.User, _pin, username: null);
 
         Record.ReleaseHoldersOf(_library);
 
@@ -355,18 +355,14 @@ public sealed class TokenLoginRecordTests : IDisposable
         using var barrier = new Barrier(2);
         var holds = new LoginHold?[2];
         var failures = new Exception?[2];
-        Thread[] threads = [.. Enumerable.Range(0, 2).Select(i => new Thread(() =>
+        CancellationToken cancellation = TestContext.Current.CancellationToken;
+        // Any exception a login throws is kept for the assertion below, whatever its type: here the test thread's
+        // Record is the token's login record, hence Xunit.Record.
+        Thread[] threads = [.. Enumerable.Range(0, 2).Select(i => new Thread(() => failures[i] = Xunit.Record.Exception(() =>
         {
-            try
-            {
-                barrier.SignalAndWait();
-                holds[i] = Record.Login(_library, TokenUser.User, _pin, username: null);
-            }
-            catch (Exception ex)
-            {
-                failures[i] = ex;
-            }
-        }))];
+            barrier.SignalAndWait(cancellation);
+            holds[i] = Record.Login(_library, TokenUser.User, _pin, username: null);
+        })))];
         foreach (Thread thread in threads)
             thread.Start();
         foreach (Thread thread in threads)
@@ -417,7 +413,7 @@ public sealed class TokenLoginRecordTests : IDisposable
         Assert.False(Record.IsLoggedIn);
         Assert.Empty(_module.OpenSessions);
 
-        LoginHold next = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold next = Record.Login(_library, TokenUser.User, _pin, username: null);
         next.Dispose();
         Assert.Equal(1, _module.LogoutCalls);
         Assert.Empty(_module.OpenSessions);
@@ -451,8 +447,8 @@ public sealed class TokenLoginRecordTests : IDisposable
             Assert.True(login.Join(TimeSpan.FromSeconds(30)));
         }
 
-        Assert.True(shared!.IsActive);
-        shared.Dispose();
+        using LoginHold held = Assert.IsType<LoginHold>(shared);
+        Assert.True(held.IsActive);
     }
 
     // Review I3: releasing a share inside an operation is refused before anything changes, so releasing it
@@ -460,7 +456,7 @@ public sealed class TokenLoginRecordTests : IDisposable
     [Fact]
     public void ReleaseInsideOperation_IsRefused_AndLeavesTheHold()
     {
-        LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
+        using LoginHold hold = Record.Login(_library, TokenUser.User, _pin, username: null);
 
         using (Record.EnterOperation())
         {

@@ -20,8 +20,9 @@ internal readonly record struct ObjectIdentity(CKO ObjectClass, CKK KeyType, str
 /// <param name="IsToken"><c>CKA_TOKEN</c>.</param>
 /// <param name="ObjectClass"><c>CKA_CLASS</c>.</param>
 /// <param name="Label">
-/// <c>CKA_LABEL</c>, as the module returned it; <see langword="null"/> also when it is longer than
-/// <see cref="ObjectIdentityReader.LabelCapacity"/>. Compared, never logged.
+/// <c>CKA_LABEL</c>, in full, as the module returned it, however long (one longer than
+/// <see cref="ObjectIdentityReader.LabelCapacity"/> is read again into a buffer of its size, so it is compared byte
+/// for byte, never by length or prefix alone). Compared, never logged.
 /// </param>
 internal readonly record struct SessionObjectMark(bool? IsToken, CKO? ObjectClass, byte[]? Label)
 {
@@ -137,8 +138,7 @@ internal static unsafe class ObjectIdentityReader
     internal static bool? TryReadBool(LowLevelPkcs11Library library, NativeCULong session, NativeCULong objectId, CKA attribute)
     {
         byte value = 0;
-        Span<CK_ATTRIBUTE> template = stackalloc CK_ATTRIBUTE[1];
-        template[0] = Entry(attribute, &value, sizeof(byte));
+        Span<CK_ATTRIBUTE> template = [Entry(attribute, &value, sizeof(byte))];
         if (library.C_GetAttributeValue(session, objectId, template) != CKR.CKR_OK
             || (ulong)template[0].valueLen != sizeof(byte))
             return null;
@@ -160,22 +160,56 @@ internal static unsafe class ObjectIdentityReader
         byte* label = stackalloc byte[LabelCapacity];
         int ulongSize = sizeof(NativeCULong);
 
-        Span<CK_ATTRIBUTE> template = stackalloc CK_ATTRIBUTE[3];
-        template[0] = Entry(CKA.CKA_TOKEN, &isToken, sizeof(byte));
-        template[1] = Entry(CKA.CKA_CLASS, &objectClass, ulongSize);
-        template[2] = Entry(CKA.CKA_LABEL, label, LabelCapacity);
+        Span<CK_ATTRIBUTE> template =
+        [
+            Entry(CKA.CKA_TOKEN, &isToken, sizeof(byte)),
+            Entry(CKA.CKA_CLASS, &objectClass, ulongSize),
+            Entry(CKA.CKA_LABEL, label, LabelCapacity),
+        ];
 
         CKR rv = library.C_GetAttributeValue(session, objectId, template);
         if (rv is not (CKR.CKR_OK or CKR.CKR_ATTRIBUTE_TYPE_INVALID or CKR.CKR_ATTRIBUTE_SENSITIVE
             or CKR.CKR_BUFFER_TOO_SMALL))
             return default;
 
-        // CK_UNAVAILABLE_INFORMATION is all ones, so it fails every length check below as well.
+        // CK_UNAVAILABLE_INFORMATION is all ones, so it fails every length check below as well. A label too long for
+        // the stack buffer answers CKR_BUFFER_TOO_SMALL with that value (PKCS#11 v3.2 C_GetAttributeValue), and is
+        // read again on its own.
         ulong labelLength = (ulong)template[2].valueLen;
+        byte[]? labelValue = null;
+        if (labelLength <= LabelCapacity)
+            labelValue = new ReadOnlySpan<byte>(label, (int)labelLength).ToArray();
+        else if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+            labelValue = ReadLongLabel(library, session, objectId);
+
         return new SessionObjectMark(
             IsToken: (ulong)template[0].valueLen == sizeof(byte) ? isToken != 0 : null,
             ObjectClass: (ulong)template[1].valueLen == (ulong)ulongSize ? (CKO)(ulong)objectClass : null,
-            Label: labelLength <= LabelCapacity ? new ReadOnlySpan<byte>(label, (int)labelLength).ToArray() : null);
+            Label: labelValue);
+    }
+
+    /// <summary>Longest <c>CKA_LABEL</c> <see cref="ReadLongLabel"/> reads; a longer one reads as unreadable.</summary>
+    internal const int LongLabelLimit = 64 * 1024;
+
+    // CKA_LABEL alone, sized by a length query first: for a label longer than LabelCapacity. Null when either call
+    // fails, the module reports more than LongLabelLimit, or the second call's length differs from the first's.
+    private static byte[]? ReadLongLabel(LowLevelPkcs11Library library, NativeCULong session, NativeCULong objectId)
+    {
+        Span<CK_ATTRIBUTE> query = [Entry(CKA.CKA_LABEL, null, 0)];
+        if (library.C_GetAttributeValue(session, objectId, query) != CKR.CKR_OK
+            || (ulong)query[0].valueLen > LongLabelLimit)
+            return null;
+
+        int length = (int)(ulong)query[0].valueLen;
+        byte[] value = new byte[length];
+        fixed (byte* buffer = value)
+        {
+            query[0] = Entry(CKA.CKA_LABEL, buffer, length);
+            if (library.C_GetAttributeValue(session, objectId, query) != CKR.CKR_OK
+                || (ulong)query[0].valueLen != (ulong)length)
+                return null;
+        }
+        return value;
     }
 
     private static CK_ATTRIBUTE Entry(CKA type, void* value, int capacity) => new()

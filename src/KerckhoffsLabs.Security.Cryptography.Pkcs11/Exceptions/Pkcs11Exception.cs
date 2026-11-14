@@ -32,7 +32,7 @@ public abstract class Pkcs11Exception : CryptographicException
     /// <param name="returnValue">The PKCS#11 return value.</param>
     /// <param name="method">Name of the failing PKCS#11 method.</param>
     /// <param name="message">Optional explanatory message.</param>
-    public Pkcs11Exception(CKR returnValue, string method, string? message)
+    protected Pkcs11Exception(CKR returnValue, string method, string? message)
         : this(returnValue, method, message, innerException: null)
     {
     }

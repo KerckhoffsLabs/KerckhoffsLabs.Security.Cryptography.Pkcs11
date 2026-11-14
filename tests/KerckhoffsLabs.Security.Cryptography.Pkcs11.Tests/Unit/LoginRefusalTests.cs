@@ -37,39 +37,26 @@ public sealed class LoginRefusalTests : IDisposable
 
     private static Pkcs11Slot SlotOf(Pkcs11Library library) => Assert.Single(library.GetSlotList());
 
-    // The library the refused call goes through: this one, or a second load of the module.
-    private Pkcs11Library Through(bool secondLoad, List<IDisposable> scope)
-    {
-        if (!secondLoad)
-            return _library;
-        Pkcs11Library second = _module.Load();
-        scope.Add(second);
-        return second;
-    }
+    // A second load of the module for the refused call to go through, or null to go through this one; the caller
+    // holds it in a using declaration.
+    private Pkcs11Library? SecondLoad(bool secondLoad) => secondLoad ? _module.Load() : null;
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void SoLogin_WhileLibraryHasReadOnlySession_RefusedBeforeModule(bool secondLoad)
     {
-        List<IDisposable> scope = [];
-        try
-        {
-            using Pkcs11Session readOnly = SlotOf(_library).OpenSession(SessionAccess.ReadOnly);
-            Pkcs11Slot slot = SlotOf(Through(secondLoad, scope));
+        using Pkcs11Session readOnly = SlotOf(_library).OpenSession(SessionAccess.ReadOnly);
+        using Pkcs11Library? second = SecondLoad(secondLoad);
+        Pkcs11Slot slot = SlotOf(second ?? _library);
 
-            var ex = Assert.Throws<Pkcs11SessionException>(() => slot.Login(TokenUser.SecurityOfficer, _pin));
+        var ex = Assert.Throws<Pkcs11SessionException>(() => slot.Login(TokenUser.SecurityOfficer, _pin));
 
-            Assert.Equal(CKR.CKR_SESSION_READ_ONLY_EXISTS, ex.ReturnValue);
-            Assert.Contains("read-only", ex.Message, StringComparison.Ordinal);
-            Assert.Equal(0, _module.LoginCalls);
-            Assert.Single(_module.OpenSessions); // no anchor left behind
-            Assert.Null(_module.LoggedIn);
-        }
-        finally
-        {
-            scope.ForEach(d => d.Dispose());
-        }
+        Assert.Equal(CKR.CKR_SESSION_READ_ONLY_EXISTS, ex.ReturnValue);
+        Assert.Contains("read-only", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(0, _module.LoginCalls);
+        Assert.Single(_module.OpenSessions); // no anchor left behind
+        Assert.Null(_module.LoggedIn);
     }
 
     [Fact]
@@ -98,23 +85,16 @@ public sealed class LoginRefusalTests : IDisposable
     [InlineData(true)]
     public void ReadOnlySession_WhileSoLoggedIn_RefusedBeforeModule(bool secondLoad)
     {
-        List<IDisposable> scope = [];
-        try
-        {
-            using Pkcs11Login so = SlotOf(_library).Login(TokenUser.SecurityOfficer, _pin);
-            Pkcs11Slot slot = SlotOf(Through(secondLoad, scope));
-            int opened = _module.CallCount("C_OpenSession");
+        using Pkcs11Login so = SlotOf(_library).Login(TokenUser.SecurityOfficer, _pin);
+        using Pkcs11Library? second = SecondLoad(secondLoad);
+        Pkcs11Slot slot = SlotOf(second ?? _library);
+        int opened = _module.CallCount("C_OpenSession");
 
-            var ex = Assert.Throws<Pkcs11SessionException>(() => slot.OpenSession(SessionAccess.ReadOnly));
+        var ex = Assert.Throws<Pkcs11SessionException>(() => slot.OpenSession(SessionAccess.ReadOnly));
 
-            Assert.Equal(CKR.CKR_SESSION_READ_WRITE_SO_EXISTS, ex.ReturnValue);
-            Assert.Contains("Security Officer", ex.Message, StringComparison.Ordinal);
-            Assert.Equal(opened, _module.CallCount("C_OpenSession"));
-        }
-        finally
-        {
-            scope.ForEach(d => d.Dispose());
-        }
+        Assert.Equal(CKR.CKR_SESSION_READ_WRITE_SO_EXISTS, ex.ReturnValue);
+        Assert.Contains("Security Officer", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(opened, _module.CallCount("C_OpenSession"));
     }
 
     [Fact]
@@ -147,28 +127,21 @@ public sealed class LoginRefusalTests : IDisposable
     [InlineData(true, true)]
     public void InitToken_WhileLibraryHasSessionOrLogin_RefusedBeforeModule(bool secondLoad, bool login)
     {
-        List<IDisposable> scope = [];
-        try
-        {
-            // A login holds a session of its own (its anchor), which is what the token counts.
-            scope.Add(login
-                ? SlotOf(_library).Login(TokenUser.User, _pin)
-                : SlotOf(_library).OpenSession());
-            Pkcs11Slot slot = SlotOf(Through(secondLoad, scope));
+        // A login holds a session of its own (its anchor), which is what the token counts.
+        using IDisposable holder = login
+            ? SlotOf(_library).Login(TokenUser.User, _pin)
+            : SlotOf(_library).OpenSession();
+        using Pkcs11Library? second = SecondLoad(secondLoad);
+        Pkcs11Slot slot = SlotOf(second ?? _library);
 
-            var ex = Assert.Throws<Pkcs11SessionException>(() => slot.InitTokenWithPin(_pin, "fresh"));
-            Assert.Equal(CKR.CKR_SESSION_EXISTS, ex.ReturnValue);
-            Assert.Contains("session", ex.Message, StringComparison.Ordinal);
+        var ex = Assert.Throws<Pkcs11SessionException>(() => slot.InitTokenWithPin(_pin, "fresh"));
+        Assert.Equal(CKR.CKR_SESSION_EXISTS, ex.ReturnValue);
+        Assert.Contains("session", ex.Message, StringComparison.Ordinal);
 
-            var pinpad = Assert.Throws<Pkcs11SessionException>(() => slot.InitTokenWithPinpad("fresh"));
-            Assert.Equal(CKR.CKR_SESSION_EXISTS, pinpad.ReturnValue);
+        var pinpad = Assert.Throws<Pkcs11SessionException>(() => slot.InitTokenWithPinpad("fresh"));
+        Assert.Equal(CKR.CKR_SESSION_EXISTS, pinpad.ReturnValue);
 
-            Assert.Equal(0, _module.InitTokenCalls);
-        }
-        finally
-        {
-            scope.ForEach(d => d.Dispose());
-        }
+        Assert.Equal(0, _module.InitTokenCalls);
     }
 
     [Fact]

@@ -70,6 +70,13 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     internal bool IsDisposingOrDisposed => Volatile.Read(ref _disposing) != 0 || IsDisposed;
 
+    /// <summary>
+    /// Test seam: marks this library disposing, as the first step of <see cref="Dispose"/> does, without going on to
+    /// release anything, so a test can stand in the instant between that mark and the release of the library's holds.
+    /// A later <see cref="Dispose"/> runs in full.
+    /// </summary>
+    internal void BeginDisposingForTest() => Volatile.Write(ref _disposing, 1);
+
     /// <summary>The logger factory from <see cref="Pkcs11LibraryOptions.LoggerFactory"/>, for what this library opens.</summary>
     internal ILoggerFactory? LoggerFactory => _loggerFactory;
 

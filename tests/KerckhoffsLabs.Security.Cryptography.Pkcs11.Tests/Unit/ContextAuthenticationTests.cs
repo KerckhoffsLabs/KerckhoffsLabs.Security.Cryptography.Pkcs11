@@ -205,7 +205,7 @@ public sealed class ContextAuthenticationTests : IDisposable
     public void PinLocked_EndsTheLogin()
     {
         _module.LockAfter = 1;
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         login.ContextAuthentication = WrongPin();
         using Pkcs11Session session = login.OpenSession();
         using Pkcs11Key key = session.OpenKey(AlwaysAuthenticateEc);
@@ -268,7 +268,7 @@ public sealed class ContextAuthenticationTests : IDisposable
     [Fact]
     public void SourceDisposesTheLogin_ReleaseRefused_StateConsistent()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Session session = Slot.OpenSession();
         session.ContextAuthentication = ContextAuthentication.FromPin(_ =>
         {

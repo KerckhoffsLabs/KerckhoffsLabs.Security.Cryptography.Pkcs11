@@ -546,11 +546,8 @@ internal sealed class LoginTokenModule : FakeModule
     private bool EndOperationsLocked(ulong session, ulong flags)
     {
         bool any = false;
-        foreach (ulong kind in new[] { CKF.CKF_SIGN, CKF.CKF_DECRYPT })
-        {
-            if ((flags & kind) != 0)
-                any |= _operations.Remove((session, kind));
-        }
+        foreach (ulong kind in new[] { CKF.CKF_SIGN, CKF.CKF_DECRYPT }.Where(k => (flags & k) != 0))
+            any |= _operations.Remove((session, kind));
         return any;
     }
 

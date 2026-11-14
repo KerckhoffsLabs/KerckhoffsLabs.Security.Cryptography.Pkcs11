@@ -31,8 +31,8 @@ public sealed class SessionDisposeTests
         var (library, token) = NewLibrary();
         using (library)
         {
-            Pkcs11Login login = LogIn(library);
-            Pkcs11Session session = login.OpenSession();
+            using Pkcs11Login login = LogIn(library);
+            using Pkcs11Session session = login.OpenSession();
 
             login.Dispose();
             Assert.Equal(0, token.LogoutCallCount); // the session still holds the login
@@ -49,7 +49,7 @@ public sealed class SessionDisposeTests
         using (library)
         {
             using Pkcs11Login login = LogIn(library);
-            Pkcs11Session session = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel).OpenSession();
+            using Pkcs11Session session = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel).OpenSession();
 
             session.Dispose();
 

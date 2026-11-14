@@ -69,9 +69,9 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void LoginDisposedBeforeItsSessions_LogsOutAfterTheLast()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
-        Pkcs11Session first = login.OpenSession();
-        Pkcs11Session second = login.OpenSession();
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session first = login.OpenSession();
+        using Pkcs11Session second = login.OpenSession();
         using Pkcs11Session observer = Slot.OpenSession();
 
         login.Dispose();
@@ -140,7 +140,7 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void LoginOpenSession_AfterTheLoginIsDisposed_IsRefused()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         login.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => login.OpenSession());
@@ -165,12 +165,12 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void DisposingTheFirstLibrary_KeepsTheSecondsLogin()
     {
-        Pkcs11Library first = _module.Load();
+        using Pkcs11Library first = _module.Load();
         using Pkcs11Library second = _module.Load();
 
-        Pkcs11Login firstLogin = SlotOf(first).Login(TokenUser.User, _pin);
-        Pkcs11Login secondLogin = SlotOf(second).Login(TokenUser.User, _pin);
-        Pkcs11Session secondSession = secondLogin.OpenSession();
+        using Pkcs11Login firstLogin = SlotOf(first).Login(TokenUser.User, _pin);
+        using Pkcs11Login secondLogin = SlotOf(second).Login(TokenUser.User, _pin);
+        using Pkcs11Session secondSession = secondLogin.OpenSession();
         using Pkcs11Session observer = SlotOf(second).OpenSession();
 
         first.Dispose();
@@ -196,9 +196,9 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void LibraryDisposed_ItsLoginsBecomeInactive_AndTheModuleCanFinalize()
     {
-        Pkcs11Library library = _module.Load();
-        Pkcs11Login login = SlotOf(library).Login(TokenUser.User, _pin);
-        Pkcs11Session session = login.OpenSession();
+        using Pkcs11Library library = _module.Load();
+        using Pkcs11Login login = SlotOf(library).Login(TokenUser.User, _pin);
+        using Pkcs11Session session = login.OpenSession();
 
         library.Dispose();
 
@@ -232,7 +232,7 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void AnchorIsNotClosedByTheOwningLibrarysDispose_WhileAnotherLibraryHolds()
     {
-        Pkcs11Library first = _module.Load();
+        using Pkcs11Library first = _module.Load();
         using Pkcs11Library second = _module.Load();
 
         using Pkcs11Login firstLogin = SlotOf(first).Login(TokenUser.User, _pin);
@@ -254,8 +254,8 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void LibraryDispose_ClosesItsSlotSessions()
     {
-        Pkcs11Library library = _module.Load();
-        Pkcs11Session session = SlotOf(library).OpenSession();
+        using Pkcs11Library library = _module.Load();
+        using Pkcs11Session session = SlotOf(library).OpenSession();
 
         library.Dispose();
 
@@ -298,8 +298,8 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void DisposingTheLastHolderSession_InsideAnOperation_IsRefused_ThenWorksAfterIt()
     {
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
-        Pkcs11Session session = login.OpenSession();
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session session = login.OpenSession();
         login.Dispose();
 
         using (session.Core.AcquireExclusive())

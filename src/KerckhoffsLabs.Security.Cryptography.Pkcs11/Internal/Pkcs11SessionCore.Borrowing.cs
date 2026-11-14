@@ -156,15 +156,19 @@ internal sealed partial class Pkcs11SessionCore
             _sessionHandle.DangerousAddRef(ref added);
             foreach ((NativeCULong handle, SessionObjectMark recorded) in created)
             {
+                // Each handle is read, then either destroyed or logged as skipped: both branches do something, so
+                // the loop is not a filter (and the borrower's return is no place for LINQ's allocations anyway).
                 SessionObjectMark now = ObjectIdentityReader.ReadSessionObjectMark(_pkcs11Library, _sessionId, handle);
-                if (now.IsToken != false || !now.Matches(recorded))
+                if (now.IsToken == false && now.Matches(recorded))
+                {
+                    CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, handle);
+                    if (rv is not (CKR.CKR_OK or CKR.CKR_OBJECT_HANDLE_INVALID))
+                        Log.LentSessionObjectNotDestroyed(_logger, (ulong)_sessionId, (ulong)handle, rv);
+                }
+                else
                 {
                     Log.LentSessionObjectNotTheOneCreated(_logger, (ulong)_sessionId, (ulong)handle);
-                    continue;
                 }
-                CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, handle);
-                if (rv is not (CKR.CKR_OK or CKR.CKR_OBJECT_HANDLE_INVALID))
-                    Log.LentSessionObjectNotDestroyed(_logger, (ulong)_sessionId, (ulong)handle, rv);
             }
         }
         catch (ObjectDisposedException)

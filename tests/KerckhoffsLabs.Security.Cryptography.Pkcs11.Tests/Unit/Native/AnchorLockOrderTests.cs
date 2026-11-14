@@ -73,19 +73,12 @@ public sealed class AnchorLockOrderTests : IDisposable
         Thread holder = HoldLease(anchor, held, release);
 
         Pkcs11Login? second = null;
-        Exception? failure = null;
-        var sharing = new Thread(() =>
-        {
-            try { second = Slot.Login(TokenUser.User, _pin); }
-            catch (Exception ex) { failure = ex; }
-        })
-        { IsBackground = true };
-        sharing.Start();
+        BackgroundWork sharing = BackgroundWork.Run(() => second = Slot.Login(TokenUser.User, _pin));
         try
         {
             // The share's C_Login waits for the anchor: it neither reaches the module nor returns.
             Assert.False(SpinWait.SpinUntil(() => _module.LoginCalls != 1 || !sharing.IsAlive, Watch),
-                $"the share did not wait for the anchor: {failure}");
+                $"the share did not wait for the anchor: {sharing.Failure}");
         }
         finally
         {
@@ -94,7 +87,7 @@ public sealed class AnchorLockOrderTests : IDisposable
             Assert.True(sharing.Join(Bounded), "the share did not finish after the anchor was released");
         }
 
-        Assert.Null(failure);
+        Assert.Null(sharing.Failure);
         using Pkcs11Login shared = Assert.IsType<Pkcs11Login>(second);
         Assert.True(shared.IsActive);
         Assert.Equal(2, _module.LoginCalls);
@@ -110,18 +103,11 @@ public sealed class AnchorLockOrderTests : IDisposable
         Thread holder = HoldLease(anchor, held, release);
 
         using var userPin = new SecurePin("5678");
-        Exception? failure = null;
-        var initializing = new Thread(() =>
-        {
-            try { so.InitUserPinWithPin(userPin); }
-            catch (Exception ex) { failure = ex; }
-        })
-        { IsBackground = true };
-        initializing.Start();
+        BackgroundWork initializing = BackgroundWork.Run(() => so.InitUserPinWithPin(userPin));
         try
         {
             Assert.False(SpinWait.SpinUntil(() => _module.LastInitPin is not null || !initializing.IsAlive, Watch),
-                $"C_InitPIN did not wait for the anchor: {failure}");
+                $"C_InitPIN did not wait for the anchor: {initializing.Failure}");
         }
         finally
         {
@@ -130,7 +116,7 @@ public sealed class AnchorLockOrderTests : IDisposable
             Assert.True(initializing.Join(Bounded), "C_InitPIN did not finish after the anchor was released");
         }
 
-        Assert.Null(failure);
+        Assert.Null(initializing.Failure);
         Assert.Equal("5678"u8.ToArray(), _module.LastInitPin?.Pin);
     }
 
@@ -146,9 +132,9 @@ public sealed class AnchorLockOrderTests : IDisposable
         Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         TokenLoginRecord record = Record;
         Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(record.Anchor);
-        Pkcs11Session slotSession = Slot.OpenSession();
+        using Pkcs11Session slotSession = Slot.OpenSession();
         slotSession.ContextAuthentication = ContextAuthentication.FromPin(_ => new SecurePin("9999"));
-        Pkcs11Key key = slotSession.OpenKey(AlwaysAuthenticateEc);
+        using Pkcs11Key key = slotSession.OpenKey(AlwaysAuthenticateEc);
         ulong slotSessionId = slotSession.Core.SessionId;
 
         using var inContextLogin = new ManualResetEventSlim();
@@ -161,27 +147,9 @@ public sealed class AnchorLockOrderTests : IDisposable
             proceed.Wait(Bounded);
         };
 
-        Exception? signFailure = null;
-        Exception? leaseFailure = null;
-        Exception? logoutFailure = null;
-        var t1 = new Thread(() =>
-        {
-            try { key.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), "data"u8); }
-            catch (Exception ex) { signFailure = ex; }
-        })
-        { IsBackground = true };
-        var w = new Thread(() =>
-        {
-            try { login.Dispose(); }
-            catch (Exception ex) { logoutFailure = ex; }
-        })
-        { IsBackground = true };
-        var t2 = new Thread(() =>
-        {
-            try { anchor.AcquireExclusive().Dispose(); }
-            catch (Exception ex) { leaseFailure = ex; }
-        })
-        { IsBackground = true };
+        var t1 = new BackgroundWork(() => key.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), "data"u8));
+        var w = new BackgroundWork(login.Dispose);
+        var t2 = new BackgroundWork(() => anchor.AcquireExclusive().Dispose());
 
         try
         {
@@ -203,10 +171,10 @@ public sealed class AnchorLockOrderTests : IDisposable
         Assert.True(w.Join(Bounded), "W (the final logout) deadlocked");
         Assert.True(t2.Join(Bounded), "T2 (the anchor's lease) deadlocked");
 
-        Assert.Equal(CKR.CKR_PIN_LOCKED, Assert.IsAssignableFrom<Pkcs11Exception>(signFailure).ReturnValue);
-        Assert.Null(logoutFailure);
+        Assert.Equal(CKR.CKR_PIN_LOCKED, Assert.IsAssignableFrom<Pkcs11Exception>(t1.Failure).ReturnValue);
+        Assert.Null(w.Failure);
         // The login ended under T2's request, which closed the anchor: T2 finds it disposed.
-        Assert.IsType<ObjectDisposedException>(leaseFailure);
+        Assert.IsType<ObjectDisposedException>(t2.Failure);
         Assert.False(login.IsActive);
         Assert.False(record.IsLoggedIn);
         Assert.Equal(0, _module.LogoutCalls);
@@ -235,26 +203,14 @@ public sealed class AnchorLockOrderTests : IDisposable
         };
 
         Pkcs11Login? second = null;
-        Exception? shareFailure = null;
-        var sharing = new Thread(() =>
-        {
-            try { second = Slot.Login(TokenUser.User, _pin); }
-            catch (Exception ex) { shareFailure = ex; }
-        })
-        { IsBackground = true };
+        var sharing = new BackgroundWork(() => second = Slot.Login(TokenUser.User, _pin));
 
         bool leased = false;
-        Exception? leaseFailure = null;
-        var leasing = new Thread(() =>
+        var leasing = new BackgroundWork(() =>
         {
-            try
-            {
-                using (anchor.AcquireExclusive())
-                    leased = true;
-            }
-            catch (Exception ex) { leaseFailure = ex; }
-        })
-        { IsBackground = true };
+            using (anchor.AcquireExclusive())
+                leased = true;
+        });
 
         try
         {
@@ -263,7 +219,7 @@ public sealed class AnchorLockOrderTests : IDisposable
 
             leasing.Start();
             Assert.False(SpinWait.SpinUntil(() => !leasing.IsAlive, Watch),
-                $"the anchor's lease did not wait for the record's send: {leaseFailure}");
+                $"the anchor's lease did not wait for the record's send: {leasing.Failure}");
         }
         finally
         {
@@ -272,8 +228,8 @@ public sealed class AnchorLockOrderTests : IDisposable
             Assert.True(leasing.Join(Bounded), "the anchor's lease did not finish after the send");
         }
 
-        Assert.Null(shareFailure);
-        Assert.Null(leaseFailure);
+        Assert.Null(sharing.Failure);
+        Assert.Null(leasing.Failure);
         Assert.True(leased);
         using Pkcs11Login shared = Assert.IsType<Pkcs11Login>(second);
         Assert.True(shared.IsActive);
@@ -291,17 +247,10 @@ public sealed class AnchorLockOrderTests : IDisposable
         Thread holder = HoldLease(anchor, held, release);
         try
         {
-            Exception? failure = null;
-            var other = new Thread(() =>
-            {
-                try { anchor.AcquireExclusive().Dispose(); }
-                catch (Exception ex) { failure = ex; }
-            })
-            { IsBackground = true };
-            other.Start();
+            BackgroundWork other = BackgroundWork.Run(() => anchor.AcquireExclusive().Dispose());
             Assert.True(other.Join(Bounded), "a second application thread on the anchor waited instead of throwing");
 
-            var ex = Assert.IsType<InvalidOperationException>(failure);
+            var ex = Assert.IsType<InvalidOperationException>(other.Failure);
             Assert.Contains("Concurrent access", ex.Message, StringComparison.Ordinal);
         }
         finally
@@ -329,17 +278,10 @@ public sealed class AnchorLockOrderTests : IDisposable
         Thread holder = HoldLease(slotSession.Core, held, release);
         try
         {
-            Exception? failure = null;
-            var other = new Thread(() =>
-            {
-                try { slotSession.Core.AcquireExclusive().Dispose(); }
-                catch (Exception ex) { failure = ex; }
-            })
-            { IsBackground = true };
-            other.Start();
+            BackgroundWork other = BackgroundWork.Run(() => slotSession.Core.AcquireExclusive().Dispose());
             Assert.True(other.Join(Bounded), "a second thread on an ordinary session waited instead of throwing");
 
-            var ex = Assert.IsType<InvalidOperationException>(failure);
+            var ex = Assert.IsType<InvalidOperationException>(other.Failure);
             Assert.Contains("Concurrent access", ex.Message, StringComparison.Ordinal);
         }
         finally

@@ -144,7 +144,8 @@ using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
   the same way (`CKR_SESSION_COUNT`; the message says "read-only"); a read-only request is served. Disposing
   a lent session returns it to the login and destroys the session objects created through that lent session
   (token objects stay, and so does an object whose handle the token has since given to a different object:
-  each is checked to still read `CKA_TOKEN` false, with the class and label it was created with). A `Login` while a slot session holds the token's only session fails the same way.
+  each is checked to still read `CKA_TOKEN` false, with the class and label it was created with). A `Login`
+  while a slot session holds the token's only session fails the same way.
 - **A lent session ends with its login.** Once the login ends (for instance after `CKR_PIN_LOCKED`, or when the
   login's own session is lost), a lent session refuses every call with `ObjectDisposedException`: log in
   again and open a new one. An ordinary session from `login.OpenSession()` is not like this: it stays open as

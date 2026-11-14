@@ -79,7 +79,7 @@ public sealed class SessionLossTests
     public void LostSession_WhoseNumberIsReused_IsDisposedWithoutTouchingTheNewSession()
     {
         using var token = new Token();
-        Pkcs11SessionCore old = token.CreateSession(sessionId: Number);
+        using Pkcs11SessionCore old = token.CreateSession(sessionId: Number);
         token.Open.Remove(Number);
 
         var ex = Assert.Throws<Pkcs11SessionException>(() => Random(old));
@@ -102,7 +102,7 @@ public sealed class SessionLossTests
     public void SessionClosedByTheModule_RefusesLaterCalls_AndIsDisposedWithoutLogoutOrClose(CKR rv)
     {
         using var token = new Token { Fail = rv };
-        Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
+        using Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
 
         Assert.Equal(rv, Assert.Throws<Pkcs11SessionException>(() => Random(session)).ReturnValue);
         var later = Assert.Throws<Pkcs11SessionException>(() => Random(session));
@@ -123,7 +123,7 @@ public sealed class SessionLossTests
     public void TokenGone_ClosesTheSessionOnceAtOnce_RefusesLaterCalls_AndNeverLogsOut(CKR rv)
     {
         using var token = new Token { Fail = rv };
-        Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
+        using Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
 
         Assert.Equal(rv, Assert.Throws<Pkcs11TokenException>(() => Random(session)).ReturnValue);
         Assert.Equal([Number], token.Closed);
@@ -143,7 +143,7 @@ public sealed class SessionLossTests
     public void OtherFailures_LeaveTheSessionInUse_AndItsDisposalCloses(CKR rv)
     {
         using var token = new Token { Fail = rv };
-        Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
+        using Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
 
         Assert.Equal(rv, Assert.ThrowsAny<Pkcs11Exception>(() => Random(session)).ReturnValue);
         Random(session);
@@ -163,7 +163,7 @@ public sealed class SessionLossTests
     public void SessionLostMidOperation_KeepsTheModulesCode_CancelsNothing_AndTearsDownCleanly(CKR rv)
     {
         using var token = new Token { Fail = rv };
-        Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
+        using Pkcs11SessionCore session = token.CreateSession(sessionId: Number);
         void Sign() => session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(5UL), [1, 2, 3]);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(Sign);

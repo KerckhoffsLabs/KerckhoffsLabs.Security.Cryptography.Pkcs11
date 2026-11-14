@@ -53,7 +53,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
     {
         // Found through a session that holds no login, while a login is held: tied to that login all the same.
         using Pkcs11Session session = Slot.OpenSession();
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Key key = session.OpenKey("private-key");
         Assert.True(key.IsPrivate);
         key.Sign(Hmac, "data"u8);
@@ -90,7 +90,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
     {
         AddRsaPair("pair", publicHalfIsPrivate: false);
         using Pkcs11Session session = Slot.OpenSession();
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Key pair = session.OpenKey("pair");
         Assert.True(pair.IsPrivate);
 
@@ -122,7 +122,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
     {
         AddRsaPair("pair", publicHalfIsPrivate: true);
         using Pkcs11Session session = Slot.OpenSession();
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Key pair = session.OpenKey("pair");
 
         login.Dispose();
@@ -209,7 +209,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
     public void PublicObject_AfterLogout_StillWorks()
     {
         using Pkcs11Session session = Slot.OpenSession();
-        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Key key = session.OpenKey("public-key");
         using Pkcs11Object data = OpenData(session, "public-data");
         Assert.False(key.IsPrivate);
@@ -287,8 +287,10 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
         // A module that shows a private object to a public session breaks the spec; the wrapper then holds it
         // to the login state it was found in: no login. Any login after that ends that state.
         using Pkcs11Session session = Slot.OpenSession();
-        using Pkcs11Key key = new(session, new ObjectHandle(0x9999), ObjectHandle.Invalid, CKK.CKK_GENERIC_SECRET,
-            "k", [], privateHalfIsPrivate: true, loginStamp: session.Core.LoginRecord.CurrentStamp());
+        using Pkcs11Key key = new Pkcs11Key(session, new ObjectHandle(0x9999), ObjectHandle.Invalid,
+                CKK.CKK_GENERIC_SECRET, "k", [])
+            .WithLoginStamp(privateHalfIsPrivate: true, publicHalfIsPrivate: false,
+                loginStamp: session.Core.LoginRecord.CurrentStamp());
         Assert.Equal(LoginTokenModule.SignatureLength, key.Sign(Hmac, "data"u8).Length);
 
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
@@ -300,7 +302,7 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
     public void AnchorLost_EndsLogin_NewLoginSucceeds()
     {
         using Pkcs11Session session = Slot.OpenSession();
-        Pkcs11Login first = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Login first = Slot.Login(TokenUser.User, _pin);
         using Pkcs11Key key = session.OpenKey("private-key");
         session.Dispose(); // so the anchor is the application's only session
 
@@ -329,8 +331,8 @@ public sealed class PrivateHandleAfterLogoutTests : IDisposable
     {
         // The long-lived pattern: log in once, open sessions from the login. Then the token is pulled and put
         // back (or the HSM fails over): the module drops every session and the login.
-        Pkcs11Login first = Slot.Login(TokenUser.User, _pin);
-        Pkcs11Session oldSession = first.OpenSession();
+        using Pkcs11Login first = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session oldSession = first.OpenSession();
         using Pkcs11Key oldKey = oldSession.OpenKey("private-key");
         oldKey.Sign(Hmac, "data"u8);
         _module.ReinsertToken();
