@@ -312,11 +312,7 @@ internal sealed class SlotEventSubscription : IDisposable
 
     internal bool HasWaitersLocked => _waiters.Count > 0;
 
-    internal void ThrowIfClosedLocked()
-    {
-        if (_closed)
-            throw new ObjectDisposedException(nameof(Pkcs11Library));
-    }
+    internal void ThrowIfClosedLocked() => ObjectDisposedException.ThrowIf(_closed, this);
 
     internal bool TryTakeLocked(out ulong slotId)
     {
