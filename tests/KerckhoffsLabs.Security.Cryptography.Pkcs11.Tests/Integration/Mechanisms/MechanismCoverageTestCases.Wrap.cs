@@ -110,17 +110,17 @@ internal static partial class MechanismCoverageTestCases
     // case gives the length, then leaves it out.
     private static ObjectHandle DecapsulateGenericSecret(Pkcs11SessionCore session, ObjectHandle priv, byte[] ciphertext)
     {
-        using (var withLength = MacSecretTemplate(32))
+        using var withLength = MacSecretTemplate(32);
+        try { return session.DecapsulateKey(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext, withLength.Attributes); }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_ATTRIBUTE_READ_ONLY)
         {
-            try { return session.DecapsulateKey(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext, withLength.Attributes); }
-            catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_ATTRIBUTE_READ_ONLY) { }
+            using var withoutLength = new Template(
+            [
+                new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET), new(CKA.CKA_TOKEN, false),
+                new(CKA.CKA_SIGN, true),
+            ]);
+            return session.DecapsulateKey(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext, withoutLength.Attributes);
         }
-        using var withoutLength = new Template(
-        [
-            new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET), new(CKA.CKA_TOKEN, false),
-            new(CKA.CKA_SIGN, true),
-        ]);
-        return session.DecapsulateKey(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext, withoutLength.Attributes);
     }
 
     // C_EncapsulateKey with CKM_RSA_PKCS (PKCS#11 v3.2) makes a secret and returns it encrypted under

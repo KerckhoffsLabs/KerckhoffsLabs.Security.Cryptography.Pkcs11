@@ -55,12 +55,13 @@ internal static partial class MechanismCoverageTestCases
     {
         HashFamily family = Family(familyName);
         CKM keyGen = family.KeyGen!.Value;
-        backend.RequireMechanisms(keyGen, family.Hmac!.Value);
+        CKM hmacType = family.Hmac!.Value;
+        backend.RequireMechanisms(keyGen, hmacType);
         AssertGenerates(backend, keyGen, family.HmacKeyType!.Value, (ulong)family.Size, [CKA.CKA_SIGN, CKA.CKA_VERIFY], (session, key) =>
         {
             if (!hmacTakesTheKey)
                 return;
-            var hmac = new Mechanism(family.Hmac.Value);
+            var hmac = new Mechanism(hmacType);
             byte[] mac = session.Sign(hmac, key, Message);
             Assert.Equal(family.Size, mac.Length);
             Assert.True(session.Verify(hmac, key, Message, mac));
