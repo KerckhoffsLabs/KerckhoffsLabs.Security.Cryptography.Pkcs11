@@ -124,9 +124,12 @@ internal static partial class MechanismCoverageTestCases
     // === HMAC ===================================================================
 
     // The HMAC of a message under a key equals RFC 2104 over the family's hash, and verifies; a changed MAC does not.
-    internal static void Assert_Hmac_IsRfc2104OverTheHash(IPkcs11Backend backend, string familyName)
+    // A backend whose wrapper declares that its HMAC of this hash departs from RFC 2104 skips with that reason.
+    internal static void Assert_Hmac_IsRfc2104OverTheHash(IPkcs11Backend backend, string familyName, string? notRfc2104Because = null)
     {
         HashFamily family = Family(familyName);
+        if (notRfc2104Because is not null)
+            Assert.Skip(notRfc2104Because);
         CKM hmac = family.Hmac!.Value;
         if (family.Bcl is null)
             backend.RequireMechanisms(hmac, family.Digest);

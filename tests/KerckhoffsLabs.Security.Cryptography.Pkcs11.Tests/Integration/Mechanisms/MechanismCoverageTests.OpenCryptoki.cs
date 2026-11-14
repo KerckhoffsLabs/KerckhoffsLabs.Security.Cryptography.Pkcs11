@@ -61,9 +61,10 @@ public sealed class MechanismCoverageTests_OpenCryptoki(OpenCryptokiBackendFixtu
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.AesFeedbackModes), MemberType = typeof(MechanismCoverageTestCases))]
-    public void AesFeedbackMode_MatchesSp80038a(CKM mechanism) => MechanismCoverageTestCases.Assert_AesFeedbackMode_MatchesSp80038a(_backend, mechanism);
+    public void AesFeedbackMode_MatchesSp80038a(CKM mechanism) => MechanismCoverageTestCases.Assert_AesFeedbackMode_MatchesSp80038a(_backend, mechanism,
+        OpenCryptokiBackendFixture.OpenCryptokiReportsTheFeedbackModeOutputLength);
 
-    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.AesCtsAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "opencryptoki gives 0x1089 (CKM_AES_CTS) to its CKM_AES_CMAC_GENERAL")]
     [MemberData(nameof(MechanismCoverageTestCases.CtsLengths), MemberType = typeof(MechanismCoverageTestCases))]
     public void AesCts_IsNistCiphertextStealing(int length) => MechanismCoverageTestCases.Assert_AesCts_IsNistCiphertextStealing(_backend, length);
 
@@ -117,7 +118,8 @@ public sealed class MechanismCoverageTests_OpenCryptoki(OpenCryptokiBackendFixtu
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.WrapMechanisms), MemberType = typeof(MechanismCoverageTestCases))]
-    public void Wrap_IsTheEncryptionOfTheKeyValue(string mechanism) => MechanismCoverageTestCases.Assert_Wrap_IsTheEncryptionOfTheKeyValue(_backend, mechanism);
+    public void Wrap_IsTheEncryptionOfTheKeyValue(string mechanism) => MechanismCoverageTestCases.Assert_Wrap_IsTheEncryptionOfTheKeyValue(_backend, mechanism,
+        OpenCryptokiBackendFixture.OpenCryptokiReportsTheFeedbackModeOutputLength || mechanism is not ("AES-OFB" or "AES-CFB8" or "AES-CFB64" or "AES-CFB128"));
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void RsaPkcs_EncapsulatesAPkcs1EncryptedSecret() => MechanismCoverageTestCases.Assert_RsaPkcs_EncapsulatesAPkcs1EncryptedSecret(_backend);

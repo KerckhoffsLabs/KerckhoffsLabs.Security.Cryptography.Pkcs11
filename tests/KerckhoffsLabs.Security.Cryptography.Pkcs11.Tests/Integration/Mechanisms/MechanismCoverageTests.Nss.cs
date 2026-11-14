@@ -22,9 +22,10 @@ public sealed class MechanismCoverageTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.HmacFamilies), MemberType = typeof(MechanismCoverageTestCases))]
-    public void Hmac_IsRfc2104OverTheHash(string family) => MechanismCoverageTestCases.Assert_Hmac_IsRfc2104OverTheHash(_backend, family);
+    public void Hmac_IsRfc2104OverTheHash(string family) => MechanismCoverageTestCases.Assert_Hmac_IsRfc2104OverTheHash(_backend, family,
+        NssBackendFixture.HmacNotRfc2104Because(family));
 
-    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [Theory(SkipUnless = nameof(NssBackendFixture.GeneralLengthMacAvailable), SkipType = typeof(NssBackendFixture), Skip = "NSS refuses every general-length MAC parameter")]
     [MemberData(nameof(MechanismCoverageTestCases.HmacGeneralFamilies), MemberType = typeof(MechanismCoverageTestCases))]
     public void HmacGeneral_IsTheLeadingBytesOfTheHmac(string family) => MechanismCoverageTestCases.Assert_HmacGeneral_IsTheLeadingBytesOfTheHmac(_backend, family);
 
@@ -57,7 +58,8 @@ public sealed class MechanismCoverageTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.Extractions), MemberType = typeof(MechanismCoverageTestCases))]
-    public void ExtractKeyFromKey_StartsAtTheBitGiven(string baseKey, int bit, int length) => MechanismCoverageTestCases.Assert_ExtractKeyFromKey_StartsAtTheBitGiven(_backend, baseKey, bit, length);
+    public void ExtractKeyFromKey_StartsAtTheBitGiven(string baseKey, int bit, int length) => MechanismCoverageTestCases.Assert_ExtractKeyFromKey_StartsAtTheBitGiven(_backend, baseKey, bit, length,
+        NssBackendFixture.NssExtractsAroundTheEndOfTheKey);
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.AesFeedbackModes), MemberType = typeof(MechanismCoverageTestCases))]
@@ -86,7 +88,9 @@ public sealed class MechanismCoverageTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(MechanismCoverageTestCases.CamelliaKeyLengths), MemberType = typeof(MechanismCoverageTestCases))]
-    public void CamelliaKeyGen_MakesAKeyCamelliaTakes(int length) => MechanismCoverageTestCases.Assert_CamelliaKeyGen_MakesAKeyCamelliaTakes(_backend, length);
+    public void CamelliaKeyGen_MakesAKeyCamelliaTakes(int length) => MechanismCoverageTestCases.Assert_CamelliaKeyGen_MakesAKeyCamelliaTakes(_backend, length,
+        NssBackendFixture.NssReadsAGeneratedCamelliaKeysLength, NssBackendFixture.SupportsLocalOnGeneratedKeys,
+        NssBackendFixture.NssRecordsAGeneratedKeysMechanism);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Poly1305KeyGen_MakesAKeyPoly1305Takes() => MechanismCoverageTestCases.Assert_Poly1305KeyGen_MakesAKeyPoly1305Takes(_backend);

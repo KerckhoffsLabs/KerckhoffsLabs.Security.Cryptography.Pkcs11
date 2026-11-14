@@ -41,7 +41,9 @@ internal static partial class MechanismCoverageTestCases
 
     // C_WrapKey of a generic secret gives what C_Encrypt gives for its value under the same mechanism and parameter,
     // and C_UnwrapKey of that gives back a key with the same value (compared through an HMAC under it).
-    internal static void Assert_Wrap_IsTheEncryptionOfTheKeyValue(IPkcs11Backend backend, string name)
+    // Where the backend's wrapper says the token's C_Encrypt reports a longer output than it wrote (a length-keeping
+    // mode only), the case compares the key's length of it.
+    internal static void Assert_Wrap_IsTheEncryptionOfTheKeyValue(IPkcs11Backend backend, string name, bool encryptReportsTheOutputLength = true)
     {
         (CKM type, Func<Mechanism> mechanism, CKK keyType, byte[] key) = WrapMechanism(name);
         backend.RequireMechanismFlags(type, f => f.Wrap && f.Unwrap && f.Encrypt, "C_WrapKey, C_UnwrapKey and C_Encrypt");
@@ -60,7 +62,10 @@ internal static partial class MechanismCoverageTestCases
             try
             {
                 byte[] wrapped = Taken(() => session.WrapKey(mechanism(), kek, target), $"C_WrapKey under {type}");
-                Assert.Equal(Convert.ToHexStringLower(session.Encrypt(mechanism(), kek, WrappedSecret)), Convert.ToHexStringLower(wrapped));
+                byte[] encrypted = session.Encrypt(mechanism(), kek, WrappedSecret);
+                if (!encryptReportsTheOutputLength)
+                    encrypted = encrypted[..WrappedSecret.Length];
+                Assert.Equal(Convert.ToHexStringLower(encrypted), Convert.ToHexStringLower(wrapped));
                 unwrapped = UnwrapGenericSecret(session, mechanism(), kek, wrapped);
                 Assert.Equal(HMACSHA256.HashData(WrappedSecret, Message), HmacUnder(session, unwrapped.Value));
             }
@@ -100,6 +105,24 @@ internal static partial class MechanismCoverageTestCases
 
     // === RSA PKCS#1 v1.5 key encapsulation ======================================
 
+    // Decapsulates a 32-byte generic secret that can sign. As with C_UnwrapKey, tokens read CKA_VALUE_LEN two ways
+    // here (opencryptoki decapsulates through its unwrap path and refuses it with CKR_TEMPLATE_INCONSISTENT), so the
+    // case gives the length, then leaves it out.
+    private static ObjectHandle DecapsulateGenericSecret(Pkcs11SessionCore session, ObjectHandle priv, byte[] ciphertext)
+    {
+        using (var withLength = MacSecretTemplate(32))
+        {
+            try { return session.DecapsulateKey(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext, withLength.Attributes); }
+            catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_ATTRIBUTE_READ_ONLY) { }
+        }
+        using var withoutLength = new Template(
+        [
+            new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET), new(CKA.CKA_TOKEN, false),
+            new(CKA.CKA_SIGN, true),
+        ]);
+        return session.DecapsulateKey(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext, withoutLength.Attributes);
+    }
+
     // C_EncapsulateKey with CKM_RSA_PKCS (PKCS#11 v3.2) makes a secret and returns it encrypted under
     // the public key as PKCS#1 v1.5 does; the runtime decrypts it to the secret the token kept, and
     // C_DecapsulateKey gives the token the same secret back.
@@ -138,8 +161,7 @@ internal static partial class MechanismCoverageTestCases
                 Assert.Equal(32, secret.Length);
                 Assert.Equal(HMACSHA256.HashData(secret, Message), HmacUnder(session, shared));
 
-                using var decapsulateTemplate = MacSecretTemplate(32);
-                decapsulated = session.DecapsulateKey(new Mechanism(CKM.CKM_RSA_PKCS), priv, ciphertext, decapsulateTemplate.Attributes);
+                decapsulated = DecapsulateGenericSecret(session, priv, ciphertext);
                 Assert.Equal(HMACSHA256.HashData(secret, Message), HmacUnder(session, decapsulated.Value));
             }
             finally

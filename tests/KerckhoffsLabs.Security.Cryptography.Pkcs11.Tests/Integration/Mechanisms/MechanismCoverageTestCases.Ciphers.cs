@@ -111,11 +111,14 @@ internal static partial class MechanismCoverageTestCases
         _ => throw new ArgumentOutOfRangeException(nameof(mechanism)),
     };
 
-    // Each feedback mode encrypts as SP 800-38A says, and decrypts its own ciphertext back.
-    internal static void Assert_AesFeedbackMode_MatchesSp80038a(IPkcs11Backend backend, CKM mechanism)
+    // Each feedback mode encrypts as SP 800-38A says, and decrypts its own ciphertext back. The modes keep the length,
+    // so where the backend's wrapper says the token reports a longer output than it wrote, the case compares the
+    // input's length of it.
+    internal static void Assert_AesFeedbackMode_MatchesSp80038a(IPkcs11Backend backend, CKM mechanism, bool reportsTheOutputLength = true)
     {
         backend.RequireMechanism(mechanism);
-        AssertEncryptsAndDecrypts(backend, CKK.CKK_AES, AesKey, new Mechanism(mechanism, Iv16), Plaintext37, ReferenceFeedback(mechanism, Plaintext37));
+        AssertEncryptsAndDecrypts(backend, CKK.CKK_AES, AesKey, new Mechanism(mechanism, Iv16), Plaintext37, ReferenceFeedback(mechanism, Plaintext37),
+            reportsTheOutputLength);
     }
 
     // CKM_AES_CTS encrypts as one of the NIST ciphertext-stealing variants (tokens differ: Kryoptic gives CS1,
@@ -141,7 +144,8 @@ internal static partial class MechanismCoverageTestCases
         });
     }
 
-    private static void AssertEncryptsAndDecrypts(IPkcs11Backend backend, CKK keyType, byte[] key, Mechanism mechanism, byte[] plaintext, byte[] expected)
+    private static void AssertEncryptsAndDecrypts(IPkcs11Backend backend, CKK keyType, byte[] key, Mechanism mechanism, byte[] plaintext, byte[] expected,
+        bool reportsTheOutputLength = true)
     {
         WithSession(backend, session =>
         {
@@ -149,8 +153,11 @@ internal static partial class MechanismCoverageTestCases
             try
             {
                 byte[] ciphertext = Taken(() => session.Encrypt(mechanism, handle, plaintext), $"{mechanism.Type} encryption of {plaintext.Length} bytes");
+                if (!reportsTheOutputLength)
+                    ciphertext = ciphertext[..expected.Length];
                 Assert.Equal(Convert.ToHexStringLower(expected), Convert.ToHexStringLower(ciphertext));
-                Assert.Equal(plaintext, session.Decrypt(mechanism, handle, ciphertext));
+                byte[] decrypted = session.Decrypt(mechanism, handle, ciphertext);
+                Assert.Equal(plaintext, reportsTheOutputLength ? decrypted : decrypted[..plaintext.Length]);
             }
             finally { session.DestroyObject(handle); }
         });

@@ -1044,6 +1044,16 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No (additive)
 - **Raised by:** BouncyHsm mechanism-coverage tests
 
+### [BL-185] Lift the NSS and opencryptoki mechanism-coverage gates once they are fixed upstream
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/NssBackendFixture.cs` (`NssRunsMd2HmacOverItsBlockSize`, `NssReadsAGeneratedCamelliaKeysLength`, `NssExtractsAroundTheEndOfTheKey`, `NssRecordsAGeneratedKeysMechanism`); `Support/Fixtures/OpenCryptokiBackendFixture.cs` (`OpenCryptokiReportsTheFeedbackModeOutputLength`, `OpenCryptokiUsesTheStandardAesCtsValue`); `Integration/Mechanisms/MechanismCoverageTests.Nss.cs`, `.OpenCryptoki.cs`; `Integration/Compat/NssQuirkTests.cs`
+- **Problem:** `MechanismCoverageTestCases` found six more departures, each confirmed in the module's source. NSS softoken (3.51 and the pinned release): HMAC-MD2 pads the key to a 64-byte block where MD2's is 16; a generated Camellia key has no readable `CKA_VALUE_LEN`; `CKM_EXTRACT_KEY_FROM_KEY` refuses an extraction that wraps around the end of the base key; a generated session key has no `CKA_KEY_GEN_MECHANISM`. opencryptoki: single-part OFB/CFB `C_Encrypt`/`C_Decrypt` never set the output length, so the caller is told its buffer's size; and `CKM_AES_CMAC_GENERAL` is defined as 0x1089, which PKCS#11 assigns to `CKM_AES_CTS` (still so on opencryptoki master). None is reported upstream yet.
+- **Proposed action:** Report them (Mozilla Bugzilla, opencryptoki/opencryptoki). The NSS gates have quirk tests that fail once fixed; the opencryptoki ones, like the fixture's others, have none, so check them on each `vendor/opencryptoki` bump.
+- **Breaks public API?** No
+- **Raised by:** Mechanism-coverage tests (CI run 43527188047)
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Session` expose no `Stream` overload at all. See BL-087 and BL-099.

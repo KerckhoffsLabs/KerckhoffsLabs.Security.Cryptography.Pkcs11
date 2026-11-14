@@ -200,11 +200,15 @@ internal static partial class MechanismCoverageTestCases
         { "00112233445566778899AABBCCDDEEFF", 4, 8 },
     };
 
-    internal static void Assert_ExtractKeyFromKey_StartsAtTheBitGiven(IPkcs11Backend backend, string baseHex, int bit, int length)
+    // A backend whose wrapper says it does not wrap around skips the rows that need it.
+    internal static void Assert_ExtractKeyFromKey_StartsAtTheBitGiven(IPkcs11Backend backend, string baseHex, int bit, int length,
+        bool wrapsAround = true)
     {
         backend.RequireMechanisms(CKM.CKM_EXTRACT_KEY_FROM_KEY, CKM.CKM_SHA256_HMAC);
         byte[] baseValue = Convert.FromHexString(baseHex);
         int bits = baseValue.Length * 8;
+        if (!wrapsAround && bit + length * 8 > bits)
+            Assert.Skip($"The backend does not extract around the end of the base key (bit {bit}, {length} bytes of a {bits}-bit key).");
         byte[] expected = new byte[length];
         for (int i = 0; i < length * 8; i++)
         {
