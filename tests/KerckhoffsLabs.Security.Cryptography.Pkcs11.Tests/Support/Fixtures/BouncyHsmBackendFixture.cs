@@ -196,14 +196,6 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool AllowedMechanismsCopyAvailable => BouncyHsmAvailable && BouncyHsmKeepsAllowedMechanismsOnACopy;
 
     /// <summary>
-    /// False while <c>C_CreateObject</c> with <c>CKA_TOKEN</c> given as <c>{NULL, 1}</c> (a NULL <c>pValue</c> with a
-    /// length) crashes the process (SIGSEGV): the native client reads the CK_BBOOL without checking the pointer.
-    /// PKCS#11 v3.2 §4.1.1 point 2 (<c>CKR_ATTRIBUTE_VALUE_INVALID</c>), or <c>CKR_ARGUMENTS_BAD</c>. Not yet
-    /// reported upstream. No tripwire: reproducing the crash would take the test host down.
-    /// </summary>
-    public const bool BouncyHsmSurvivesANullAttributeValue = false;
-
-    /// <summary>
     /// False while an RSA key of the wrong class is refused with <c>CKR_KEY_HANDLE_INVALID</c>: a public key given
     /// to <c>C_SignRecoverInit</c> and a private key given to <c>C_VerifyRecoverInit</c> (CKM_RSA_PKCS;
     /// <c>RsaWrapperSignWithRecover</c> in BouncyHsm.Core). The handle names a valid key; PKCS#11 v3.2 §5.1.6

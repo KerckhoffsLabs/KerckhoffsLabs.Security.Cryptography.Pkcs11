@@ -124,12 +124,7 @@ public sealed class ObjectConformanceTests_BouncyHsm(BouncyHsmBackendFixture bac
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.MalformedAttributes), MemberType = typeof(ObjectConformanceTestCases))]
-    public void MalformedAttribute_IsRefusedHarmlessly(string malformed)
-    {
-        if (malformed == "C_CreateObject with CKA_TOKEN NULL and ulValueLen 1" && !BouncyHsmBackendFixture.BouncyHsmSurvivesANullAttributeValue)
-            Assert.Skip("BouncyHsm's native client crashes on a NULL CKA_TOKEN with a length");
-        ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
-    }
+    public void MalformedAttribute_IsRefusedHarmlessly(string malformed) => ObjectConformanceTestCases.Assert_MalformedAttribute_IsRefusedHarmlessly(_backend, malformed);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void CopyObject_KeepsCkaToken() => ObjectConformanceTestCases.Assert_CopyObject_KeepsCkaToken(_backend);
