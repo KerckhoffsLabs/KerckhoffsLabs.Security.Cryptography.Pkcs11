@@ -1223,6 +1223,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism.Mechanism(KerckhoffsLabs.S
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism.Type.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKM
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Decapsulate.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Decrypt.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Derive.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Digest.get -> bool
@@ -1234,6 +1235,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.EcFp.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.EcNamedCurve.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.EcOid.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.EcUncompress.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Encapsulate.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Encrypt.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags? other) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismFlags.Extension.get -> bool

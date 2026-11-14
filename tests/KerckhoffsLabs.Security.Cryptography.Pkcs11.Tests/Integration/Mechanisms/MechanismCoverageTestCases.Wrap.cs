@@ -128,9 +128,7 @@ internal static partial class MechanismCoverageTestCases
     // C_DecapsulateKey gives the token the same secret back.
     internal static void Assert_RsaPkcs_EncapsulatesAPkcs1EncryptedSecret(IPkcs11Backend backend)
     {
-        // MechanismFlags has no Encapsulate/Decapsulate property yet, so the case reads the CKF bits.
-        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => (f.Flags & (CKF.CKF_ENCAPSULATE | CKF.CKF_DECAPSULATE)) == (CKF.CKF_ENCAPSULATE | CKF.CKF_DECAPSULATE),
-            "C_EncapsulateKey and C_DecapsulateKey");
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => f.Encapsulate && f.Decapsulate, "C_EncapsulateKey and C_DecapsulateKey");
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         RSAParameters k = SigningRsa.Value.ExportParameters(true);
         WithSession(backend, session =>
