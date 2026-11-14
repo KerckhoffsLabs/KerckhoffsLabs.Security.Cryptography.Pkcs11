@@ -654,10 +654,13 @@ public sealed class Pkcs11Library : IDisposable
     /// label with. Finding the slot neither opens a session nor logs in.
     /// </summary>
     /// <remarks>
-    /// PKCS#11 does not make labels unique: two tokens may share one. When more than one does, this refuses
-    /// rather than picking one, which would let whoever can initialize a token decide which one the
-    /// application uses; select the slot by its ID from <see cref="GetSlotList"/> instead. A token removed
-    /// while the slots are being read is passed over.
+    /// PKCS#11 does not make labels unique: two tokens may share one (a cloned card, two HSM partitions given the same
+    /// name). When more than one does, this refuses rather than picking one, which would let whoever can initialize a
+    /// token decide which one the application uses: select the token by its serial number
+    /// (<see cref="GetSlotByTokenSerial"/>), a PKCS#11 URI (<see cref="GetSlotByUri(string)"/>) or a predicate
+    /// (<see cref="FindSlot"/>) instead. A slot ID is no substitute: the module assigns it, and it can change between
+    /// runs or name another token after a card is swapped. A token removed while the slots are being read is passed
+    /// over.
     /// </remarks>
     /// <param name="tokenLabel">The token label, without its padding.</param>
     /// <returns>The slot holding the token.</returns>
@@ -671,21 +674,144 @@ public sealed class Pkcs11Library : IDisposable
         ArgumentNullException.ThrowIfNull(tokenLabel);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        return SelectOneSlot((_, token) => string.Equals(token.Label.TrimEnd(' '), tokenLabel, StringComparison.Ordinal),
+            $"the label '{tokenLabel}'");
+    }
+
+    /// <summary>
+    /// Finds the one slot whose token's serial number (<c>CK_TOKEN_INFO.serialNumber</c>) is
+    /// <paramref name="serialNumber"/>, among the slots with a token present: the way to tell apart tokens that share a
+    /// label. The comparison is ordinal (case-sensitive), after removing the padding. Finding the slot neither opens a
+    /// session nor logs in.
+    /// </summary>
+    /// <remarks>
+    /// A serial number is unique for a manufacturer and model, not across them: two tokens of different makes may report
+    /// the same one, and this then refuses rather than picking one. Add the manufacturer or model with
+    /// <see cref="GetSlotByUri(string)"/> (<c>pkcs11:manufacturer=…;serial=…</c>) or <see cref="FindSlot"/>.
+    /// </remarks>
+    /// <param name="serialNumber">The token's serial number, without its padding.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="serialNumber"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">No present token has the serial number (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).</exception>
+    /// <exception cref="InvalidOperationException">More than one present token has it; the message names their slot IDs.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSlotList</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlotByTokenSerial(string serialNumber)
+    {
+        ArgumentNullException.ThrowIfNull(serialNumber);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return SelectOneSlot(
+            (_, token) => string.Equals(token.SerialNumber.TrimEnd(' '), serialNumber, StringComparison.Ordinal),
+            $"the serial number '{serialNumber}'");
+    }
+
+    /// <summary>
+    /// Finds the one slot whose token <paramref name="match"/> accepts, among the slots with a token present: for a
+    /// selection the other lookups do not express (a label and a model, a manufacturer prefix, a flag). Finding the slot
+    /// neither opens a session nor logs in.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="match"/> sees each present token's <see cref="TokenInfo"/> (its text fields without their
+    /// padding, and its <see cref="TokenInfo.SlotId"/>), and must accept exactly one: none, or more than one, is
+    /// refused rather than resolved by picking one. A token removed while the slots are being read is passed over.
+    /// </remarks>
+    /// <param name="match">Whether a token is the one wanted. An exception it throws propagates.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="match"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">No present token matches (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).</exception>
+    /// <exception cref="InvalidOperationException">More than one present token matches; the message names their slot IDs.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetSlotList</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot FindSlot(Func<TokenInfo, bool> match)
+    {
+        ArgumentNullException.ThrowIfNull(match);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return SelectOneSlot((_, token) => match(token), "the properties asked for");
+    }
+
+    /// <summary>
+    /// Finds the one slot holding the token a PKCS#11 URI (RFC 7512) names, among the slots with a token present: for
+    /// instance <c>pkcs11:token=signing-prod;serial=0123456789abcdef</c>, or
+    /// <c>pkcs11:manufacturer=SoftHSM%20project;model=SoftHSM%20v2;token=signing-prod</c>. Finding the slot neither
+    /// opens a session nor logs in. See <see cref="GetSlotByUri(Pkcs11Uri)"/>.
+    /// </summary>
+    /// <param name="uri">The URI; see <see cref="Pkcs11Uri"/> for what is taken and what is refused.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="uri"/> is not a PKCS#11 URI this library takes (see <see cref="Pkcs11Uri"/>).</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">
+    /// No present token matches, or the module is not the one the <c>library-*</c> attributes name
+    /// (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).
+    /// </exception>
+    /// <exception cref="InvalidOperationException">More than one present token matches; the message names their slot IDs.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetInfo</c>, <c>C_GetSlotList</c>, <c>C_GetSlotInfo</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlotByUri(string uri) => GetSlotByUri(Pkcs11Uri.Parse(uri));
+
+    /// <summary>
+    /// Finds the one slot holding the token <paramref name="uri"/> names, among the slots with a token present. Finding
+    /// the slot neither opens a session nor logs in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The module (<c>library-*</c>, checked against <see cref="GetInfo"/>), the slot (<c>slot-*</c>) and the token
+    /// (<c>token</c>, <c>manufacturer</c>, <c>serial</c>, <c>model</c>) attributes select; an attribute left out matches
+    /// anything, so <c>pkcs11:</c> alone names every token. The object attributes (<c>object</c>, <c>type</c>,
+    /// <c>id</c>) do not take part: a key's URI selects the token it is on, and
+    /// <see cref="Pkcs11Session.OpenKey(Pkcs11Uri)"/> then opens the key.
+    /// </para>
+    /// <para>
+    /// As with the other lookups, the URI must name exactly one present token: none, or more than one, is refused rather
+    /// than resolved by picking one. A <c>slot-id</c> pins the slot, which the module may renumber between runs; prefer
+    /// the token's own attributes (<see cref="Pkcs11Slot.GetTokenUri"/>) in configuration.
+    /// </para>
+    /// </remarks>
+    /// <param name="uri">The URI.</param>
+    /// <returns>The slot holding the token.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11TokenException">
+    /// No present token matches, or the module is not the one the <c>library-*</c> attributes name
+    /// (<see cref="CKR.CKR_TOKEN_NOT_PRESENT"/>).
+    /// </exception>
+    /// <exception cref="InvalidOperationException">More than one present token matches; the message names their slot IDs.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetInfo</c>, <c>C_GetSlotList</c>, <c>C_GetSlotInfo</c> or <c>C_GetTokenInfo</c>.</exception>
+    public Pkcs11Slot GetSlotByUri(Pkcs11Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (uri.NamesLibrary && !uri.Matches(GetInfo()))
+        {
+            throw new Pkcs11TokenException(CKR.CKR_TOKEN_NOT_PRESENT, Pkcs11Operations.OpGetInfo,
+                "No present token matches the PKCS#11 URI: its library-* attributes do not describe this module.");
+        }
+
+        return SelectOneSlot(uri.Matches, "the attributes of the PKCS#11 URI");
+    }
+
+    // The one present token match accepts. A token removed while the slots are read is passed over. None is
+    // CKR_TOKEN_NOT_PRESENT; more than one is refused, naming the slots, rather than resolved by picking one.
+    private Pkcs11Slot SelectOneSlot(Func<Pkcs11Slot, TokenInfo, bool> match, string what)
+    {
         List<Pkcs11Slot> matches = [];
         foreach (Pkcs11Slot slot in GetSlotList())
         {
-            string label;
+            TokenInfo token;
             try
             {
-                label = slot.GetTokenInfo().Label;
+                token = slot.GetTokenInfo();
+                if (!match(slot, token))
+                    continue;
             }
             catch (Pkcs11TokenException ex) when (ex.ReturnValue is CKR.CKR_TOKEN_NOT_PRESENT or CKR.CKR_DEVICE_REMOVED)
             {
                 continue;
             }
 
-            if (string.Equals(label.TrimEnd(' '), tokenLabel, StringComparison.Ordinal))
-                matches.Add(slot);
+            matches.Add(slot);
         }
 
         return matches.Count switch
@@ -694,10 +820,11 @@ public sealed class Pkcs11Library : IDisposable
             0 => throw new Pkcs11TokenException(
                 CKR.CKR_TOKEN_NOT_PRESENT,
                 Pkcs11Operations.OpGetTokenInfo,
-                $"No present token has the label '{tokenLabel}'."),
+                $"No present token has {what}."),
             _ => throw new InvalidOperationException(
-                $"More than one token has the label '{tokenLabel}': slots {string.Join(", ", matches.Select(s => s.SlotId))}. "
-                + "Select the slot by its ID from GetSlotList instead."),
+                $"More than one token has {what}: slots {string.Join(", ", matches.Select(s => s.SlotId))}. "
+                + "Select the token by what tells them apart: its serial number (GetSlotByTokenSerial), a PKCS#11 URI "
+                + "with its manufacturer or model (GetSlotByUri), or a predicate (FindSlot)."),
         };
     }
 

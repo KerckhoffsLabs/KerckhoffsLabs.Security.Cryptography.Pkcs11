@@ -2244,3 +2244,52 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.ContextAuthentication.
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login.Share() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.TryShareLogin(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login? login) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.TryShareLogin(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenUser user, string! username, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Login? login) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetSlotByTokenSerial(string! serialNumber) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.FindSlot(System.Func<KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenInfo!, bool>! match) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetSlotByUri(string! uri) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetSlotByUri(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri! uri) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.OpenCertificate(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri! uri) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.OpenKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri! uri) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot.GetTokenUri() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri? other) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Id.get -> System.ReadOnlyMemory<byte>?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Id.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.LibraryDescription.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.LibraryDescription.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.LibraryManufacturer.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.LibraryManufacturer.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.LibraryVersion.get -> System.Version?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.LibraryVersion.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Manufacturer.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Manufacturer.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Matches(KerckhoffsLabs.Security.Cryptography.Pkcs11.LibraryInfo! info) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Matches(KerckhoffsLabs.Security.Cryptography.Pkcs11.SlotInfo! info) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Matches(KerckhoffsLabs.Security.Cryptography.Pkcs11.TokenInfo! info) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Model.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Model.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.NamesLibrary.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.NamesObject.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Object.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Object.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Pkcs11Uri() -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Serial.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Serial.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.SlotDescription.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.SlotDescription.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.SlotId.get -> ulong?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.SlotId.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.SlotManufacturer.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.SlotManufacturer.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Token.get -> string?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Token.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Type.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKO?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Type.init -> void
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Equals(object? obj) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.GetHashCode() -> int
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.ToString() -> string!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.Parse(string! uri) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.TryParse(string? uri, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri? result) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.operator !=(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri? right) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri.operator ==(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Uri? right) -> bool

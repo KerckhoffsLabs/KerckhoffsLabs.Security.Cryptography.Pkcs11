@@ -278,6 +278,43 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
+    /// Opens the one key a PKCS#11 URI (RFC 7512) names on this session's token: for instance
+    /// <c>pkcs11:token=signing-prod;object=release-key;type=private</c>. See <see cref="OpenKey(string)"/> for which
+    /// objects match and when the lookup is ambiguous.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The object attributes select: <c>object</c> (<c>CKA_LABEL</c>), <c>id</c> (<c>CKA_ID</c>) and <c>type</c>
+    /// (<c>public</c>, <c>private</c> or <c>secret-key</c>; with <c>private</c> or <c>public</c>, that half is found and
+    /// the other found by <c>CKA_ID</c> on first use, as for any key). The URI must name the object, by <c>object</c> or
+    /// <c>id</c>: one with neither would open whichever key is alone on the token.
+    /// </para>
+    /// <para>
+    /// The URI's token, slot and module attributes, when it has some, must describe this session's token, so a URI meant
+    /// for another token is refused rather than looked up here, where a key of the same label may exist. Find the
+    /// token from the same URI with <see cref="Pkcs11Library.GetSlotByUri(Pkcs11Uri)"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="uri">The URI; see <see cref="Pkcs11Uri"/> for what it may carry.</param>
+    /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// The URI names no object (no <c>object</c> or <c>id</c>), an empty <c>id</c>, a <c>type</c> that is not a key, or
+    /// another token than this session's.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no key matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if the matches form more than one key.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetInfo</c>, <c>C_GetSlotInfo</c>, <c>C_GetTokenInfo</c>, <c>C_FindObjects</c> or <c>C_GetAttributeValue</c>.</exception>
+    public Pkcs11Key OpenKey(Pkcs11Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ObjectTemplate filter = UriFilter(uri, Keys, "a key");
+        return OpenKeyCore(filter, "named by the PKCS#11 URI");
+    }
+
+    /// <summary>
     /// Opens the one key that matches <paramref name="filter"/>: any attributes, such as a key class
     /// (<c>CKA_CLASS = CKO_SECRET_KEY</c>) or a key type (<c>CKA_KEY_TYPE = CKK_EC</c>) next to a label.
     /// See <see cref="OpenKey(string)"/> for which objects match and when the lookup is ambiguous.
@@ -640,6 +677,63 @@ public sealed partial class Pkcs11Session : IDisposable
     {
         ArgumentNullException.ThrowIfNull(filter);
         return OpenCertificateCore(filter, "matching the filter");
+    }
+
+    /// <summary>
+    /// Opens the one X.509 certificate a PKCS#11 URI (RFC 7512) names on this session's token: for instance
+    /// <c>pkcs11:token=signing-prod;object=release-key;type=cert</c>. As <see cref="OpenKey(Pkcs11Uri)"/>: the URI
+    /// must name the object (<c>object</c> or <c>id</c>), its <c>type</c>, if any, must be <c>cert</c>, and its token,
+    /// slot and module attributes, if any, must describe this session's token. See <see cref="OpenCertificate(string)"/>
+    /// for which objects match.
+    /// </summary>
+    /// <param name="uri">The URI; see <see cref="Pkcs11Uri"/> for what it may carry.</param>
+    /// <returns>A new <see cref="Pkcs11Certificate"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// The URI names no object, an empty <c>id</c>, a <c>type</c> other than <c>cert</c>, or another token than this
+    /// session's.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="Pkcs11ObjectNotFoundException">Thrown if no certificate matches.</exception>
+    /// <exception cref="Pkcs11AmbiguousObjectException">Thrown if more than one certificate matches.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if the certificate's <c>CKA_VALUE</c> cannot be read; otherwise propagated from <c>C_GetInfo</c>, <c>C_GetSlotInfo</c>, <c>C_GetTokenInfo</c>, <c>C_FindObjects</c> or <c>C_GetAttributeValue</c>.</exception>
+    public Pkcs11Certificate OpenCertificate(Pkcs11Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ObjectTemplate filter = UriFilter(uri, Certificates, "a certificate");
+        return OpenCertificateCore(filter, "named by the PKCS#11 URI");
+    }
+
+    // The search filter of an object URI for family: its label, id and class. Refuses a URI that names no object, an
+    // empty id, a class outside family, or another token than this session's.
+    private ObjectTemplate UriFilter(Pkcs11Uri uri, ObjectFamily family, string what)
+    {
+        if (uri.Object is null && uri.Id is null)
+        {
+            throw new ArgumentException(
+                "The PKCS#11 URI names no object: give the object's label ('object') or its CKA_ID ('id').", nameof(uri));
+        }
+        if (uri.Id is { IsEmpty: true })
+            throw new ArgumentException("The PKCS#11 URI's 'id' is empty.", nameof(uri));
+        if (uri.Type is { } type && Array.IndexOf(family.Classes, type) < 0)
+            throw new ArgumentException($"The PKCS#11 URI's 'type' names {type}, which is not {what}.", nameof(uri));
+
+        Pkcs11Library library = Slot.Library;
+        if ((uri.NamesLibrary && !uri.Matches(library.GetInfo())) || !uri.Matches(Slot, Slot.GetTokenInfo()))
+        {
+            throw new ArgumentException("The PKCS#11 URI names another token than this session's: find the token from " +
+                "the same URI (Pkcs11Library.GetSlotByUri) and open the session there.", nameof(uri));
+        }
+
+        GenericTemplateBuilder builder = ObjectTemplate.Empty();
+        if (uri.Object is not null)
+            builder.Label(uri.Object);
+        if (uri.Id is { } id)
+            builder.Id(id.Span);
+        if (uri.Type is { } objectClass)
+            builder.Attribute(CKA.CKA_CLASS, (ulong)objectClass);
+        return builder.Build();
     }
 
     /// <summary>

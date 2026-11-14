@@ -40,8 +40,8 @@ What each step does:
    `C_Finalize` when it is disposed, if it was the one that initialized the module.
 2. **`GetSlotByTokenLabel`** finds the slot holding the token with that label. It throws
    `Pkcs11TokenException` (`CKR_TOKEN_NOT_PRESENT`) when no token has the label, and refuses with
-   `InvalidOperationException`, naming the slots, when more than one does: select the slot from
-   `GetSlotList` by its ID then. **`slot.Login(TokenUser.User, pin)`** logs the normal user in and returns a
+   `InvalidOperationException`, naming the slots, when more than one does (see *Choosing the token* below).
+   **`slot.Login(TokenUser.User, pin)`** logs the normal user in and returns a
    `Pkcs11Login`, and **`login.OpenSession()`** opens a read/write session of that login. (A token that takes
    no login, such as a software crypto token, is used through `slot.OpenSession()` instead, which opens a
    read-only session by default. A read-only session creates session objects, such as the key below; pass
@@ -61,6 +61,39 @@ What each step does:
    (`using`), rather than leaving them to the garbage collector. The token is logged out when the login and
    every session opened from it have been disposed, in whatever order: disposing one of them logs out only
    when it is the last.
+
+### Choosing the token
+
+Every lookup finds exactly one present token, or throws: `Pkcs11TokenException` (`CKR_TOKEN_NOT_PRESENT`) when
+none matches, `InvalidOperationException` naming the slots when more than one does. None picks one for you,
+which would let whoever can initialize a token decide which one the application uses. None opens a session or
+logs in.
+
+| Lookup | Selects by | Example |
+|---|---|---|
+| `GetSlotByTokenLabel("signing-prod")` | the label given when the token was initialized | `signing-prod`, `NSS Certificate DB` |
+| `GetSlotByTokenSerial("0123456789abcdef")` | the token's serial number, which tells apart tokens sharing a label | |
+| `GetSlotByUri("pkcs11:token=signing-prod;serial=0123456789abcdef")` | a PKCS#11 URI (RFC 7512): token, manufacturer, serial, model, slot and library attributes | `pkcs11:manufacturer=SoftHSM%20project;token=signing-prod` |
+| `FindSlot(t => t.Label == "signing-prod" && t.Model == "SoftHSM v2")` | any test on the token's `TokenInfo` | |
+
+`slot.GetTokenUri()` gives the URI of a token (its manufacturer, model, serial number and label) to put in
+configuration. A URI can also name a key or certificate on the token, by label (`object`), `id` and `type`
+(`public`, `private`, `secret-key`, `cert`): find the token and open the key from the same URI.
+
+```csharp
+var uri = Pkcs11Uri.Parse(config["Pkcs11:SigningKey"]);   // pkcs11:serial=0123456789abcdef;object=release-key;type=private
+Pkcs11Slot slot = library.GetSlotByUri(uri);
+using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+using Pkcs11Session session = login.OpenSession();
+using Pkcs11Key key = session.OpenKey(uri);   // refused if the URI names another token
+```
+
+Labels are not unique (a cloned card, two HSM partitions with the same name); a serial number is unique for a
+manufacturer and model. Keep the slot ID out of configuration: the module assigns it, may renumber it between
+runs, and a swapped card puts another token behind the same ID. A URI is read strictly: values are
+percent-encoded (`%20` for a space); vendor (`x-…`) or unknown attributes, and query attributes, are refused
+rather than ignored. A URI only selects: a PIN is never taken from one (`pin-value`, `pin-source`), nor a module
+loaded from one (`module-name`, `module-path`).
 
 ### In an application: load and log in once
 

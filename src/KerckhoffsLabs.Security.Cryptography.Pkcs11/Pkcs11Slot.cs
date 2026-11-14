@@ -126,6 +126,23 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     }
 
     /// <summary>
+    /// The PKCS#11 URI (RFC 7512) of the token in this slot: its manufacturer, model, serial number and label, e.g.
+    /// <c>pkcs11:manufacturer=SoftHSM%20project;model=SoftHSM%20v2;serial=8e1b2c3d4f5a6b7c;token=signing-prod</c>.
+    /// Put its text (<see cref="Pkcs11Uri.ToString"/>) in configuration and find the token again with
+    /// <see cref="Pkcs11Library.GetSlotByUri(string)"/>, wherever the module numbers its slot then; add the object
+    /// attributes (<c>uri with { Object = "release-key", Type = CKO.CKO_PRIVATE_KEY }</c>) to name a key on it.
+    /// </summary>
+    /// <remarks>
+    /// The serial number tells apart tokens that share a label, and the manufacturer and model tokens of different
+    /// makes that share a serial number. A token whose fields are not unique even together cannot be told apart by any
+    /// URI: <see cref="Pkcs11Library.GetSlotByUri(string)"/> then refuses rather than picks one.
+    /// </remarks>
+    /// <returns>The token's URI.</returns>
+    /// <exception cref="ObjectDisposedException">The library has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetTokenInfo</c> (<c>CKR_TOKEN_NOT_PRESENT</c> when the slot is empty).</exception>
+    public Pkcs11Uri GetTokenUri() => Pkcs11Uri.ForToken(GetTokenInfo());
+
+    /// <summary>
     /// Obtains a list of mechanism types supported by a token.
     /// </summary>
     /// <remarks>
