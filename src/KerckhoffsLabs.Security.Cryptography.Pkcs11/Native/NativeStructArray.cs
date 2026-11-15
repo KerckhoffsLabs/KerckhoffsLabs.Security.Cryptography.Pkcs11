@@ -78,7 +78,7 @@ internal unsafe ref struct NativeStructArray<T> : IDisposable
             _block = UnmanagedMemory.Allocate(size);
         }
         for (int i = 0; i < _count; i++)
-            Pkcs11Marshal.WriteStructure(_block + i * _stride, in items[i], windowsLayout);
+            Pkcs11Marshal.WriteStructure((IntPtr)((byte*)_block + i * _stride), in items[i], windowsLayout);
     }
 
     /// <summary>The first struct, or NULL for an empty array built with <c>nullWhenEmpty</c>.</summary>
@@ -91,7 +91,7 @@ internal unsafe ref struct NativeStructArray<T> : IDisposable
     public readonly void CopyTo(Span<T> items)
     {
         for (int i = 0; i < _count; i++)
-            items[i] = Pkcs11Marshal.ReadStructure<T>(_block + i * _stride, _windowsLayout);
+            items[i] = Pkcs11Marshal.ReadStructure<T>((IntPtr)((byte*)_block + i * _stride), _windowsLayout);
     }
 
     /// <summary>Zeroizes a stack block, or frees (and so zeroizes) a heap one.</summary>
