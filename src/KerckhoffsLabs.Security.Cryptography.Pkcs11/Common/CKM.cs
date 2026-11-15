@@ -987,24 +987,28 @@ public enum CKM : ulong
     CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE = 0x000003D5,
 
     /// <summary>
-    /// Mechanism is defined in PKCS#11 v2.40e1 headers but the description is not present in the specification
+    /// Server-side TLS 1.0 MAC mechanism. It is defined in the PKCS#11 headers from v2.40 on, but no version of the
+    /// specification describes it, so its behavior is module-defined; prefer <see cref="CKM_TLS_MAC"/>.
     /// </summary>
-    CKM_TLS10_MAC_SERVER = 0x000003D6, // TODO - Fix description when fixed in PKCS#11 specification
+    CKM_TLS10_MAC_SERVER = 0x000003D6,
 
     /// <summary>
-    /// Mechanism is defined in PKCS#11 v2.40e1 headers but the description is not present in the specification
+    /// Client-side TLS 1.0 MAC mechanism. It is defined in the PKCS#11 headers from v2.40 on, but no version of the
+    /// specification describes it, so its behavior is module-defined; prefer <see cref="CKM_TLS_MAC"/>.
     /// </summary>
-    CKM_TLS10_MAC_CLIENT = 0x000003D7, // TODO - Fix description when fixed in PKCS#11 specification
+    CKM_TLS10_MAC_CLIENT = 0x000003D7,
 
     /// <summary>
-    /// Mechanism is defined in PKCS#11 v2.40e1 headers but the description is not present in the specification
+    /// Deprecated alias of <see cref="CKM_TLS_MAC"/>, kept under its own identifier for historical reasons: generates
+    /// the integrity tag (verify_data) for the TLS 1.2 "finished" message and behaves identically to <see cref="CKM_TLS_MAC"/>.
     /// </summary>
-    CKM_TLS12_MAC = 0x000003D8, // TODO - Fix description when fixed in PKCS#11 specification
+    CKM_TLS12_MAC = 0x000003D8,
 
     /// <summary>
-    /// Mechanism is defined in PKCS#11 v2.40e1 headers but the description is not present in the specification
+    /// Deprecated alias of <see cref="CKM_TLS_KDF"/>, kept under its own identifier for historical reasons: derives
+    /// additional key material from the TLS key material and PRF (RFC 5705) and behaves identically to <see cref="CKM_TLS_KDF"/>.
     /// </summary>
-    CKM_TLS12_KDF = 0x000003D9, // TODO - Fix description when fixed in PKCS#11 specification
+    CKM_TLS12_KDF = 0x000003D9,
 
     /// <summary>
     /// Mechanism for master key derivation in TLS 1.2
