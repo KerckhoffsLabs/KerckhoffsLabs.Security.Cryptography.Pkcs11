@@ -316,12 +316,14 @@ public enum CKA : ulong
     /// <summary>
     /// DER-encoding of an ANSI X9.62 Parameters value [byte array]
     /// </summary>
-    CKA_ECDSA_PARAMS = 0x00000180,
+    CKA_EC_PARAMS = 0x00000180,
 
     /// <summary>
-    /// DER-encoding of an ANSI X9.62 Parameters value [byte array]
+    /// Deprecated name of <see cref="CKA_EC_PARAMS"/>, which has the same value.
     /// </summary>
-    CKA_EC_PARAMS = 0x00000180,
+    [Obsolete("CKA_ECDSA_PARAMS is the deprecated PKCS#11 name of CKA_EC_PARAMS, which has the same value. Use CKA_EC_PARAMS.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKA_ECDSA_PARAMS = CKA_EC_PARAMS,
 
     /// <summary>
     /// DER-encoding of ANSI X9.62 ECPoint value Q [byte array]
