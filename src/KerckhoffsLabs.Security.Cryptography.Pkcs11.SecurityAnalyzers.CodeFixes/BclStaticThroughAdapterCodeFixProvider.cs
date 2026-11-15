@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Composition;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -40,24 +41,39 @@ public sealed class BclStaticThroughAdapterCodeFixProvider : CodeFixProvider
         if (root is null || model is null)
             return;
 
-        foreach (Diagnostic diagnostic in context.Diagnostics)
+        foreach (Fixable fixable in context.Diagnostics
+            .Select(diagnostic => Resolve(root, model, diagnostic, context.CancellationToken))
+            .OfType<Fixable>())
         {
-            // The analyzer reports on the member access itself: `Adapter.Member`.
-            if (root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true) is not MemberAccessExpressionSyntax access)
-                continue;
-
-            SymbolInfo info = model.GetSymbolInfo(access, context.CancellationToken);
-            ISymbol? member = info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
-            if (member?.ContainingType is not INamedTypeSymbol declaring)
-                continue;
-
             context.RegisterCodeFix(
                 CodeAction.Create(
-                    $"Call '{declaring.Name}.{member.Name}' directly",
-                    ct => QualifyAsync(context.Document, access, declaring, ct),
+                    $"Call '{fixable.Declaring.Name}.{fixable.MemberName}' directly",
+                    ct => QualifyAsync(context.Document, fixable.Access, fixable.Declaring, ct),
                     EquivalenceKey),
-                diagnostic);
+                fixable.Diagnostic);
         }
+    }
+
+    // The member access a diagnostic reports (`Adapter.Member`) and the BCL type that declares the member, or null
+    // when the reported node is not a member access or its symbol cannot be resolved.
+    private static Fixable? Resolve(SyntaxNode root, SemanticModel model, Diagnostic diagnostic, CancellationToken cancellationToken)
+    {
+        if (root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true) is not MemberAccessExpressionSyntax access)
+            return null;
+
+        SymbolInfo info = model.GetSymbolInfo(access, cancellationToken);
+        ISymbol? member = info.Symbol ?? (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] : null);
+        return member?.ContainingType is INamedTypeSymbol declaring
+            ? new Fixable(diagnostic, access, declaring, member.Name)
+            : null;
+    }
+
+    private sealed class Fixable(Diagnostic diagnostic, MemberAccessExpressionSyntax access, INamedTypeSymbol declaring, string memberName)
+    {
+        public Diagnostic Diagnostic { get; } = diagnostic;
+        public MemberAccessExpressionSyntax Access { get; } = access;
+        public INamedTypeSymbol Declaring { get; } = declaring;
+        public string MemberName { get; } = memberName;
     }
 
     private static async Task<Document> QualifyAsync(Document document, MemberAccessExpressionSyntax access, INamedTypeSymbol declaring, CancellationToken cancellationToken)
