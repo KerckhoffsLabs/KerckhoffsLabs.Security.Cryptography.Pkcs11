@@ -4,6 +4,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// <summary>
 /// Mechanism type
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Info Code Smell", "S1133:Deprecated code should be removed",
+    Justification = "The [Obsolete] members are the PKCS#11 headers' own deprecated names (KLPKCS11013). They stay for "
+    + "source compatibility with code written against older headers, as the headers themselves keep them; there is "
+    + "no plan to remove them.")]
 public enum CKM : ulong
 {
     /// <summary>
