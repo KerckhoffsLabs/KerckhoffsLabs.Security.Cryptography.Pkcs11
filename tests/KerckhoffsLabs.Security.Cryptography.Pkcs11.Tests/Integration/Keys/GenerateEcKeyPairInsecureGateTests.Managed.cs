@@ -22,7 +22,11 @@ public sealed class GenerateEcKeyPairInsecureGateTests
                 System.Security.Cryptography.ECCurve.CreateFromValue("1.3.132.0.33"));
             return true;
         }
-        catch (Exception)
+        catch (PlatformNotSupportedException)
+        {
+            return false;
+        }
+        catch (System.Security.Cryptography.CryptographicException)
         {
             return false;
         }

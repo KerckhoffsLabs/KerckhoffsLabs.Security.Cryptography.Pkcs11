@@ -32,7 +32,11 @@ internal static class DSAPkcs11TestCases
             using var d = DSA.Create(2048);
             return true;
         }
-        catch (Exception)
+        catch (PlatformNotSupportedException)
+        {
+            return false;
+        }
+        catch (CryptographicException)
         {
             return false;
         }
