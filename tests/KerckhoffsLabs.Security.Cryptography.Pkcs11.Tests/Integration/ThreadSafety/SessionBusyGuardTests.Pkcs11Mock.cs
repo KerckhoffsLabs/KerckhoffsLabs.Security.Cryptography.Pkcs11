@@ -33,11 +33,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
             startGate.Wait(TestContext.Current.CancellationToken);
             try
             {
-                session.GetSessionInfo();
-            }
-            catch (Exception ex)
-            {
-                capturedB = ex;
+                capturedB = Record.Exception(() => session.GetSessionInfo());
             }
             finally
             {
