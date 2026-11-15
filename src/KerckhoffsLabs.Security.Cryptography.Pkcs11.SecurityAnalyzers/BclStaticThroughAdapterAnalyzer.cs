@@ -18,8 +18,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers;
 /// <c>MLKemPkcs11.IsSupported</c> reports the OS crypto library's support, not the token's. Nothing
 /// the library declares is involved, so there is no symbol to mark obsolete.
 /// <para>
-/// Key factories, object factories and capability probes are KLPKCS11014 (Warning): the result is
-/// a different object, or a different answer, from the one the adapter name promises. The remaining
+/// Key factories, object factories and capability probes are KLPKCS11014, an error by default: the
+/// result is a different object, or a different answer, from the one the adapter name promises, and a
+/// software key mistaken for a token key is a key outside the HSM. Code that means the software object
+/// names the BCL type (the code fix does it); the severity can still be lowered in .editorconfig. The remaining
 /// inherited statics (<c>HashData</c>, <c>IsWeakKey</c>, <c>GetKeyWrapPaddedLength</c> …) compute
 /// the same value either way and only run in software, so they are KLPKCS11015 (Info). An adapter is
 /// any type in this library's assembly that derives from a <c>System.Security.Cryptography</c> type,
@@ -44,13 +46,14 @@ public sealed class BclStaticThroughAdapterAnalyzer : DiagnosticAnalyzer
             "'{0}.{1}' calls '{2}.{1}', which {3}; name '{2}' if that is intended, otherwise create or " +
             "open the key on the token and wrap it in '{0}'",
         category: "Security",
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description:
             "A PKCS#11 adapter derives from its BCL algorithm type, so the base type's static members are " +
             "also reachable through the adapter's name. GenerateKey, Import*, Create and IsSupported then " +
             "run the BCL's own implementation: they produce exportable software keys and objects that never " +
-            "touch the token, or report the operating system's algorithm support rather than the token's.",
+            "touch the token, or report the operating system's algorithm support rather than the token's. " +
+            "Reported as an error by default: name the BCL type when the software object is intended.",
         helpLinkUri:
             "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11014");
 

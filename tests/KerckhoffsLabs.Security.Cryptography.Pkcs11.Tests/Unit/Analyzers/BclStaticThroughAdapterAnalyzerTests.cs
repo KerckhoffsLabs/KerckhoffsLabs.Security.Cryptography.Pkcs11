@@ -52,14 +52,14 @@ public sealed class BclStaticThroughAdapterAnalyzerTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public async Task GenerateKey_ThroughTheAdapterName_IsAWarningNamingTheBclMember()
+    public async Task GenerateKey_ThroughTheAdapterName_IsAnErrorNamingTheBclMember()
     {
         Diagnostic diagnostic = Assert.Single(await AnalyzeAsync(Usings + """
             static class C { static MLDsa M() => MLDsaPkcs11.GenerateKey(MLDsaAlgorithm.MLDsa65); }
             """));
 
         Assert.Equal(BclStaticThroughAdapterAnalyzer.FactoryDiagnosticId, diagnostic.Id);
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal(
             "'MLDsaPkcs11.GenerateKey' calls 'MLDsa.GenerateKey', which generates an exportable software key in " +
             "process memory, not a token key; name 'MLDsa' if that is intended, otherwise create or open the key " +
@@ -83,11 +83,12 @@ public sealed class BclStaticThroughAdapterAnalyzerTests
         "MLDsaPkcs11.GenerateKey", "generates an exportable software key in process memory, not a token key")]
     [InlineData("static MLDsa M() => global::KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.MLDsaPkcs11.GenerateKey(MLDsaAlgorithm.MLDsa44);",
         "global::KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms.MLDsaPkcs11.GenerateKey", "generates an exportable software key in process memory, not a token key")]
-    public async Task FactoryOrCapabilityMember_ThroughTheAdapterName_IsAWarning(string member, string reported, string consequence)
+    public async Task FactoryOrCapabilityMember_ThroughTheAdapterName_IsAnError(string member, string reported, string consequence)
     {
         Diagnostic diagnostic = Assert.Single(await AnalyzeAsync(Usings + $"static class C {{ {member} }}"));
 
         Assert.Equal(BclStaticThroughAdapterAnalyzer.FactoryDiagnosticId, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal(reported, SourceAt(diagnostic));
         Assert.Contains(consequence, diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
     }

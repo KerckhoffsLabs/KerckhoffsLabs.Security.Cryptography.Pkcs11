@@ -231,6 +231,10 @@ Those calls compile, read like token operations, and are not:
 | `AesPkcs11.Create()`, `RSAPkcs11.Create(3072)`, `SHA256Pkcs11.Create()` … | `Aes.Create` … | a plain software object that never touches the token |
 | `MLKemPkcs11.IsSupported`, `MLDsaPkcs11.IsSupported` … | `MLKem.IsSupported` … | whether the *operating system* supports the algorithm, not the token |
 
+It is an **error** by default, not a warning: a software key taken for a token key is a key outside
+the HSM, and the build is the last point at which that is cheap to notice. Nothing is lost by it: the
+same call through the BCL name compiles as before.
+
 The rule covers `GenerateKey`, every `Import*`, `Create` and `IsSupported` reached through any type of
 this library that derives from a `System.Security.Cryptography` type, so a new adapter is covered
 automatically. To get a token key, generate or open it through `Pkcs11Session` and wrap it in the
@@ -239,6 +243,15 @@ adapter (`new MLDsaPkcs11(key)`); to ask the token, use `Pkcs11Slot.GetMechanism
 code fix rewrites `MLDsaPkcs11.GenerateKey(…)` to `MLDsa.GenerateKey(…)` and adds the `using` if
 needed. An alias (`using Signer = …MLDsaPkcs11;`) is reported the same way. `using static MLDsaPkcs11;`
 cannot cause this: it imports only the members a type declares itself, never inherited ones.
+
+To keep such a call as it is (generated code you cannot edit, say), lower the severity rather than
+suppress every security rule:
+
+```ini
+# .editorconfig
+[generated/**.cs]
+dotnet_diagnostic.KLPKCS11014.severity = warning
+```
 
 <a id="KLPKCS11015"></a>
 ### KLPKCS11015 — BCL static helper reached through an adapter type
