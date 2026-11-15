@@ -27,7 +27,7 @@ public sealed class Pkcs11SessionCoreObjectsTests
     {
         public CKR CopyRv = CKR.CKR_OK, SizeRv = CKR.CKR_OK, SetAttrRv = CKR.CKR_OK;
         public ulong CopiedId = 0x99;
-        public ulong SizeBytes = 128;
+        public readonly ulong SizeBytes = 128;
 
         protected override CKR C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, ref NativeCULong newObjectId)
         { newObjectId = (NativeCULong)CopiedId; return CopyRv; }
@@ -96,7 +96,8 @@ public sealed class Pkcs11SessionCoreObjectsTests
     /// <summary>Returns one page per dequeued count; an empty queue yields a zero-length page.</summary>
     private sealed class FindFake : SessionTestModule
     {
-        public CKR InitRv = CKR.CKR_OK, FindRv = CKR.CKR_OK, FinalRv = CKR.CKR_OK;
+        public CKR InitRv = CKR.CKR_OK, FinalRv = CKR.CKR_OK;
+        public readonly CKR FindRv = CKR.CKR_OK;
         public readonly Queue<int> Pages = new();
         public int FindCalls { get; private set; }
         public int FinalCalls { get; private set; }

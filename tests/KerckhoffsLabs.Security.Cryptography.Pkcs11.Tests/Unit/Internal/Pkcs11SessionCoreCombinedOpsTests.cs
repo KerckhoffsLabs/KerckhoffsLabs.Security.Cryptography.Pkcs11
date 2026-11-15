@@ -33,7 +33,7 @@ public sealed class Pkcs11SessionCoreCombinedOpsTests
     {
         public byte[] DigestOutput = [0xD1, 0xD2, 0xD3];
         public CKR VerifyFinalRv = CKR.CKR_OK;
-        public CKR UpdateRv = CKR.CKR_OK;          // first C_*Update return value
+        public readonly CKR UpdateRv = CKR.CKR_OK; // first C_*Update return value
         public bool FirstUpdateBufferTooSmall;     // emulate a token that demands a bigger buffer first
         public CKR VerifyInitRv = CKR.CKR_OK;
         public CKR DecryptInitRv = CKR.CKR_OK;

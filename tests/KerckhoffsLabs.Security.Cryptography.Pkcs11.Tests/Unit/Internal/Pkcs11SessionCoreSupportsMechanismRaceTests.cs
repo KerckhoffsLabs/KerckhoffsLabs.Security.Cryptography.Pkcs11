@@ -35,7 +35,7 @@ public sealed class Pkcs11SessionCoreSupportsMechanismRaceTests
         /// <summary>Set if a probe call was issued while a native call was still executing.</summary>
         internal volatile bool ProbedDuringNativeCall;
 
-        internal CKM[] Mechanisms = [CKM.CKM_AES_GCM, CKM.CKM_SHA256];
+        internal readonly CKM[] Mechanisms = [CKM.CKM_AES_GCM, CKM.CKM_SHA256];
 
         protected override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         {
