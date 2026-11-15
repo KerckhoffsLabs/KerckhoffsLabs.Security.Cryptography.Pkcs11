@@ -243,20 +243,25 @@ internal sealed class SlotEventDispatcher
     }
 
     // A library that is still alive, to call the module through; drops the subscribers of libraries
-    // collected without Dispose.
+    // collected without Dispose. Walks backwards so a removal never shifts an entry still to be visited,
+    // and reads each weak reference once, so a library seen alive is the one returned.
     private LowLevelPkcs11Library? AnyLibraryLocked()
     {
-        for (int i = 0; i < _subscribers.Count; i++)
+        LowLevelPkcs11Library? alive = null;
+        for (int i = _subscribers.Count - 1; i >= 0; i--)
         {
             if (_subscribers[i].Library is { } library)
-                return library;
+            {
+                alive = library;
+                continue;
+            }
 
             // Collected, so nothing can be awaiting it any more; end it all the same.
             foreach (TaskCompletionSource<ulong> orphan in _subscribers[i].CloseLocked())
                 orphan.TrySetException(new ObjectDisposedException(nameof(Pkcs11Library)));
-            _subscribers.RemoveAt(i--);
+            _subscribers.RemoveAt(i);
         }
-        return null;
+        return alive;
     }
 
     private void PublishLocked(ulong slotId)
