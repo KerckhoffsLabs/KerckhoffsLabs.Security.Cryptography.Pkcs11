@@ -33,62 +33,48 @@ internal static class EncryptAesTestCases
 
     internal static void Assert_AesCbcPad_ProducesCiphertext(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
         try
         {
-            var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
-            try
-            {
-                byte[] plaintext = Encoding.UTF8.GetBytes("Hello, PKCS#11 AES-CBC-PAD!");
+            byte[] plaintext = Encoding.UTF8.GetBytes("Hello, PKCS#11 AES-CBC-PAD!");
 
-                using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_CBC_PAD is unauthenticated and gated by default.
-                var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
-                byte[] ciphertext = session.Encrypt(mechanism, keyHandle, plaintext);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_CBC_PAD is unauthenticated and gated by default.
+            var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
+            byte[] ciphertext = session.Encrypt(mechanism, keyHandle, plaintext);
 
-                Assert.NotNull(ciphertext);
-                Assert.True(ciphertext.Length > 0, "Expected non-empty ciphertext.");
-            }
-            finally
-            {
-                session.DestroyObject(keyHandle);
-            }
+            Assert.NotNull(ciphertext);
+            Assert.True(ciphertext.Length > 0, "Expected non-empty ciphertext.");
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(keyHandle);
         }
     }
 
     internal static void Assert_AesCbcPad_RoundTrips(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
         try
         {
-            var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
-            try
-            {
-                byte[] plaintext = Encoding.UTF8.GetBytes("Round-trip test for AES-CBC-PAD.");
+            byte[] plaintext = Encoding.UTF8.GetBytes("Round-trip test for AES-CBC-PAD.");
 
-                using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_CBC_PAD is unauthenticated and gated by default.
-                var encMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
-                byte[] ciphertext = session.Encrypt(encMechanism, keyHandle, plaintext);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_CBC_PAD is unauthenticated and gated by default.
+            var encMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
+            byte[] ciphertext = session.Encrypt(encMechanism, keyHandle, plaintext);
 
-                Assert.NotNull(ciphertext);
-                Assert.True(ciphertext.Length > 0);
+            Assert.NotNull(ciphertext);
+            Assert.True(ciphertext.Length > 0);
 
-                var decMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
-                byte[] recovered = session.Decrypt(decMechanism, keyHandle, ciphertext);
+            var decMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
+            byte[] recovered = session.Decrypt(decMechanism, keyHandle, ciphertext);
 
-                Assert.Equal(plaintext, recovered);
-            }
-            finally
-            {
-                session.DestroyObject(keyHandle);
-            }
+            Assert.Equal(plaintext, recovered);
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(keyHandle);
         }
     }
 
@@ -96,60 +82,46 @@ internal static class EncryptAesTestCases
     {
         // The CryptoPolicyViolationException guard fires before any P/Invoke call to C_Encrypt,
         // but a session must still be opened first.
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
         try
         {
-            var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
-            try
-            {
-                byte[] plaintext = new byte[16]; // must be block-aligned for ECB
-                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            byte[] plaintext = new byte[16]; // must be block-aligned for ECB
+            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                    session.Encrypt(mechanism, keyHandle, plaintext));
-                Assert.Equal(CKM.CKM_AES_ECB, ex.Mechanism);
-            }
-            finally
-            {
-                session.DestroyObject(keyHandle);
-            }
+            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+                session.Encrypt(mechanism, keyHandle, plaintext));
+            Assert.Equal(CKM.CKM_AES_ECB, ex.Mechanism);
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(keyHandle);
         }
     }
 
     internal static void Assert_AesEcb_AllowedWithOptIn(IPkcs11Backend backend)
     {
         // With the AllowInsecure policy the gate is bypassed; the backend accepts the call.
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
         try
         {
-            var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
-            try
-            {
-                byte[] plaintext = new byte[16];
-                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            byte[] plaintext = new byte[16];
+            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                // Must not throw CryptoPolicyViolationException.
-                var ex = Record.Exception(() =>
-                    session.Encrypt(mechanism, keyHandle, plaintext));
+            // Must not throw CryptoPolicyViolationException.
+            var ex = Record.Exception(() =>
+                session.Encrypt(mechanism, keyHandle, plaintext));
 
-                // The backend may throw a Pkcs11Exception for other reasons, but must NOT
-                // throw CryptoPolicyViolationException.
-                Assert.False(ex is CryptoPolicyViolationException,
-                    "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
-            }
-            finally
-            {
-                session.DestroyObject(keyHandle);
-            }
+            // The backend may throw a Pkcs11Exception for other reasons, but must NOT
+            // throw CryptoPolicyViolationException.
+            Assert.False(ex is CryptoPolicyViolationException,
+                "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(keyHandle);
         }
     }
 }

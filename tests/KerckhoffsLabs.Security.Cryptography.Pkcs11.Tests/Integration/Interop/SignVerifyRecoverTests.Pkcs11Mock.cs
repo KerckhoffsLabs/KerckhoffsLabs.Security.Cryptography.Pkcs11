@@ -30,57 +30,50 @@ public sealed class SignVerifyRecoverTests(MockBackendFixture f)
     [Fact]
     public void SignRecover_ThenVerifyRecover_RoundTripsViaXorAb()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findPrivate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        ObjectHandle privateKey = Assert.Single(session.FindAllObjects([findPrivate]));
+
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var sessionId = (NativeCULong)session.SessionId;
+        byte[] data = "sign-recover round trip"u8.ToArray();
+
+        using (var scope = new MechanismParameterScope())
         {
-            using var findPrivate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-            ObjectHandle privateKey = Assert.Single(session.FindAllObjects([findPrivate]));
-
-            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-            var sessionId = (NativeCULong)session.SessionId;
-            byte[] data = "sign-recover round trip"u8.ToArray();
-
-            using (var scope = new MechanismParameterScope())
-            {
-                CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_RSA_PKCS).Marshal(scope, out _);
-                CKR rv = lowLevel.C_SignRecoverInit(sessionId, in ckMechanism, (NativeCULong)privateKey.ObjectId);
-                Assert.Equal(CKR.CKR_OK, rv);
-            }
-
-            // Two-pass probe, per the standard PKCS#11 idiom: a length query reports the length first.
-            CKR probeRv = lowLevel.C_SignRecover(sessionId, data, default, lengthOnly: true, out NativeCULong sigLen);
-            Assert.Equal(CKR.CKR_OK, probeRv);
-            Assert.Equal((NativeCULong)data.Length, sigLen);
-
-            byte[] signature = new byte[(int)sigLen];
-            CKR signRv = lowLevel.C_SignRecover(sessionId, data, signature, lengthOnly: false, out sigLen);
-            Assert.Equal(CKR.CKR_OK, signRv);
-
-            byte[] expectedSignature = new byte[data.Length];
-            for (int i = 0; i < data.Length; i++)
-                expectedSignature[i] = (byte)(data[i] ^ 0xAB);
-            Assert.Equal(expectedSignature, signature);
-
-            using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-            ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
-
-            using (var scope = new MechanismParameterScope())
-            {
-                CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_RSA_PKCS).Marshal(scope, out _);
-                CKR rv = lowLevel.C_VerifyRecoverInit(sessionId, in ckMechanism, (NativeCULong)publicKey.ObjectId);
-                Assert.Equal(CKR.CKR_OK, rv);
-            }
-
-            byte[] recovered = new byte[signature.Length];
-            CKR verifyRv = lowLevel.C_VerifyRecover(sessionId, signature, recovered, lengthOnly: false, out NativeCULong recoveredLen);
-            Assert.Equal(CKR.CKR_OK, verifyRv);
-            Assert.Equal((NativeCULong)data.Length, recoveredLen);
-            Assert.Equal(data, recovered);
+            CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_RSA_PKCS).Marshal(scope, out _);
+            CKR rv = lowLevel.C_SignRecoverInit(sessionId, in ckMechanism, (NativeCULong)privateKey.ObjectId);
+            Assert.Equal(CKR.CKR_OK, rv);
         }
-        finally
+
+        // Two-pass probe, per the standard PKCS#11 idiom: a length query reports the length first.
+        CKR probeRv = lowLevel.C_SignRecover(sessionId, data, default, lengthOnly: true, out NativeCULong sigLen);
+        Assert.Equal(CKR.CKR_OK, probeRv);
+        Assert.Equal((NativeCULong)data.Length, sigLen);
+
+        byte[] signature = new byte[(int)sigLen];
+        CKR signRv = lowLevel.C_SignRecover(sessionId, data, signature, lengthOnly: false, out sigLen);
+        Assert.Equal(CKR.CKR_OK, signRv);
+
+        byte[] expectedSignature = new byte[data.Length];
+        for (int i = 0; i < data.Length; i++)
+            expectedSignature[i] = (byte)(data[i] ^ 0xAB);
+        Assert.Equal(expectedSignature, signature);
+
+        using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
+
+        using (var scope = new MechanismParameterScope())
         {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
+            CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_RSA_PKCS).Marshal(scope, out _);
+            CKR rv = lowLevel.C_VerifyRecoverInit(sessionId, in ckMechanism, (NativeCULong)publicKey.ObjectId);
+            Assert.Equal(CKR.CKR_OK, rv);
         }
+
+        byte[] recovered = new byte[signature.Length];
+        CKR verifyRv = lowLevel.C_VerifyRecover(sessionId, signature, recovered, lengthOnly: false, out NativeCULong recoveredLen);
+        Assert.Equal(CKR.CKR_OK, verifyRv);
+        Assert.Equal((NativeCULong)data.Length, recoveredLen);
+        Assert.Equal(data, recovered);
     }
 }

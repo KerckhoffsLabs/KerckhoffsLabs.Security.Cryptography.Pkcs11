@@ -27,21 +27,14 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Encrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mechanism = new Mechanism((CKM)mechanismId);
-            var fakeHandle = new ObjectHandle(0);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var mechanism = new Mechanism((CKM)mechanismId);
+        var fakeHandle = new ObjectHandle(0);
 
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Encrypt(mechanism, fakeHandle, []));
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Encrypt(mechanism, fakeHandle, []));
 
-            Assert.Equal((CKM)mechanismId, ex.Mechanism);
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        Assert.Equal((CKM)mechanismId, ex.Mechanism);
     }
 
     /// <summary>
@@ -51,23 +44,16 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Encrypt_AllowInsecureBypassesGate(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        try
-        {
-            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
-            var fakeHandle = new ObjectHandle(0);
+        var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+        var fakeHandle = new ObjectHandle(0);
 
-            var ex = Record.Exception(() =>
-                session.Encrypt(mechanism, fakeHandle, []));
+        var ex = Record.Exception(() =>
+            session.Encrypt(mechanism, fakeHandle, []));
 
-            Assert.False(ex is CryptoPolicyViolationException,
-                "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        Assert.False(ex is CryptoPolicyViolationException,
+            "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
     }
 
     // ---------------------------------------------------------------------------
@@ -81,21 +67,14 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Decrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mechanism = new Mechanism((CKM)mechanismId);
-            var fakeHandle = new ObjectHandle(0);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var mechanism = new Mechanism((CKM)mechanismId);
+        var fakeHandle = new ObjectHandle(0);
 
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Decrypt(mechanism, fakeHandle, []));
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Decrypt(mechanism, fakeHandle, []));
 
-            Assert.Equal((CKM)mechanismId, ex.Mechanism);
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        Assert.Equal((CKM)mechanismId, ex.Mechanism);
     }
 
     /// <summary>
@@ -105,23 +84,16 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Decrypt_AllowInsecureBypassesGate(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        try
-        {
-            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
-            var fakeHandle = new ObjectHandle(0);
+        var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+        var fakeHandle = new ObjectHandle(0);
 
-            var ex = Record.Exception(() =>
-                session.Decrypt(mechanism, fakeHandle, []));
+        var ex = Record.Exception(() =>
+            session.Decrypt(mechanism, fakeHandle, []));
 
-            Assert.False(ex is CryptoPolicyViolationException,
-                "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        Assert.False(ex is CryptoPolicyViolationException,
+            "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
     }
 
     // ---------------------------------------------------------------------------
@@ -136,20 +108,13 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Sign_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism((CKM)mechanismId);
-            var fakeHandle = new ObjectHandle(0);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Sign(mech, fakeHandle, []));
-            Assert.Equal((CKM)mechanismId, ex.Mechanism);
-        }
-        finally
-        {
-            try { session.Logout(); } catch { }
-            try { session.Dispose(); } catch { }
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism((CKM)mechanismId);
+        var fakeHandle = new ObjectHandle(0);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Sign(mech, fakeHandle, []));
+        Assert.Equal((CKM)mechanismId, ex.Mechanism);
     }
 
     // ---------------------------------------------------------------------------
@@ -164,20 +129,13 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Verify_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism((CKM)mechanismId);
-            var fakeHandle = new ObjectHandle(0);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>()));
-            Assert.Equal((CKM)mechanismId, ex.Mechanism);
-        }
-        finally
-        {
-            try { session.Logout(); } catch { }
-            try { session.Dispose(); } catch { }
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism((CKM)mechanismId);
+        var fakeHandle = new ObjectHandle(0);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>()));
+        Assert.Equal((CKM)mechanismId, ex.Mechanism);
     }
 
     // ---------------------------------------------------------------------------
@@ -192,22 +150,15 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Sign_MechanismNotGated(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
         // The default Recommended policy is deliberately left in place — a strong-hash v1.5 signature
         // is a secure, standard scheme and must not require an insecure opt-in.
-        try
-        {
-            var mech = new Mechanism((CKM)mechanismId);
-            var fakeHandle = new ObjectHandle(0);
-            var ex = Record.Exception(() => session.Sign(mech, fakeHandle, []));
-            Assert.False(ex is CryptoPolicyViolationException,
-                $"Mechanism {(CKM)mechanismId} must not be refused under the AllowInsecure policy.");
-        }
-        finally
-        {
-            try { session.Logout(); } catch { }
-            try { session.Dispose(); } catch { }
-        }
+        var mech = new Mechanism((CKM)mechanismId);
+        var fakeHandle = new ObjectHandle(0);
+        var ex = Record.Exception(() => session.Sign(mech, fakeHandle, []));
+        Assert.False(ex is CryptoPolicyViolationException,
+            $"Mechanism {(CKM)mechanismId} must not be refused under the AllowInsecure policy.");
     }
 
     /// <summary>
@@ -216,21 +167,14 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Verify_MechanismNotGated(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism((CKM)mechanismId);
-            var fakeHandle = new ObjectHandle(0);
-            var ex = Record.Exception(() =>
-                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>()));
-            Assert.False(ex is CryptoPolicyViolationException,
-                $"Mechanism {(CKM)mechanismId} must not be refused under the AllowInsecure policy.");
-        }
-        finally
-        {
-            try { session.Logout(); } catch { }
-            try { session.Dispose(); } catch { }
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism((CKM)mechanismId);
+        var fakeHandle = new ObjectHandle(0);
+        var ex = Record.Exception(() =>
+            session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>()));
+        Assert.False(ex is CryptoPolicyViolationException,
+            $"Mechanism {(CKM)mechanismId} must not be refused under the AllowInsecure policy.");
     }
 
     // ---------------------------------------------------------------------------
@@ -245,19 +189,12 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_Digest_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism((CKM)mechanismId);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Digest(mech, []));
-            Assert.Equal((CKM)mechanismId, ex.Mechanism);
-        }
-        finally
-        {
-            try { session.Logout(); } catch { }
-            try { session.Dispose(); } catch { }
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism((CKM)mechanismId);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Digest(mech, []));
+        Assert.Equal((CKM)mechanismId, ex.Mechanism);
     }
 
     // ---------------------------------------------------------------------------
@@ -272,19 +209,12 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_GenerateKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism((CKM)mechanismId);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.GenerateKey(mech, []));
-            Assert.Equal((CKM)mechanismId, ex.Mechanism);
-        }
-        finally
-        {
-            try { session.Logout(); } catch { }
-            try { session.Dispose(); } catch { }
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism((CKM)mechanismId);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.GenerateKey(mech, []));
+        Assert.Equal((CKM)mechanismId, ex.Mechanism);
     }
 
     // ---------------------------------------------------------------------------
@@ -299,19 +229,12 @@ internal static class InsecureOperationGateTestCases
     /// </summary>
     internal static void Assert_DeriveKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism((CKM)mechanismId);
-            var fakeBase = new ObjectHandle(0);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.DeriveKey(mech, fakeBase, []));
-            Assert.Equal((CKM)mechanismId, ex.Mechanism);
-        }
-        finally
-        {
-            try { session.Logout(); } catch { }
-            try { session.Dispose(); } catch { }
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism((CKM)mechanismId);
+        var fakeBase = new ObjectHandle(0);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.DeriveKey(mech, fakeBase, []));
+        Assert.Equal((CKM)mechanismId, ex.Mechanism);
     }
 }

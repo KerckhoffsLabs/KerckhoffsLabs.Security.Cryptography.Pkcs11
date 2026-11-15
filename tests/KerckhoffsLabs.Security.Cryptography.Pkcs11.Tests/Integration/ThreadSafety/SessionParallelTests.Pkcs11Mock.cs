@@ -42,22 +42,15 @@ public sealed class SessionParallelTests(MockBackendFixture f)
                 sessionSlot.Wait(TestContext.Current.CancellationToken);
                 try
                 {
-                    var session = TestKeys.OpenLoggedInSession(_backend);
-                    try
+                    using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+                    var session = sessionScope.Session;
+                    for (int i = 0; i < opsPerThread; i++)
                     {
-                        for (int i = 0; i < opsPerThread; i++)
-                        {
-                            // All ops on this thread → same-thread sequential access.
-                            // The guard must not be "stuck" from a previous session closed
-                            // on a different thread. This validates that guard state scopes
-                            // to the Session instance and resets cleanly on dispose.
-                            _ = session.GetSessionInfo();
-                        }
-                    }
-                    finally
-                    {
-                        session.Logout();
-                        session.Dispose();
+                        // All ops on this thread → same-thread sequential access.
+                        // The guard must not be "stuck" from a previous session closed
+                        // on a different thread. This validates that guard state scopes
+                        // to the Session instance and resets cleanly on dispose.
+                        _ = session.GetSessionInfo();
                     }
                 }
                 catch (Exception ex)

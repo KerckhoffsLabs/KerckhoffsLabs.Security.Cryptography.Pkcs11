@@ -31,28 +31,21 @@ internal static class DecryptAesTestCases
     /// </summary>
     internal static void Assert_AesEcb_GatedByDefault(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
         try
         {
-            var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
-            try
-            {
-                // Block-aligned ciphertext placeholder; gate fires before it is ever consumed.
-                byte[] ciphertext = new byte[16];
-                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            // Block-aligned ciphertext placeholder; gate fires before it is ever consumed.
+            byte[] ciphertext = new byte[16];
+            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                    session.Decrypt(mechanism, keyHandle, ciphertext));
-                Assert.Equal(CKM.CKM_AES_ECB, ex.Mechanism);
-            }
-            finally
-            {
-                session.DestroyObject(keyHandle);
-            }
+            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+                session.Decrypt(mechanism, keyHandle, ciphertext));
+            Assert.Equal(CKM.CKM_AES_ECB, ex.Mechanism);
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(keyHandle);
         }
     }
 
@@ -63,31 +56,24 @@ internal static class DecryptAesTestCases
     /// </summary>
     internal static void Assert_AesEcb_AllowedWithOptIn(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
         try
         {
-            var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
-            try
-            {
-                byte[] ciphertext = new byte[16];
-                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            byte[] ciphertext = new byte[16];
+            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                var ex = Record.Exception(() =>
-                    session.Decrypt(mechanism, keyHandle, ciphertext));
+            var ex = Record.Exception(() =>
+                session.Decrypt(mechanism, keyHandle, ciphertext));
 
-                // Gate must NOT be the reason for any exception.
-                Assert.False(ex is CryptoPolicyViolationException,
-                    "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
-            }
-            finally
-            {
-                session.DestroyObject(keyHandle);
-            }
+            // Gate must NOT be the reason for any exception.
+            Assert.False(ex is CryptoPolicyViolationException,
+                "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(keyHandle);
         }
     }
 

@@ -60,52 +60,45 @@ public sealed class EncryptDecryptStressTests : IDisposable
 
         for (int i = 0; i < 100; i++)
         {
-            var session = TestKeys.OpenLoggedInSession(_backend);
+            using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+            var session = sessionScope.Session;
             // Raw AES-CBC is gated by default; opt in since this stress test only
             // cares about unmanaged-allocation discipline, not the choice of mechanism.
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            // Build the Mechanism and attempt a realistic create+encrypt+destroy cycle.
+            var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
+
+            // The mock may reject C_CreateObject outright; if it does, nothing was created and
+            // there is nothing to clean up for this cycle.
+            ObjectHandle key;
             try
             {
-                // Build the Mechanism and attempt a realistic create+encrypt+destroy cycle.
-                var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
+                key = TestKeys.CreateAes256Key(session, rawKey);
+            }
+            catch (Pkcs11Exception)
+            {
+                continue;
+            }
 
-                // The mock may reject C_CreateObject outright; if it does, nothing was created and
-                // there is nothing to clean up for this cycle.
-                ObjectHandle key;
-                try
-                {
-                    key = TestKeys.CreateAes256Key(session, rawKey);
-                }
-                catch (Pkcs11Exception)
-                {
-                    continue;
-                }
-
-                created++;
-                try
-                {
-                    // The mock backend may reject C_EncryptInit with a CKR_* code; that is fine —
-                    // the assertion is about allocation discipline, not crypto output.
-                    byte[] plaintext = new byte[16];
-                    _ = session.Encrypt(mech, key, plaintext);
-                }
-                catch (Pkcs11Exception)
-                {
-                    // Mock-specific encrypt CKR codes are not the point.
-                }
-                finally
-                {
-                    // A key that was successfully created MUST be destroyed regardless of the
-                    // encrypt outcome. Do NOT swallow a DestroyObject failure here — it would leave
-                    // the token-object handle leaked, which is exactly what this test guards against.
-                    session.DestroyObject(key);
-                    destroyed++;
-                }
+            created++;
+            try
+            {
+                // The mock backend may reject C_EncryptInit with a CKR_* code; that is fine —
+                // the assertion is about allocation discipline, not crypto output.
+                byte[] plaintext = new byte[16];
+                _ = session.Encrypt(mech, key, plaintext);
+            }
+            catch (Pkcs11Exception)
+            {
+                // Mock-specific encrypt CKR codes are not the point.
             }
             finally
             {
-                session.Logout();
-                session.Dispose();
+                // A key that was successfully created MUST be destroyed regardless of the
+                // encrypt outcome. Do NOT swallow a DestroyObject failure here — it would leave
+                // the token-object handle leaked, which is exactly what this test guards against.
+                session.DestroyObject(key);
+                destroyed++;
             }
         }
 

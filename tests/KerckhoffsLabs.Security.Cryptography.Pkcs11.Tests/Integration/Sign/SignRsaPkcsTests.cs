@@ -23,20 +23,13 @@ internal static class SignRsaPkcsTestCases
     /// </summary>
     internal static void Assert_SignRsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var fakeKey = new ObjectHandle(0);
-            var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Sign(mech, fakeKey, []));
-            Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var fakeKey = new ObjectHandle(0);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Sign(mech, fakeKey, []));
+        Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
     }
 
     /// <summary>
@@ -47,30 +40,23 @@ internal static class SignRsaPkcsTestCases
     /// </summary>
     internal static void Assert_SignRsaPkcs1V15_AllowInsecureBypassesGate(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var fakeKey = new ObjectHandle(0);
         try
         {
-            var fakeKey = new ObjectHandle(0);
-            try
-            {
-                var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-                session.Sign(mech, fakeKey, []);
-            }
-            catch (CryptoPolicyViolationException)
-            {
-                Assert.Fail("The AllowInsecure policy should have suppressed the gate.");
-            }
-            catch
-            {
-                // Any other exception (Pkcs11Exception for bad key handle, etc.) is acceptable —
-                // we're only asserting the gate didn't fire.
-            }
+            var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+            session.Sign(mech, fakeKey, []);
         }
-        finally
+        catch (CryptoPolicyViolationException)
         {
-            TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
+            Assert.Fail("The AllowInsecure policy should have suppressed the gate.");
+        }
+        catch
+        {
+            // Any other exception (Pkcs11Exception for bad key handle, etc.) is acceptable —
+            // we're only asserting the gate didn't fire.
         }
     }
 }

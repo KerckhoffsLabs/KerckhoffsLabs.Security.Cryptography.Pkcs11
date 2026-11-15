@@ -17,62 +17,41 @@ internal static class DigestMd5Sha1TestCases
 {
     internal static void Assert_Md5_GatedByDefault(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism(CKM.CKM_MD5);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Digest(mech, []));
-            Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism(CKM.CKM_MD5);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Digest(mech, []));
+        Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
     }
 
     internal static void Assert_Sha1_GatedByDefault(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var mech = new Mechanism(CKM.CKM_SHA_1);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Digest(mech, []));
-            Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mech = new Mechanism(CKM.CKM_SHA_1);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Digest(mech, []));
+        Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
     }
 
     internal static void Assert_Md5_AllowInsecureBypassesGate(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
-            try
-            {
-                var mech = new Mechanism(CKM.CKM_MD5);
-                session.Digest(mech, []);
-            }
-            catch (CryptoPolicyViolationException)
-            {
-                Assert.Fail("The AllowInsecure policy should have suppressed the gate.");
-            }
-            catch
-            {
-                // Any other exception is acceptable — we only assert the gate didn't fire.
-            }
+            var mech = new Mechanism(CKM.CKM_MD5);
+            session.Digest(mech, []);
         }
-        finally
+        catch (CryptoPolicyViolationException)
         {
-            TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
+            Assert.Fail("The AllowInsecure policy should have suppressed the gate.");
+        }
+        catch
+        {
+            // Any other exception is acceptable — we only assert the gate didn't fire.
         }
     }
 }

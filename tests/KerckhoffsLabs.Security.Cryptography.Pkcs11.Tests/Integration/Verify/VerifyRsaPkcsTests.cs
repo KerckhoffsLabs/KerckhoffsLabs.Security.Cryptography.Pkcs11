@@ -18,19 +18,12 @@ internal static class VerifyRsaPkcsTestCases
 {
     internal static void Assert_VerifyRsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var fakeKey = new ObjectHandle(0);
-            var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                session.Verify(mech, fakeKey, Array.Empty<byte>(), Array.Empty<byte>()));
-            Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var fakeKey = new ObjectHandle(0);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            session.Verify(mech, fakeKey, Array.Empty<byte>(), Array.Empty<byte>()));
+        Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
     }
 }

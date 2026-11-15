@@ -23,30 +23,23 @@ internal static class DecryptRsaTestCases
     /// </summary>
     internal static void Assert_RsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
         try
         {
-            var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
-            try
-            {
-                byte[] fakeCiphertext = new byte[256]; // RSA-2048 output size
+            byte[] fakeCiphertext = new byte[256]; // RSA-2048 output size
 
-                // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by the session's crypto policy check; the same
-                // gate the RSAPkcs11.Decrypt(RSAEncryptionPadding.Pkcs1) path relies on.
-                var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                    session.Decrypt(mech, priv, fakeCiphertext));
-                Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
-            }
-            finally
-            {
-                session.DestroyObject(pub);
-                session.DestroyObject(priv);
-            }
+            // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by the session's crypto policy check; the same
+            // gate the RSAPkcs11.Decrypt(RSAEncryptionPadding.Pkcs1) path relies on.
+            var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+                session.Decrypt(mech, priv, fakeCiphertext));
+            Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(pub);
+            session.DestroyObject(priv);
         }
     }
 }

@@ -22,30 +22,23 @@ internal static class EncryptRsaTestCases
     {
         // The CryptoPolicyViolationException guard fires before any P/Invoke call to C_Encrypt,
         // but a session must still be opened and a key pair generated first.
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
         try
         {
-            var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
-            try
-            {
-                byte[] plaintext = Encoding.UTF8.GetBytes("RSA v1.5 test");
+            byte[] plaintext = Encoding.UTF8.GetBytes("RSA v1.5 test");
 
-                // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by the session's crypto policy check; the same
-                // gate the RSAPkcs11.Encrypt(RSAEncryptionPadding.Pkcs1) path relies on.
-                var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
-                    session.Encrypt(mech, pub, plaintext));
-                Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
-            }
-            finally
-            {
-                session.DestroyObject(pub);
-                session.DestroyObject(priv);
-            }
+            // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by the session's crypto policy check; the same
+            // gate the RSAPkcs11.Encrypt(RSAEncryptionPadding.Pkcs1) path relies on.
+            var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+                session.Encrypt(mech, pub, plaintext));
+            Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }
         finally
         {
-            session.Dispose();
+            session.DestroyObject(pub);
+            session.DestroyObject(priv);
         }
     }
 }
