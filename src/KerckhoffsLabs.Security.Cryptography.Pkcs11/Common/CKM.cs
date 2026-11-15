@@ -4,6 +4,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// <summary>
 /// Mechanism type
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Info Code Smell", "S1133:Deprecated code should be removed",
+    Justification = "The [Obsolete] members are the PKCS#11 headers' own deprecated names (KLPKCS11013). They stay for "
+    + "source compatibility with code written against older headers, as the headers themselves keep them; there is "
+    + "no plan to remove them.")]
 public enum CKM : ulong
 {
     /// <summary>
@@ -639,17 +643,14 @@ public enum CKM : ulong
     /// <summary>
     /// CAST128 key generation mechanism
     /// </summary>
-    CKM_CAST5_KEY_GEN = 0x00000320,
-
-    /// <summary>
-    /// CAST128 key generation mechanism
-    /// </summary>
     CKM_CAST128_KEY_GEN = 0x00000320,
 
     /// <summary>
-    /// CAST128-ECB encryption mechanism with electronic codebook mode (ECB)
+    /// Deprecated name of <see cref="CKM_CAST128_KEY_GEN"/>, which has the same value.
     /// </summary>
-    CKM_CAST5_ECB = 0x00000321,
+    [Obsolete("CKM_CAST5_KEY_GEN is the deprecated PKCS#11 name of CKM_CAST128_KEY_GEN, which has the same value. Use CKM_CAST128_KEY_GEN.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_CAST5_KEY_GEN = CKM_CAST128_KEY_GEN,
 
     /// <summary>
     /// CAST128-ECB encryption mechanism with electronic codebook mode (ECB)
@@ -657,9 +658,11 @@ public enum CKM : ulong
     CKM_CAST128_ECB = 0x00000321,
 
     /// <summary>
-    /// CAST128-CBC encryption mechanism with cipher-block chaining mode (CBC)
+    /// Deprecated name of <see cref="CKM_CAST128_ECB"/>, which has the same value.
     /// </summary>
-    CKM_CAST5_CBC = 0x00000322,
+    [Obsolete("CKM_CAST5_ECB is the deprecated PKCS#11 name of CKM_CAST128_ECB, which has the same value. Use CKM_CAST128_ECB.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_CAST5_ECB = CKM_CAST128_ECB,
 
     /// <summary>
     /// CAST128-CBC encryption mechanism with cipher-block chaining mode (CBC)
@@ -667,9 +670,11 @@ public enum CKM : ulong
     CKM_CAST128_CBC = 0x00000322,
 
     /// <summary>
-    /// Special case of general-length CAST128-MAC mechanism
+    /// Deprecated name of <see cref="CKM_CAST128_CBC"/>, which has the same value.
     /// </summary>
-    CKM_CAST5_MAC = 0x00000323,
+    [Obsolete("CKM_CAST5_CBC is the deprecated PKCS#11 name of CKM_CAST128_CBC, which has the same value. Use CKM_CAST128_CBC.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_CAST5_CBC = CKM_CAST128_CBC,
 
     /// <summary>
     /// Special case of general-length CAST128-MAC mechanism
@@ -677,9 +682,11 @@ public enum CKM : ulong
     CKM_CAST128_MAC = 0x00000323,
 
     /// <summary>
-    /// General-length CAST128-MAC mechanism based on data authentication as defined in FIPS PUB 113
+    /// Deprecated name of <see cref="CKM_CAST128_MAC"/>, which has the same value.
     /// </summary>
-    CKM_CAST5_MAC_GENERAL = 0x00000324,
+    [Obsolete("CKM_CAST5_MAC is the deprecated PKCS#11 name of CKM_CAST128_MAC, which has the same value. Use CKM_CAST128_MAC.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_CAST5_MAC = CKM_CAST128_MAC,
 
     /// <summary>
     /// General-length CAST128-MAC mechanism based on data authentication as defined in FIPS PUB 113
@@ -687,14 +694,23 @@ public enum CKM : ulong
     CKM_CAST128_MAC_GENERAL = 0x00000324,
 
     /// <summary>
-    /// CAST128-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
+    /// Deprecated name of <see cref="CKM_CAST128_MAC_GENERAL"/>, which has the same value.
     /// </summary>
-    CKM_CAST5_CBC_PAD = 0x00000325,
+    [Obsolete("CKM_CAST5_MAC_GENERAL is the deprecated PKCS#11 name of CKM_CAST128_MAC_GENERAL, which has the same value. Use CKM_CAST128_MAC_GENERAL.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_CAST5_MAC_GENERAL = CKM_CAST128_MAC_GENERAL,
 
     /// <summary>
     /// CAST128-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
     CKM_CAST128_CBC_PAD = 0x00000325,
+
+    /// <summary>
+    /// Deprecated name of <see cref="CKM_CAST128_CBC_PAD"/>, which has the same value.
+    /// </summary>
+    [Obsolete("CKM_CAST5_CBC_PAD is the deprecated PKCS#11 name of CKM_CAST128_CBC_PAD, which has the same value. Use CKM_CAST128_CBC_PAD.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_CAST5_CBC_PAD = CKM_CAST128_CBC_PAD,
 
     /// <summary>
     /// RC5 key generation mechanism
@@ -897,24 +913,28 @@ public enum CKM : ulong
     CKM_PBE_MD5_CAST3_CBC = 0x000003A3,
 
     /// <summary>
-    /// MD5-PBE for CAST128-CBC (CAST5-CBC) mechanism used for generating a CAST128 (CAST5) secret key and an IV from a password and a salt value by using the MD5 digest algorithm and an iteration count.
-    /// </summary>
-    CKM_PBE_MD5_CAST5_CBC = 0x000003A4,
-
-    /// <summary>
     /// MD5-PBE for CAST128-CBC mechanism used for generating a CAST128 secret key and an IV from a password and a salt value by using the MD5 digest algorithm and an iteration count.
     /// </summary>
     CKM_PBE_MD5_CAST128_CBC = 0x000003A4,
 
     /// <summary>
-    /// SHA-1-PBE for CAST128-CBC (CAST5-CBC) mechanism used for generating a CAST128 (CAST5) secret key and an IV from a password and a salt value by using the SHA-1 digest algorithm and an iteration count.
+    /// Deprecated name of <see cref="CKM_PBE_MD5_CAST128_CBC"/>, which has the same value.
     /// </summary>
-    CKM_PBE_SHA1_CAST5_CBC = 0x000003A5,
+    [Obsolete("CKM_PBE_MD5_CAST5_CBC is the deprecated PKCS#11 name of CKM_PBE_MD5_CAST128_CBC, which has the same value. Use CKM_PBE_MD5_CAST128_CBC.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_PBE_MD5_CAST5_CBC = CKM_PBE_MD5_CAST128_CBC,
 
     /// <summary>
     /// SHA-1-PBE for CAST128-CBC mechanism used for generating a CAST128 secret key and an IV from a password and a salt value by using the SHA-1 digest algorithm and an iteration count.
     /// </summary>
     CKM_PBE_SHA1_CAST128_CBC = 0x000003A5,
+
+    /// <summary>
+    /// Deprecated name of <see cref="CKM_PBE_SHA1_CAST128_CBC"/>, which has the same value.
+    /// </summary>
+    [Obsolete("CKM_PBE_SHA1_CAST5_CBC is the deprecated PKCS#11 name of CKM_PBE_SHA1_CAST128_CBC, which has the same value. Use CKM_PBE_SHA1_CAST128_CBC.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_PBE_SHA1_CAST5_CBC = CKM_PBE_SHA1_CAST128_CBC,
 
     /// <summary>
     /// SHA-1-PBE for 128-bit RC4 mechanism used for generating a 128-bit RC4 secret key from a password and a salt value by using the SHA-1 digest algorithm and an iteration count.
@@ -1308,12 +1328,14 @@ public enum CKM : ulong
     /// <summary>
     /// The EC (also related to ECDSA) key pair generation mechanism
     /// </summary>
-    CKM_ECDSA_KEY_PAIR_GEN = 0x00001040,
+    CKM_EC_KEY_PAIR_GEN = 0x00001040,
 
     /// <summary>
-    /// The EC (also related to ECDSA) key pair generation mechanism
+    /// Deprecated name of <see cref="CKM_EC_KEY_PAIR_GEN"/>, which has the same value.
     /// </summary>
-    CKM_EC_KEY_PAIR_GEN = 0x00001040,
+    [Obsolete("CKM_ECDSA_KEY_PAIR_GEN is the deprecated PKCS#11 name of CKM_EC_KEY_PAIR_GEN, which has the same value. Use CKM_EC_KEY_PAIR_GEN.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_ECDSA_KEY_PAIR_GEN = CKM_EC_KEY_PAIR_GEN,
 
     /// <summary>
     /// The ECDSA without hashing mechanism
@@ -1632,11 +1654,6 @@ public enum CKM : ulong
     CKM_X9_42_DH_PARAMETER_GEN = 0x00002002,
 
     /// <summary>
-    /// The DSA probabilistic domain parameter generation mechanism based on the DSA defined in Appendix A.1.1 of FIPS PUB 186-4
-    /// </summary>
-    CKM_DSA_PROBABLISTIC_PARAMETER_GEN = 0x00002003,
-
-    /// <summary>
     /// The DSA Shawe-Taylor domain parameter generation mechanism based on the DSA defined in Appendix A.1.2 of FIPS PUB 186-4
     /// </summary>
     CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN = 0x00002004,
@@ -1952,6 +1969,13 @@ public enum CKM : ulong
     /// DSA domain parameter generation, probabilistic method (PKCS#11 v3.0)
     /// </summary>
     CKM_DSA_PROBABILISTIC_PARAMETER_GEN = 0x00002003,
+
+    /// <summary>
+    /// Deprecated name of <see cref="CKM_DSA_PROBABILISTIC_PARAMETER_GEN"/>, which has the same value.
+    /// </summary>
+    [Obsolete("CKM_DSA_PROBABLISTIC_PARAMETER_GEN is the deprecated PKCS#11 name of CKM_DSA_PROBABILISTIC_PARAMETER_GEN, which has the same value. Use CKM_DSA_PROBABILISTIC_PARAMETER_GEN.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKM_DSA_PROBABLISTIC_PARAMETER_GEN = CKM_DSA_PROBABILISTIC_PARAMETER_GEN,
 
     /// <summary>
     /// DSA generator (g) generation per FIPS 186 (PKCS#11 v3.0)

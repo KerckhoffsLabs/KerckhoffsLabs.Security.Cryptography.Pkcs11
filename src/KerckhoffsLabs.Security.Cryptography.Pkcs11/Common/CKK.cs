@@ -3,6 +3,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// <summary>
 /// Key types
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Info Code Smell", "S1133:Deprecated code should be removed",
+    Justification = "The [Obsolete] members are the PKCS#11 headers' own deprecated names (KLPKCS11013). They stay for "
+    + "source compatibility with code written against older headers, as the headers themselves keep them; there is "
+    + "no plan to remove them.")]
 public enum CKK : ulong
 {
     /// <summary>
@@ -23,12 +27,14 @@ public enum CKK : ulong
     /// <summary>
     /// EC (Elliptic Curve) key
     /// </summary>
-    CKK_ECDSA = 0x00000003,
+    CKK_EC = 0x00000003,
 
     /// <summary>
-    /// EC (Elliptic Curve) key
+    /// Deprecated name of <see cref="CKK_EC"/>, which has the same value.
     /// </summary>
-    CKK_EC = 0x00000003,
+    [Obsolete("CKK_ECDSA is the deprecated PKCS#11 name of CKK_EC, which has the same value. Use CKK_EC.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKK_ECDSA = CKK_EC,
 
     /// <summary>
     /// X9.42 Diffie-Hellman public keys
@@ -83,12 +89,14 @@ public enum CKK : ulong
     /// <summary>
     /// CAST128 key
     /// </summary>
-    CKK_CAST5 = 0x00000018,
+    CKK_CAST128 = 0x00000018,
 
     /// <summary>
-    /// CAST128 key
+    /// Deprecated name of <see cref="CKK_CAST128"/>, which has the same value.
     /// </summary>
-    CKK_CAST128 = 0x00000018,
+    [Obsolete("CKK_CAST5 is the deprecated PKCS#11 name of CKK_CAST128, which has the same value. Use CKK_CAST128.",
+        DiagnosticId = DiagnosticIds.DeprecatedSpecAlias, UrlFormat = DiagnosticIds.UrlFormat)]
+    CKK_CAST5 = CKK_CAST128,
 
     /// <summary>
     /// RC5 key

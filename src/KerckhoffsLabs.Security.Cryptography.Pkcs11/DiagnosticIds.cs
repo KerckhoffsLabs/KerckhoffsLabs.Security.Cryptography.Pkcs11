@@ -45,4 +45,11 @@ internal static class DiagnosticIds
     /// are all <c>[Obsolete]</c> in favor of its static <c>Pbkdf2</c> method.
     /// </summary>
     internal const string Rfc2898DeriveBytesPkcs11Constructors = "KLPKCS11011";
+
+    /// <summary>
+    /// A deprecated PKCS#11 name for a constant that also has a current name with the same value
+    /// (<c>CKK_ECDSA</c> for <c>CKK_EC</c>, <c>CKM_CAST5_*</c> for <c>CKM_CAST128_*</c>, …) — not a
+    /// security obsoletion: both names mean the same thing to the module.
+    /// </summary>
+    internal const string DeprecatedSpecAlias = "KLPKCS11013";
 }

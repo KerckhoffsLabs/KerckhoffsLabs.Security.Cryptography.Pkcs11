@@ -250,7 +250,9 @@ public sealed class CatalogueEvaluatorTests
         PolicyDecision unlisted = Evaluate(new MechanismUseRequest(new Mechanism(CKM.CKM_SHA3_256_KEY_DERIVATION), CryptoOperation.Derive));
         Assert.StartsWith("CKM_SHA3_256_KEY_DERIVE is not on", unlisted.Reason, StringComparison.Ordinal);
 
+#pragma warning disable KLPKCS11013 // the deprecated spelling is the point: the reason must still use the current name
         PolicyDecision restricted = Evaluate(new MechanismUseRequest(new Mechanism(CKM.CKM_ECDSA_KEY_PAIR_GEN), CryptoOperation.Sign));
+#pragma warning restore KLPKCS11013
         Assert.StartsWith($"CKM_EC_KEY_PAIR_GEN is allowed under {PolicyName} only for GenerateKeyPair;", restricted.Reason, StringComparison.Ordinal);
     }
 

@@ -197,6 +197,26 @@ private key ([the private-key scope](guide/crypto-policies.md#private-key-scope)
 `UsePolicy` lease or on a session of its own, not as the policy your sessions are opened with
 ([where to apply it](guide/crypto-policies.md#where-to-apply-an-export-opt-in)).
 
+<a id="KLPKCS11013"></a>
+### KLPKCS11013 — Deprecated PKCS#11 constant name
+
+Not a security obsoletion. The PKCS#11 headers keep some old names next to the current name for the
+same value, and mark the old one deprecated. The `CKK`, `CKA` and `CKM` enums keep them too, so code
+written against older headers still compiles, but each is `[Obsolete]` and points at the current name:
+
+| Deprecated name | Current name |
+|---|---|
+| `CKK_ECDSA` | `CKK_EC` |
+| `CKA_ECDSA_PARAMS` | `CKA_EC_PARAMS` |
+| `CKM_ECDSA_KEY_PAIR_GEN` | `CKM_EC_KEY_PAIR_GEN` |
+| `CKK_CAST5` | `CKK_CAST128` |
+| `CKM_CAST5_KEY_GEN`, `_ECB`, `_CBC`, `_MAC`, `_MAC_GENERAL`, `_CBC_PAD` | `CKM_CAST128_*` |
+| `CKM_PBE_MD5_CAST5_CBC`, `CKM_PBE_SHA1_CAST5_CBC` | `CKM_PBE_MD5_CAST128_CBC`, `CKM_PBE_SHA1_CAST128_CBC` |
+| `CKM_DSA_PROBABLISTIC_PARAMETER_GEN` (misspelled) | `CKM_DSA_PROBABILISTIC_PARAMETER_GEN` |
+
+Each pair has one value, so the module sees no difference: replacing the name changes nothing at run
+time. The CAST mechanisms keep their [KLPKCS11009](#KLPKCS11009) warning under either name.
+
 ## Runtime-only gates
 
 Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early
