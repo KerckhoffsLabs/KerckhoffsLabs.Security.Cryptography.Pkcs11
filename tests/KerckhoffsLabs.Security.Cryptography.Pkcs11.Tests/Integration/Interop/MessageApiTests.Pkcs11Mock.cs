@@ -27,68 +27,47 @@ public sealed class MessageApiTests(MockBackendFixture f)
     [Fact]
     public void SupportsMessageApi_TrueForMock_SymbolsResolveEvenThoughCallsAreStubbed()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            Assert.True(session.SupportsMessageApi);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        Assert.True(session.SupportsMessageApi);
     }
 
     [Fact]
     public void MessageEncrypt_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_GCM's IV size is not what's under test here
-            var mechanism = new Mechanism(CKM.CKM_AES_GCM);
-            var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_GCM's IV size is not what's under test here
+        var mechanism = new Mechanism(CKM.CKM_AES_GCM);
+        var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
-            {
-                session.MessageEncrypt(mechanism, key, messageParams, [], "plaintext"u8.ToArray());
-            });
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
         {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+            session.MessageEncrypt(mechanism, key, messageParams, [], "plaintext"u8.ToArray());
+        });
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [Fact]
     public void MessageDecrypt_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-            var mechanism = new Mechanism(CKM.CKM_AES_GCM);
-            var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var mechanism = new Mechanism(CKM.CKM_AES_GCM);
+        var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
-            {
-                session.MessageDecrypt(mechanism, key, messageParams, [], "ciphertext-ish"u8.ToArray());
-            });
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
         {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+            session.MessageDecrypt(mechanism, key, messageParams, [], "ciphertext-ish"u8.ToArray());
+        });
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     // Message-based sign/verify have no high-level Pkcs11SessionCore wrapper (unlike MessageEncrypt/
@@ -97,46 +76,32 @@ public sealed class MessageApiTests(MockBackendFixture f)
     [Fact]
     public void MessageSignInit_ReturnsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-            ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-            using var scope = new MechanismParameterScope();
-            CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
 
-            CKR rv = lowLevel.C_MessageSignInit((NativeCULong)session.SessionId, in ckMechanism, (NativeCULong)key.ObjectId);
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        CKR rv = lowLevel.C_MessageSignInit((NativeCULong)session.SessionId, in ckMechanism, (NativeCULong)key.ObjectId);
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
     }
 
     [Fact]
     public void MessageVerifyInit_ReturnsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-            ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-            using var scope = new MechanismParameterScope();
-            CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
 
-            CKR rv = lowLevel.C_MessageVerifyInit((NativeCULong)session.SessionId, in ckMechanism, (NativeCULong)key.ObjectId);
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        CKR rv = lowLevel.C_MessageVerifyInit((NativeCULong)session.SessionId, in ckMechanism, (NativeCULong)key.ObjectId);
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
     }
 }

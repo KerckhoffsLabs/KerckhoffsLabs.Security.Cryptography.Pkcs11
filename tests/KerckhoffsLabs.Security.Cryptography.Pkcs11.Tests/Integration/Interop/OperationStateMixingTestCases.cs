@@ -119,12 +119,9 @@ internal static class OperationStateMixingTestCases
 
     private static void WithRawSession(IPkcs11Backend backend, Action<LowLevelPkcs11Library, NativeCULong, Pkcs11SessionCore> body)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            body(backend.Library.LowLevelLibrary!, (NativeCULong)session.SessionId, session);
-        }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        body(backend.Library.LowLevelLibrary!, (NativeCULong)session.SessionId, session);
     }
 
     // === Digest ==============================================================

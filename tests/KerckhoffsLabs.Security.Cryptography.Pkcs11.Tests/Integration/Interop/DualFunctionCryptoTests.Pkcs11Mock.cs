@@ -40,116 +40,81 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
     [Fact]
     public void GetFunctionStatus_ReportsFunctionNotParallel()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.GetFunctionStatus());
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_PARALLEL, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.GetFunctionStatus());
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_PARALLEL, ex.ReturnValue);
     }
 
     [Fact]
     public void CancelFunction_ReportsFunctionNotParallel()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.CancelFunction());
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_PARALLEL, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.CancelFunction());
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_PARALLEL, ex.ReturnValue);
     }
 
     [Fact]
     public void DigestEncrypt_XorsPlaintextWithAB()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_SHA_1 and CKM_AES_CBC are both gated by default
-            var digestMechanism = new Mechanism(CKM.CKM_SHA_1);
-            var encryptMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
-            byte[] plaintext = "dual-function encrypt"u8.ToArray();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_SHA_1 and CKM_AES_CBC are both gated by default
+        var digestMechanism = new Mechanism(CKM.CKM_SHA_1);
+        var encryptMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
+        byte[] plaintext = "dual-function encrypt"u8.ToArray();
 
-            session.DigestEncrypt(digestMechanism, encryptMechanism, key, plaintext, out byte[] digest, out byte[] encrypted);
+        session.DigestEncrypt(digestMechanism, encryptMechanism, key, plaintext, out byte[] digest, out byte[] encrypted);
 
-            Assert.Equal(XorAb(plaintext), encrypted);
-            Assert.NotEmpty(digest);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        Assert.Equal(XorAb(plaintext), encrypted);
+        Assert.NotEmpty(digest);
     }
 
     [Fact]
     public void DecryptDigest_XorsCiphertextWithAB()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-            var digestMechanism = new Mechanism(CKM.CKM_SHA_1);
-            var decryptMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
-            byte[] ciphertext = "dual-function decrypt"u8.ToArray();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        var digestMechanism = new Mechanism(CKM.CKM_SHA_1);
+        var decryptMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
+        byte[] ciphertext = "dual-function decrypt"u8.ToArray();
 
-            session.DecryptDigest(digestMechanism, decryptMechanism, key, ciphertext, out byte[] digest, out byte[] decrypted);
+        session.DecryptDigest(digestMechanism, decryptMechanism, key, ciphertext, out byte[] digest, out byte[] decrypted);
 
-            Assert.Equal(XorAb(ciphertext), decrypted);
-            Assert.NotEmpty(digest);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        Assert.Equal(XorAb(ciphertext), decrypted);
+        Assert.NotEmpty(digest);
     }
 
     [Fact]
     public void DecryptVerify_XorsCiphertextWithAB_AndValidatesTheCannedSignature()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            ObjectHandle secretKey = Assert.Single(session.FindAllObjects([findSecret]));
-            using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-            ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        ObjectHandle secretKey = Assert.Single(session.FindAllObjects([findSecret]));
+        using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
 
-            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-            // pkcs11-mock's C_VerifyInit only recognizes CKM_RSA_PKCS/CKM_SHA1_RSA_PKCS.
-            var verificationMechanism = new Mechanism(CKM.CKM_SHA1_RSA_PKCS);
-            var decryptionMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
-            byte[] ciphertext = "dual-function decrypt+verify"u8.ToArray();
-            // pkcs11-mock's C_VerifyFinal only accepts this exact 10-byte canned signature.
-            byte[] signature = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        // pkcs11-mock's C_VerifyInit only recognizes CKM_RSA_PKCS/CKM_SHA1_RSA_PKCS.
+        var verificationMechanism = new Mechanism(CKM.CKM_SHA1_RSA_PKCS);
+        var decryptionMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
+        byte[] ciphertext = "dual-function decrypt+verify"u8.ToArray();
+        // pkcs11-mock's C_VerifyFinal only accepts this exact 10-byte canned signature.
+        byte[] signature = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
 
-            bool isValid = session.DecryptVerify(verificationMechanism, publicKey, decryptionMechanism, secretKey,
-                ciphertext, signature, out byte[] decryptedData);
+        bool isValid = session.DecryptVerify(verificationMechanism, publicKey, decryptionMechanism, secretKey,
+            ciphertext, signature, out byte[] decryptedData);
 
-            Assert.True(isValid);
-            Assert.Equal(XorAb(ciphertext), decryptedData);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        Assert.True(isValid);
+        Assert.Equal(XorAb(ciphertext), decryptedData);
     }
 }

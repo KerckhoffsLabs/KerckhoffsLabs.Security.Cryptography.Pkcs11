@@ -54,55 +54,48 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
     public void AesKeyWrapKwp_RoundTrip_GenericSecret(int secretLength)
     {
         _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_KWP);
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
+
+        byte[] secret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(secretLength);
+        using var c1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var c2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var c3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var c4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+        using var c5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var c6 = new ObjectAttribute(CKA.CKA_VALUE, secret);
+        ObjectHandle dataKey;
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            dataKey = session.CreateObject([c1, c2, c3, c4, c5, c6]);
+
         try
         {
-            ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
+            var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP);
+            byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
 
-            byte[] secret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(secretLength);
-            using var c1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var c2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
-            using var c3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var c4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
-            using var c5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
-            using var c6 = new ObjectAttribute(CKA.CKA_VALUE, secret);
-            ObjectHandle dataKey;
+            using var u1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var u2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var u3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var u4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+            using var u5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+            var template = new List<ObjectAttribute> { u1, u2, u3, u4, u5 };
+
+            ObjectHandle unwrapped;
             using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-                dataKey = session.CreateObject([c1, c2, c3, c4, c5, c6]);
-
+                unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
             try
             {
-                var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP);
-                byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
-
-                using var u1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-                using var u2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
-                using var u3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
-                using var u4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
-                using var u5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
-                var template = new List<ObjectAttribute> { u1, u2, u3, u4, u5 };
-
-                ObjectHandle unwrapped;
-                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-                    unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
-                try
-                {
-                    using var read = session.GetAttributeValue(unwrapped, [CKA.CKA_VALUE]);
-                    byte[] recovered = read[0].GetValueAsByteArray();
-                    Assert.Equal(secret, recovered);
-                }
-                finally { session.DestroyObject(unwrapped); }
+                using var read = session.GetAttributeValue(unwrapped, [CKA.CKA_VALUE]);
+                byte[] recovered = read[0].GetValueAsByteArray();
+                Assert.Equal(secret, recovered);
             }
-            finally
-            {
-                session.DestroyObject(dataKey);
-                session.DestroyObject(kek);
-            }
+            finally { session.DestroyObject(unwrapped); }
         }
         finally
         {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
+            session.DestroyObject(dataKey);
+            session.DestroyObject(kek);
         }
     }
 
@@ -121,50 +114,43 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
     public void Unwrap_SecretOver256Bytes_ThrowsTemplateInconsistent()
     {
         _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_KWP);
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
+
+        byte[] secret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(264);
+        using var c1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var c2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var c3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var c4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+        using var c5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var c6 = new ObjectAttribute(CKA.CKA_VALUE, secret);
+        ObjectHandle dataKey;
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            dataKey = session.CreateObject([c1, c2, c3, c4, c5, c6]);
+
         try
         {
-            ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
+            var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP);
+            byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
 
-            byte[] secret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(264);
-            using var c1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var c2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
-            using var c3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var c4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
-            using var c5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
-            using var c6 = new ObjectAttribute(CKA.CKA_VALUE, secret);
-            ObjectHandle dataKey;
+            using var u1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var u2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+            using var u3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var u4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+            using var u5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+            var template = new List<ObjectAttribute> { u1, u2, u3, u4, u5 };
+
             using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-                dataKey = session.CreateObject([c1, c2, c3, c4, c5, c6]);
-
-            try
             {
-                var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP);
-                byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
-
-                using var u1 = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-                using var u2 = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
-                using var u3 = new ObjectAttribute(CKA.CKA_TOKEN, false);
-                using var u4 = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
-                using var u5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
-                var template = new List<ObjectAttribute> { u1, u2, u3, u4, u5 };
-
-                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-                {
-                    var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(wrapMech, kek, wrapped, template));
-                    Assert.Equal(CKR.CKR_TEMPLATE_INCONSISTENT, ex.ReturnValue);
-                }
-            }
-            finally
-            {
-                session.DestroyObject(dataKey);
-                session.DestroyObject(kek);
+                var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(wrapMech, kek, wrapped, template));
+                Assert.Equal(CKR.CKR_TEMPLATE_INCONSISTENT, ex.ReturnValue);
             }
         }
         finally
         {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
+            session.DestroyObject(dataKey);
+            session.DestroyObject(kek);
         }
     }
 

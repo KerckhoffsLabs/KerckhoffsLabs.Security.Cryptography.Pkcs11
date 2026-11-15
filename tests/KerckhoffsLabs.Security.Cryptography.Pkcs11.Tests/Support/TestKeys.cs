@@ -162,6 +162,28 @@ internal static class TestKeys
     }
 
     /// <summary>
+    /// <see cref="OpenLoggedInSession"/> for a <see langword="using"/>: the returned scope logs the session
+    /// out (when the backend needed a login) and closes it on dispose, which <see cref="Pkcs11SessionCore.Dispose()"/>
+    /// alone does not. The logout is best-effort, so a failing one cannot replace the test's own exception.
+    /// </summary>
+    public static LoggedInSessionScope OpenLoggedInSessionScope(IPkcs11Backend backend) =>
+        new(backend, OpenLoggedInSession(backend));
+
+    /// <summary>A session from <see cref="OpenLoggedInSessionScope"/>; see there.</summary>
+    internal sealed class LoggedInSessionScope(IPkcs11Backend backend, Pkcs11SessionCore session) : IDisposable
+    {
+        public Pkcs11SessionCore Session => session;
+
+        public void Dispose()
+        {
+            if (backend.RequiresUserLogin)
+                session.LogoutAndDispose();
+            else
+                session.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Logs the session out, but only when the backend authenticates with a login. A
     /// login-not-required token (NSS softoken's public crypto services) was never logged in, so
     /// <c>C_Logout</c> would return <c>CKR_USER_NOT_LOGGED_IN</c>; this no-ops there. Lets the shared

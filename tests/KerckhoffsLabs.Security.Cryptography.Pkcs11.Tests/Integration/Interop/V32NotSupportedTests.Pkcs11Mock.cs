@@ -32,118 +32,76 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
     [Fact]
     public void EncapsulateKey_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-            ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
-                session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey, [], expectedCiphertextLen: 32));
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            session.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), publicKey, [], expectedCiphertextLen: 32));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [Fact]
     public void DecapsulateKey_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findPrivate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-            ObjectHandle privateKey = Assert.Single(session.FindAllObjects([findPrivate]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findPrivate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        ObjectHandle privateKey = Assert.Single(session.FindAllObjects([findPrivate]));
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
-                session.DecapsulateKey(new Mechanism(CKM.CKM_ML_KEM), privateKey, new byte[32], []));
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            session.DecapsulateKey(new Mechanism(CKM.CKM_ML_KEM), privateKey, new byte[32], []));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [Fact]
     public void WrapKeyAuthenticated_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            ObjectHandle secretKey = Assert.Single(session.FindAllObjects([findSecret]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        ObjectHandle secretKey = Assert.Single(session.FindAllObjects([findSecret]));
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
-                session.WrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), secretKey, secretKey, []));
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            session.WrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), secretKey, secretKey, []));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [Fact]
     public void UnwrapKeyAuthenticated_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            ObjectHandle secretKey = Assert.Single(session.FindAllObjects([findSecret]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        ObjectHandle secretKey = Assert.Single(session.FindAllObjects([findSecret]));
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
-                session.UnwrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), secretKey, new byte[16], [], []));
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            session.UnwrapKeyAuthenticated(new Mechanism(CKM.CKM_AES_GCM), secretKey, new byte[16], [], []));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [Fact]
     public void VerifySignature_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-            ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
-                session.VerifySignature(new Mechanism(CKM.CKM_SHA256_RSA_PKCS), publicKey, [1, 2, 3], "data"u8.ToArray()));
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            session.VerifySignature(new Mechanism(CKM.CKM_SHA256_RSA_PKCS), publicKey, [1, 2, 3], "data"u8.ToArray()));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [Fact]
     public void GetSessionValidationFlags_ReportsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(
-                () => session.GetSessionValidationFlags(CksValidationFlagsType.CKS_LAST_VALIDATION_OK));
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(
+            () => session.GetSessionValidationFlags(CksValidationFlagsType.CKS_LAST_VALIDATION_OK));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     // Async* has no high-level Pkcs11SessionCore wrapper at all, so it's driven through the internal
@@ -151,52 +109,31 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
     [Fact]
     public void AsyncComplete_ReturnsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-            var result = new CK_ASYNC_DATA();
-            CKR rv = lowLevel.C_AsyncComplete((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, ref result);
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        var result = new CK_ASYNC_DATA();
+        CKR rv = lowLevel.C_AsyncComplete((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, ref result);
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
     }
 
     [Fact]
     public void AsyncGetID_ReturnsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-            CKR rv = lowLevel.C_AsyncGetID((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, out NativeCULong id);
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        CKR rv = lowLevel.C_AsyncGetID((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, out NativeCULong id);
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
     }
 
     [Fact]
     public void AsyncJoin_ReturnsFunctionNotSupported()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-            CKR rv = lowLevel.C_AsyncJoin((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, (NativeCULong)1, []);
-            Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
-        }
-        finally
-        {
-            TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+        CKR rv = lowLevel.C_AsyncJoin((NativeCULong)session.SessionId, "C_GenerateRandom\0"u8, (NativeCULong)1, []);
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
     }
 }

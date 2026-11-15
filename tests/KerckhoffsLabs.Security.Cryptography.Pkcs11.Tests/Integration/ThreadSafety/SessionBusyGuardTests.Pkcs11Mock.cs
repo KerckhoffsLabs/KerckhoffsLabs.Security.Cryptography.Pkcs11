@@ -10,56 +10,45 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
     [Fact]
     public void ConcurrentCall_FromDifferentThread_Throws_InvalidOperationException()
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var startGate = new System.Threading.ManualResetEventSlim(false);
+        using var holdGate = new System.Threading.ManualResetEventSlim(false);
+
+        Exception? capturedB = null;
+
+        // Thread A: take the busy lock via the internal AcquireExclusive helper
+        // (accessible via [InternalsVisibleTo]), hold it open via a gate, then release.
+        var threadA = new System.Threading.Thread(() =>
         {
-            using var startGate = new System.Threading.ManualResetEventSlim(false);
-            using var holdGate = new System.Threading.ManualResetEventSlim(false);
+            using var lease = session.AcquireExclusive(nameof(ConcurrentCall_FromDifferentThread_Throws_InvalidOperationException));
+            startGate.Set();
+            holdGate.Wait(TestContext.Current.CancellationToken);
+        });
 
-            Exception? capturedB = null;
-
-            // Thread A: take the busy lock via the internal AcquireExclusive helper
-            // (accessible via [InternalsVisibleTo]), hold it open via a gate, then release.
-            var threadA = new System.Threading.Thread(() =>
-            {
-                using var lease = session.AcquireExclusive(nameof(ConcurrentCall_FromDifferentThread_Throws_InvalidOperationException));
-                startGate.Set();
-                holdGate.Wait(TestContext.Current.CancellationToken);
-            });
-
-            // Thread B: wait until A holds the lock, then call any public method.
-            // The guard should detect cross-thread contention and throw.
-            var threadB = new System.Threading.Thread(() =>
-            {
-                startGate.Wait(TestContext.Current.CancellationToken);
-                try
-                {
-                    session.GetSessionInfo();
-                }
-                catch (Exception ex)
-                {
-                    capturedB = ex;
-                }
-                finally
-                {
-                    holdGate.Set();
-                }
-            });
-
-            threadA.Start();
-            threadB.Start();
-            threadA.Join();
-            threadB.Join();
-
-            Assert.NotNull(capturedB);
-            Assert.IsType<InvalidOperationException>(capturedB);
-            Assert.Contains("Concurrent access", capturedB!.Message);
-        }
-        finally
+        // Thread B: wait until A holds the lock, then call any public method.
+        // The guard should detect cross-thread contention and throw.
+        var threadB = new System.Threading.Thread(() =>
         {
-            session.Logout();
-            session.Dispose();
-        }
+            startGate.Wait(TestContext.Current.CancellationToken);
+            try
+            {
+                capturedB = Record.Exception(() => session.GetSessionInfo());
+            }
+            finally
+            {
+                holdGate.Set();
+            }
+        });
+
+        threadA.Start();
+        threadB.Start();
+        threadA.Join();
+        threadB.Join();
+
+        Assert.NotNull(capturedB);
+        Assert.IsType<InvalidOperationException>(capturedB);
+        Assert.Contains("Concurrent access", capturedB!.Message);
     }
 
     [Fact]
@@ -67,17 +56,10 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
     {
         // Same-thread reentrancy is required by secure helpers (e.g. GenerateAesKey calls
         // public GenerateKey internally). The lock is reentrant on the same thread.
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var outerLease = session.AcquireExclusive(nameof(ReentrantCall_FromSameThread_Succeeds));
-            // Same thread — calling a public method that internally re-acquires must succeed.
-            Assert.NotNull(session.GetSessionInfo());
-        }
-        finally
-        {
-            session.Logout();
-            session.Dispose();
-        }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        using var outerLease = session.AcquireExclusive(nameof(ReentrantCall_FromSameThread_Succeeds));
+        // Same thread — calling a public method that internally re-acquires must succeed.
+        Assert.NotNull(session.GetSessionInfo());
     }
 }

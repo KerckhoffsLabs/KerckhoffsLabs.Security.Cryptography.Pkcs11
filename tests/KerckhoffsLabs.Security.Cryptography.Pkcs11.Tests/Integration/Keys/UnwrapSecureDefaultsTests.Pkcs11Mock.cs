@@ -21,9 +21,9 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
     // the shared Mock fixture would cascade into the other Mock-collection tests.
     private void WithSession(Action<Pkcs11SessionCore> body)
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
-        try { body(session); }
-        finally { session.Logout(); session.Dispose(); }
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(_backend);
+        var session = sessionScope.Session;
+        body(session);
     }
 
     private static List<ObjectAttribute> InsecureTemplate(ObjectAttribute insecure) =>

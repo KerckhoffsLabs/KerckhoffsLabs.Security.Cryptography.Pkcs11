@@ -84,36 +84,29 @@ internal static class Pkcs5Pbkd2ReferenceVectorTestCases
 
     private static byte[] Derive(IPkcs11Backend backend, CKP prf, string salt, int outputLength)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var sessionScope = TestKeys.OpenLoggedInSessionScope(backend);
+        var session = sessionScope.Session;
+        var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2,
+            new CkmPkcs5Pbkd2Params(Encoding.UTF8.GetBytes(salt), Iterations, prf, Encoding.UTF8.GetBytes(Password)));
+
+        // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back --
+        // the same template shape Rfc2898DeriveBytesPkcs11.DeriveExtractable uses.
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)outputLength);
+        using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+        var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrToken, attrValueLen, attrExtractable, attrSensitive };
+
+        ObjectHandle derived;
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            derived = session.GenerateKey(mechanism, template);
         try
         {
-            var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2,
-                new CkmPkcs5Pbkd2Params(Encoding.UTF8.GetBytes(salt), Iterations, prf, Encoding.UTF8.GetBytes(Password)));
-
-            // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back --
-            // the same template shape Rfc2898DeriveBytesPkcs11.DeriveExtractable uses.
-            using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
-            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var attrValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)outputLength);
-            using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
-            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
-            var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrToken, attrValueLen, attrExtractable, attrSensitive };
-
-            ObjectHandle derived;
-            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
-                derived = session.GenerateKey(mechanism, template);
-            try
-            {
-                using var attrs = session.GetAttributeValue(derived, [CKA.CKA_VALUE]);
-                return attrs[0].GetValueAsByteArray();
-            }
-            finally { session.DestroyObject(derived); }
+            using var attrs = session.GetAttributeValue(derived, [CKA.CKA_VALUE]);
+            return attrs[0].GetValueAsByteArray();
         }
-        finally
-        {
-            TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
-        }
+        finally { session.DestroyObject(derived); }
     }
 }
