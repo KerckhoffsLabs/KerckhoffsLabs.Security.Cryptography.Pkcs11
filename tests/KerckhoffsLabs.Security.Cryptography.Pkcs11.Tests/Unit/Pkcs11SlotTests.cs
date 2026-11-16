@@ -26,7 +26,7 @@ public sealed class Pkcs11SlotTests
         public CKR MechInfoRv = CKR.CKR_OK; public CK_MECHANISM_INFO MechInfo;
         public CKR InitTokenRv = CKR.CKR_OK;
         public byte[]? CapturedPin; public NativeCULong CapturedPinLen; public byte[]? CapturedLabel;
-        public CKR OpenRv = CKR.CKR_OK; public NativeCULong OpenSessionId = (NativeCULong)7UL; public NativeCULong CapturedOpenFlags;
+        public CKR OpenRv = CKR.CKR_OK; public readonly NativeCULong OpenSessionId = (NativeCULong)7UL; public NativeCULong CapturedOpenFlags;
 
         // Mechanism-list two-call probe knobs.
         public CKR MechListRv1 = CKR.CKR_OK, MechListRv2 = CKR.CKR_OK;

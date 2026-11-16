@@ -29,7 +29,8 @@ public sealed class Pkcs11SessionCoreLifecycleTests
     {
         public CKR LoginRv = CKR.CKR_OK, LoginUserRv = CKR.CKR_OK, InitPinRv = CKR.CKR_OK,
             SetPinRv = CKR.CKR_OK, SeedRv = CKR.CKR_OK, GenRandomRv = CKR.CKR_OK,
-            GetOpStateRv = CKR.CKR_OK, SetOpStateRv = CKR.CKR_OK, GenerateKeyRv = CKR.CKR_OK,
+            GetOpStateRv = CKR.CKR_OK, SetOpStateRv = CKR.CKR_OK;
+        public readonly CKR GenerateKeyRv = CKR.CKR_OK,
             FunctionStatusRv = CKR.CKR_FUNCTION_NOT_PARALLEL, CancelFunctionRv = CKR.CKR_FUNCTION_NOT_PARALLEL;
 
         public CKU? CapturedUserType;

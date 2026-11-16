@@ -246,7 +246,7 @@ public sealed class Pkcs11SessionCoreTests
 
     private sealed class CryptoFake : SessionTestModule
     {
-        public byte[] Output = [0xAA, 0xBB, 0xCC, 0xDD];
+        public readonly byte[] Output = [0xAA, 0xBB, 0xCC, 0xDD];
         public CKR InitRv = CKR.CKR_OK, ProbeRv = CKR.CKR_OK, FinalRv = CKR.CKR_OK;
         public int? SecondLen;            // when set, the data call reports fewer bytes -> resize
         public CKR GenerateKeyRv = CKR.CKR_OK;

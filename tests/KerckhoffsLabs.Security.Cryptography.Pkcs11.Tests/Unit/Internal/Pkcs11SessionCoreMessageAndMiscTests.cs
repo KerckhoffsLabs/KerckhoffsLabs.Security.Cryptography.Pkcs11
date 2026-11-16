@@ -264,7 +264,8 @@ public sealed class Pkcs11SessionCoreMessageAndMiscTests
 
     private sealed class MechListFake : SessionTestModule
     {
-        public CKR SessionInfoRv = CKR.CKR_OK, MechListRv = CKR.CKR_OK;
+        public CKR SessionInfoRv = CKR.CKR_OK;
+        public readonly CKR MechListRv = CKR.CKR_OK;
         public CKM[] Mechanisms = [CKM.CKM_AES_GCM, CKM.CKM_SHA256];
         public int SessionInfoCalls { get; private set; }
         public int MechListCalls { get; private set; }

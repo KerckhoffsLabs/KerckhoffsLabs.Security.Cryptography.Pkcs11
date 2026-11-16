@@ -37,7 +37,7 @@ public sealed class Pkcs11SessionCoreStreamTests
         public CKR VerifyRecoverRv = CKR.CKR_OK;
         public CKR VerifyRecoverProbeRv = CKR.CKR_OK;
         public CKR DigestKeyRv = CKR.CKR_OK;
-        public CKR VerifySignatureInitRv = CKR.CKR_OK;
+        public readonly CKR VerifySignatureInitRv = CKR.CKR_OK;
         public CKR VerifySignatureUpdateRv = CKR.CKR_OK;
         public CKR VerifySignatureFinalRv = CKR.CKR_OK;
 
