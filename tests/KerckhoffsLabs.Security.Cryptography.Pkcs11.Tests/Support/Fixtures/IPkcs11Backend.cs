@@ -103,6 +103,12 @@ public interface IPkcs11Backend
     /// refuses any context with <c>CKR_MECHANISM_PARAM_INVALID</c>, overrides it.</summary>
     bool SupportsPqcSignContext => true;
 
+    /// <summary>True when the token implements the dual-function calls (<c>C_DigestEncryptUpdate</c>,
+    /// <c>C_DecryptDigestUpdate</c>, <c>C_DecryptVerifyUpdate</c>, PKCS#11 v3.2 §5.13), which are optional.
+    /// Default <see langword="false"/>: a backend opts in once its implementation has been checked; Craton HSM,
+    /// which added them in 0.11.0, overrides it.</summary>
+    bool SupportsDualFunctionCrypto => false;
+
     /// <summary>The SLH-DSA parameter set tests use when the parameter set is not what they test. Default
     /// SHA2-128f, the fastest to sign; Craton HSM, which implements only SHA2-128s and SHA2-256s, overrides it.</summary>
     CkpSlhDsa SlhDsaTestParameterSet => CkpSlhDsa.CKP_SLH_DSA_SHA2_128F;

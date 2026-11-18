@@ -12,12 +12,10 @@ public sealed class EncapsulateKeyTests_CratonHsm(CratonHsmBackendFixture backen
 {
     private readonly CratonHsmBackendFixture _backend = backend;
 
-    // Craton HSM's encapsulate/decapsulate trait methods are implemented only by its ML-KEM mechanism
-    // (mlkem.rs); no RSA or EC mechanism implements them (see
-    // https://github.com/latchset/kryoptic/issues/432, which asks for exactly this: RSA and ECC
-    // support for C_[En|De]capsulateKey). CKM_RSA_PKCS_OAEP and CKM_ECDH1_DERIVE both exist on
-    // Craton HSM for ordinary encrypt/derive use, so a live mechanism-list check would not catch this
-    // gap -- it is the CKF_ENCAPSULATE/CKF_DECAPSULATE flag on those mechanisms that is missing.
+    // Craton HSM (a PKCS#11 v3.0 module, as of 0.11.1) exports no C_EncapsulateKey/C_DecapsulateKey: its
+    // ML-KEM encapsulation goes through C_DeriveKey (src/pkcs11_abi/functions.rs), and RSA and EC have no
+    // encapsulation path at all. CKM_RSA_PKCS_OAEP and CKM_ECDH1_DERIVE are both advertised for ordinary
+    // encrypt/derive use, so a live mechanism-list check would not catch this gap.
     public static bool SupportsAsymmetricEncapsulate => false;
 
     [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]

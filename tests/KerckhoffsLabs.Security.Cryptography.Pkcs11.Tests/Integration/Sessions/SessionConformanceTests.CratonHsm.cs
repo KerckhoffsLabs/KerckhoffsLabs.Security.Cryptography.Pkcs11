@@ -34,10 +34,7 @@ public sealed class SessionConformanceTests_CratonHsm(CratonHsmBackendFixture ba
     public void StaleHandles_AreRefused() => SessionConformanceTestCases.Assert_StaleHandles_AreRefused(_backend);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void SessionObject_OutlivesNoSessionOfIts()
-    {
-        Assert.Skip("Craton HSM keeps a session object after the session that created it closes.");
-    }
+    public void SessionObject_OutlivesNoSessionOfIts() => SessionConformanceTestCases.Assert_SessionObject_OutlivesNoSessionOfIts(_backend);
 
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void SecondLibraryInstance_LeavesTheFirstWorking() => SessionConformanceTestCases.Assert_SecondLibraryInstance_LeavesTheFirstWorking(_backend);
