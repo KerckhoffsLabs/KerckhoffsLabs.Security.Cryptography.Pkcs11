@@ -228,7 +228,7 @@ internal static class AcvpKnownAnswerTestCases
         _ => throw new ArgumentOutOfRangeException(nameof(hashAlg), hashAlg, null),
     };
 
-    private static CkpMlDsa MlDsaParameterSet(string parameterSet) => parameterSet switch
+    internal static CkpMlDsa MlDsaParameterSet(string parameterSet) => parameterSet switch
     {
         "ML-DSA-44" => CkpMlDsa.CKP_ML_DSA_44,
         "ML-DSA-65" => CkpMlDsa.CKP_ML_DSA_65,
@@ -263,7 +263,7 @@ internal static class AcvpKnownAnswerTestCases
         return session.CreateObject([cls, type, token, set, use, key]);
     }
 
-    private static ObjectHandle ImportPublicKey(Pkcs11SessionCore session, CKK keyType, ulong parameterSet, byte[] value)
+    internal static ObjectHandle ImportPublicKey(Pkcs11SessionCore session, CKK keyType, ulong parameterSet, byte[] value)
     {
         using var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var type = new ObjectAttribute(CKA.CKA_KEY_TYPE, keyType);
@@ -309,7 +309,7 @@ internal static class AcvpKnownAnswerTestCases
         }
     }
 
-    private static void WithSession(IPkcs11Backend backend, Action<Pkcs11SessionCore> body)
+    internal static void WithSession(IPkcs11Backend backend, Action<Pkcs11SessionCore> body)
     {
         using var session = TestKeys.OpenLoggedInSession(backend);
         try

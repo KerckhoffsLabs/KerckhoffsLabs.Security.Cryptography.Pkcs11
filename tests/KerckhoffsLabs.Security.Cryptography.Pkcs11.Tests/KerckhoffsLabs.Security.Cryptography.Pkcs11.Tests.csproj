@@ -86,6 +86,9 @@
     <!-- Verbatim subsets of NIST ACVP-Server test vectors (FIPS 203 / 204 / 205), read by AcvpVectors.
          Each file names its source file and commit. -->
     <EmbeddedResource Include="Support\Vectors\Acvp\*.json" LogicalName="Acvp.%(Filename)%(Extension)" />
+    <!-- C2SP Wycheproof test vectors, read by WycheproofVectors. Each file names its source file and commit, and
+         says how it was cut down if it is a subset. -->
+    <EmbeddedResource Include="Support\Vectors\Wycheproof\*.json" LogicalName="Wycheproof.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

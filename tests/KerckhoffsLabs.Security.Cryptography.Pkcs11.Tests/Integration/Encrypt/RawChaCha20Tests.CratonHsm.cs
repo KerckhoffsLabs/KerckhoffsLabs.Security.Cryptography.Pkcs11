@@ -19,4 +19,9 @@ public sealed class RawChaCha20Tests_CratonHsm(CratonHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     public void Decrypt_WrongCounter_ProducesGarbageNotException() =>
         RawChaCha20TestCases.Assert_Decrypt_WrongCounter_ProducesGarbageNotException(_backend);
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(RawChaCha20TestCases.CounterBoundaryCases), MemberType = typeof(RawChaCha20TestCases))]
+    public void CounterBoundary_Wycheproof(int tcId) =>
+        RawChaCha20TestCases.Assert_CounterBoundary_Wycheproof(_backend, tcId);
 }

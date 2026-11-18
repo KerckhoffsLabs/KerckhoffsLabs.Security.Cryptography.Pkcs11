@@ -19,4 +19,9 @@ public sealed class RawChaCha20Tests_Kryoptic(KryopticBackendFixture backend)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Decrypt_WrongCounter_ProducesGarbageNotException() =>
         RawChaCha20TestCases.Assert_Decrypt_WrongCounter_ProducesGarbageNotException(_backend);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(RawChaCha20TestCases.CounterBoundaryCases), MemberType = typeof(RawChaCha20TestCases))]
+    public void CounterBoundary_Wycheproof(int tcId) =>
+        RawChaCha20TestCases.Assert_CounterBoundary_Wycheproof(_backend, tcId);
 }

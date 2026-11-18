@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
 
-/// <summary>ML-KEM, ML-DSA and SLH-DSA known answers from NIST ACVP over BouncyHsm — thin wrapper over <see cref="AcvpKnownAnswerTestCases"/>.</summary>
+/// <summary>ML-KEM, ML-DSA and SLH-DSA known answers from NIST ACVP, and ML-DSA verification from Wycheproof, over BouncyHsm — thin wrapper over <see cref="AcvpKnownAnswerTestCases"/>.</summary>
 [Collection("BouncyHsm")]
 public sealed class AcvpKnownAnswerTests_BouncyHsm(BouncyHsmBackendFixture backend)
 {
@@ -15,6 +15,17 @@ public sealed class AcvpKnownAnswerTests_BouncyHsm(BouncyHsmBackendFixture backe
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(AcvpKnownAnswerTestCases.MlDsaPureVerificationCases), MemberType = typeof(AcvpKnownAnswerTestCases))]
     public void MlDsa_PureVerification_Acvp(string parameterSet, int tcId) => AcvpKnownAnswerTestCases.Assert_MlDsa_PureVerification_Acvp(_backend, parameterSet, tcId);
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(WycheproofMlDsaTestCases.ParameterSets), MemberType = typeof(WycheproofMlDsaTestCases))]
+    // BouncyHsm takes an ML-DSA public key one byte short or long, then answers C_Verify with CKR_GENERAL_ERROR. It
+    // refuses to verify an empty message with CKR_DATA_LEN_RANGE (VerifyState, "Verify empty data"), though FIPS 204
+    // signs one like any other, so the valid signatures over "" fail. A context over 255 bytes never reaches it.
+    public void MlDsa_Verification_Wycheproof(string parameterSet) =>
+        WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet, v =>
+            v.Flags.Contains("IncorrectPublicKeyLength") ? "BouncyHsm imports a public key of the wrong length; C_Verify then answers CKR_GENERAL_ERROR."
+            : v.Message.Length == 0 && v.Context.Length <= 255 ? "BouncyHsm refuses to verify an empty message (CKR_DATA_LEN_RANGE)."
+            : null);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(AcvpKnownAnswerTestCases.MlDsaPreHashVerificationCases), MemberType = typeof(AcvpKnownAnswerTestCases))]
