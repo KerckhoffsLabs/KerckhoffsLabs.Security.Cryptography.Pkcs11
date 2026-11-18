@@ -53,6 +53,11 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public bool SupportsPqcSignContext => false;
 
     /// <inheritdoc/>
+    // C_DigestEncryptUpdate, C_DecryptDigestUpdate, C_SignEncryptUpdate and C_DecryptVerifyUpdate arrived in
+    // 0.11.0 (upstream 3f217bf; streaming IV fixed in b4c9145).
+    public bool SupportsDualFunctionCrypto => true;
+
+    /// <inheritdoc/>
     // Only SHA2-128s and SHA2-256s (CKP 1 and 9); its CKM_SLH_DSA_KEY_PAIR_GEN key-size range of 1..9
     // names those two, not the seven in between.
     public CkpSlhDsa SlhDsaTestParameterSet => CkpSlhDsa.CKP_SLH_DSA_SHA2_128S;
@@ -266,6 +271,28 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the Ed25519ctx and Ed25519ph cases: see <see cref="CratonHsmTakesEdDsaParams"/>.</summary>
     public static bool EdDsaParamsAvailable => CratonHsmAvailable && CratonHsmTakesEdDsaParams;
+
+    /// <summary>
+    /// False while <c>C_DecryptDigestUpdate</c> and <c>C_DecryptVerifyUpdate</c> with <c>CKM_AES_CBC_PAD</c> treat every
+    /// ciphertext part as the last one: each is decrypted with padding removal first and without it only when that
+    /// fails, so a part whose plaintext happens to end like PKCS#7 padding (a last byte of <c>01</c>, say) loses those
+    /// bytes, and the digest or signature check covers the shortened plaintext. PKCS#11 v3.2 §2.10.2 removes padding
+    /// at the end of the message only. Plain <c>C_DecryptUpdate</c> is not affected.
+    /// CratonHsmQuirkTests.CbcPadDualDecryptUnpadsEveryPart_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmUnpadsOnlyTheLastCbcPadPart = false;
+
+    /// <summary>Gate for the CBC-PAD dual-function decryption case: see <see cref="CratonHsmUnpadsOnlyTheLastCbcPadPart"/>.</summary>
+    public static bool CbcPadDualDecryptAvailable => CratonHsmAvailable && CratonHsmUnpadsOnlyTheLastCbcPadPart;
+
+    /// <summary>
+    /// False while ECDSA on a P-521 key refuses a SHA-256 digest with <c>CKR_DATA_LEN_RANGE</c>:
+    /// <c>ecdsa_p521_sign_prehashed</c> (<c>src/crypto/sign.rs</c>) goes through the RustCrypto <c>ecdsa</c> crate's
+    /// <c>bits2field</c>, which refuses a digest shorter than half the 66-byte field. FIPS 186-5 §6.4.1 sets no such
+    /// floor (it only truncates a digest longer than the order), and P-521 with SHA-384 or SHA-512 signs.
+    /// CratonHsmQuirkTests.P521WithSha256_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool CratonHsmSignsP521WithSha256 = false;
 
     /// <summary>Gate for the RSA public exponent case: see <see cref="CratonHsmKeepsThePublicExponentAsked"/>.</summary>
     public static bool PublicExponentAvailable => CratonHsmAvailable && CratonHsmKeepsThePublicExponentAsked;
