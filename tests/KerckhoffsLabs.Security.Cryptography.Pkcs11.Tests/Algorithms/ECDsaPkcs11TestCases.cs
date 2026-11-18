@@ -588,6 +588,40 @@ internal static class ECDsaPkcs11TestCases
         });
     }
 
+    // Wycheproof ecdsa_secp256k1_sha256_bitcoin_test.json, tcId 464 ("r = p - n + 1, x(k*G) = 1"), added upstream
+    // after pkcs11-check 0.3.0 refreshed its Wycheproof pin (https://github.com/mingulov/pkcs11-check, sources.toml).
+    // s = 1 and the empty message put x(u1·G + u2·Q) at 1, so x mod n is 1, not r: the signature is invalid in plain
+    // ECDSA, not only in Bitcoin's. On secp256k1, p - n is about 2^128, so r + n can reach p. A verifier that skips
+    // the reduction mod n by also comparing x against r + n must first check r + n < p; one that does not takes
+    // (r + n) mod p = p + 1 mod p = 1 = x, and accepts.
+    private static readonly WycheproofVector RPlusNPastTheFieldVector = new("secp256k1",
+        "2ff2a886e60b814963cf60db62cc4d0510efca3220833013e1f97891b655f9c6",
+        "aa6df83c7e059539e4342f82067d80502f31bdb81cdfaf56a348b8201ad0b092",
+        "",
+        "30160211014551231950b75fc4402da1722fc9baef020101");
+
+    internal static void Assert_Secp256k1_RPlusNPastTheField_ReturnsFalse(IPkcs11Backend backend)
+    {
+        WycheproofVector v = RPlusNPastTheFieldVector;
+        WithVectorKey(backend, v, ec =>
+        {
+            // The token holds the vector's point, so a false below is the signature's, not the key's.
+            ECParameters imported = ec.ExportParameters(includePrivateParameters: false);
+            Assert.Equal(Convert.FromHexString(v.Wx), imported.Q.X);
+            Assert.Equal(Convert.FromHexString(v.Wy), imported.Q.Y);
+
+            byte[] msg = Convert.FromHexString(v.Msg);
+            byte[] der = Convert.FromHexString(v.Sig);
+            byte[] hash = SHA256.HashData(msg);
+            byte[] ieee = DssSignatureEncoding.DerToIeeeP1363(der, SignatureFieldSize(v.Curve))!;
+
+            Assert.False(ec.VerifyHash(hash, ieee));
+            Assert.False(ec.VerifyHash(hash, der, DSASignatureFormat.Rfc3279DerSequence));
+            Assert.False(ec.VerifyData(msg, ieee, HashAlgorithmName.SHA256));
+            Assert.False(ec.VerifyData(msg, der, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+        });
+    }
+
     // A key generated on the curve: the token's r‖s takes the order's length for r and s, and a DER
     // signature made from it verifies, under the BCL too.
     internal static void Assert_SignHash_OrderLongerThanField_RoundTrips(IPkcs11Backend backend, string curve)
