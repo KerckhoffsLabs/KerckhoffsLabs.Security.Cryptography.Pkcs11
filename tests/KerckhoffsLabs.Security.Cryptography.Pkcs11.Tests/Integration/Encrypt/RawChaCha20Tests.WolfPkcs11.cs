@@ -19,4 +19,9 @@ public sealed class RawChaCha20Tests_WolfPkcs11(WolfPkcs11BackendFixture backend
     [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     public void Decrypt_WrongCounter_ProducesGarbageNotException() =>
         RawChaCha20TestCases.Assert_Decrypt_WrongCounter_ProducesGarbageNotException(_backend);
+
+    [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    [MemberData(nameof(RawChaCha20TestCases.CounterBoundaryCases), MemberType = typeof(RawChaCha20TestCases))]
+    public void CounterBoundary_Wycheproof(int tcId) =>
+        RawChaCha20TestCases.Assert_CounterBoundary_Wycheproof(_backend, tcId);
 }

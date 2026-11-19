@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
 
-/// <summary>ML-KEM, ML-DSA and SLH-DSA known answers from NIST ACVP over OpenCryptoki — thin wrapper over <see cref="AcvpKnownAnswerTestCases"/>.</summary>
+/// <summary>ML-KEM, ML-DSA and SLH-DSA known answers from NIST ACVP, and ML-DSA verification from Wycheproof, over OpenCryptoki — thin wrapper over <see cref="AcvpKnownAnswerTestCases"/>.</summary>
 [Collection("OpenCryptoki")]
 public sealed class AcvpKnownAnswerTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
@@ -15,6 +15,15 @@ public sealed class AcvpKnownAnswerTests_OpenCryptoki(OpenCryptokiBackendFixture
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(AcvpKnownAnswerTestCases.MlDsaPureVerificationCases), MemberType = typeof(AcvpKnownAnswerTestCases))]
     public void MlDsa_PureVerification_Acvp(string parameterSet, int tcId) => AcvpKnownAnswerTestCases.Assert_MlDsa_PureVerification_Acvp(_backend, parameterSet, tcId);
+
+    [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [MemberData(nameof(WycheproofMlDsaTestCases.ParameterSets), MemberType = typeof(WycheproofMlDsaTestCases))]
+    // opencryptoki takes an ML-DSA public key one byte short or long, then answers C_Verify with CKR_FUNCTION_FAILED.
+    public void MlDsa_Verification_Wycheproof(string parameterSet) =>
+        WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet, v =>
+            v.Flags.Contains("IncorrectPublicKeyLength")
+                ? "opencryptoki imports a public key of the wrong length; C_Verify then answers CKR_FUNCTION_FAILED."
+                : null);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(AcvpKnownAnswerTestCases.MlDsaPreHashVerificationCases), MemberType = typeof(AcvpKnownAnswerTestCases))]
