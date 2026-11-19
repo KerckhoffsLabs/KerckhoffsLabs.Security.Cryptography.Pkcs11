@@ -18,7 +18,12 @@ public sealed class AcvpKnownAnswerTests_OpenCryptoki(OpenCryptokiBackendFixture
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(WycheproofMlDsaTestCases.ParameterSets), MemberType = typeof(WycheproofMlDsaTestCases))]
-    public void MlDsa_Verification_Wycheproof(string parameterSet) => WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet);
+    // opencryptoki takes an ML-DSA public key one byte short or long, then answers C_Verify with CKR_FUNCTION_FAILED.
+    public void MlDsa_Verification_Wycheproof(string parameterSet) =>
+        WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet, v =>
+            v.Flags.Contains("IncorrectPublicKeyLength")
+                ? "opencryptoki imports a public key of the wrong length; C_Verify then answers CKR_FUNCTION_FAILED."
+                : null);
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(AcvpKnownAnswerTestCases.MlDsaPreHashVerificationCases), MemberType = typeof(AcvpKnownAnswerTestCases))]

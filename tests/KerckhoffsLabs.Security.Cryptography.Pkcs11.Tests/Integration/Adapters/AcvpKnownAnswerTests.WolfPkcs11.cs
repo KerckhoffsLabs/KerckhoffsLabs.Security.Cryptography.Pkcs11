@@ -18,7 +18,18 @@ public sealed class AcvpKnownAnswerTests_WolfPkcs11(WolfPkcs11BackendFixture bac
 
     [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     [MemberData(nameof(WycheproofMlDsaTestCases.ParameterSets), MemberType = typeof(WycheproofMlDsaTestCases))]
-    public void MlDsa_Verification_Wycheproof(string parameterSet) => WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet);
+    // wolfPKCS11 answers CKR_FUNCTION_FAILED, not CKR_SIGNATURE_INVALID or CKR_SIGNATURE_LEN_RANGE, for a signature
+    // wolfCrypt cannot decode: the wrong length, or a malformed hint section (which the last byte belongs to, so a
+    // bit flip there is one too). A public key of the wrong length it refuses at import with CKR_FUNCTION_FAILED
+    // rather than CKR_ATTRIBUTE_VALUE_INVALID. Each is still a refusal; only the return code is wrong.
+    public void MlDsa_Verification_Wycheproof(string parameterSet) =>
+        WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet, v =>
+            v.Flags.Contains("IncorrectSignatureLength") || v.Flags.Contains("InvalidHintsEncoding")
+                    || v.Comment == "signature with a bit flip in the last byte"
+                ? "wolfPKCS11 answers C_Verify on a signature it cannot decode with CKR_FUNCTION_FAILED."
+            : v.Flags.Contains("IncorrectPublicKeyLength")
+                ? "wolfPKCS11 refuses a public key of the wrong length with CKR_FUNCTION_FAILED, not CKR_ATTRIBUTE_VALUE_INVALID."
+            : null);
 
     [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     [MemberData(nameof(AcvpKnownAnswerTestCases.MlDsaPreHashVerificationCases), MemberType = typeof(AcvpKnownAnswerTestCases))]

@@ -22,6 +22,13 @@ public sealed class RawChaCha20Tests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(RawChaCha20TestCases.CounterBoundaryCases), MemberType = typeof(RawChaCha20TestCases))]
+    // NSS softoken never checks the 32-bit counter's end: sftk_ChaCha20Ctr hands the whole input to
+    // Hacl_Chacha20_chacha20_encrypt, which adds each block's index to the counter in 32 bits, so past 0xFFFFFFFF it
+    // wraps to 0 and reuses block 0's keystream. (The 64-bit counter layout it refuses outright: its context keeps the
+    // counter in a PRUint32.)
     public void CounterBoundary_Wycheproof(int tcId) =>
-        RawChaCha20TestCases.Assert_CounterBoundary_Wycheproof(_backend, tcId);
+        RawChaCha20TestCases.Assert_CounterBoundary_Wycheproof(_backend, tcId,
+            encryptsPastTheLastBlockBecause: tcId is 40 or 41 or 42
+                ? "NSS wraps the 32-bit counter past 0xFFFFFFFF to 0, reusing block 0's keystream."
+                : null);
 }

@@ -153,6 +153,12 @@ internal static class RawChaCha20TestCases
             try { ciphertext = chacha20.Encrypt(mechanism, v.Message); }
             catch (Pkcs11Exception ex) { refused = ex.ReturnValue; }
 
+            // PKCS#11 leaves the 64-bit counter / 64-bit nonce layout optional: NSS keeps the counter in 32 bits and
+            // Kryoptic takes only the RFC 8439 layout, and both answer CKR_MECHANISM_PARAM_INVALID. A refusal at
+            // counter 0 as well says the layout is not offered, which tells nothing about the counter's end.
+            if (refused == CKR.CKR_MECHANISM_PARAM_INVALID && v.CounterSize == 64 && RefusesCounterLayout(chacha20, nonce))
+                Assert.Skip($"{vector}: the backend does not take a 64-bit block counter with a {8 * nonce.Length}-bit nonce.");
+
             if (v.Valid)
             {
                 if (refusesBecause is not null)
@@ -176,5 +182,19 @@ internal static class RawChaCha20TestCases
             Assert.True(ciphertext is null,
                 $"{vector}: encrypted {v.Message.Length} bytes, past the {v.CounterSize}-bit counter's last block, where it must refuse rather than wrap the counter and reuse a block's keystream.");
         });
+    }
+
+    private static bool RefusesCounterLayout(Pkcs11Key chacha20, byte[] nonce)
+    {
+        var atZero = new Mechanism(CKM.CKM_CHACHA20, new CkmChaCha20Params(new byte[8], 64, nonce, 8 * nonce.Length));
+        try
+        {
+            chacha20.Encrypt(atZero, new byte[1]);
+            return false;
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_MECHANISM_PARAM_INVALID)
+        {
+            return true;
+        }
     }
 }
