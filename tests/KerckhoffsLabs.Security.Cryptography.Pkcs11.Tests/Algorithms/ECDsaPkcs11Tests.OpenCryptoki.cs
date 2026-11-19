@@ -92,4 +92,7 @@ public sealed class ECDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
     public void SignHash_VerifiesUnderBcl_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, curve);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void Secp256k1_RPlusNPastTheField_ReturnsFalse() => ECDsaPkcs11TestCases.Assert_Secp256k1_RPlusNPastTheField_ReturnsFalse(_backend);
 }

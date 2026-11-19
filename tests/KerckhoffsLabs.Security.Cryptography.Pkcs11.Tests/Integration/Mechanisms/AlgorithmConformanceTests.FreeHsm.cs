@@ -32,6 +32,9 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
             ? "FreeHSM signs pure EdDSA only: CK_EDDSA_PARAMS with a context or phFlag is CKR_MECHANISM_PARAM_INVALID."
             : null);
 
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void Ed25519_MixedOrderPublicKey_SignatureDoesNotVerify() => AlgorithmConformanceTestCases.Assert_Ed25519_MixedOrderPublicKey_SignatureDoesNotVerify(_backend);
+
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdsaCurves), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void Ecdsa_OnTheCurve_VerifiesUnderBcl(string curve) => AlgorithmConformanceTestCases.Assert_Ecdsa_OnTheCurve_VerifiesUnderBcl(_backend, curve);

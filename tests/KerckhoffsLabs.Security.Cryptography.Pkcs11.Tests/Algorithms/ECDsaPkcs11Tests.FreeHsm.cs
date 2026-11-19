@@ -109,4 +109,7 @@ public sealed class ECDsaPkcs11Tests_FreeHsm(FreeHsmBackendFixture f)
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(PropertyTestSupport.MoreCurves), MemberType = typeof(PropertyTestSupport))]
     public void SignHash_VerifiesUnderBcl_OnMoreCurves(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, curve);
+
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    public void Secp256k1_RPlusNPastTheField_ReturnsFalse() => ECDsaPkcs11TestCases.Assert_Secp256k1_RPlusNPastTheField_ReturnsFalse(_backend);
 }

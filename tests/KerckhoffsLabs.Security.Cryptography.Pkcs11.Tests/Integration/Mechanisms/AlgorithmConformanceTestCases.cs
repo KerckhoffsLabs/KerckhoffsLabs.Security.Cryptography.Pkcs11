@@ -24,7 +24,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// What the algorithms compute, checked on every real backend against a reference the test holds: the RSA-PSS
 /// salt and mask the token was asked for, read back out of its signatures, and the PSS parameters it refuses;
 /// RSA-OAEP's randomisation, key transport and wrapped-key length; the PKCS#1 v1.5 length bound; raw RSA
-/// verification; the RFC 8032 EdDSA variants other than pure Ed25519; ECDSA on the curves the rest of the suite
+/// verification; the RFC 8032 EdDSA variants other than pure Ed25519, and an Ed25519 signature under a mixed-order
+/// public key that must not verify; ECDSA on the curves the rest of the suite
 /// does not reach; the 224-bit digests; <c>C_DigestKey</c>; key agreement with a KDF, with the cofactor and on
 /// X448, the ECDH parameters it refuses and a derived AES key of a length AES does not have; HKDF with SHA-512
 /// and with a salt key; SHA-256 key derivation; AES key wrap's IV and integrity check; ML-KEM and HashML-DSA
@@ -33,8 +34,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Mechanis
 /// <remarks>
 /// <para>
 /// A derived secret is compared through an HMAC under it rather than by reading it, so a module that derives
-/// only sensitive keys (NSS) runs the same case. The vectors are RFC 8032 §7.2–7.5, RFC 7748 §6.2, FIPS 180-4 and
-/// FIPS 202; a computed reference comes from the .NET runtime.
+/// only sensitive keys (NSS) runs the same case. The vectors are RFC 8032 §7.1–7.5, RFC 7748 §6.2, FIPS 180-4,
+/// FIPS 202 and Wycheproof; a computed reference comes from the .NET runtime.
 /// </para>
 /// <para>
 /// Every object is a session object, destroyed by the case. A case that needs a curve, mechanism or parameter the
@@ -635,6 +636,72 @@ internal static class AlgorithmConformanceTestCases
                 Assert.False(session.Verify(eddsa, pub, message, tampered));
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
+        });
+    }
+
+    // Wycheproof ed25519_test.json, tcId 210 ("sodium_compat v2.5.1 mixed-order subgroup regression"), added upstream
+    // after pkcs11-check 0.3.0 refreshed its Wycheproof pin (https://github.com/mingulov/pkcs11-check, sources.toml).
+    // The public key is a prime-order point plus a torsion point, and the signature fails both RFC 8032 checks, the
+    // cofactorless [S]B = R + [k]A and the cofactored [8][S]B = [8]R + [8][k]A: unlike the vectors around it, which
+    // Wycheproof marks acceptable either way, a verifier must reject it. sodium_compat 2.5.1 accepted it.
+    private const string MixedOrderPublicKey = "d1e06adf4e05e248e1e52beca14b6be4da0af01b41645d2849b407ec22f41d47";
+    private const string MixedOrderMessage = "af82";
+    private const string MixedOrderSignature =
+        "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a";
+
+    // RFC 8032 §7.1, TEST 2: pure Ed25519 over the one-octet message 0x72.
+    private const string Rfc8032Test2PublicKey = "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c";
+    private const string Rfc8032Test2Message = "72";
+    private const string Rfc8032Test2Signature =
+        "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00";
+
+    // The token verifies RFC 8032's TEST 2 under its imported public key, so it takes an Ed25519 key it is given,
+    // then refuses Wycheproof's mixed-order signature: C_Verify answers CKR_SIGNATURE_INVALID. A module may instead
+    // refuse to import a public key with a torsion component (CKR_ATTRIBUTE_VALUE_INVALID); that rejects it too.
+    internal static void Assert_Ed25519_MixedOrderPublicKey_SignatureDoesNotVerify(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_EDDSA);
+        byte[] ed25519 = [0x06, 0x03, 0x2B, 0x65, 0x70];
+        var eddsa = new Mechanism(CKM.CKM_EDDSA);
+        WithSession(backend, session =>
+        {
+            ObjectHandle ImportPublicKey(string hex)
+            {
+                byte[] point = Convert.FromHexString(hex);
+                using var template = new Template(
+                [
+                    new(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS),
+                    new(CKA.CKA_TOKEN, false), new(CKA.CKA_VERIFY, true), new(CKA.CKA_EC_PARAMS, ed25519),
+                    new(CKA.CKA_EC_POINT, backend.EcxPointIsDerEncoded ? [0x04, (byte)point.Length, .. point] : point),
+                ]);
+                return session.CreateObject(template.Attributes);
+            }
+
+            ObjectHandle control = ImportPublicKey(Rfc8032Test2PublicKey);
+            try
+            {
+                Assert.True(
+                    session.Verify(eddsa, control, Convert.FromHexString(Rfc8032Test2Message), Convert.FromHexString(Rfc8032Test2Signature)),
+                    "The token refuses RFC 8032's TEST 2.");
+            }
+            finally { session.DestroyObject(control); }
+
+            ObjectHandle mixedOrder;
+            try
+            {
+                mixedOrder = ImportPublicKey(MixedOrderPublicKey);
+            }
+            catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_VALUE_INVALID)
+            {
+                return;
+            }
+            try
+            {
+                Assert.False(
+                    session.Verify(eddsa, mixedOrder, Convert.FromHexString(MixedOrderMessage), Convert.FromHexString(MixedOrderSignature)),
+                    "The token accepts Wycheproof's mixed-order Ed25519 signature (tcId 210).");
+            }
+            finally { session.DestroyObject(mixedOrder); }
         });
     }
 
