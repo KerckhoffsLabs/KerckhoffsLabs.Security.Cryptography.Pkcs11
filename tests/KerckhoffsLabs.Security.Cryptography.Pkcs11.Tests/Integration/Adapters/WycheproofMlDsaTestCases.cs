@@ -52,10 +52,9 @@ internal static class WycheproofMlDsaTestCases
         int run = 0;
         AcvpKnownAnswerTestCases.WithSession(backend, session =>
         {
-            foreach (MlDsaVerification v in vectors)
+            // A backend that takes no ML-DSA context runs only the vectors without one.
+            foreach (MlDsaVerification v in vectors.Where(c => c.Context.Length == 0 || backend.SupportsPqcSignContext))
             {
-                if (v.Context.Length > 0 && !backend.SupportsPqcSignContext)
-                    continue;
                 run++;
                 string outcome = Verify(session, set, v);
                 bool right = outcome == (v.Valid ? Verified : Refused);
