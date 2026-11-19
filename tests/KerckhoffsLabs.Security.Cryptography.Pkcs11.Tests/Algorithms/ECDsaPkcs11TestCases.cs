@@ -453,9 +453,24 @@ internal static class ECDsaPkcs11TestCases
             .Verify()
             .OnToken(false)
             .Build();
-        using var key = backend.SkipIfRefusedOutsideKeySize(CKM.CKM_ECDSA, info.FieldSizeBits, () => session.ImportKey(template));
-        using var ec = new ECDsaPkcs11(key);
-        body(ec);
+        Pkcs11Key key;
+        try
+        {
+            key = backend.SkipIfRefusedOutsideKeySize(CKM.CKM_ECDSA, info.FieldSizeBits, () => session.ImportKey(template));
+        }
+        // A token can generate keys on a curve and still not import public keys on it: FreeHSM's C_CreateObject
+        // takes P-256, P-384 and P-521 only, and answers secp256k1 with CKR_CURVE_NOT_SUPPORTED.
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_CURVE_NOT_SUPPORTED or CKR.CKR_DOMAIN_PARAMS_INVALID)
+        {
+            Assert.Skip($"The token does not import public keys on {v.Curve} ({ex.ReturnValue}).");
+            throw; // unreachable: Assert.Skip throws
+        }
+
+        using (key)
+        {
+            using var ec = new ECDsaPkcs11(key);
+            body(ec);
+        }
     }
 
     internal static void Assert_VerifyHash_DerSignature_OrderLongerThanField_Verifies(IPkcs11Backend backend, string vector)
