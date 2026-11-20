@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -10,8 +9,7 @@ public sealed class Pkcs11SessionFindKeysTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixtu
 
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "Requires " + nameof(Tpm2Pkcs11BackendFixture.Tpm2Pkcs11Available))]
     public void OpenKey_NotFound_Throws()

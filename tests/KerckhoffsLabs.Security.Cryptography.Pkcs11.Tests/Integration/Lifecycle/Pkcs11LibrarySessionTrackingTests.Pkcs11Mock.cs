@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Lifecycle;
@@ -89,14 +88,13 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
         Assert.Equal(0, lowLevel.Module.TrackedSessionCount);
     }
 
-    // Disposing the library closes the session's handle, so the session's own logout finds it
-    // closed. Its disposal must still succeed: it used to throw ObjectDisposedException.
+    // Disposing the library closes the session's handle, so the session's own disposal finds it
+    // closed. It must still succeed.
     [Fact]
     public void DisposingTheLibraryFirst_ThenTheSession_DoesNotThrow()
     {
         Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
-        Pkcs11Session session = library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        Pkcs11Session session = library.GetSlotByTokenLabel(_backend.TokenLabel).OpenSession(SessionAccess.ReadWrite);
 
         library.Dispose();
 

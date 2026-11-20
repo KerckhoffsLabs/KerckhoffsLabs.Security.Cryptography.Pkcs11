@@ -8,6 +8,29 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 // operation name passed as a parameter; the rendered message text is identical to the previous form.
 internal static partial class Log
 {
+    /// <summary>
+    /// Logs on a disposal path: a logger that throws must not make a disposal throw, or stop it before the state it
+    /// changes (a session closed, a hold released). Loggers are not supposed to throw; this one's exception is dropped.
+    /// </summary>
+    public static void Quietly(Action log)
+    {
+        try
+        {
+            log();
+        }
+        catch (Exception ex) when (!IsFatal(ex))
+        {
+            // Dropped: see above.
+        }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="exception"/> is one no disposal or logging path may swallow: the process is out of memory
+    /// or stack, and carrying on would hide that.
+    /// </summary>
+    public static bool IsFatal(Exception exception)
+        => exception is OutOfMemoryException or InsufficientExecutionStackException;
+
     [LoggerMessage(Level = LogLevel.Debug, Message = "Session({SessionId})::{Operation}")]
     public static partial void SessionTrace(ILogger logger, ulong sessionId, string operation);
 
@@ -52,6 +75,19 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "C_MessageEncryptFinal returned {Rv}")]
     public static partial void MessageEncryptFinalFailed(ILogger logger, CKR rv);
+
+    // Once per sign or decrypt with a CKA_ALWAYS_AUTHENTICATE key: Debug, not the Information of a token login.
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Context login (CKU_CONTEXT_SPECIFIC) for the operation on session {SessionId}{Pinpad}")]
+    public static partial void ContextLoggingIn(ILogger logger, ulong sessionId, string pinpad);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Context login on session {SessionId} answered CKR_OPERATION_NOT_INITIALIZED: the module takes no re-authentication for this operation (the key needs none, or the module has no login to check it against), which goes on; the module decides at its end")]
+    public static partial void ContextLoginNotNeeded(ILogger logger, ulong sessionId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session {SessionId} was closed to end a {Operation} whose context login failed: the module has no C_SessionCancel, and the operation must not be finished unauthenticated")]
+    public static partial void SessionClosedToEndOperation(ILogger logger, ulong sessionId, string operation);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "A logout step handed to the thread finishing a login on slot {SlotId} failed")]
+    public static partial void TokenHandOffFailed(ILogger logger, ulong slotId, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "C_MessageDecryptFinal returned {Rv}")]
     public static partial void MessageDecryptFinalFailed(ILogger logger, CKR rv);
@@ -99,6 +135,30 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Session({SessionId}): policy restored {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyRestored(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Slot({SlotId}): C_Logout for the last holder of the login returned {Rv}; closing its anchor session anyway")]
+    public static partial void TokenLogoutFailed(ILogger logger, ulong slotId, CKR rv);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Slot({SlotId}): the login's anchor session was already closed, so no C_Logout was sent for its last holder")]
+    public static partial void TokenLogoutAnchorClosed(ILogger logger, ulong slotId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Slot({SlotId}): the module reported the login ended ({Reason}); its holders are no longer logged in")]
+    public static partial void TokenLoginEnded(ILogger logger, ulong slotId, CKR reason);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Slot({SlotId}): the token allows this application no further session of the kind asked for, so the login lends its own session {SessionId} as a working session")]
+    public static partial void AnchorLent(ILogger logger, ulong slotId, ulong sessionId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Slot({SlotId}): the login's own session {SessionId} was returned by the session it was lent to")]
+    public static partial void AnchorReturned(ILogger logger, ulong slotId, ulong sessionId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): returning the lent session, C_DestroyObject on its session object {ObjectHandle} returned {Rv}; the object stays until the login's session closes")]
+    public static partial void LentSessionObjectNotDestroyed(ILogger logger, ulong sessionId, ulong objectHandle, CKR rv);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Session({SessionId}): returning the lent session, its session object {ObjectHandle} is gone or no longer the one it created (CKA_TOKEN, CKA_CLASS or CKA_LABEL differ or cannot be read); not destroyed")]
+    public static partial void LentSessionObjectNotTheOneCreated(ILogger logger, ulong sessionId, ulong objectHandle);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): returning the lent session with operations 0x{Operations:X} still active, which the module cannot cancel; the next session it is lent to cannot start operations of those kinds")]
+    public static partial void LentSessionOperationsCarried(ILogger logger, ulong sessionId, ulong operations);
 
     /// <summary>
     /// A user type as a log argument: converts from <see cref="CKU"/> without work, and renders as

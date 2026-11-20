@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -57,6 +58,12 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     private static readonly Lock s_loadsLock = new();
     private static readonly Dictionary<object, Loads> s_loads = [];
 
+    // State the layers above keep per module for the life of the process, across its C_Finalize and its unloading
+    // (see Durable<T>), keyed by the module's durable key: its path for a module loaded from a file (interned, so the
+    // key lives as long as the process), else its identity, whose life the entry then shares.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, ConcurrentDictionary<Type, object>> s_durable = [];
+
+    private readonly object _durableKey;
     private readonly bool _freeOnRelease;
     private readonly object _identity;
     private Loads? _loads;
@@ -101,6 +108,12 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         // whose wait C_Finalize woke, never reaches it.
         public SlotEventDispatcher SlotEvents = new();
 
+        // State the layers above keep per module rather than per load, keyed by its type (see Shared<T>):
+        // the token login records, since a login belongs to the module's Cryptoki state and every load of
+        // it shares that. Recreated with the slot events (see ResetAfterFinalize): C_Finalize ends every
+        // session and login, so a load that comes after it starts from none.
+        public ConcurrentDictionary<Type, object> Shared = new();
+
         // How the module was initialized, for every load of it: a ConcurrencyMode, written by the load
         // whose C_Initialize succeeded. Not under s_loadsLock: it is set from inside a call.
         public int Mode;
@@ -109,12 +122,13 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         public readonly Lock CallLock = new();
     }
 
-    private Pkcs11ModuleHandle(IntPtr moduleHandle, bool freeOnRelease, object identity)
+    private Pkcs11ModuleHandle(IntPtr moduleHandle, bool freeOnRelease, object identity, object? durableKey = null)
         : base(IntPtr.Zero, ownsHandle: true)
     {
         SetHandle(moduleHandle);
         _freeOnRelease = freeOnRelease;
         _identity = identity;
+        _durableKey = durableKey ?? identity;
     }
 
     private CryptokiTable _table;
@@ -147,7 +161,15 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     {
         // A bare name is never searched for in the current directory; see ModulePath.
         IntPtr loaded = ModulePath.Load(libraryPath);
-        return Bound(new Pkcs11ModuleHandle(loaded, freeOnRelease: true, identity: loaded), () => LowLevelPkcs11Library.LoadTable(loaded));
+        // The OS handle may differ once the module is unloaded and loaded again: the path names it for good. A path with
+        // a directory is the file it named when loaded (a relative one against the current directory then, as the OS
+        // resolved it), so a later change of directory does not make another file share this key; a bare name is the
+        // OS's search, which the name stands for.
+        string durableKey = string.Intern("module:" + (ModulePath.Classify(libraryPath) == ModulePathKind.BareName
+            ? libraryPath
+            : Path.GetFullPath(libraryPath)));
+        return Bound(new Pkcs11ModuleHandle(loaded, freeOnRelease: true, identity: loaded, durableKey),
+            () => LowLevelPkcs11Library.LoadTable(loaded));
     }
 
     /// <summary>
@@ -193,7 +215,13 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// <see langword="false"/> only for a blocking <c>C_WaitForSlotEvent</c>, which <c>C_Finalize</c> is
     /// meant to wake (see remarks).
     /// </param>
-    internal void AddUse(ref bool added, bool holdsOffFinalize = true)
+    /// <param name="underOpenSession">
+    /// Whether the caller holds an open session of this handle (its <see cref="Pkcs11SessionHandle"/>, with a
+    /// reference taken for the call), so the use is taken even once this handle is disposed: that session's own
+    /// use keeps the module initialized and mapped. Only for a session that outlives the disposal of the load
+    /// that opened it, a token login's anchor session.
+    /// </param>
+    internal void AddUse(ref bool added, bool holdsOffFinalize = true, bool underOpenSession = false)
     {
         DangerousAddRef(ref added);
         if (!added)
@@ -204,7 +232,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         // Read after taking the use, and Dispose writes before it reads the holds (both full fences): so
         // either this sees the dispose and backs out, or TryFinalize sees this use and leaves C_Finalize
         // to its release.
-        if (Volatile.Read(ref _disposed) != 0)
+        if (Volatile.Read(ref _disposed) != 0 && !underOpenSession)
         {
             added = false;
             ReleaseUse(holdsOffFinalize);
@@ -273,6 +301,59 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     internal SlotEventDispatcher SlotEvents
         => _slotEvents ?? throw new InvalidOperationException("The module was never bound.");
 
+    /// <summary>
+    /// The one <typeparamref name="T"/> of the module, shared by every load of it until its next
+    /// <c>C_Finalize</c>, created on first use. Lets a layer above keep module-wide state here (the token
+    /// login records) without this layer depending on it.
+    /// </summary>
+    /// <remarks>
+    /// Two first uses that race may both construct a <typeparamref name="T"/>; both get the same one, so
+    /// its constructor must have no side effects.
+    /// </remarks>
+    internal T Shared<T>() where T : class, new()
+    {
+        Loads loads = _loads ?? throw new InvalidOperationException("The module was never bound.");
+        return (T)Volatile.Read(ref loads.Shared).GetOrAdd(typeof(T), static _ => new T());
+    }
+
+    /// <summary>
+    /// The one <typeparamref name="T"/> of the module for the life of the process, created on first use: kept across
+    /// the module's <c>C_Finalize</c> and its unloading, for state that must outlive a login, such as the PINs a token
+    /// refused. A module loaded again from the same path gets the same one.
+    /// </summary>
+    /// <remarks>As for <see cref="Shared{T}"/>, its constructor must have no side effects.</remarks>
+    internal T Durable<T>() where T : class, new()
+        => (T)s_durable.GetValue(_durableKey, static _ => new ConcurrentDictionary<Type, object>())
+            .GetOrAdd(typeof(T), static _ => new T());
+
+    /// <summary>
+    /// Module-wide state (<see cref="Shared{T}"/>) told when the module's last load is released, before that state is
+    /// dropped: the module may stay initialized (another component of the process initialized it, or a load was
+    /// abandoned), so its logins with it, and a load that comes later gets fresh state.
+    /// </summary>
+    internal interface IUnloadAware
+    {
+        /// <summary>The module's last load was released; this state is dropped next.</summary>
+        void Unloaded();
+    }
+
+    /// <summary>How many times the module was finalized through this library, for the life of the process.</summary>
+    internal sealed class FinalizeCount
+    {
+        private long _value;
+
+        /// <summary>The count so far.</summary>
+        public long Value => Interlocked.Read(ref _value);
+
+        internal void Increment() => Interlocked.Increment(ref _value);
+    }
+
+    /// <summary>
+    /// How many times the module was finalized through this library: state carried past an unload
+    /// (<see cref="IUnloadAware"/>) is stale once it changes.
+    /// </summary>
+    internal FinalizeCount Finalizations => Durable<FinalizeCount>();
+
     /// <summary>Count of still-live tracked sessions (test/diagnostic seam).</summary>
     internal int TrackedSessionCount
     {
@@ -309,13 +390,19 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// <see cref="SafeHandle.Dispose()"/> is reentrant and thread-safe, so a caller disposing the same
     /// session on another thread is harmless.
     /// </summary>
+    /// <remarks>
+    /// An anchor session (<see cref="Pkcs11SessionHandle.IsAnchor"/>) is left open and tracked: it keeps a token
+    /// login that every load of the module shares, and closes once the last holder of that login goes, whichever
+    /// load it came through. Its use of this handle holds off <c>C_Finalize</c> until then.
+    /// </remarks>
     internal void CloseAllTrackedSessions()
     {
         Pkcs11SessionHandle[] live;
         lock (_sessionsLock)
         {
-            live = [.. _sessions.Select(wr => wr.TryGetTarget(out var h) ? h : null).OfType<Pkcs11SessionHandle>()];
-            _sessions.Clear();
+            _sessions.RemoveAll(wr => !wr.TryGetTarget(out _));
+            live = [.. _sessions.Select(wr => wr.TryGetTarget(out var h) ? h : null).OfType<Pkcs11SessionHandle>().Where(h => !h.IsAnchor)];
+            _sessions.RemoveAll(wr => wr.TryGetTarget(out var h) && !h.IsAnchor);
         }
 
         // A session's release never throws: a C_CloseSession that fails, or throws, is reported by its
@@ -405,10 +492,26 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         // Decides C_Finalize for a handle abandoned without Dispose; a no-op once it has been decided.
         TryFinalize();
 
+        ConcurrentDictionary<Type, object>? dropped = null;
         lock (s_loadsLock)
         {
             if (_loads is not null && --_loads.Live == 0)
+            {
                 s_loads.Remove(_identity);
+                dropped = Volatile.Read(ref _loads.Shared);
+            }
+        }
+        // Outside the lock: the state takes its own locks. Nothing may escape a release.
+        foreach (object state in dropped?.Values ?? [])
+        {
+            try
+            {
+                (state as IUnloadAware)?.Unloaded();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or InsufficientExecutionStackException))
+            {
+                // Lost with the state: what it would have carried over is what a load without it starts with.
+            }
         }
 
         if (_initialized && !_finalizeOnRelease && !_ranFinalize)
@@ -449,14 +552,16 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     }
 
     // Always under s_loadsLock. Decided once: a load of the module that comes later initializes it
-    // afresh, owes nothing, and gets a slot-event stream of its own.
+    // afresh, owes nothing, and gets a slot-event stream and shared state (no logins) of its own.
     private void ResetAfterFinalize()
     {
         if (_loads is null)
             return;
+        Finalizations.Increment();
         _loads.FinalizeOwed = false;
         Volatile.Write(ref _loads.Mode, (int)ConcurrencyMode.Unknown);
         _loads.SlotEvents = new SlotEventDispatcher();
+        Volatile.Write(ref _loads.Shared, new ConcurrentDictionary<Type, object>());
     }
 }
 

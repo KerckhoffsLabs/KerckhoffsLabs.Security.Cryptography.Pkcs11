@@ -11,7 +11,7 @@ public sealed class Pkcs11KeyMechanismTests_Nss(NssBackendFixture backend)
     // These generate a token (persistent) key; NSS's generic token is write-protected, so they skip.
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void RsaPkcs_SignVerify_RoundTrip()

@@ -14,8 +14,7 @@ public sealed class DeriveSharedSecretEcdhTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixt
     private readonly Tpm2Pkcs11BackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     private static byte[] ReadEcPoint(Pkcs11Session session, ObjectHandle publicHandle)
     {

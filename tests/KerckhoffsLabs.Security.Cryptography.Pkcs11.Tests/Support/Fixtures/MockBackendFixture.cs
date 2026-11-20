@@ -21,6 +21,15 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
 
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
+    /// <summary>
+    /// <see langword="false"/>: pkcs11-mock allows one open session at a time (<c>C_OpenSession</c> answers
+    /// <c>CKR_SESSION_COUNT</c> for a second), so a login's anchor would take the only session from every other mock
+    /// test, and the fixture keeps none. The mock runs every crypto operation on a public session and checks a login only
+    /// for <c>C_InitPIN</c> and <c>C_Logout</c>, so its tests open sessions without one; login behaviour is
+    /// tested on <c>LoginTokenModule</c>.
+    /// </summary>
+    public bool RequiresUserLogin => false;
+
     public MockBackendFixture()
     {
         LibraryPath = Settings.MockLibraryPath;

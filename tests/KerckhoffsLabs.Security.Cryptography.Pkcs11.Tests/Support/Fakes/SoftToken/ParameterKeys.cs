@@ -29,7 +29,7 @@ internal sealed class ParameterKeys : IDisposable
         _library = library;
         _ownsLibrary = ownsLibrary;
         var lowLevel = library.LowLevelLibrary!;
-        var slot = new Pkcs11Slot(lowLevel, slotId: 1);
+        var slot = new Pkcs11Slot(library, slotId: 1);
         var session = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId, policy: policy);
         Session = new Pkcs11Session(library, slot, session);
     }

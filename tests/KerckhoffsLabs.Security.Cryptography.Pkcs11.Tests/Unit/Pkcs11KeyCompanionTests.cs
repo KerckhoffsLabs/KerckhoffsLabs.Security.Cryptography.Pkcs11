@@ -205,7 +205,7 @@ public sealed class Pkcs11KeyCompanionTests
             Pkcs11Library library = Load();
             LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
             var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1);
-            var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core);
+            var session = new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core);
             var key = new Pkcs11Key(session, new ObjectHandle(1), ObjectHandle.Invalid, CKK.CKK_EC, "k", [0x01],
                 companionPending: true);
             return new KeyScope(key, session, library);

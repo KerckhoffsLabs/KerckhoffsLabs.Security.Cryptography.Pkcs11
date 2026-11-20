@@ -16,7 +16,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// </remarks>
 internal static class ExceptionMapper
 {
-    internal static Pkcs11Exception Map(CKR returnValue, string method)
+    internal static Pkcs11Exception Map(CKR returnValue, string method) => Map(returnValue, method, message: null);
+
+    /// <summary>
+    /// The typed exception for <paramref name="returnValue"/>, with <paramref name="message"/> instead of the default
+    /// one: for a call the library refuses before the module, with the code the module would have answered.
+    /// </summary>
+    internal static Pkcs11Exception Map(CKR returnValue, string method, string? message)
         => returnValue switch
         {
             // CKR_PIN_* and CKR_USER_* → authentication
@@ -32,7 +38,7 @@ internal static class ExceptionMapper
               or CKR.CKR_USER_TYPE_INVALID
               or CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN
               or CKR.CKR_USER_TOO_MANY_TYPES
-                => new Pkcs11AuthenticationException(returnValue, method, message: null),
+                => new Pkcs11AuthenticationException(returnValue, method, message),
 
             // CKR_SESSION_* → session
             CKR.CKR_SESSION_CLOSED
@@ -43,7 +49,7 @@ internal static class ExceptionMapper
               or CKR.CKR_SESSION_EXISTS
               or CKR.CKR_SESSION_READ_ONLY_EXISTS
               or CKR.CKR_SESSION_READ_WRITE_SO_EXISTS
-                => new Pkcs11SessionException(returnValue, method, message: null),
+                => new Pkcs11SessionException(returnValue, method, message),
 
             // CKR_TOKEN_*, CKR_DEVICE_* → token/device
             CKR.CKR_TOKEN_NOT_PRESENT
@@ -53,13 +59,13 @@ internal static class ExceptionMapper
               or CKR.CKR_DEVICE_ERROR
               or CKR.CKR_DEVICE_MEMORY
               or CKR.CKR_DEVICE_REMOVED
-                => new Pkcs11TokenException(returnValue, method, message: null),
+                => new Pkcs11TokenException(returnValue, method, message),
 
             // CKR_MECHANISM_*, CKR_KEY_FUNCTION_NOT_PERMITTED → mechanism
             CKR.CKR_MECHANISM_INVALID
               or CKR.CKR_MECHANISM_PARAM_INVALID
               or CKR.CKR_KEY_FUNCTION_NOT_PERMITTED
-                => new Pkcs11MechanismException(returnValue, method, message: null),
+                => new Pkcs11MechanismException(returnValue, method, message),
 
             // CKR_OBJECT_*, CKR_ATTRIBUTE_* → object/attribute
             CKR.CKR_OBJECT_HANDLE_INVALID
@@ -67,15 +73,15 @@ internal static class ExceptionMapper
               or CKR.CKR_ATTRIBUTE_SENSITIVE
               or CKR.CKR_ATTRIBUTE_TYPE_INVALID
               or CKR.CKR_ATTRIBUTE_VALUE_INVALID
-                => new Pkcs11ObjectException(returnValue, method, message: null),
+                => new Pkcs11ObjectException(returnValue, method, message),
 
             // CKR_ARGUMENTS_BAD, CKR_DATA_*, CKR_BUFFER_TOO_SMALL → argument
             CKR.CKR_ARGUMENTS_BAD
               or CKR.CKR_DATA_INVALID
               or CKR.CKR_DATA_LEN_RANGE
               or CKR.CKR_BUFFER_TOO_SMALL
-                => new Pkcs11ArgumentException(returnValue, method, message: null),
+                => new Pkcs11ArgumentException(returnValue, method, message),
 
-            _ => new Pkcs11UnclassifiedException(returnValue, method, message: null),
+            _ => new Pkcs11UnclassifiedException(returnValue, method, message),
         };
 }

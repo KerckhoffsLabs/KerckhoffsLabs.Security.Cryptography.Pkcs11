@@ -7,6 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -82,13 +83,13 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
         using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-logout-{Guid.NewGuid():N}");
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         ObjectHandle handle = session.CreateObject([attrClass, attrToken, attrPrivate, attrLabel]);
-        session.Logout();
-        session.Login(CKU.CKU_USER, pin);
+        session.SendLogout();
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
         Exception? ex;
         try { ex = Record.Exception(() => { using var read = session.GetAttributeValue(handle, [CKA.CKA_CLASS]); }); }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is null,
             "A private session object no longer outlives C_Logout " +
@@ -177,7 +178,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             session.DestroyObject(privateKey);
             session.DestroyObject(publicKey);
         }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(rv == CKR.CKR_OK && length != CK.CK_UNAVAILABLE_INFORMATION,
             $"A sensitive ML-DSA private key no longer reveals the length of its CKA_VALUE (got {rv}): set " +
@@ -194,7 +195,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         using var attrExponent = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, (byte[])[0x01, 0x00, 0x01]);
         Exception? ex;
         try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrKeyType, attrToken, attrExponent]))); }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_ATTRIBUTE_VALUE_INVALID },
             "C_CreateObject of an RSA public key without CKA_MODULUS no longer answers CKR_ATTRIBUTE_VALUE_INVALID " +
@@ -211,7 +212,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, new byte[32]);
         Exception? ex;
         try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrToken, attrValue]))); }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is null,
             "C_CreateObject of a secret key without CKA_KEY_TYPE no longer makes a key " +
@@ -238,7 +239,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
                 session.DestroyObject(publicKey);
             });
         }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is null,
             "C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN) with CKK_RSA in the private template is now refused " +
@@ -271,7 +272,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             session.DestroyObject(copy);
             session.DestroyObject(data);
         }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(original.AsSpan().SequenceEqual(copied),
             "A copy no longer has the original's CKA_UNIQUE_ID: set " +
@@ -300,7 +301,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
                 after = read[0].GetValueAsByteArray();
             session.DestroyObject(key);
         }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is null && after.AsSpan().SequenceEqual(replacement),
             "C_SetAttributeValue no longer changes an AES key's CKA_VALUE " +
@@ -323,7 +324,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
                 after = read[0].GetValueAsBool();
             session.DestroyObject(data);
         }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is null && after,
             "C_SetAttributeValue no longer makes a public object private " +
@@ -354,7 +355,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         finally
         {
             System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
-            session.Logout();
+            session.SendLogout();
         }
 
         Assert.True(rv == CKR.CKR_GENERAL_ERROR,
@@ -380,7 +381,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
                 after = read[0].GetValueAsBool();
             session.DestroyObject(data);
         }
-        finally { session.Logout(); }
+        finally { session.SendLogout(); }
 
         Assert.True(ex is null && after,
             "C_SetAttributeValue no longer sets CKA_COPYABLE back to TRUE " +
@@ -920,4 +921,20 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             "BouncyHsmBackendFixture.BouncyHsmTakesSha512THmacKeys to true and delete this test.");
     }
 #pragma warning restore KLPKCS11008, KLPKCS11009
+
+    // The harrison314/BouncyHsm#145 canary. On the shared token, which is not a qualified-area one (so it needs no
+    // QualifiedAreaToken): the case puts CKA_ALWAYS_AUTHENTICATE in the template. A skip from inside the case (the
+    // token lacks the mechanisms or a login) is a skip here too, not the quirk's disappearance.
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void AlwaysAuthenticateInATemplate_QuirkStillPresent()
+    {
+        Exception? ex = Record.Exception(() => TokenLoginTestCases.Assert_AlwaysAuthenticateKey_SignsWithContextLogin(_backend));
+        if (ex is SkipException skip)
+            Assert.Skip(skip.Message);
+
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_ATTRIBUTE_READ_ONLY },
+            "C_GenerateKeyPair with CKA_ALWAYS_AUTHENTICATE in the private template no longer gives CKR_ATTRIBUTE_READ_ONLY " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): delete " +
+            "this test and BouncyHsmBackendFixture.BouncyHsmTakesAlwaysAuthenticateInATemplate (harrison314/BouncyHsm#145).");
+    }
 }

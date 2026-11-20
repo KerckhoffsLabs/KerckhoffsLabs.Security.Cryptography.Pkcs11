@@ -14,12 +14,12 @@ internal ref struct ModuleCall
     private bool _added;
     private bool _serialized;
 
-    internal ModuleCall(Pkcs11ModuleHandle module, bool holdsOffFinalize)
+    internal ModuleCall(Pkcs11ModuleHandle module, bool holdsOffFinalize, bool underOpenSession = false)
     {
         _module = module;
         _holdsOffFinalize = holdsOffFinalize;
         _added = false;
-        module.AddUse(ref _added, holdsOffFinalize);
+        module.AddUse(ref _added, holdsOffFinalize, underOpenSession);
         _serialized = module.EnterCall();
     }
 

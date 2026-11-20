@@ -7,8 +7,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
-/// Objects that are neither keys nor certificates (<see cref="Pkcs11Session.OpenObject"/>,
-/// <see cref="Pkcs11Session.TryOpenObject"/>, <see cref="Pkcs11Session.CreateObject"/>): the filter names the
+/// Objects that are neither keys nor certificates (<see cref="Pkcs11Session.OpenObject(ObjectTemplate)"/>,
+/// <see cref="Pkcs11Session.TryOpenObject(ObjectTemplate, out Pkcs11Object?)"/>, <see cref="Pkcs11Session.CreateObject"/>): the filter names the
 /// class, the key lookup rules apply, and keys and certificates are left to their typed lookups.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
@@ -143,8 +143,10 @@ public sealed class Pkcs11SessionObjectTests : IDisposable
     [Fact]
     public void InvalidArguments_AreRejected()
     {
-        Assert.Throws<ArgumentNullException>(() => _session.OpenObject(null!));
-        Assert.Throws<ArgumentNullException>(() => _session.TryOpenObject(null!, out _));
+        Assert.Throws<ArgumentNullException>(() => _session.OpenObject((ObjectTemplate)null!));
+        Assert.Throws<ArgumentNullException>(() => _session.TryOpenObject((ObjectTemplate)null!, out _));
+        Assert.Throws<ArgumentNullException>(() => _session.OpenObject((Pkcs11Uri)null!));
+        Assert.Throws<ArgumentNullException>(() => _session.TryOpenObject((Pkcs11Uri)null!, out _));
         Assert.Throws<ArgumentNullException>(() => _session.CreateObject(null!));
     }
 }

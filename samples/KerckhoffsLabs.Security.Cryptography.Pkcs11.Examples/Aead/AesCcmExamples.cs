@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 
@@ -30,7 +29,9 @@ public static class AesCcmExamples
         // 1. Load the module and log in. The module path and token label come from configuration; the PIN
         //    from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
-        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        Pkcs11Slot slot = library.GetSlotByTokenLabel(tokenLabel);
+        using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+        using Pkcs11Session session = login.OpenSession();
         //    Refuse a label already in use: a second key under it would make OpenKey ambiguous.
         if (session.TryOpenKey(keyLabel, out Pkcs11Key? existing))
         {
@@ -57,7 +58,9 @@ public static class AesCcmExamples
         // 1. Load the module and log in. The module path and token label come from configuration; the
         //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
-        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        Pkcs11Slot slot = library.GetSlotByTokenLabel(tokenLabel);
+        using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+        using Pkcs11Session session = login.OpenSession();
 
         // 2. Open the AES key that is already on the token, by its CKA_LABEL (OpenKey(id) finds it by
         //    CKA_ID instead). It throws if no key, or more than one, matches. The key stays on the token.

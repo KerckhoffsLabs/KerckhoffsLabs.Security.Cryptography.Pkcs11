@@ -26,22 +26,30 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 /// of the public surface, so which subclass a code maps to can be refined without a breaking change
 /// to any caller other than a <see langword="catch"/>.
 /// </remarks>
-/// <remarks>
-/// Initializes a new instance carrying the CKR and method name. Used by
-/// <see cref="ExceptionMapper"/> when dispatching <see cref="ThrowIfError(CKR, string)"/>.
-/// </remarks>
-/// <param name="returnValue">The PKCS#11 return value.</param>
-/// <param name="method">Name of the failing PKCS#11 method.</param>
-/// <param name="message">Optional explanatory message. When null, a default message
-/// of the form <c>"PKCS#11 method &lt;method&gt; returned &lt;returnValue&gt;"</c> is used.</param>
-public abstract class Pkcs11Exception(CKR returnValue, string method, string? message)
-    : CryptographicException(BuildMessage(method, returnValue, message))
+public abstract class Pkcs11Exception : CryptographicException
 {
+    /// <summary>Initializes a new instance carrying the CKR and method name.</summary>
+    /// <param name="returnValue">The PKCS#11 return value.</param>
+    /// <param name="method">Name of the failing PKCS#11 method.</param>
+    /// <param name="message">Optional explanatory message.</param>
+    protected Pkcs11Exception(CKR returnValue, string method, string? message)
+        : this(returnValue, method, message, innerException: null)
+    {
+    }
+
+    // For a refusal the library makes in place of an answer the module gave: that answer's exception is the inner one.
+    private protected Pkcs11Exception(CKR returnValue, string method, string? message, Exception? innerException)
+        : base(BuildMessage(method, returnValue, message), innerException)
+    {
+        ReturnValue = returnValue;
+        Method = method;
+    }
+
     /// <summary>PKCS#11 return value that triggered this exception.</summary>
-    public CKR ReturnValue { get; } = returnValue;
+    public CKR ReturnValue { get; }
 
     /// <summary>Name of the PKCS#11 method whose return value triggered this exception.</summary>
-    public string Method { get; } = method;
+    public string Method { get; }
 
     private static string BuildMessage(string method, CKR returnValue, string? message)
     {
@@ -98,4 +106,15 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     /// <returns>The typed exception to throw.</returns>
     internal static Pkcs11Exception Create(CKR returnValue, string method)
         => ExceptionMapper.Map(returnValue, method);
+
+    /// <summary>
+    /// Builds the typed <see cref="Pkcs11Exception"/> subclass for <paramref name="returnValue"/> with a message of
+    /// the caller's: for a call refused before the module, with the code the module would have answered.
+    /// </summary>
+    /// <param name="returnValue">The PKCS#11 return value the module would have answered.</param>
+    /// <param name="method">Name of the PKCS#11 method that was refused.</param>
+    /// <param name="message">The message; must carry no secret.</param>
+    /// <returns>The typed exception to throw.</returns>
+    internal static Pkcs11Exception Create(CKR returnValue, string method, string message)
+        => ExceptionMapper.Map(returnValue, method, message);
 }

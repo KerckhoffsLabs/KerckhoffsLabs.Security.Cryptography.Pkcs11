@@ -1,5 +1,4 @@
 using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -20,8 +19,7 @@ public sealed class PinManagementTests_Kryoptic(KryopticBackendFixture f)
         byte[] original = _backend.UserPin.ToArray();
         byte[] temp = Encoding.UTF8.GetBytes("87654321");
 
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original));
+        using var session = _backend.OpenSession();
 
         bool atTemp = false;
         try

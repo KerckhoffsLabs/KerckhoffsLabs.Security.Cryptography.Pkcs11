@@ -16,8 +16,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </remarks>
 public sealed class SecurePin : IDisposable
 {
+    private readonly Lock _lock = new();
     private byte[] _buffer;
     private bool _disposed;
+    // Uses in progress (BeginUse): a disposal meanwhile zeroes the buffer when the last one ends.
+    private int _uses;
 
     // Strict UTF-8: a lone surrogate in a PIN is refused instead of being silently replaced with
     // U+FFFD, which would log in with different bytes from the ones the user typed.
@@ -90,15 +93,21 @@ public sealed class SecurePin : IDisposable
     /// behind — between the copy and the zeroing. The only plaintext image is this buffer, pinned for
     /// its lifetime and zeroed by <see cref="Dispose"/>.
     /// </remarks>
-    /// <exception cref="ObjectDisposedException">Thrown if the pin has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the pin has been disposed, and no use of it is in progress.</exception>
     internal ReadOnlySpan<byte> Pin
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            return _buffer;
+            lock (_lock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed && _uses == 0, this);
+                return _buffer;
+            }
         }
     }
+
+    /// <summary>Whether <see cref="Dispose"/> was called.</summary>
+    internal bool IsDisposed => Volatile.Read(ref _disposed);
 
     /// <summary>The length of the PIN in bytes.</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the pin has been disposed.</exception>
@@ -111,18 +120,82 @@ public sealed class SecurePin : IDisposable
         }
     }
 
-    /// <summary>Zeroes the underlying buffer.</summary>
+    /// <summary>
+    /// Starts a use of the PIN by the library (a check against refused PINs, a send, the record of its answer), which
+    /// its caller may dispose meanwhile on another thread: the PIN is then zeroed once the use ends, so the module is
+    /// never sent a PIN zeroed half way, which would cost a retry.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the pin has been disposed.</exception>
+    internal Use BeginUse()
+    {
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _uses++;
+        }
+        return new Use(this);
+    }
+
+    /// <summary>A use of the PIN (<see cref="BeginUse"/>); ends when disposed.</summary>
+    /// <remarks>
+    /// A class, not a struct, so that it ends exactly once: a copy of a struct disposed twice would end two uses, drive
+    /// the count below zero, and leave the PIN unzeroed by every later <see cref="SecurePin.Dispose"/>, or zero it under
+    /// another use still in progress.
+    /// </remarks>
+    internal sealed class Use(SecurePin pin) : IDisposable
+    {
+        private int _ended;
+
+        /// <summary>Ends the use; zeroes the PIN if it was disposed meanwhile and this was its last use. Idempotent.</summary>
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _ended, 1) == 0)
+                pin.EndUse();
+        }
+    }
+
+    private void EndUse()
+    {
+        lock (_lock)
+        {
+            if (--_uses == 0 && _disposed)
+                Zero();
+        }
+    }
+
+    /// <summary>Zeroes the underlying buffer, at once or, while the library uses the PIN, once it is done.</summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        CryptographicOperations.ZeroMemory(_buffer);
-        _buffer = [];
-        _disposed = true;
+        lock (_lock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            if (_uses == 0)
+                Zero();
+        }
         GC.SuppressFinalize(this);
     }
 
+    // Under _lock.
+    private void Zero()
+    {
+        CryptographicOperations.ZeroMemory(_buffer);
+        _buffer = [];
+    }
+
     /// <summary>Finalizer safety net — zeroes the buffer even if Dispose was not called.</summary>
-    ~SecurePin() => Dispose();
+    /// <remarks>
+    /// Takes no lock: a finalizer runs only once the instance is unreachable, and a <see cref="Use"/> in progress keeps
+    /// it reachable, so nothing else can touch the buffer. It also runs on an instance whose constructor threw: the
+    /// string overload throws while computing the argument of the constructor it chains to, before any field
+    /// initializer has run, so <c>_lock</c> and <c>_buffer</c> are still null there, and locking would throw on the
+    /// finalizer thread and end the process.
+    /// </remarks>
+    ~SecurePin()
+    {
+        if (_buffer is not null)
+            CryptographicOperations.ZeroMemory(_buffer);
+    }
 
     /// <summary>
     /// Returns a non-revealing marker. Overridden so that accidentally formatting

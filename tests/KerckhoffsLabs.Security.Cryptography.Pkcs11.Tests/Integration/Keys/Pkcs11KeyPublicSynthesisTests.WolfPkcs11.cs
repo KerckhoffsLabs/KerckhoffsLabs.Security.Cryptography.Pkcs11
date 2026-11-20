@@ -101,6 +101,5 @@ public sealed class Pkcs11KeyPublicSynthesisTests_WolfPkcs11(WolfPkcs11BackendFi
     }
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 }

@@ -16,7 +16,9 @@ public static class Pbkdf2Examples
         //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         //    The PIN unlocks the token; the password below is the one the key is derived from.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
-        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        Pkcs11Slot slot = library.GetSlotByTokenLabel(tokenLabel);
+        using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+        using Pkcs11Session session = login.OpenSession();
 
         // 2. A key from a password: the password goes to the token in a SecurePassword (a pinned buffer
         //    zeroed on dispose), and the AES key is created on the token. Use a random salt per password,

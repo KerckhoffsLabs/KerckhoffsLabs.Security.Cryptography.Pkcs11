@@ -51,7 +51,7 @@ internal sealed class MontgomeryAgreementModule(byte[] ecParams, byte[] secret, 
     {
         var library = Load();
         var lowLevel = library.LowLevelLibrary!;
-        var slot = new Pkcs11Slot(lowLevel, slotId: 1);
+        var slot = new Pkcs11Slot(library, slotId: 1);
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1, loggerFactory: loggerFactory, policy: policy);
         var session = new Pkcs11Session(library, slot, core);
         var key = new Pkcs11Key(

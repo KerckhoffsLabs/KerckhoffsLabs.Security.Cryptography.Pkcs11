@@ -45,6 +45,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// On a curve the catalog doesn't list, <c>KeySize</c> stays 0 and a DER signature can't be converted
 /// for the token, so it does not verify; describe the curve with <see cref="Pkcs11CurveCatalog.With(Pkcs11CurveInfo)"/>.
 /// </para>
+/// <para>
+/// A private key with <c>CKA_ALWAYS_AUTHENTICATE</c> is re-authenticated for each signature with the PIN from its
+/// session's <see cref="Pkcs11Session.ContextAuthentication"/> (see <see cref="Pkcs11.ContextAuthentication"/>). The
+/// operations then also throw <see cref="System.Security.Cryptography.CryptographicException"/> (not the
+/// <see cref="System.InvalidOperationException"/> of <see cref="Pkcs11Key"/>'s own methods, which is its inner exception,
+/// so code written against the BCL type catches it) when the session has no source, or the
+/// pinpad on a token without a protected authentication path, or the PIN callback returned no PIN or a disposed one;
+/// and <see cref="Exceptions.Pkcs11AuthenticationException"/> when the token refuses the PIN, or refused it before
+/// (<c>CKR_PIN_INCORRECT</c>, not sent again). <see cref="Exceptions.Pkcs11LoginEndedException"/> means the login the
+/// key was found under has ended.
+/// </para>
 /// </remarks>
 public sealed class ECDsaPkcs11 : ECDsa
 {
@@ -227,9 +238,18 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] SignHash(byte[] hash)
     {
-        ArgumentNullException.ThrowIfNull(hash);
-        var mech = new Mechanism(CKM.CKM_ECDSA);
-        return _key.Sign(mech, hash);
+        try
+        {
+            ArgumentNullException.ThrowIfNull(hash);
+            var mech = new Mechanism(CKM.CKM_ECDSA);
+            return _key.Sign(mech, hash);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     /// <inheritdoc/>
@@ -278,12 +298,21 @@ public sealed class ECDsaPkcs11 : ECDsa
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
-        var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined.Type))
-            return _key.Sign(combined, data);
-        byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
-        var raw = new Mechanism(CKM.CKM_ECDSA);
-        return _key.Sign(raw, hash);
+        try
+        {
+            var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
+            if (_key.SupportsMechanism(combined.Type))
+                return _key.Sign(combined, data);
+            byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
+            var raw = new Mechanism(CKM.CKM_ECDSA);
+            return _key.Sign(raw, hash);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     // Submits the hash choice to the wrapped key's session policy, mirroring CryptoPolicy.Recommended's

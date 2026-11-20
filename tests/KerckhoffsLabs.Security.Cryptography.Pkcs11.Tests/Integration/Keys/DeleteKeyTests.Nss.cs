@@ -15,7 +15,7 @@ public sealed class DeleteKeyTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
-        using var session = _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
+        using var session = _backend.OpenSession();
 
         string label = $"octk-del-{Guid.NewGuid():N}";
         using (var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)

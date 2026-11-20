@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
@@ -24,7 +23,9 @@ public static class DsaExamples
         // 1. Load the module and log in. The module path and token label come from configuration; the
         //    PIN from your secret store (see ReadPinFromEnvironment in Getting started), never from code.
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
-        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        Pkcs11Slot slot = library.GetSlotByTokenLabel(tokenLabel);
+        using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+        using Pkcs11Session session = login.OpenSession();
 
         // 2. Open the DSA key that is already on the token, by its CKA_LABEL (OpenKey(id) finds it by
         //    CKA_ID instead). It throws if no key, or more than one, matches.

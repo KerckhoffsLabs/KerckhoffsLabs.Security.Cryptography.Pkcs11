@@ -33,7 +33,7 @@ public sealed class NssV240ComplianceTests(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(ExpectV240), Skip = "Requires " + nameof(ExpectV240))]
     public void Module_ExposesNoV3xSurface()
     {
-        using var session = _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
+        using var session = _backend.OpenSession();
 
         // A v2.40 module negotiates neither the v3.0 message API nor the v3.2 additions.
         Assert.False(session.Core.SupportsMessageApi);

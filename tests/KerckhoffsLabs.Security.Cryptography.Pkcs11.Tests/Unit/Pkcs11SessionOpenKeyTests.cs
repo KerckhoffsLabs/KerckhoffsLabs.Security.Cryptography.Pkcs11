@@ -209,6 +209,19 @@ public sealed class Pkcs11SessionOpenKeyTests : IDisposable
     }
 
     // === No key ==============================================================
+    // === No key ==============================================================
+
+    // The label is the caller's value, echoed in the message: escaped as the slot lookups escape theirs, so it cannot
+    // forge a log line.
+    [Fact]
+    public void NoMatch_ByLabel_EchoesTheLabelEscaped()
+    {
+        var ex = Assert.Throws<Pkcs11ObjectNotFoundException>(() => _session.OpenKey("key\r\nINFO forged\u202E"));
+
+        Assert.Contains(@"'key\u000D\u000AINFO forged\u202E'", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain('\n', ex.Message);
+        Assert.DoesNotContain('\u202E', ex.Message);
+    }
 
     [Fact]
     public void NoMatch_OpenKeyThrowsNotFound_AndTryOpenKeyReturnsFalse()

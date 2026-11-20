@@ -44,9 +44,10 @@ public sealed partial class Pkcs11Key
     /// returned is empty or zero, or an Edwards or Montgomery key's <c>CKA_EC_PARAMS</c> names none of its
     /// curves or its <c>CKA_EC_POINT</c> is not a key of that curve's length; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.
     /// </exception>
+    /// <exception cref="Exceptions.Pkcs11LoginEndedException">The half this uses is a private object (a private or secret key, as a rule) and the login it was found or made under has ended.</exception>
     public byte[] Export(Pkcs11KeyBlobFormat format)
     {
-        ThrowIfUnusable();
+        using var use = Use();
         if (format is not (Pkcs11KeyBlobFormat.SubjectPublicKeyInfo or Pkcs11KeyBlobFormat.RawPublicKey))
             throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown key blob format.");
 
@@ -200,10 +201,11 @@ public sealed partial class Pkcs11Key
     /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate or key lengths don't match the curve, its point does not satisfy the curve equation, or (X25519 / X448) it is a low-order point or the token returns an all-zero secret for it.</exception>
     /// <exception cref="Pkcs11Exception">Thrown if this key's <c>CKA_EC_PARAMS</c> cannot be read (or, for a Montgomery key, names neither X25519 nor X448) or the derived value is not readable; otherwise propagated from <c>C_DeriveKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c>.</exception>
     /// <exception cref="CryptographicException">Thrown if the token returns a shared secret that is not the curve's length.</exception>
+    /// <exception cref="Exceptions.Pkcs11LoginEndedException">The half this uses is a private object (a private or secret key, as a rule) and the login it was found or made under has ended.</exception>
     public byte[] DeriveRawSecret(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
         const string operation = "Pkcs11Key.DeriveRawSecret";
-        ThrowIfUnusable();
+        using var use = Use();
         RequireAgreementKeyType(operation);
         // The export check comes before the peer is examined, and it is what a policy that allows extractable
         // templates but not a plaintext shared secret relies on. Inside the read-back, the derivation's
@@ -285,10 +287,11 @@ public sealed partial class Pkcs11Key
     /// <exception cref="Pkcs11ArgumentException">Thrown if the peer's algorithm or curve does not match this key's, its coordinate or key lengths don't match the curve, its point does not satisfy the curve equation, or (X25519 / X448) it is a low-order point.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if the session's <see cref="Pkcs11Session.Policy"/> refuses ECDH, this key's type or this key's curve.</exception>
     /// <exception cref="Pkcs11Exception">Thrown if this key's <c>CKA_EC_PARAMS</c> cannot be read (or, for a Montgomery key, names neither X25519 nor X448); otherwise propagated from <c>C_DeriveKey</c>.</exception>
+    /// <exception cref="Exceptions.Pkcs11LoginEndedException">The half this uses is a private object (a private or secret key, as a rule) and the login it was found or made under has ended.</exception>
     public Pkcs11Key DeriveSecretAgreement(ReadOnlySpan<byte> peerSubjectPublicKeyInfo)
     {
         const string operation = "Pkcs11Key.DeriveSecretAgreement";
-        ThrowIfUnusable();
+        using var use = Use();
         RequireAgreementKeyType(operation);
 
         AgreementPeer peer = ValidateAgreementPeer(peerSubjectPublicKeyInfo, operation);

@@ -7,12 +7,12 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
-/// Hermetic coverage for <see cref="Pkcs11Library.OpenSessionWithoutLogin"/>: a session over a
-/// login-not-required token (e.g. NSS softoken's public crypto services) must open a session and
-/// NOT call <c>C_Login</c> — a login there fails with <see cref="CKR.CKR_USER_TYPE_INVALID"/>.
+/// A login-not-required token (e.g. NSS softoken's public crypto services) is used through
+/// <see cref="Pkcs11Slot.OpenSession"/>, which opens a session and does NOT call <c>C_Login</c>: a login there
+/// fails with <see cref="CKR.CKR_USER_TYPE_INVALID"/>.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
-public sealed class OpenSessionWithoutLoginTests
+public sealed class LoginNotRequiredTokenTests
 {
     private const string TokenLabel = "no-login-token";
 
@@ -59,7 +59,7 @@ public sealed class OpenSessionWithoutLoginTests
         using var fake = new SlotFake();
         using var lib = fake.Load();
 
-        using (var session = lib.OpenSessionWithoutLogin(TokenLabel))
+        using (var session = lib.GetSlotByTokenLabel(TokenLabel).OpenSession(SessionAccess.ReadWrite))
         {
             Assert.Equal(TokenLabel, session.Slot.GetTokenInfo().Label);
         }
@@ -69,24 +69,15 @@ public sealed class OpenSessionWithoutLoginTests
     }
 
     [Fact]
-    public void LoginOverload_DoesCallLogin_ForContrast()
+    public void Login_DoesCallLogin_ForContrast()
     {
         using var fake = new SlotFake();
         using var lib = fake.Load();
         using var pin = new SecurePin([1, 2, 3, 4]);
 
         // The token rejects login (CKR_USER_TYPE_INVALID), which is exactly why the no-login path
-        // exists — but it proves the login overload does attempt C_Login where this one does not.
-        Assert.ThrowsAny<Pkcs11Exception>(() => lib.OpenSessionWithPin(TokenLabel, CKU.CKU_USER, pin));
+        // exists — but it proves a login does attempt C_Login where a slot's session does not.
+        Assert.ThrowsAny<Pkcs11Exception>(() => lib.GetSlotByTokenLabel(TokenLabel).Login(TokenUser.User, pin));
         Assert.Equal(1, fake.LoginCalls);
-    }
-
-    [Fact]
-    public void UnknownLabel_Throws()
-    {
-        using var fake = new SlotFake();
-        using var lib = fake.Load();
-
-        Assert.Throws<ArgumentException>(() => lib.OpenSessionWithoutLogin("no-such-token"));
     }
 }

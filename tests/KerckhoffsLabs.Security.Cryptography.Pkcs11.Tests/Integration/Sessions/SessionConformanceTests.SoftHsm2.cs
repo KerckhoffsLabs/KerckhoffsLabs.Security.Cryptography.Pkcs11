@@ -61,7 +61,13 @@ public sealed class SessionConformanceTests_SoftHsm(SoftHsmBackendFixture backen
     public void WithoutTheUser_NoCallMakesAPrivateObject(string whoAndCall) => SessionConformanceTestCases.Assert_WithoutTheUser_NoCallMakesAPrivateObject(_backend, whoAndCall);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void OpenSessionWithPin_WhileLoggedIn_IsRefused() => SessionConformanceTestCases.Assert_OpenSessionWithPin_WhileLoggedIn_IsRefused(_backend);
+    public void SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin() => SessionConformanceTestCases.Assert_SecondLogin_WhileLoggedIn_IsRefused_AndShareKeepsTheLogin(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void ShareOrLogin_LogsInOnce_AndSharesAfter() => SessionConformanceTestCases.Assert_ShareOrLogin_LogsInOnce_AndSharesAfter(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void TokenUri_FindsItsSlotAgain() => SessionConformanceTestCases.Assert_TokenUri_FindsItsSlotAgain(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void WrongPin_ThenTheRightOne_ResetsTheRetryCounter() => SessionConformanceTestCases.Assert_WrongPin_ThenTheRightOne_ResetsTheRetryCounter(_backend);

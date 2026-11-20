@@ -104,7 +104,7 @@ public sealed class ReportedLengthTests
     public void GetMechanismList_ReportsMoreThanTheBuffer_IsRefused_NotPaddedWithMechanismZero()
     {
         using var fake = new LyingFake { ProbeReports = (NativeCULong)2UL, FillReports = (NativeCULong)3UL };
-        var slot = new Pkcs11Slot(fake.LowLevel, 0);
+        var slot = new Pkcs11Slot(fake.Library, 0);
 
         // Padding used to add CKM 0, CKM_RSA_PKCS_KEY_PAIR_GEN, a mechanism the module never listed.
         Assert.Throws<Pkcs11UnclassifiedException>(() => slot.GetMechanismList());
@@ -115,7 +115,7 @@ public sealed class ReportedLengthTests
     {
         using var fake = new LyingFake { ProbeReports = Unavailable };
 
-        Assert.Throws<Pkcs11UnclassifiedException>(() => new Pkcs11Slot(fake.LowLevel, 0).GetMechanismList());
+        Assert.Throws<Pkcs11UnclassifiedException>(() => new Pkcs11Slot(fake.Library, 0).GetMechanismList());
     }
 
     private static Pkcs11SessionCore Session(LyingFake fake) => fake.OpenSessionCore();

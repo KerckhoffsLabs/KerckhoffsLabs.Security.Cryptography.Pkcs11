@@ -30,8 +30,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     private readonly MockBackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     private static ObjectHandle FindByClass(Pkcs11Session session, CKO objectClass)
     {

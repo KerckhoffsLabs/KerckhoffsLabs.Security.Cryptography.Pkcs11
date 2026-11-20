@@ -23,6 +23,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <c>CKM_SHA256_RSA_PKCS</c>) — the token hashes and signs in a single <c>C_Sign</c> call,
 /// avoiding the gated <c>CKM_RSA_PKCS</c> raw-sign mechanism.
 /// </para>
+/// <para>
+/// A private key with <c>CKA_ALWAYS_AUTHENTICATE</c> is re-authenticated for each signature and decryption with the PIN from its
+/// session's <see cref="Pkcs11Session.ContextAuthentication"/> (see <see cref="Pkcs11.ContextAuthentication"/>). The
+/// operations then also throw <see cref="System.Security.Cryptography.CryptographicException"/> (not the
+/// <see cref="System.InvalidOperationException"/> of <see cref="Pkcs11Key"/>'s own methods, which is its inner exception,
+/// so code written against the BCL type catches it) when the session has no source, or the
+/// pinpad on a token without a protected authentication path, or the PIN callback returned no PIN or a disposed one;
+/// and <see cref="Exceptions.Pkcs11AuthenticationException"/> when the token refuses the PIN, or refused it before
+/// (<c>CKR_PIN_INCORRECT</c>, not sent again). <see cref="Exceptions.Pkcs11LoginEndedException"/> means the login the
+/// key was found under has ended.
+/// </para>
 /// </remarks>
 public sealed class RSAPkcs11 : RSA
 {
@@ -90,17 +101,26 @@ public sealed class RSAPkcs11 : RSA
         RSASignaturePadding padding,
         out int bytesWritten)
     {
-        ArgumentNullException.ThrowIfNull(padding);
-        var mech = SignMechanismFor(hashAlgorithm, padding);
-        byte[] sig = _key.Sign(mech, data);
-        if (sig.Length > destination.Length)
+        try
         {
-            bytesWritten = 0;
-            return false;
+            ArgumentNullException.ThrowIfNull(padding);
+            var mech = SignMechanismFor(hashAlgorithm, padding);
+            byte[] sig = _key.Sign(mech, data);
+            if (sig.Length > destination.Length)
+            {
+                bytesWritten = 0;
+                return false;
+            }
+            sig.CopyTo(destination);
+            bytesWritten = sig.Length;
+            return true;
         }
-        sig.CopyTo(destination);
-        bytesWritten = sig.Length;
-        return true;
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     /// <inheritdoc/>
@@ -123,13 +143,22 @@ public sealed class RSAPkcs11 : RSA
         HashAlgorithmName hashAlgorithm,
         RSASignaturePadding padding)
     {
-        ArgumentNullException.ThrowIfNull(data);
-        ArgumentNullException.ThrowIfNull(padding);
-        if (offset < 0 || count < 0 || offset > data.Length - count)
-            throw new ArgumentOutOfRangeException(nameof(offset));
+        try
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            ArgumentNullException.ThrowIfNull(padding);
+            if (offset < 0 || count < 0 || offset > data.Length - count)
+                throw new ArgumentOutOfRangeException(nameof(offset));
 
-        var mech = SignMechanismFor(hashAlgorithm, padding);
-        return _key.Sign(mech, data.AsSpan(offset, count));
+            var mech = SignMechanismFor(hashAlgorithm, padding);
+            return _key.Sign(mech, data.AsSpan(offset, count));
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     /// <inheritdoc/>
@@ -222,17 +251,26 @@ public sealed class RSAPkcs11 : RSA
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] SignHash(byte[] hash, HashAlgorithmName hashAlgorithm, RSASignaturePadding padding)
     {
-        ArgumentNullException.ThrowIfNull(hash);
-        ThrowIfNoHashName(hashAlgorithm);
-        ArgumentNullException.ThrowIfNull(padding);
+        try
+        {
+            ArgumentNullException.ThrowIfNull(hash);
+            ThrowIfNoHashName(hashAlgorithm);
+            ArgumentNullException.ThrowIfNull(padding);
 
-        GuardHash(hashAlgorithm, CryptoOperation.Sign);
-        if (hash.Length != DigestLength(hashAlgorithm))
-            throw new CryptographicException($"The hash is {hash.Length} bytes; a {hashAlgorithm.Name} digest is {DigestLength(hashAlgorithm)}.");
+            GuardHash(hashAlgorithm, CryptoOperation.Sign);
+            if (hash.Length != DigestLength(hashAlgorithm))
+                throw new CryptographicException($"The hash is {hash.Length} bytes; a {hashAlgorithm.Name} digest is {DigestLength(hashAlgorithm)}.");
 
-        return padding == RSASignaturePadding.Pkcs1
-            ? _key.SignPkcs1Digest(hashAlgorithm, hash)
-            : _key.Sign(PssDigestMechanism(hashAlgorithm, padding), hash);
+            return padding == RSASignaturePadding.Pkcs1
+                ? _key.SignPkcs1Digest(hashAlgorithm, hash)
+                : _key.Sign(PssDigestMechanism(hashAlgorithm, padding), hash);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     /// <inheritdoc/>
@@ -319,10 +357,19 @@ public sealed class RSAPkcs11 : RSA
     /// <exception cref="Pkcs11Exception">Propagated from reading the key's <c>CKA_MODULUS</c> or from the underlying <c>C_Decrypt</c> call.</exception>
     public override byte[] Decrypt(byte[] data, RSAEncryptionPadding padding)
     {
-        ArgumentNullException.ThrowIfNull(data);
-        ArgumentNullException.ThrowIfNull(padding);
-        var mech = EncryptMechanismFor(padding);
-        return _key.Decrypt(mech, data);
+        try
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            ArgumentNullException.ThrowIfNull(padding);
+            var mech = EncryptMechanismFor(padding);
+            return _key.Decrypt(mech, data);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     // -----------------------------------------------------------------------

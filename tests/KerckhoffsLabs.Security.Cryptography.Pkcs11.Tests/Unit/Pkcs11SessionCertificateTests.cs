@@ -146,6 +146,17 @@ public sealed class Pkcs11SessionCertificateTests : IDisposable
     }
 
     // === No certificate ======================================================
+    // === No certificate ======================================================
+
+    // The label is the caller's value, echoed in the message: escaped, so it cannot forge a log line.
+    [Fact]
+    public void NoMatch_ByLabel_EchoesTheLabelEscaped()
+    {
+        var ex = Assert.Throws<Pkcs11ObjectNotFoundException>(() => _session.OpenCertificate("cert\r\nINFO forged"));
+
+        Assert.Contains(@"'cert\u000D\u000AINFO forged'", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain('\n', ex.Message);
+    }
 
     [Fact]
     public void NoMatch_OpenThrowsNotFound_AndTryOpenReturnsFalse()
