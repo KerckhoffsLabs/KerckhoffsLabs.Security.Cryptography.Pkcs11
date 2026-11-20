@@ -41,7 +41,9 @@ Load the module, log in, generate a non-extractable AES-256 key on the token, an
 using var pin = new SecurePin(Environment.GetEnvironmentVariable("TOKEN_PIN")!); // from your secret store
 
 using Pkcs11Library library = Pkcs11Library.Load(modulePath);
-using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+Pkcs11Slot slot = library.GetSlotByTokenLabel(tokenLabel);
+using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+using Pkcs11Session session = login.OpenSession();
 using Pkcs11Key key = session.GenerateAesKey(bitLength: 256, label: "getting-started");
 
 using var aesGcm = new AesGcmPkcs11(key, tagSizeInBytes: 16);
