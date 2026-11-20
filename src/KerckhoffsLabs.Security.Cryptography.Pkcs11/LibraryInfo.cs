@@ -31,12 +31,18 @@ public sealed record LibraryInfo
     /// <see cref="CryptokiVersion"/> for how <c>CK_VERSION</c> encodes the minor field.</summary>
     public Version LibraryVersion { get; }
 
+    // The fields as the module reported them, padding removed (PaddedField.Raw), for comparisons.
+    internal string RawManufacturerId { get; }
+    internal string RawLibraryDescription { get; }
+
     internal LibraryInfo(CK_INFO ck_info)
     {
         CryptokiVersion = ck_info.CryptokiVersion.ToVersion();
-        ManufacturerId = Encoding.UTF8.GetString(ck_info.ManufacturerId).TrimEnd();
+        ManufacturerId = Encoding.UTF8.GetString(ck_info.ManufacturerId).TrimEnd(' ', '\0');
         LibraryFlags = new LibraryFlags((ulong)ck_info.Flags);
-        LibraryDescription = Encoding.UTF8.GetString(ck_info.LibraryDescription).TrimEnd();
+        LibraryDescription = Encoding.UTF8.GetString(ck_info.LibraryDescription).TrimEnd(' ', '\0');
+        RawManufacturerId = Internal.PaddedField.Raw(ck_info.ManufacturerId);
+        RawLibraryDescription = Internal.PaddedField.Raw(ck_info.LibraryDescription);
         LibraryVersion = ck_info.LibraryVersion.ToVersion();
     }
 }

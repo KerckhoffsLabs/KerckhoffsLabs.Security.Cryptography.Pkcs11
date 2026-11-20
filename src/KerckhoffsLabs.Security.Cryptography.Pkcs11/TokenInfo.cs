@@ -70,13 +70,24 @@ public sealed record TokenInfo
     /// <summary><see cref="UtcTimeString"/> converted to <see cref="DateTime"/>, or <see langword="null"/> if conversion failed.</summary>
     public DateTime? UtcTime { get; }
 
+    // The identifying fields as the module reported them, padding removed (PaddedField.Raw): what the library compares,
+    // since two fields that are not UTF-8 can decode to the same text.
+    internal string RawLabel { get; }
+    internal string RawManufacturerId { get; }
+    internal string RawModel { get; }
+    internal string RawSerialNumber { get; }
+
     internal TokenInfo(NativeCULong slotId, CK_TOKEN_INFO ck_token_info)
     {
         SlotId = new SlotId((ulong)slotId);
-        Label = Encoding.UTF8.GetString(ck_token_info.Label).TrimEnd();
-        ManufacturerId = Encoding.UTF8.GetString(ck_token_info.ManufacturerId).TrimEnd();
-        Model = Encoding.UTF8.GetString(ck_token_info.Model).TrimEnd();
-        SerialNumber = Encoding.UTF8.GetString(ck_token_info.SerialNumber).TrimEnd();
+        Label = Encoding.UTF8.GetString(ck_token_info.Label).TrimEnd(' ', '\0');
+        ManufacturerId = Encoding.UTF8.GetString(ck_token_info.ManufacturerId).TrimEnd(' ', '\0');
+        Model = Encoding.UTF8.GetString(ck_token_info.Model).TrimEnd(' ', '\0');
+        SerialNumber = Encoding.UTF8.GetString(ck_token_info.SerialNumber).TrimEnd(' ', '\0');
+        RawLabel = Internal.PaddedField.Raw(ck_token_info.Label);
+        RawManufacturerId = Internal.PaddedField.Raw(ck_token_info.ManufacturerId);
+        RawModel = Internal.PaddedField.Raw(ck_token_info.Model);
+        RawSerialNumber = Internal.PaddedField.Raw(ck_token_info.SerialNumber);
         TokenFlags = new TokenFlags((ulong)ck_token_info.Flags);
         MaxSessionCount = (ulong)ck_token_info.MaxSessionCount;
         SessionCount = (ulong)ck_token_info.SessionCount;
@@ -90,7 +101,7 @@ public sealed record TokenInfo
         FreePrivateMemory = (ulong)ck_token_info.FreePrivateMemory;
         HardwareVersion = ck_token_info.HardwareVersion.ToVersion();
         FirmwareVersion = ck_token_info.FirmwareVersion.ToVersion();
-        UtcTimeString = Encoding.UTF8.GetString(ck_token_info.UtcTime).TrimEnd();
+        UtcTimeString = Encoding.UTF8.GetString(ck_token_info.UtcTime).TrimEnd(' ', '\0');
 
         UtcTime = DateTime.TryParseExact(
             UtcTimeString,
