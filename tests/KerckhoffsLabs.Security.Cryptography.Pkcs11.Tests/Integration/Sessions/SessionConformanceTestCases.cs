@@ -588,8 +588,8 @@ internal static class SessionConformanceTestCases
             return new SecurePin(backend.UserPin.Span);
         }
 
-        using (Pkcs11Login first = slot.ShareOrLoginFromPinSource(Pin))
-        using (Pkcs11Login second = slot.ShareOrLoginFromPinSource(Pin))
+        using (Pkcs11Login first = slot.ShareOrLogin(LoginCredential.FromPinSource(Pin)))
+        using (Pkcs11Login second = slot.ShareOrLogin(LoginCredential.FromPinSource(Pin)))
         using (Pkcs11Session session = second.OpenSession())
         {
             Assert.Equal(1, asked);

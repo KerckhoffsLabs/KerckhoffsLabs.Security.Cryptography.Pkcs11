@@ -5,8 +5,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// A hold of this application's login to a token, from <see cref="Pkcs11Slot.Login(TokenUser, SecurePin)"/>,
-/// <see cref="Pkcs11Slot.LoginWithPinpad(TokenUser)"/> or <see cref="Pkcs11Slot.Login(TokenUser, string, SecurePin)"/>, and the way to open
+/// A hold of this application's login to a token, from <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/> or
+/// <see cref="Pkcs11Slot.ShareOrLogin(LoginCredential, string?)"/>, and the way to open
 /// sessions that keep it.
 /// </summary>
 /// <remarks>
@@ -53,7 +53,7 @@ public sealed class Pkcs11Login : IDisposable
     public TokenUser User { get; }
 
     /// <summary>
-    /// The username of a <see cref="Pkcs11Slot.Login(TokenUser, string, SecurePin)"/> login, or <see langword="null"/> for one without.
+    /// The username of a <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/> login, or <see langword="null"/> for one without.
     /// The library never logs it.
     /// </summary>
     public string? Username { get; }
@@ -94,7 +94,7 @@ public sealed class Pkcs11Login : IDisposable
     /// <remarks>
     /// Not a health check: the library learns that the module dropped the login only from a call that says so. After a
     /// token reinsertion or a network HSM's failover, this can read <see langword="true"/> until the next call on one of
-    /// the login's sessions (or the next <see cref="Pkcs11Slot.Login(TokenUser, SecurePin)"/>, which probes the login's
+    /// the login's sessions (or the next <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/>, which probes the login's
     /// own session) reports the loss. Use the key, or the session, and handle the exception.
     /// </remarks>
     public bool IsActive => _hold.IsActive;
@@ -187,7 +187,7 @@ public sealed class Pkcs11Login : IDisposable
     /// </para>
     /// <para>
     /// On a module without <c>C_SessionCancel</c>, an operation a lent session abandoned (a failure partway through
-    /// a sign, say) can make a later <see cref="Pkcs11Slot.Login(TokenUser, SecurePin)"/> or <see cref="InitUserPinWithPin"/> answer
+    /// a sign, say) can make a later <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/> or <see cref="InitUserPinWithPin"/> answer
     /// <c>CKR_OPERATION_ACTIVE</c>: dispose the login's sessions and the login, and log in again.
     /// </para>
     /// </remarks>
@@ -395,7 +395,7 @@ public sealed class Pkcs11Login : IDisposable
     /// <remarks>
     /// The logout waits for operations in flight on the token: when there are some (this called from code the library
     /// calls back during one, or another thread's), it is left pending and sent as the last of them ends, so this
-    /// returns before the token is logged out. A <see cref="Pkcs11Slot.Login(TokenUser, SecurePin)"/> made meanwhile waits for it.
+    /// returns before the token is logged out. A <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/> made meanwhile waits for it.
     /// </remarks>
     public void Dispose()
     {

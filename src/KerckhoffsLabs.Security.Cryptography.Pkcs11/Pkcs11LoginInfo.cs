@@ -26,7 +26,7 @@ public sealed class Pkcs11LoginInfo
     /// <summary>Who is logged in.</summary>
     public TokenUser User { get; }
 
-    /// <summary>The username of a <see cref="Pkcs11Slot.Login(TokenUser, string, SecurePin)"/> login, or <see langword="null"/>.</summary>
+    /// <summary>The username of a <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/> login, or <see langword="null"/>.</summary>
     public string? Username { get; }
 
     /// <summary>

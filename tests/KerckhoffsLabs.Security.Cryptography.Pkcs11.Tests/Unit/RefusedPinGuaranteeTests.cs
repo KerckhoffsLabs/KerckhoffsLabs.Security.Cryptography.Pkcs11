@@ -95,11 +95,11 @@ public sealed class RefusedPinGuaranteeTests : IDisposable
     public void Refusal_IsTheUsernames()
     {
         using SecurePin wrong = Wrong();
-        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, "alice", wrong));
-        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, "alice", wrong));
+        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, wrong, "alice"));
+        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, wrong, "alice"));
         Assert.Equal(1, _module.LoginCalls);
 
-        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, "bob", wrong));
+        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, wrong, "bob"));
         Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, wrong));
         Assert.Equal(3, _module.LoginCalls);
     }
@@ -176,9 +176,9 @@ public sealed class RefusedPinGuaranteeTests : IDisposable
             release.Wait(TimeSpan.FromSeconds(60));
         };
         Pkcs11Slot slot = Slot;
-        BackgroundWork first = BackgroundWork.Run(() => slot.ShareOrLoginFromPinSource(Wrong).Dispose());
+        BackgroundWork first = BackgroundWork.Run(() => slot.ShareOrLogin(LoginCredential.FromPinSource(Wrong)).Dispose());
         Assert.True(inLogin.Wait(Timeout, TestContext.Current.CancellationToken));
-        BackgroundWork[] others = [.. Enumerable.Range(0, 2).Select(_ => BackgroundWork.Run(() => slot.ShareOrLoginFromPinSource(Wrong).Dispose()))];
+        BackgroundWork[] others = [.. Enumerable.Range(0, 2).Select(_ => BackgroundWork.Run(() => slot.ShareOrLogin(LoginCredential.FromPinSource(Wrong)).Dispose()))];
         try
         {
             Assert.All(others, other => Assert.True(other.WaitUntilBlocked(Timeout), $"did not wait its turn: {other.Failure}"));
@@ -297,13 +297,13 @@ public sealed class RefusedPinGuaranteeTests : IDisposable
         record.WhileWaitingForOperations = waiting.Set;
         Pkcs11Slot slot = Slot;
         Pkcs11Login? login = null;
-        BackgroundWork logIn = BackgroundWork.Run(() => login = slot.ShareOrLoginFromPinSource(() =>
+        BackgroundWork logIn = BackgroundWork.Run(() => login = slot.ShareOrLogin(LoginCredential.FromPinSource(() =>
         {
             // The prompt: an operation starts on another session meanwhile.
             search = BackgroundWork.Run(() => other.FindCertificates().Dispose());
             Assert.True(inSearch.Wait(Timeout));
             return new SecurePin(_module.ExpectedPin);
-        }));
+        })));
         try
         {
             Assert.True(waiting.Wait(Timeout, TestContext.Current.CancellationToken), $"the login did not wait: {logIn.Failure}");
@@ -376,11 +376,11 @@ public sealed class RefusedPinGuaranteeTests : IDisposable
         _module.Label = "another";
         bool asked = false;
 
-        var ex = Assert.Throws<Pkcs11TokenException>(() => slot.ShareOrLoginFromPinSource(() =>
+        var ex = Assert.Throws<Pkcs11TokenException>(() => slot.ShareOrLogin(LoginCredential.FromPinSource(() =>
         {
             asked = true;
             return new SecurePin(_module.ExpectedPin);
-        }));
+        })));
 
         Assert.Equal(CKR.CKR_TOKEN_NOT_RECOGNIZED, ex.ReturnValue);
         Assert.False(asked);
