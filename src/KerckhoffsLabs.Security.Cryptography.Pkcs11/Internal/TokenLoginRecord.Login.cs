@@ -93,6 +93,15 @@ internal sealed partial class TokenLoginRecord
         return username is null ? OpLogin : OpLoginUser;
     }
 
+    // A share's PIN, from its source: handed to owner, which disposes it on the way out, unless disposeFetched is false.
+    private static SecurePin? FetchSharePin(Func<SecurePin?> pin, Owned<SecurePin> owner, bool disposeFetched)
+    {
+        SecurePin? fetched = pin();
+        if (fetched is not null && disposeFetched)
+            owner.Own(fetched);
+        return fetched;
+    }
+
     // The PIN a first login sends: a share's, fetched from its source outside the semaphore; a login's, its caller's.
     private static SecurePin? PinToSend(bool shareHeld, SecurePin? fetched, Func<SecurePin?> pin)
         => shareHeld ? fetched : pin();
@@ -114,77 +123,70 @@ internal sealed partial class TokenLoginRecord
         bool waitedForOperations = false;
         // A share's PIN comes from the caller's source, run outside the semaphore (it may take its time, or wait for a
         // thread that logs in to this token), once a first look found no login to share; owned, and disposed on the way
-        // out, sent or not. A login's is the caller's, at hand.
+        // out, sent or not (unless disposeFetched is false). A login's is the caller's, at hand.
         SecurePin? fetched = null;
+        using var ownedFetched = new Owned<SecurePin>();
         bool pinAtHand = !shareHeld;
         bool fetchPin = false;
-        try
+        while (true)
         {
-            while (true)
+            // Before any wait: a logout handed to this thread would wait for it to release the semaphore.
+            ThrowIfHoldingTransition();
+            if (operationsBefore is { } epoch)
             {
-                // Before any wait: a logout handed to this thread would wait for it to release the semaphore.
-                ThrowIfHoldingTransition();
-                if (operationsBefore is { } epoch)
-                {
-                    WaitForOperationsBefore(epoch);
-                    operationsBefore = null;
-                    waitedForOperations = true;
-                }
-                if (fetchPin)
-                {
-                    fetchPin = false;
-                    fetched = pin();
-                    pinAtHand = true;
-                }
-                WaitForNoLogoutUnderway();
-                WaitForAnchorClosed();
-                AcquireTransition();
-                try
-                {
-                    switch (HeldLogin(owner, user, username, method, shareHeld, expectedToken, out LoginHold? shared))
-                    {
-                        case Held.Shared:
-                            return shared!;
-                        case Held.LogoutUnderway:
-                            continue;
-                        default:
-                            break;
-                    }
-
-                    // The share's PIN, fetched now the semaphore is let go: a login made meanwhile is then shared, and the
-                    // PIN disposed unsent. Before the operations in flight are looked at, so a slow source (a prompt) is not
-                    // followed by a login that lands inside operations started while it ran.
-                    if (!pinAtHand)
-                    {
-                        // Not for a token swapped in since the slot was selected: the source (a prompt) is not run for it.
-                        ThrowIfAnotherToken(owner, expectedToken, method);
-                        fetchPin = true;
-                        continue;
-                    }
-
-                    // PKCS#11 (C_Login): operations active when a login lands may or may not stay active, so they should
-                    // finish first. Those in flight on the token's other sessions are waited for, once, outside the
-                    // semaphore (an operation may need it on its way out); those that start meanwhile are not, so the wait
-                    // ends. A login from inside an operation (on any token) does not wait: on this token its own operation
-                    // is active, and on another, two such logins would wait for each other.
-                    if (!waitedForOperations && t_operationsOnThread == 0 && StartOperationEpoch() is { } inFlight)
-                    {
-                        operationsBefore = inFlight;
-                        continue;
-                    }
-
-                    return FirstLogin(owner, user, PinToSend(shareHeld, fetched, pin), username, loggerFactory, logger, expectedToken);
-                }
-                finally
-                {
-                    ReleaseTransition();
-                }
+                WaitForOperationsBefore(epoch);
+                operationsBefore = null;
+                waitedForOperations = true;
             }
-        }
-        finally
-        {
-            if (shareHeld && disposeFetched)
-                fetched?.Dispose();
+            if (fetchPin)
+            {
+                fetchPin = false;
+                fetched = FetchSharePin(pin, ownedFetched, disposeFetched);
+                pinAtHand = true;
+            }
+            WaitForNoLogoutUnderway();
+            WaitForAnchorClosed();
+            AcquireTransition();
+            try
+            {
+                switch (HeldLogin(owner, user, username, method, shareHeld, expectedToken, out LoginHold? shared))
+                {
+                    case Held.Shared:
+                        return shared!;
+                    case Held.LogoutUnderway:
+                        continue;
+                    default:
+                        break;
+                }
+
+                // The share's PIN, fetched now the semaphore is let go: a login made meanwhile is then shared, and the
+                // PIN disposed unsent. Before the operations in flight are looked at, so a slow source (a prompt) is not
+                // followed by a login that lands inside operations started while it ran.
+                if (!pinAtHand)
+                {
+                    // Not for a token swapped in since the slot was selected: the source (a prompt) is not run for it.
+                    ThrowIfAnotherToken(owner, expectedToken, method);
+                    fetchPin = true;
+                    continue;
+                }
+
+                // PKCS#11 (C_Login): operations active when a login lands may or may not stay active, so they should
+                // finish first. Those in flight on the token's other sessions are waited for, once, outside the
+                // semaphore (an operation may need it on its way out); those that start meanwhile are not, so the wait
+                // ends. A login from inside an operation (on any token) does not wait: on this token its own operation
+                // is active, and on another, two such logins would wait for each other.
+                if (!waitedForOperations && t_operationsOnThread == 0 && StartOperationEpoch() is { } inFlight)
+                {
+                    operationsBefore = inFlight;
+                    continue;
+                }
+
+                return FirstLogin(owner, user, PinToSend(shareHeld, fetched, pin), username, loggerFactory, logger, expectedToken);
+            }
+            finally
+            {
+                ReleaseTransition();
+            }
         }
     }
 
