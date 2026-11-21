@@ -1,11 +1,11 @@
 # Library Review Backlog
 
-_Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (cryptography, PKCS#11 v3.2 conformance, .NET library design and P/Invoke, QA and release engineering), then re-verified against `main` by staleness passes on 2026-09-15 and 2026-10-27. This file lists open items only: on 2026-10-27 the 88 resolved items were removed to keep it readable. Their records, and any reference below to an ID no longer listed here, are in the git history; commit 6ecb5d70 is the last to hold them all. A partly resolved item stays, with a `Remaining scope` line for what is left._
+_Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (cryptography, PKCS#11 v3.2 conformance, .NET library design and P/Invoke, QA and release engineering), then re-verified against `main` by staleness passes on 2026-09-15 and 2026-10-27. This file lists open items only: on 2026-10-27 the 88 resolved items were removed to keep it readable, and on 2026-11-21 seven more (BL-014, BL-030, BL-122, BL-125, BL-168, BL-180, BL-184), each checked against the code. Their records, and any reference below to an ID no longer listed here, are in the git history; commit 6ecb5d70 is the last to hold the first 88, and 1ddfe11f the last to hold the seven. A partly resolved item stays, with a `Remaining scope` line for what is left._
 
 ## Summary
 
-- Open items: 95, 25 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 5 (1 partly resolved) | Medium: 47 (16 partly resolved) | Low: 43 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 88, 25 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 5 (1 partly resolved) | Medium: 43 (16 partly resolved) | Low: 40 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **The public surface is narrower than the module's.** There is no capability probe for the v3.0 message API or the v3.2 functions (BL-077), and most of the v3.0 and v3.2 functions bound at the interop layer have no public caller (BL-019, BL-099).
@@ -94,17 +94,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** Yes if changed later — decide before 1.0
 - **Raised by:** .NET Engineer B
 
-### [BL-014] Fixed-length token strings NUL-padded by real tokens are not trimmed, breaking label matching
-- **Area:** P/Invoke
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/TokenInfo.cs:76-79` and `:95` (`UtcTime`), `SlotInfo.cs:34-35`, `LibraryInfo.cs:37,39` (argless `TrimEnd()`, so NULs survive), `Pkcs11Library.cs:646` (label match); attribute strings already use `TrimEnd('\0')` (`Objects/ObjectAttribute.cs:294`, `Native/ObjectIdentityReader.cs:89`)
-- **Problem:** CK_UTF8CHAR fields are decoded with argless `TrimEnd()`, which strips whitespace but not `'\0'`. The spec mandates space padding but many real tokens NUL-pad; a NUL-padded label decodes to `"mytoken\0\0…"`, the token-by-label lookup silently fails, and every info string carries embedded NULs.
-- **Proposed action:** Truncate at the first `'\0'` or use `TrimEnd(' ', '\0')` across all fixed-length string decodes.
-- **Breaks public API?** No
-- **Raised by:** .NET Engineer B
-- **Spec / References:** PKCS#11 v3.1 §3.2 (blank-padded fields)
-
 ### [BL-019] v3.2 functions bound at the interop layer but unreachable from the public API (verify-signature, authenticated wrap, async, validation flags)
 - **Area:** PKCS#11 Conformance
 - **Severity:** Medium
@@ -157,17 +146,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Add a SharpFuzz harness over (1) `CK_ATTRIBUTE[]` template build/read-back and (2) length-probe read-back with adversarial `ulValueLen`. Pairs with BL-013.
 - **Breaks public API?** No
 - **Raised by:** QA B, Cryptographer B
-
-### [BL-030] ⚠️ PARTIALLY RESOLVED — Docs site has no getting-started article; README now has a quickstart
-- **Area:** Release Eng
-- **Severity:** Medium
-- **Effort:** M
-- **Location:** `docs/toc.yml`, `docs/index.md`, `README.md`
-- **Problem:** `toc.yml` has only Home + API; there is no getting-started or end-to-end flow (load → initialize → session → login → operate → dispose) anywhere, and the README contains no usage code at all.
-- **Remaining scope:** The README now has a full end-to-end quickstart snippet (load → session → generate → sign → verify), so that half is resolved. `docs/toc.yml` still lists only Home/Diagnostics/API — there is still no getting-started walkthrough article on the docs site itself.
-- **Proposed action:** Add a `docs/articles/` getting-started walkthrough wired into `toc.yml` (the README snippet can be reused as its basis).
-- **Breaks public API?** No
-- **Raised by:** QA C
 
 ### [BL-031] No migration guide from Pkcs11Interop
 - **Area:** Release Eng
@@ -257,12 +235,14 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** .NET Engineer A
 - **Spec / References:** Framework Design Guidelines §3.2 (namespace naming). BL-009 covers member and type *naming*, not namespace placement
 
-### [BL-092] `Pkcs11Key.IsAsymmetricKeyType` omits six asymmetric key types the library's own `CKK` enum declares, so the wrong handle is used
+### [BL-092] ⚠️ PARTIALLY RESOLVED — `Pkcs11Key.IsAsymmetricKeyType` omits six asymmetric key types the library's own `CKK` enum declares, so the wrong handle is used
+- **Status:** Partially resolved 2026-11-08 (#170, #357). The predicate now lists all six types (`Pkcs11Key.cs:1378-1385`): `CKK_DH`, `CKK_X9_42_DH` and `CKK_EC_MONTGOMERY` came with #170, and `CKK_HSS`, `CKK_XMSS` and `CKK_XMSSMT` with #357. `Pkcs11KeyAsymmetricTests.GetAttributeValue_KeyPair_ReadsThePublicHalf` checks that the public half is read for 13 key types, the six included, and `GetAttributeValue_PrivateKeyOnly_ReadsThePrivateKey` that a lone private key is read.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** S
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs:919-924` (the predicate; call sites `:122`, `:241`, `:496`, `:581`, `:657`, `:707`); missing members at `Common/CKK.cs:21` (`CKK_DH`), `:36` (`CKK_X9_42_DH`), `:294` (`CKK_EC_MONTGOMERY`), `:319` (`CKK_HSS`), `:324` (`CKK_XMSS`), `:329` (`CKK_XMSSMT`)
 - **Problem:** The predicate lists only RSA/DSA/EC/EC_EDWARDS/ML_KEM/ML_DSA/SLH_DSA. For an X25519/X448 (`CKK_EC_MONTGOMERY`), DH, or HSS/XMSS/XMSS^MT key pair it returns `false`, so `GetAttributeValue` (`Pkcs11Key.cs:126-128`), `Encrypt` (`:394`), `Wrap` (`:514`) and `MessageEncrypt` (`:464`) pick the **private** handle where they intend the public one. Concretely, a `CKA_EC_POINT` read on an X25519 key pair hits the private object and fails with `CKR_ATTRIBUTE_SENSITIVE` even though a readable public companion is attached — and HSS/XMSS are exactly the v3.1/v3.2 surface this library advertises.
+- **Remaining scope:** the predicate is still a fixed list of `CKK` values, so a vendor-defined asymmetric key type still gets the private handle. Deriving it from `CKA_CLASS`, or from whether a public handle is attached, would close that.
 - **Proposed action:** Add the six members, and re-derive the predicate from `CKA_CLASS` where available (the hydrated `objectClass` is already known at `Pkcs11Session.cs:638`). Add a unit test per key type asserting handle selection.
 - **Breaks public API?** No — behavioural fix
 - **Raised by:** .NET Engineer A, Cryptographer A
@@ -289,7 +269,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** .NET Engineer A
 
 ### [BL-099] ⚠️ PARTIALLY RESOLVED — The v3.0 half of "bound at interop but publicly unreachable": `C_SessionCancel`, `C_LoginUser`, and the 14 message multi-part / message sign-verify functions
-- **Status:** Partially resolved 2026-11-13 (token login model, PR #365). `C_LoginUser` is public as `Pkcs11Slot.LoginUser(TokenUser, string username, SecurePin)` (and `LoginUserWithPinpad(TokenUser, string username)`), which returns a `Pkcs11Login` like `Login`; the username is part of the login's identity, compared ordinally and never logged.
+- **Status:** Partially resolved 2026-11-13 (token login model, PR #365). `C_LoginUser` is public through the username overloads of `Pkcs11Slot.Login(TokenUser, string username, SecurePin)` and `LoginWithPinpad(TokenUser, string username)` (and of `TryShareLogin`, `ShareOrLogin` and `ShareOrLoginWithPinpad`), which returns a `Pkcs11Login` like `Login`; the username is part of the login's identity, compared ordinally and never logged.
 - **Area:** PKCS#11 Conformance
 - **Severity:** Medium
 - **Effort:** L
@@ -301,12 +281,14 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** PKCS#11 Specialist A
 - **Spec / References:** Extends BL-019 with the v3.0 half and concrete counts
 
-### [BL-101] The public flag records omit five v3.x bits that `CKF` already defines
+### [BL-101] ⚠️ PARTIALLY RESOLVED — The public flag records omit five v3.x bits that `CKF` already defines
+- **Status:** Partially resolved 2026-11-13 (#367, filed as BL-184). `MechanismFlags.Encapsulate` and `MechanismFlags.Decapsulate` read `CKF_ENCAPSULATE` and `CKF_DECAPSULATE` (`MechanismFlags.cs:121-127`), with a `MechanismFlagsTests` case.
 - **Area:** PKCS#11 Conformance
 - **Severity:** Medium
 - **Effort:** S
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/MechanismFlags.cs:118-121` (no `Encapsulate`/`Decapsulate`), `TokenFlags.cs:86-87` (no `ErrorState`/`AsyncSessionSupported`), `SessionFlags.cs:18-19` (no `AsyncSession`); the unused constants are at `Common/CKF.cs:116`, `:290`, `:295`, `:300`, `:305`
 - **Problem:** `MechanismFlags` exposes every v2.40 and v3.0 mechanism flag but neither v3.2 addition, so a consumer of the public `Pkcs11Key.EncapsulateKey`/`DecapsulateKey` has no typed way to ask `C_GetMechanismInfo` whether the token supports encapsulation with a given mechanism. `TokenFlags` picked up `CKF_SEED_RANDOM_REQUIRED` but not `CKF_ERROR_STATE` (token in an error state — operationally important) or `CKF_ASYNC_SESSION_SUPPORTED`, and `SessionFlags` omits `CKF_ASYNC_SESSION`. The raw `Flags` value is public on each record, so this is discoverability rather than a hard block.
+- **Remaining scope:** `TokenFlags.ErrorState`/`AsyncSessionSupported` and `SessionFlags.AsyncSession`, and the test that every `CKF_*` constant of a category has a property.
 - **Proposed action:** Add `MechanismFlags.Encapsulate`/`Decapsulate`, `TokenFlags.ErrorState`/`AsyncSessionSupported` and `SessionFlags.AsyncSession`. Add a test asserting every `CKF_*` constant in the relevant category has a corresponding property, so the next spec revision cannot drift.
 - **Breaks public API?** No — additive
 - **Raised by:** PKCS#11 Specialist A
@@ -404,26 +386,14 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Spec / References:** Supersedes the untracked design note previously recorded in Appendix B, which accepted the buffering without noting that the multi-part path already exists
 
 ### [BL-121] ⚠️ PARTIALLY RESOLVED — Multi-part and streaming paths have zero real-backend coverage, and the fake is an identity transform where output length always equals input length
-- **Status:** Partially resolved 2026-10-26 (#129, #259, #260). The stream overloads now reach real modules with mechanisms whose update output differs from their input. `KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat` (#129) encrypts and decrypts the McGrew–Viega vector through the stream overloads in 16-, 17-, 32- and 64-byte pieces, on every backend that does multi-part GCM. `OperationContractTestCases.Assert_CbcPad_MultipartDecrypt_MatchesBcl` (#259) decrypts BCL `CKM_AES_CBC_PAD` ciphertexts of 1, 15, 16, 17, 31 and 33 bytes in 16- to 64-byte pieces. `DecryptAesTestCases.Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal` (#260) checks that the held-back last block comes from `C_DecryptFinal`, on SoftHSM, Kryoptic, NSS, opencryptoki, BouncyHsm, Craton and FreeHSM. `Assert_Digest_Multipart_MatchesSinglePart` and `Assert_Hmac_Multipart_MatchesBcl` (#259) drive the stream digest and verify in 7-byte pieces. #260's `CallFinal` and `StreamFinalLengthTests` cover a final whose length query answers 0.
+- **Status:** Partially resolved 2026-10-26 (#129, #259, #260). The stream overloads now reach real modules with mechanisms whose update output differs from their input. `KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat` (#129) encrypts and decrypts the McGrew–Viega vector through the stream overloads in 16-, 17-, 32- and 64-byte pieces, on every backend that does multi-part GCM. `OperationContractTestCases.Assert_CbcPad_MultipartDecrypt_MatchesBcl` (#259) decrypts BCL `CKM_AES_CBC_PAD` ciphertexts of 1, 15, 16, 17, 31 and 33 bytes in 16- to 64-byte pieces. `DecryptAesTestCases.Assert_AesCbcPad_StreamDecrypt_LastBlockComesFromFinal` (#260) checks that the held-back last block comes from `C_DecryptFinal`, on SoftHSM, Kryoptic, NSS, opencryptoki, BouncyHsm, Craton and FreeHSM. `Assert_Digest_Multipart_MatchesSinglePart` and `Assert_Hmac_Multipart_MatchesBcl` (#259) drive the stream digest and verify in 7-byte pieces. #260's `CallFinal` and `StreamFinalLengthTests` cover a final whose length query answers 0. Extended 2026-11-18 (#284, #377): `BufferConventionTestCases.Assert_StreamCbc_AnyPieceLength_MatchesBcl` stream-encrypts and stream-decrypts AES-CBC in 1-, 15-, 17-, 4095- and 4097-byte pieces against the BCL, on SoftHSM, Kryoptic, NSS, opencryptoki, BouncyHsm, Craton, FreeHSM and wolfPKCS11. `Assert_Digest_EmptyStream_IsTheHashOfNothing` and `Assert_HmacVerify_EmptyStream_IsTheMacOfNothing` feed an empty stream, and `DualFunctionTests.CratonHsm` runs the dual-function streams on a real module.
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M
 - **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Internal/Pkcs11SessionCoreStreamTests.cs:41-54` (the fake's `Update`); the code under test in `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11SessionCore.Encryption.cs`; dual-function streams only in `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Interop/DualFunctionCryptoTests.Pkcs11Mock.cs`
 - **Problem:** `C_EncryptUpdate`/`C_DecryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` and the combined `DigestEncrypt`/`DecryptDigest`/`DecryptVerify` operations are exercised only against `StreamFake`, whose `Update` copies exactly `inLen` bytes out. A real CBC or block-mode token buffers partial blocks and returns *fewer* bytes than it was fed — often zero — flushing the remainder in `C_EncryptFinal`, which is precisely the case where the loop's length bookkeeping and the `CKR_BUFFER_TOO_SMALL` regrow at `:1910-1916` actually matter. There is no empty-input-stream case either.
-- **Remaining scope:** no real-backend stream *encrypt* with a block-buffering mode such as CBC (encrypt is covered only through GCM). The dual-function `DigestEncrypt`/`DecryptDigest`/`DecryptVerify` streams run only against pkcs11-mock (`DualFunctionCryptoTests.Pkcs11Mock.cs`). There is no zero-byte input stream and no 4096±1 buffer length. `Pkcs11SessionCoreStreamTests`' `StreamFake.Update` is still an identity transform.
+- **Remaining scope:** no zero-byte input stream for stream encrypt or decrypt (only digest and HMAC verify). The dual-function `DigestEncrypt`/`DecryptDigest`/`DecryptVerify` streams run on Craton HSM and pkcs11-mock only. `Pkcs11SessionCoreStreamTests`' `StreamFake.Update` is still an identity transform.
 - **Proposed action:** Add a SoftHSM/opencryptoki integration class driving the stream overloads with AES-CBC — a mechanism whose update output length differs from its input length — at buffer lengths 1, 15, 16, 17 and 4096±1, plus a zero-byte input, comparing against the one-shot result.
-- **Breaks public API?** No
-- **Raised by:** QA B
-
-### [BL-122] ⚠️ PARTIALLY RESOLVED — Every real-backend crypto payload is ≤ 256 bytes; boundary and bulk sizes are untested, and the empty-input digest runs only against the in-process fake
-- **Status:** Partially resolved 2026-10-17 (#182). Empty input is now exercised on every real backend through `EmptyInputTestCases` (SoftHSM, Kryoptic, NSS, opencryptoki, BouncyHsm, Craton, FreeHSM): `Sha256_EmptyInput_MatchesBcl_SessionReusable`, `Hmac_EmptyInput_MatchesBcl_SessionReusable`, `EcDsa_EmptyData_SignVerify_MatchesBcl_SessionReusable` and `AesGcm_EmptyPlaintext_WithAad_MatchesBcl_SessionReusable`. Each runs an empty input and then a non-empty one on the same session, so a module that leaves the operation active is caught. `Cbc_EmptyInput_MatchesBcl` covers AES, DES and 3DES.
-- **Area:** QA
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Interop/EmptyInputTestCases.cs`; `Algorithms/SHA256Pkcs11TestCases.cs`, `Algorithms/SHA256Pkcs11Tests.Managed.cs`, `Algorithms/AesGcmPkcs11TestCases.cs`
-- **Problem:** Across every `new byte[N]` literal in `Algorithms/` and `Integration/`, the largest buffer is 256 bytes and digest inputs are 3–54 bytes. Nothing crosses the 4096-byte internal stream buffer, and no digest exercises the SHA padding boundaries (55/56/64/119/120 bytes). `ComputeHash([])` — the case where a module receives `pData == NULL, ulDataLen == 0` and real tokens diverge — exists only in the eight `*Tests.Managed.cs` files, i.e. against `ManagedSoftToken`, which accepts it by construction.
-- **Remaining scope:** the size matrix. No digest input crosses the SHA padding boundaries (55/56/64/119/120 bytes). No payload crosses the 4096-byte stream buffer or reaches 1 MiB; the only large inputs are `AesCcmPkcs11TestCases.Assert_EncryptDecrypt_LargeAad_MatchesBcl`'s 8192- and 0xFF00-byte AAD over a 40-byte plaintext.
-- **Proposed action:** Add a shared size-matrix theory (0, 1, 15, 16, 17, 55, 56, 64, 4095, 4096, 4097, 1 MiB) to the digest and AES/GCM test-case classes, run on at least SoftHSM across all six legs and asserted against the BCL; promote the empty-input digest to the real backends.
 - **Breaks public API?** No
 - **Raised by:** QA B
 
@@ -451,19 +421,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA B, QA A
 - **Spec / References:** Extends BL-028 with a mechanism its list omits
-
-### [BL-125] ⚠️ PARTIALLY RESOLVED — No real-token negatives for the two states consumers hit most: not-logged-in, and session reuse after a failed operation
-- **Status:** Partially resolved 2026-10-26 (#259; library side in #63, 2026-10-07). #63 tracks an operation that a module without `C_SessionCancel` could not cancel (`CancelAbandoned`); the next init of that kind then fails with a message saying the operation is still active and the session should be replaced, instead of a bare `CKR_OPERATION_ACTIVE`. `OperationContractTestCases.Assert_Operation_AfterAnError_TheSessionStaysUsable` (#259) forces a mid-operation failure — an AES-CBC partial block through the stream decrypt, a wrong HMAC through the stream verify, a tampered RSA-OAEP ciphertext — and then runs a successful operation of the same kind on the same session, on SoftHSM, Kryoptic, NSS, opencryptoki, BouncyHsm, Craton and FreeHSM. The `pkcs11-v240` CI legs run the SoftHSM and NSS suites against SoftHSM 2.5 and NSS 3.51, so the case also runs on v2.40 modules.
-- **Area:** QA
-- **Severity:** Medium
-- **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11SessionCore.cs:620`, `:646` (`CancelAbandoned`); `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Interop/OperationContractTestCases.cs`
-- **Problem:** `CKR_USER_NOT_LOGGED_IN` appears in the test tree only in the mapping table and in fakes — no real-backend test performs a private-key operation or a `FindObjects` for `CKA_PRIVATE=true` objects on an un-logged-in session, so the token's actual access-control behaviour (throw versus silently return nothing) is undocumented and unpinned. Separately, `TryCancelOperation` treats `CKR_FUNCTION_NOT_SUPPORTED` as success and logs nothing, so on a v2.40 module — SoftHSM 2.5 via the `softhsm-v240` job, NSS, opencryptoki — a failed operation stays *active*, and no test verifies the session is still usable afterwards; the next call would fail with `CKR_OPERATION_ACTIVE`.
-- **Remaining scope:** no real-backend not-logged-in negative. No test signs with a private key on an un-logged-in session or checks that `CKA_PRIVATE` objects are invisible to `FindObjects` there.
-- **Proposed action:** Add a real-backend test that a private-key sign on an un-logged-in session surfaces `Pkcs11AuthenticationException` and that private objects are invisible to `FindObjects`; add an "operation failure leaves the session usable" test (force a failure with a bad mechanism parameter, then run a successful operation on the same session) and run it on both a v3.x and the gated v2.40 module.
-- **Breaks public API?** No
-- **Raised by:** QA B
-- **Spec / References:** BL-049 is the missing cancel call on one method and BL-052 (resolved: a lost session now stops sending its handle, `SessionLossTests`) was token removal; neither covers session recoverability on modules where `C_SessionCancel` does not exist
 
 ### [BL-126] ⚠️ PARTIALLY RESOLVED — All four named priorities, HKDF, ChaCha20 and IKE-derive landed; X3DH/X2Ratchet and XEdDSA still never reach a real module (and never can — no vendored backend implements them)
 - **Area:** QA
@@ -539,13 +496,15 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA A
 
-### [BL-134] No compile gate on the README and docs code snippets
+### [BL-134] ⚠️ PARTIALLY RESOLVED — No compile gate on the README and docs code snippets
+- **Status:** Partially resolved 2026-11-03 (#311, #312). The compiled `samples/KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples` project is in `KerckhoffsLabs.sln`. The docs site pulls its snippets from it through docfx `[!code-csharp[](…#region)]` (`docs/index.md`, `docs/guide/getting-started.md`, `docs/examples/`), and `ExamplesTests` runs them on every backend.
 - **Area:** Release Eng
 - **Severity:** Medium
 - **Effort:** M
 - **Location:** `README.md:51-75,87-91,104-113,157-168,220-233`, `docs/diagnostics.md:11-16`; no samples project in `KerckhoffsLabs.sln` (now at the repository root) and none under `tests/`; `tests/AotSmoke` compiles none of the snippets
 - **Problem:** The quickstart snippet is the flagship API demonstration (`Pkcs11Library` → `OpenSession(slotLabel:, CKU, SecurePin)` → `GenerateRsaKeyPair(modulusBits:, label:)` → `RSAPkcs11.SignData`) and the wrap-hardening snippet chains eight template-builder methods. The reviewer verified all of them resolve against the current surface today, but nothing compiles them — so the first pre-1.0 rename silently ships a broken quickstart, and the API is explicitly still moving (BL-008, BL-038, BL-039 were all signature changes; BL-063 through BL-071 add more). **This already happened**: BL-070's fix removed `GenerateRsaKeyPair` and the quickstart snippet above kept calling it, uncaught until a manual review noticed — exactly the silent-break scenario this entry predicted.
 - **Follow-up note 2026-09-07:** the README snippet was manually patched to `GenerateRsaSigningKeyPair` after the fact; this entry's proposed action (a compiled samples project) is what would have caught it automatically.
+- **Remaining scope:** the README quickstart (`README.md:40`) and the `docs/diagnostics.md:11-16` and `:179-188` snippets are still fenced `csharp` blocks that nothing compiles.
 - **Proposed action:** Add a small `tests/Samples` project (or a `Samples` folder in the test project) holding each snippet as a real compiled method, and reference them from the docs via docfx `[!code-csharp[](…#region)]` so the markdown and the compiled source cannot diverge. The `AllowInsecureScope` snippet uses `…` as a body placeholder, so extract it as a region rather than fencing raw markdown.
 - **Breaks public API?** No
 - **Raised by:** QA A
@@ -879,17 +838,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-168] ✅ RESOLVED — Lift the BouncyHsm SP 800-108 double-pipeline gate once its A chain matches SP 800-108
-- **Status:** Resolved 2026-10-29 by the `vendor/bouncyhsm` bump to 3e257941, the fix for harrison314/BouncyHsm#130 (reported from this entry). Block i is now keyed on A(i), so the output matches SP 800-108; `BouncyHsmDoublePipelineMatchesSp800108`, its gate and its quirk test are gone and `DoublePipeline_HmacSha256_MatchesReference` runs on BouncyHsm.
-- **Area:** QA
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmDoublePipelineMatchesSp800108`, `Sp800108DoublePipelineAvailable`); `Integration/Derive/Sp800108ChainedKdfTests.BouncyHsm.cs` (`DoublePipeline_HmacSha256_MatchesReference`)
-- **Problem:** BouncyHsm's `Sp800_108DoublePipelineKdf` computes A(1) = PRF(fixed input), as SP 800-108 §5.3 does, then applies the PRF again before the first block, so block i is keyed on A(i+1) and the output is not SP 800-108's. NSS agrees with the managed reference in `Sp800108ChainedKdfTestCases`; BouncyHsm's output equals that reference with one extra PRF on the A chain. Feedback mode matches the reference. Not yet reported upstream.
-- **Proposed action:** Report it upstream. After a `vendor/bouncyhsm` bump with the fix, `BouncyHsmQuirkTests.Sp800108DoublePipeline_QuirkStillPresent` fails. Then set the flag to true and delete the test.
-- **Breaks public API?** No
-- **Raised by:** BouncyHsm backend
-
 ### [BL-169] Lift the wolfPKCS11 derived-key sensitivity gate once C_DeriveKey takes the template's CKA_SENSITIVE and CKA_EXTRACTABLE
 - **Area:** QA
 - **Severity:** Low
@@ -1000,16 +948,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No (additive)
 - **Raised by:** wolfPKCS11 backend
 
-### [BL-180] Lift the inline per-backend signing tests into shared test cases
-- **Area:** QA
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Sign/` (`SignEdDsaContextTests`, `SignHashMlDsaTests`, `SignMlDsaDeterministicHedgeTests`)
-- **Problem:** BouncyHsm's and opencryptoki's wrappers each carry their own copy of these test bodies, with no `*TestCases` class, so no other backend runs them (wolfPKCS11's ML-DSA hedge variant goes unchecked).
-- **Proposed action:** Move the bodies into shared `*TestCases` and wrap them on every backend.
-- **Breaks public API?** No
-- **Raised by:** wolfPKCS11 backend
-
 ### [BL-181] Restore the hand-trimmed RSA-size and small-curve rows in the backend wrappers
 - **Area:** QA
 - **Severity:** Low
@@ -1042,17 +980,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
-### [BL-184] ✅ RESOLVED — `MechanismFlags` has no `Encapsulate` / `Decapsulate` properties
-- **Status:** Resolved 2026-11-13. `MechanismFlags.Encapsulate` and `MechanismFlags.Decapsulate` read `CKF_ENCAPSULATE` and `CKF_DECAPSULATE`, `MechanismFlagsTests` checks each toggles only its own property, and `MechanismCoverageTestCases.Assert_RsaPkcs_EncapsulatesAPkcs1EncryptedSecret` uses them instead of the raw bits.
-- **Area:** .NET API Design
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/MechanismFlags.cs`
-- **Problem:** `MechanismFlags` exposes a property for every `CKF_*` operation flag up to the message-based ones, but none for `CKF_ENCAPSULATE` and `CKF_DECAPSULATE` (v3.2), although `Common/CKF.cs` defines both and the library implements `C_EncapsulateKey` and `C_DecapsulateKey`. A caller who wants to know whether a token encapsulates with a mechanism has to test the raw `Flags` bits, as `MechanismCoverageTestCases.Assert_RsaPkcs_EncapsulatesAPkcs1EncryptedSecret` does.
-- **Proposed action:** Add `Encapsulate` and `Decapsulate` properties beside the others, with the PublicAPI entries, and use them in that test case.
-- **Breaks public API?** No (additive)
-- **Raised by:** BouncyHsm mechanism-coverage tests
-
 ### [BL-185] Lift the NSS and opencryptoki mechanism-coverage gates once they are fixed upstream
 - **Area:** QA
 - **Severity:** Low
@@ -1080,7 +1007,7 @@ Condensed from PKCS#11 Specialist A, who cross-checked `CK_FUNCTION_LIST_3_0`/`_
 | v2.40 key management / RNG | ✅ | ✅ |
 | v2.40 legacy (`C_GetFunctionStatus`, `C_CancelFunction`) | ✅ | low-level only (legacy no-ops) |
 | v3.0 interfaces (`C_GetInterfaceList`, `C_GetInterface`) | ✅ | ✅ |
-| v3.0 `C_LoginUser` | ✅ | ✅ — `Pkcs11Slot.LoginUser` |
+| v3.0 `C_LoginUser` | ✅ | ✅ — `Pkcs11Slot.Login(TokenUser, string username, SecurePin)` |
 | v3.0 `C_SessionCancel` | ✅ | ❌ — implemented but `internal` — BL-099 |
 | v3.0 message-based AEAD — encrypt/decrypt single-shot triples | ✅ | ✅ |
 | v3.0 message-based — `Begin`/`Next` multi-part, message Sign/Verify (14 functions) | ✅ | ❌ — no caller outside `Native/` — BL-099 |
@@ -1096,7 +1023,7 @@ Mechanisms (`CKM`, 480 members): RSA (PSS/OAEP), EC/EdDSA/Montgomery, AES (GCM/C
 Constant coverage was re-verified 2026-08-11 by diffing the enums against three independent vendored headers (`vendor/opencryptoki/usr/include/pkcs11types.h`, `vendor/nss/lib/util/pkcs11t.h`, `vendor/pkcs11-mock/src/cryptoki/pkcs11t.h`): **zero value mismatches** across `CKM` (480), `CKA` (160), `CKR` (105), `CKK` (69), `CKD` (26), `CKO`, `CKC`, `CKS`, `CKU`, `CKN`, `CKH`, `CKT`, `CKG`, `CKP`. Residual gaps: `CKF` is 68 of 72 (BL-144: `CKF_END_OF_MESSAGE` and `CKF_HKDF_SALT_NULL`/`_DATA`/`_KEY`; re-counted 2026-10-27 against NSS 3.132's `pkcs11t.h`), `CK_GENERATOR_FUNCTION` is entirely absent (BL-102), `CKK_INVALID_KEY_TYPE` is absent (trivial), and five defined `CKF` bits have no property on the public flag records (BL-101). `CK_FUNCTION_LIST_3_2` declaration order matches `pkcs11f.h` exactly — a transposition there would have been Critical, and there is none.
 ## Appendix A — Unverified / Speculative
 
-- **KEM/authenticated-unwrap secure-defaults application** (Cryptographer B, round 1): whether `EncapsulateKey`/`DecapsulateKey` and `UnwrapKeyAuthenticated` call `BuildSecureKeyDefaults` like `UnwrapKey`/`DeriveKey` do — a shared comment claims so, but the reviewer read only the latter two call sites in full. Confirm before 1.0.
+- ~~**KEM/authenticated-unwrap secure-defaults application** (Cryptographer B, round 1): whether `EncapsulateKey`/`DecapsulateKey` and `UnwrapKeyAuthenticated` call `BuildSecureKeyDefaults` like `UnwrapKey`/`DeriveKey` do — a shared comment claims so, but the reviewer read only the latter two call sites in full. Confirm before 1.0.~~ Confirmed: all three apply them (`Internal/Pkcs11SessionCore.Pkcs11V32.cs`, `BuildSecureKeyDefaults` in `EncapsulateKey`, `DecapsulateKey` and `UnwrapKeyAuthenticated`).
 - **GitHub repository settings** (QA C, both rounds): branch protections, required status checks, tag protection, Environment approvals, and Private Vulnerability Reporting enablement are not verifiable from the repo — confirm in Settings. Specifically confirm that `lint`, all six `build-and-test` legs, `aot-smoke` and `softhsm-v240` are *required* checks; BL-139 changes character depending on whether `code-quality` is required.
 - **`CK_CCM_WRAP_PARAMS` field order and the `CK_XEDDSA_HASH_TYPE` value set** (Cryptographer A): `CK_GCM_WRAP_PARAMS` and both PQC context structs were confirmed against `vendor/opencryptoki/usr/include/pkcs11types.h:1890-1901`, but `CK_CCM_WRAP_PARAMS` appears in no vendored header. Someone with the OASIS v3.2 PDF should confirm that one before BL-103 is implemented.
 - ~~**Real-HSM handle recycling frequency** (PKCS#11 Specialist B): whether shipping HSMs recycle session and object handles aggressively enough for BL-116 to fire in practice.~~ Moot for object handles since BL-116's fix: a wrapper refuses every token call after its own `Destroy()`, whatever the module's recycling policy (`DestroyedWrapperTests`). Session-handle recycling still matters for a session the module closed on its own (`CKR_SESSION_CLOSED`, token removal), whose dispose still sends `C_Logout`/`C_CloseSession`. (BL-071's half of this question is moot now that `CloseAllSessions()` is resolved by removal — there is no bookkeeping gap left to fire.)
@@ -1122,8 +1049,8 @@ Positive findings worth preserving. Items marked **(re-verified 2026-08-11)** we
 - **Secure-by-default is consistently enforced** in key-producing operations via `BuildSecureKeyDefaults`; template builders default correctly; verification is delegated to the token with `CKR_SIGNATURE_INVALID → false` mapping. The remaining gaps are the gate's *membership* (BL-074) and one verify return code (BL-065) — not the mechanism. (The generators' *role assignment* gap, BL-070, is resolved.)
 - **PQC handling is unusually careful.** ML-DSA pre-hash/SHAKE arms are refused with accurate FIPS 204 domain-separation reasoning rather than emitting non-interoperable signatures; `MLKemPkcs11` length-checks the token's `CKA_VALUE` before copying, zeroizes the intermediate in a `finally`, zeroizes the caller's secret on every failure path, surfaces rather than swallows a `C_DestroyObject` failure, caches the `CKA_VALUE_LEN` token quirk, and refuses private-key export on all four BCL paths. Two independent reviewers named it the strongest file in the repository.
 - **`MechanismParameterScope` is a sound design:** call-scoped allocation, `Write` returning `IntPtr.Zero` for an empty span (the correct PKCS#11 absent-buffer encoding), zeroize-on-free, and a deliberately stateless `Mechanism.Marshal` together eliminate the aliasing and lifetime bugs this layer usually has. `ThrowIfOneDescriptorDrivesBothHalves` is a thoughtful guard.
-- **The test suite is mature where it covers.** ~90 struct sizes pinned per platform via a reflection census; genuine KATs from NIST/RFC sources (AES-GCM McGrew & Viega, HMAC RFC 4231, Ed25519 RFC 8032, AES-KW RFC 3394, RSA-OAEP/PSS, ECDSA P-256, ECDH P-256) re-run against three real backends with the deterministic direction correctly chosen for randomized schemes; independent BCL cross-verification for RSA, ECDSA (correctly asserting `IeeeP1363FixedFieldConcatenation`), DSA and ML-DSA; thorough AEAD negatives (tampered tag, tampered ciphertext, wrong AAD, wrong nonce). **No timing-dependent test exists anywhere** — zero hits for `Thread.Sleep`/`Task.Delay`/`Stopwatch`/`SpinWait` across the suite; concurrency tests use barriers and latches. Assertion mix is healthy (1493 `Assert.Equal` versus 50 `Assert.NotNull`). `Unit/TestCollectionConventionTests.cs` is exemplary, including an explicit anti-vacuity guard — and is the pattern BL-129 should be built on.
+- **The test suite is mature where it covers.** ~90 struct sizes pinned per platform via a reflection census; genuine KATs from NIST/RFC sources (AES-GCM McGrew & Viega, HMAC RFC 4231, Ed25519 RFC 8032, AES-KW RFC 3394, RSA-OAEP/PSS, ECDSA P-256, ECDH P-256) re-run against three real backends with the deterministic direction correctly chosen for randomized schemes; independent BCL cross-verification for RSA, ECDSA (correctly asserting `IeeeP1363FixedFieldConcatenation`), DSA and ML-DSA; thorough AEAD negatives (tampered tag, tampered ciphertext, wrong AAD, wrong nonce). **Almost no test depends on timing.** Concurrency tests use barriers and latches, and the waits in the suite are bounded waits for a condition (`SpinWait.SpinUntil` with a timeout, and retry loops in the backend fixtures), which can only slow a run down. The exception is `Unit/Native/ConcurrencyModeTests`, which waits a fixed 300 ms to assert that a serialized call has not reached the module yet: on a slow runner it can pass without proving the serialization, though it cannot fail spuriously. Assertion mix is healthy (1493 `Assert.Equal` versus 50 `Assert.NotNull`). `Unit/TestCollectionConventionTests.cs` is exemplary, including an explicit anti-vacuity guard — and is the pattern BL-129 should be built on.
 - **The fakes do not bypass parameter marshalling**, contrary to the usual concern: `ManagedSoftToken` reads the mechanism parameter block back out of unmanaged memory, so the GCM/CCM/ChaCha/RC2 param writers are genuinely exercised, and `FakeLowLevelPkcs11Library` throws on all ~110 members by default so a test cannot pass via an unimplemented call. What they do bypass is `LowLevelPkcs11Library`'s own struct-array marshalling and `_Windows` sibling dispatch — covered instead by the `*.Managed.cs` suites running on all six legs plus direct marshalling tests.
 - **CI/publish hygiene is modern (re-verified 2026-08-11).** Every `uses:` in all four workflows is SHA-pinned with a version comment; `GITHUB_TOKEN` is least-privilege per job; `persist-credentials: false` everywhere; no `pull_request_target` anywhere; concurrency groups correctly asymmetric (cancel PRs, never cancel `main`); OIDC trusted publishing with build-provenance attestation; package source mapping; enforced `.editorconfig` + `dotnet format` gate; docfx pinned in `dotnet-tools.json`; analyzer release tracking (`AnalyzerReleases.Shipped/Unshipped.md`) correctly staged for all three diagnostic ids. Source integrity is good where it exists — the OpenSSL tarball is SHA-256 verified and the SoftHSM 2.5 `.deb`s come from content-addressed snapshot URLs with pinned digests and a post-extract version assertion.
 - **Deliberately evaluated and not raised:** cache poisoning via the native/OpenSSL caches (GitHub cache scoping makes it require push access to `main`, at which point the workflow is writable); NuGet author signing (nuget.org repository-signs, and OIDC + provenance attestation is stronger); the unversioned `analyzers/dotnet/cs` folder (a `net10.0`-only package can only be consumed by Roslyn ≥ 4.14, so the 4.11-built analyzer cannot bite); `tests/AotSmoke` being outside the solution (cosmetic — the job still builds it); and the pack(1)-on-Unix ambiguity, which is inherent to PKCS#11 rather than a defect here (NSS applies `pragma pack(1)` unconditionally, so its view of `CK_TLS12_KEY_MAT_PARAMS` differs from the standard OASIS convention this library correctly follows; affects only SSL3/TLS12 key-material mechanisms, unreachable from any public API — worth a documented vendor-quirk note).
-- **Deliberate design notes:** no async surface anywhere, which is the correct default for a synchronous P/Invoke wrapper — the real cancellation primitive is `C_SessionCancel` (BL-099), and a `Task`-returning façade would be worse; `CK_NOTIFY` is unsupported (BL-151); `[Experimental]` propagation is handled correctly where it applies (`SlhDsaPkcs11` re-declares `SYSLIB5006`); vendor extensibility is genuinely available via `VendorMechanismParameters` + `Mechanism`'s `ulong` constructors; XML-doc completeness is structurally enforced by `GenerateDocumentationFile` + `TreatWarningsAsErrors`, so CS1591 is a build error and no undocumented public member exists; and `LangVersion` is pinned to 14.0 in every project, as `CLAUDE.md` says.
+- **Deliberate design notes:** the only async member is `Pkcs11Library.WaitForSlotEventAsync` (from BL-182), which waits for a slot event; the token operations are synchronous, which is the correct default for a synchronous P/Invoke wrapper — the real cancellation primitive is `C_SessionCancel` (BL-099), and a `Task`-returning façade would be worse; `CK_NOTIFY` is unsupported (BL-151); `[Experimental]` propagation is handled correctly where it applies (`SlhDsaPkcs11` re-declares `SYSLIB5006`); vendor extensibility is genuinely available via `VendorMechanismParameters` + `Mechanism`'s `ulong` constructors; XML-doc completeness is structurally enforced by `GenerateDocumentationFile` + `TreatWarningsAsErrors`, so CS1591 is a build error and no undocumented public member exists; and `LangVersion` is pinned to 14.0 in every project, as `CLAUDE.md` says.
