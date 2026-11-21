@@ -45,6 +45,31 @@ using var fips = login.OpenSession(policy: CryptoPolicy.NistApproved);
 > `NistApproved` restricts what this library sends to the token; it is not a FIPS 140-3 certification, which
 > also requires a validated module operating in its approved mode.
 
+### Setting the policy for the whole library
+
+To hold an application to a policy whatever its code passes to `OpenSession`, set it when the library is loaded,
+from configuration:
+
+```csharp
+using var library = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions
+{
+    Policy = CryptoPolicy.NistApproved,
+});
+```
+
+Every session of the library then enforces it. What a session's own `policy:` does depends on whether the
+library's policy allows overrides (`ICryptoPolicy.AllowsOverride`):
+
+| Library policy | A session opened with no policy | A session opened with `policy: p` | `session.UsePolicy(...)` |
+|---|---|---|---|
+| Allows overrides (`Recommended`, the default) | enforces the library's | enforces `p` instead | allowed, if `p` allows it |
+| Allows none (`NistApproved`, or `AllowsOverride(false)`) | enforces the library's | enforces both: an operation goes ahead only if each allows it | refused |
+
+So under a `NistApproved` library, `login.OpenSession(policy: CryptoPolicy.AllowInsecure)` still refuses
+everything `NistApproved` refuses, and a stricter session policy narrows it further. The refusal's reason
+ends with `(the library's NistApproved policy)` when the library's policy was the one that refused.
+`Pkcs11Library.Policy` returns the library's policy.
+
 ## Handling a refusal
 
 A refusal is a `CryptoPolicyViolationException`, a `CryptographicException`. It names the policy, the

@@ -1515,6 +1515,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetInterface(string? i
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetInterfaces() -> System.Collections.Generic.IReadOnlyList<KerckhoffsLabs.Security.Cryptography.Pkcs11.InterfaceInfo!>!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetSlotByTokenLabel(string! tokenLabel) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.GetSlotList(bool tokenPresent = true) -> System.Collections.Generic.IReadOnlyList<KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot!>!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.Policy.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsConcurrentAccess.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.SupportsCryptokiVersion(System.Version! version) -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.TryGetSlotEvent(out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Slot? slot) -> bool
@@ -2128,6 +2129,8 @@ virtual KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest.PrintMe
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.LoggerFactory.get -> Microsoft.Extensions.Logging.ILoggerFactory?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.LoggerFactory.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.Policy.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.Policy.init -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.ModuleParameters.get -> string?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.ModuleParameters.init -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.Pkcs11LibraryOptions() -> void

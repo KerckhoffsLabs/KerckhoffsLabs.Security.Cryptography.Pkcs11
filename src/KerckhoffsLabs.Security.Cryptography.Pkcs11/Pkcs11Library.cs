@@ -43,6 +43,25 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>From <see cref="Pkcs11LibraryOptions.RefusedPinLifetime"/>: how long a refused PIN is kept from the token.</summary>
     internal TimeSpan? RefusedPinLifetime { get; }
 
+    /// <summary>
+    /// The crypto policy of this library's sessions: <see cref="Pkcs11LibraryOptions.Policy"/>, or
+    /// <see cref="CryptoPolicy.Recommended"/> when none was set.
+    /// </summary>
+    /// <remarks>
+    /// A session opened with no policy of its own enforces this one. When it allows overrides
+    /// (<see cref="ICryptoPolicy.AllowsOverride"/>), a session opened with a policy of its own enforces that one instead;
+    /// when it does not, it is a ceiling: the session enforces both, and refuses every <c>UsePolicy</c> lease.
+    /// </remarks>
+    public ICryptoPolicy Policy { get; }
+
+    /// <summary>The policy a session opened with <paramref name="policy"/> (or none) enforces. See <see cref="Policy"/>.</summary>
+    internal ICryptoPolicy SessionPolicy(ICryptoPolicy? policy)
+    {
+        if (policy is null || ReferenceEquals(policy, Policy))
+            return Policy;
+        return Policy.AllowsOverride ? policy : new CeilingCryptoPolicy(Policy, policy);
+    }
+
     private LowLevelPkcs11Library? _pkcs11Library;
 
     // This library's share of its module's slot events; ended first thing in Dispose.
@@ -223,6 +242,7 @@ public sealed class Pkcs11Library : IDisposable
         _loggerFactory = loggerFactory;
         CurveCatalog = options?.CurveCatalog ?? Pkcs11CurveCatalog.Default;
         RefusedPinLifetime = options?.RefusedPinLifetime;
+        Policy = options?.Policy ?? CryptoPolicy.Recommended;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");
 
