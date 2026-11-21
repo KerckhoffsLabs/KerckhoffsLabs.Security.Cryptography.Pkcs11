@@ -45,6 +45,26 @@ public sealed class Pkcs11LibraryOptions
     public ILoggerFactory? LoggerFactory { get; init; }
 
     /// <summary>
+    /// The crypto policy of every session of the library, or <see langword="null"/> (the default) for
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="Pkcs11Library.Policy"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A policy that allows overrides (<see cref="ICryptoPolicy.AllowsOverride"/>, as
+    /// <see cref="CryptoPolicy.Recommended"/> does) is the library's default: a session opened with a policy of
+    /// its own enforces that one instead, and a session may take a <c>UsePolicy</c> lease.
+    /// </para>
+    /// <para>
+    /// A policy that does not (<see cref="CryptoPolicy.NistApproved"/>, or one built with
+    /// <c>AllowsOverride(false)</c>) is a ceiling for the whole library: a session opened with a policy of its own
+    /// enforces both, so an operation goes ahead only if each allows it, and every <c>UsePolicy</c> lease is refused.
+    /// Set it here, from configuration, to hold an application to a policy whatever its code passes when it opens a
+    /// session.
+    /// </para>
+    /// </remarks>
+    public ICryptoPolicy? Policy { get; init; }
+
+    /// <summary>
     /// Whether <c>C_Initialize</c> asks the module to use OS locking (<c>CKF_OS_LOCKING_OK</c>), so it
     /// can be called from several threads at once. Defaults to <see langword="true"/>.
     /// </summary>

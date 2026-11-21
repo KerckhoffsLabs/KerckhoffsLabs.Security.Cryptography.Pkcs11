@@ -23,7 +23,9 @@ public interface ICryptoPolicy
 
     /// <summary>
     /// When <see langword="false"/>, a session opened under this policy refuses every
-    /// <c>UsePolicy</c> lease, so the policy holds for the session's whole lifetime.
+    /// <c>UsePolicy</c> lease, so the policy holds for the session's whole lifetime. As a library's policy
+    /// (<see cref="Pkcs11LibraryOptions.Policy"/>), it is then a ceiling: every session of the library enforces it as
+    /// well as its own.
     /// </summary>
     bool AllowsOverride { get; }
 
