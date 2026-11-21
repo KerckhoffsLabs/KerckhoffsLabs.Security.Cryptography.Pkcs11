@@ -246,7 +246,7 @@ public sealed class PinManagementTests : IDisposable
     {
         Assert.False(_module.ProtectedAuthenticationPath);
 
-        Assert.Throws<InvalidOperationException>(() => Slot.LoginWithPinpad(TokenUser.User));
+        Assert.Throws<InvalidOperationException>(() => Slot.Login(TokenUser.User, LoginCredential.Pinpad));
         Assert.Equal(0, _module.LoginCalls);
 
         using (Pkcs11Login so = Slot.Login(TokenUser.SecurityOfficer, _pin))

@@ -286,7 +286,7 @@ internal static class TokenLoginTestCases
             "Pkcs11Login.OpenSession");
     }
 
-    /// <summary>While a slot session holds the token's only session, a <see cref="Pkcs11Slot.Login(TokenUser, SecurePin)"/> fails with
+    /// <summary>While a slot session holds the token's only session, a <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/> fails with
     /// <c>CKR_SESSION_COUNT</c>, and works once the session is disposed.</summary>
     internal static void Assert_OneSessionToken_LoginRefusedWhileSlotSessionOpen(IPkcs11Backend backend)
     {

@@ -66,7 +66,7 @@ public interface IPkcs11Backend
         if (!RequiresUserLogin)
             return this.Slot.OpenSession(SessionAccess.ReadWrite, policy);
 
-        using Pkcs11Login login = this.Slot.ShareOrLoginFromPinSource(() => new SecurePin(UserPin.Span));
+        using Pkcs11Login login = this.Slot.ShareOrLogin(LoginCredential.FromPinSource(() => new SecurePin(UserPin.Span)));
         return login.OpenSession(SessionAccess.ReadWrite, policy);
     }
 

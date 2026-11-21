@@ -269,7 +269,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** .NET Engineer A
 
 ### [BL-099] ⚠️ PARTIALLY RESOLVED — The v3.0 half of "bound at interop but publicly unreachable": `C_SessionCancel`, `C_LoginUser`, and the 14 message multi-part / message sign-verify functions
-- **Status:** Partially resolved 2026-11-13 (token login model, PR #365). `C_LoginUser` is public through the username overloads of `Pkcs11Slot.Login(TokenUser, string username, SecurePin)` and `LoginWithPinpad(TokenUser, string username)` (and of `TryShareLogin`, `ShareOrLogin` and `ShareOrLoginWithPinpad`), which returns a `Pkcs11Login` like `Login`; the username is part of the login's identity, compared ordinally and never logged.
+- **Status:** Partially resolved 2026-11-13 (token login model, PR #365). `C_LoginUser` is public through the `username` parameter of `Pkcs11Slot.Login(TokenUser, LoginCredential, string? username)` and `ShareOrLogin(LoginCredential, string? username)` (and the username overload of `TryShareLogin`), which returns a `Pkcs11Login` like `Login`; the username is part of the login's identity, compared ordinally and never logged.
 - **Area:** PKCS#11 Conformance
 - **Severity:** Medium
 - **Effort:** L
@@ -1007,7 +1007,7 @@ Condensed from PKCS#11 Specialist A, who cross-checked `CK_FUNCTION_LIST_3_0`/`_
 | v2.40 key management / RNG | ✅ | ✅ |
 | v2.40 legacy (`C_GetFunctionStatus`, `C_CancelFunction`) | ✅ | low-level only (legacy no-ops) |
 | v3.0 interfaces (`C_GetInterfaceList`, `C_GetInterface`) | ✅ | ✅ |
-| v3.0 `C_LoginUser` | ✅ | ✅ — `Pkcs11Slot.Login(TokenUser, string username, SecurePin)` |
+| v3.0 `C_LoginUser` | ✅ | ✅ — `Pkcs11Slot.Login(TokenUser, LoginCredential, string? username)` |
 | v3.0 `C_SessionCancel` | ✅ | ❌ — implemented but `internal` — BL-099 |
 | v3.0 message-based AEAD — encrypt/decrypt single-shot triples | ✅ | ✅ |
 | v3.0 message-based — `Begin`/`Next` multi-part, message Sign/Verify (14 functions) | ✅ | ❌ — no caller outside `Native/` — BL-099 |

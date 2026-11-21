@@ -124,7 +124,7 @@ using Pkcs11Session signing = login.OpenSession();   // read/write by default
 using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
 ```
 
-- **A login ends with its last holder.** `Pkcs11Slot.Login` and `LoginWithPinpad` (each with a username overload, for `C_LoginUser`) return a
+- **A login ends with its last holder.** `Pkcs11Slot.Login` and `ShareOrLogin` (each taking a `LoginCredential`: a `SecurePin`, a PIN source, or `LoginCredential.Pinpad`; and an optional username, for `C_LoginUser`) return a
   `Pkcs11Login`, a hold of the token's login; each session opened through `login.OpenSession()` holds it too.
   The token is logged out (`C_Logout`) when the last holder is disposed, in whatever order they go: disposing
   the `Pkcs11Login` before its sessions leaves them working. Every `Pkcs11Library` loaded from the same module
@@ -228,11 +228,11 @@ using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
   (`InvalidOperationException`; through `RSAPkcs11`, `ECDsaPkcs11` and the other BCL-shaped adapters, a
   `CryptographicException` with it inside, which code written against `RSA` or `ECDsa` catches).
   `ContextAuthentication.Pinpad` is refused (`InvalidOperationException`) on a token without a protected
-  authentication path, as are `LoginWithPinpad`, `InitUserPinWithPinpad`, `SetPinWithPinpad` and
+  authentication path, as are `LoginCredential.Pinpad`, `InitUserPinWithPinpad`, `SetPinWithPinpad` and
   `InitTokenWithPinpad`: PKCS#11 gives a call without a PIN no meaning there. `ContextAuthentication.FromPin(pin)`
   takes a `SecurePin` the caller keeps (the library never disposes it, and an operation that finds it disposed throws
   `ObjectDisposedException`, through the adapters too: it is a bug in the calling code, not a cryptographic failure); the callback form takes a new one each time
-  and disposes it, as `ShareOrLoginFromPinSource(() => ...)` does, while `ShareOrLogin(pin)` leaves it with the caller. On a v2.40 module (no `C_SessionCancel`), an operation
+  and disposes it, as `LoginCredential.FromPinSource(() => ...)` does, while a `SecurePin` passed to `Login` or `ShareOrLogin` stays with the caller. On a v2.40 module (no `C_SessionCancel`), an operation
   whose context login failed is never finished: that could sign data nobody asked for, spending a qualified
   signature's counter or a one-time key leaf, on a module whose context login only re-checks the user's PIN
   (OpenSC). When the token answered this operation's own PIN `CKR_PIN_INCORRECT`, a length query, which produces no

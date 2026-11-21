@@ -131,7 +131,7 @@ public sealed class RefusedPinEdgeTests : IDisposable
     {
         _module.ProtectedAuthenticationPath = true;
         Slot.Login(TokenUser.User, _pin).Dispose();
-        using Pkcs11Login pinpad = Slot.LoginWithPinpad(TokenUser.User);
+        using Pkcs11Login pinpad = Slot.Login(TokenUser.User, LoginCredential.Pinpad);
         using Pkcs11Session session = pinpad.OpenSession();
         session.ContextAuthentication = Pin(_module.ExpectedPin);
         using Pkcs11Key qualified = session.OpenKey(Qualified);
@@ -154,7 +154,7 @@ public sealed class RefusedPinEdgeTests : IDisposable
         _module.ProtectedAuthenticationPath = true;
         using (var stale = new SecurePin("4321"))
             Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, stale));
-        using (Pkcs11Login pinpad = Slot.LoginWithPinpad(TokenUser.User))
+        using (Pkcs11Login pinpad = Slot.Login(TokenUser.User, LoginCredential.Pinpad))
         using (Pkcs11Session session = pinpad.OpenSession())
         using (Pkcs11Key first = session.OpenKey(First))
         {
@@ -169,7 +169,7 @@ public sealed class RefusedPinEdgeTests : IDisposable
             Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, stale));
 
         Assert.Equal(loginCalls + 1, _module.LoginCalls); // sent again
-        using (Pkcs11Login pinpad = Slot.LoginWithPinpad(TokenUser.User))
+        using (Pkcs11Login pinpad = Slot.Login(TokenUser.User, LoginCredential.Pinpad))
         using (Pkcs11Session session = pinpad.OpenSession())
         using (Pkcs11Key first = session.OpenKey(First))
         {
@@ -205,7 +205,7 @@ public sealed class RefusedPinEdgeTests : IDisposable
     public void SetPin_OldPinRefusedAsAContextPin_NotSent()
     {
         _module.ProtectedAuthenticationPath = true;
-        using Pkcs11Login pinpad = Slot.LoginWithPinpad(TokenUser.User);
+        using Pkcs11Login pinpad = Slot.Login(TokenUser.User, LoginCredential.Pinpad);
         using Pkcs11Session session = pinpad.OpenSession(SessionAccess.ReadWrite);
         session.ContextAuthentication = Pin("4321"u8.ToArray());
         using (Pkcs11Key first = session.OpenKey(First))
@@ -258,7 +258,7 @@ public sealed class RefusedPinEdgeTests : IDisposable
     public void NamedUser_PinRefusedAsAContextPin_NotSentForTheLoginOrSetPin()
     {
         byte[] loginPin = _module.ExpectedPin;
-        using (Pkcs11Login login = Slot.Login(TokenUser.User, "alice", _pin))
+        using (Pkcs11Login login = Slot.Login(TokenUser.User, _pin, "alice"))
         using (Pkcs11Session session = login.OpenSession(SessionAccess.ReadWrite))
         {
             _module.ExpectedPin = "13572468"u8.ToArray(); // changed outside the library
@@ -278,7 +278,7 @@ public sealed class RefusedPinEdgeTests : IDisposable
         }
         int loginCalls = _module.LoginCalls;
 
-        var again = Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, "alice", _pin));
+        var again = Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, _pin, "alice"));
 
         Assert.Contains("refused this PIN before", again.Message, StringComparison.Ordinal);
         Assert.Equal(loginCalls, _module.LoginCalls);

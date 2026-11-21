@@ -168,7 +168,7 @@ public sealed class RefusedPinScopeTests : IDisposable
     public void ContextLogin_UserPinRefusedAfterPinpadLogin_TakenForStale_UntilForgotten()
     {
         _module.ProtectedAuthenticationPath = true;
-        using (Pkcs11Login pinpad = Slot.LoginWithPinpad(TokenUser.User))
+        using (Pkcs11Login pinpad = Slot.Login(TokenUser.User, LoginCredential.Pinpad))
         using (Pkcs11Session session = pinpad.OpenSession())
         {
             session.ContextAuthentication = Pin(_module.ExpectedPin);
@@ -373,14 +373,14 @@ public sealed class RefusedPinScopeTests : IDisposable
         SecurePin? handedOut = null;
         Pkcs11Slot slot = Slot;
 
-        using Pkcs11Login shared = slot.ShareOrLoginFromPinSource(() =>
+        using Pkcs11Login shared = slot.ShareOrLogin(LoginCredential.FromPinSource(() =>
         {
             var thread = new Thread(() => other = slot.Login(TokenUser.User, _pin));
             thread.Start();
             Assert.True(thread.Join(Timeout));
             handedOut = new SecurePin(_module.ExpectedPin);
             return handedOut;
-        });
+        }));
 
         using (other)
         {

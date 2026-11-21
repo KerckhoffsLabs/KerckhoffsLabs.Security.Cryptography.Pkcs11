@@ -145,18 +145,18 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void LoginUser_EmptyUsername_IsRefused()
     {
-        Assert.Throws<ArgumentException>(() => Slot.Login(TokenUser.User, "", _pin));
+        Assert.Throws<ArgumentException>(() => Slot.Login(TokenUser.User, _pin, ""));
         Assert.Equal(0, _module.LoginCalls);
     }
 
     [Fact]
     public void LoginUser_KeepsTheUsername_AndADifferentOneIsAnotherUser()
     {
-        using Pkcs11Login alice = Slot.Login(TokenUser.User, "alice", _pin);
+        using Pkcs11Login alice = Slot.Login(TokenUser.User, _pin, "alice");
 
         Assert.Equal("alice", alice.Username);
         Assert.Equal(TokenUser.User, alice.User);
-        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, "Alice", _pin));
+        Assert.Throws<Pkcs11AuthenticationException>(() => Slot.Login(TokenUser.User, _pin, "Alice"));
     }
 
     [Fact]
@@ -366,8 +366,8 @@ public sealed class Pkcs11LoginTests : IDisposable
     public void ShareOrLogin_FirstLogsIn_NextShares()
     {
         int asked = 0;
-        using Pkcs11Login first = Slot.ShareOrLoginFromPinSource(() => { asked++; return new SecurePin(_module.ExpectedPin); });
-        using Pkcs11Login second = Slot.ShareOrLoginFromPinSource(() => { asked++; return new SecurePin(_module.ExpectedPin); });
+        using Pkcs11Login first = Slot.ShareOrLogin(LoginCredential.FromPinSource(() => { asked++; return new SecurePin(_module.ExpectedPin); }));
+        using Pkcs11Login second = Slot.ShareOrLogin(LoginCredential.FromPinSource(() => { asked++; return new SecurePin(_module.ExpectedPin); }));
 
         Assert.Equal(1, asked);
         Assert.Equal(1, _module.LoginCalls);
@@ -395,7 +395,7 @@ public sealed class Pkcs11LoginTests : IDisposable
         using Pkcs11Login so = Slot.Login(TokenUser.SecurityOfficer, _pin);
 
         var ex = Assert.Throws<Pkcs11AuthenticationException>(
-            () => Slot.ShareOrLoginFromPinSource(() => new SecurePin(_module.ExpectedPin)));
+            () => Slot.ShareOrLogin(LoginCredential.FromPinSource(() => new SecurePin(_module.ExpectedPin))));
 
         Assert.Equal(CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN, ex.ReturnValue);
         Assert.True(so.IsActive);
@@ -405,12 +405,12 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void ShareOrLogin_SourceThrowsOrReturnsNull_NoLoginLeft()
     {
-        Assert.Throws<TimeoutException>(() => Slot.ShareOrLoginFromPinSource(() => throw new TimeoutException("secret store")));
-        Assert.Throws<InvalidOperationException>(() => Slot.ShareOrLoginFromPinSource(() => null!));
+        Assert.Throws<TimeoutException>(() => Slot.ShareOrLogin(LoginCredential.FromPinSource(() => throw new TimeoutException("secret store"))));
+        Assert.Throws<InvalidOperationException>(() => Slot.ShareOrLogin(LoginCredential.FromPinSource(() => null!)));
 
         Assert.Equal(0, _module.LoginCalls);
         Assert.Empty(_module.OpenSessions);
-        using Pkcs11Login login = Slot.ShareOrLoginFromPinSource(() => new SecurePin(_module.ExpectedPin));
+        using Pkcs11Login login = Slot.ShareOrLogin(LoginCredential.FromPinSource(() => new SecurePin(_module.ExpectedPin)));
         Assert.True(login.IsActive);
     }
 
@@ -418,7 +418,7 @@ public sealed class Pkcs11LoginTests : IDisposable
     [Fact]
     public void NamedUserLogin_SharedByItsUsernameOnly()
     {
-        using Pkcs11Login alice = Slot.Login(TokenUser.User, "alice", _pin);
+        using Pkcs11Login alice = Slot.Login(TokenUser.User, _pin, "alice");
 
         Assert.False(Slot.TryShareLogin(out _));
         Assert.False(Slot.TryShareLogin("bob", out _));
@@ -427,7 +427,7 @@ public sealed class Pkcs11LoginTests : IDisposable
             Assert.True(shared.IsActive);
 
         int asked = 0;
-        using Pkcs11Login again = Slot.ShareOrLoginFromPinSource("alice", () => { asked++; return new SecurePin(_module.ExpectedPin); });
+        using Pkcs11Login again = Slot.ShareOrLogin(LoginCredential.FromPinSource(() => { asked++; return new SecurePin(_module.ExpectedPin); }), "alice");
         Assert.Equal(0, asked);
         Assert.Equal(1, _module.LoginCalls);
     }
@@ -438,15 +438,15 @@ public sealed class Pkcs11LoginTests : IDisposable
         _module.ProtectedAuthenticationPath = true;
         _module.ExpectedPin = [];
 
-        using (Pkcs11Login first = Slot.ShareOrLoginWithPinpad())
-        using (Pkcs11Login second = Slot.ShareOrLoginWithPinpad())
+        using (Pkcs11Login first = Slot.ShareOrLogin(LoginCredential.Pinpad))
+        using (Pkcs11Login second = Slot.ShareOrLogin(LoginCredential.Pinpad))
         {
             Assert.Equal(1, _module.LoginCalls);
             Assert.True(second.IsActive);
         }
 
-        using Pkcs11Login named = Slot.LoginWithPinpad(TokenUser.User, "alice");
-        using Pkcs11Login shared = Slot.ShareOrLoginWithPinpad("alice");
+        using Pkcs11Login named = Slot.Login(TokenUser.User, LoginCredential.Pinpad, "alice");
+        using Pkcs11Login shared = Slot.ShareOrLogin(LoginCredential.Pinpad, "alice");
         Assert.Equal(2, _module.LoginCalls);
         Assert.True(shared.IsActive);
     }

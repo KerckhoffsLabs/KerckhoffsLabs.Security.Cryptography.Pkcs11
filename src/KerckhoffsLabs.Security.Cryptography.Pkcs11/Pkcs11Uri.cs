@@ -39,7 +39,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// would select more than its author meant: vendor attributes (<c>x-…</c>) and unknown ones. Query attributes do not
 /// select (RFC 7512 section 2.4), so unknown ones are ignored, as the RFC asks. A URI only selects: the library never
 /// takes a PIN from one (<c>pin-value</c>, <c>pin-source</c>), and a URI that carries either is refused; read the PIN
-/// from a secret store and pass it to <see cref="Pkcs11Slot.Login(TokenUser, SecurePin)"/>. Nor does it load a module from one
+/// from a secret store and pass it to <see cref="Pkcs11Slot.Login(TokenUser, LoginCredential, string?)"/>. Nor does it load a module from one
 /// (<c>module-name</c>, <c>module-path</c>, also refused): the module is the one the <see cref="Pkcs11Library"/> was
 /// loaded from.
 /// Error messages name the attribute at fault, never the URI's values, which may carry a PIN; an unknown path attribute
