@@ -475,8 +475,9 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// session that keeps a login (<see cref="Pkcs11Login.OpenSession()"/>) is read/write where the
     /// token allows it, and this one asks for what the caller says.
     /// </param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means the library's
+    /// (<see cref="Pkcs11Library.Policy"/>); a library policy that allows no override is enforced as well. See
+    /// <see cref="ICryptoPolicy"/>.</param>
     /// <returns>The open session; the caller disposes it.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
@@ -497,7 +498,7 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         ThrowIfUndefined(access);
         ObjectDisposedException.ThrowIf(_library.IsDisposed, _library);
 
-        Pkcs11SessionCore core = ExactAccess(OpenSessionCore(access == SessionAccess.ReadWrite, policy), access);
+        Pkcs11SessionCore core = ExactAccess(OpenSessionCore(access == SessionAccess.ReadWrite, _library.SessionPolicy(policy)), access);
         return new Pkcs11Session(_library, this, core, access);
     }
 

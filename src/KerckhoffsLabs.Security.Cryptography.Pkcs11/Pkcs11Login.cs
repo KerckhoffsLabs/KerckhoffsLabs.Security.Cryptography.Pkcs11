@@ -152,8 +152,9 @@ public sealed class Pkcs11Login : IDisposable
     /// read-only where it does not, as <see cref="OpenSession()"/>.
     /// </summary>
     /// <inheritdoc cref="OpenSession()" path="/remarks"/>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means the library's
+    /// (<see cref="Pkcs11Library.Policy"/>); a library policy that allows no override is enforced as well. See
+    /// <see cref="ICryptoPolicy"/>.</param>
     /// <returns>The open session; the caller disposes it (see <see cref="OpenSession()"/>).</returns>
     /// <exception cref="Pkcs11LoginEndedException">
     /// The login has ended: logged out, its logout pending (its last holder gone, the logout waiting for operations in
@@ -197,8 +198,9 @@ public sealed class Pkcs11Login : IDisposable
     /// allows only read/write sessions. <see cref="OpenSession()"/> picks read/write where the token
     /// allows it instead.
     /// </param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means the library's
+    /// (<see cref="Pkcs11Library.Policy"/>); a library policy that allows no override is enforced as well. See
+    /// <see cref="ICryptoPolicy"/>.</param>
     /// <returns>
     /// The open session; the caller disposes it. Disposing it closes it (or, for a lent session, hands it back) and
     /// releases its hold: it logs out only when it is the login's last holder.
@@ -237,10 +239,11 @@ public sealed class Pkcs11Login : IDisposable
 
         // Taken first, so the login cannot go between the session opening and the session holding it. Both the share
         // and the core are released if anything fails (the core first), and handed to the session once it is built.
+        ICryptoPolicy sessionPolicy = library.SessionPolicy(policy);
         using var share = new Owned<LoginHold>(_hold.Record.Share(_hold, library));
         using var core = new Owned<Pkcs11SessionCore>(access is { } requested
-            ? OpenCore(share.Value, library, requested, policy, exact: true)
-            : OpenDefaultCore(share.Value, library, policy));
+            ? OpenCore(share.Value, library, requested, sessionPolicy, exact: true)
+            : OpenDefaultCore(share.Value, library, sessionPolicy));
 
         core.Value.ContextAuthentication = Volatile.Read(ref _contextAuthentication);
         SessionAccess actual = core.Value.IsReadWrite ? SessionAccess.ReadWrite : SessionAccess.ReadOnly;
