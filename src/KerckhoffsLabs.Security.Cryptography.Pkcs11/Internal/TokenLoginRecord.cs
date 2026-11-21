@@ -411,7 +411,7 @@ internal sealed class TokenLoginRecord
     /// <summary>
     /// Shares the login held for <paramref name="user"/> (and <paramref name="username"/>), or logs in when none is
     /// held, deciding under the transition semaphore, so two callers never race into a refusal: for
-    /// <see cref="Pkcs11Slot.ShareOrLoginFromPinSource(Func{SecurePin})"/>. <paramref name="pinSource"/> runs when no login is held
+    /// <see cref="Pkcs11Slot.ShareOrLogin(LoginCredential, string?)"/>. <paramref name="pinSource"/> runs when no login is held
     /// to share, outside the semaphore (it may take its time, or wait for a thread that logs in to the token); a login
     /// made meanwhile is then shared. The PIN it returns is disposed, sent or not. A share checks no PIN.
     /// </summary>
@@ -434,7 +434,7 @@ internal sealed class TokenLoginRecord
         SecurePin pin)
         => LoginCore(owner, user, username, expectedToken, shareHeld: true, () => pin, disposeFetched: false);
 
-    private static SecurePin TakePin(Func<SecurePin> pinSource)
+    internal static SecurePin TakePin(Func<SecurePin> pinSource)
     {
         SecurePin pin = pinSource() ?? throw new InvalidOperationException("The PIN source returned null.");
         if (pin.IsDisposed)

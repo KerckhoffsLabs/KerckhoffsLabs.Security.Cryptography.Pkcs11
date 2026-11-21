@@ -85,7 +85,7 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     // The login's own session is closed again when the login is refused.
     [Fact]
     public void SlotLoginWithPinpad_NoPinpad_RefusedBeforeTheModule() =>
-        AssertRefusedNoPinpad(() => _backend.Slot.LoginWithPinpad(TokenUser.User));
+        AssertRefusedNoPinpad(() => _backend.Slot.Login(TokenUser.User, LoginCredential.Pinpad));
 
     [Fact]
     public void SessionSetPinWithPinpad_NoPinpad_RefusedBeforeTheModule()

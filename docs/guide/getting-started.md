@@ -118,7 +118,7 @@ module and with no PIN sent: PKCS#11 cannot check a PIN against a login already 
 succeeded would succeed with any PIN. A component that should work under the login takes a share of it
 instead, without a PIN: `login.Share()` from a `Pkcs11Login` it was given, or `slot.TryShareLogin(out
 Pkcs11Login? shared)` for the normal user's login held on the slot. Components that each need the user logged in, without
-knowing which goes first, call `slot.ShareOrLoginFromPinSource(() => ReadPinFromSecretStore("user-pin"))`: it shares the
+knowing which goes first, call `slot.ShareOrLogin(LoginCredential.FromPinSource(() => ReadPinFromSecretStore("user-pin")))`: it shares the
 login if there is one and logs in otherwise, asking for the PIN only then. A security officer login is shared
 only through `login.Share()`: a share checks no PIN, so the SO's rights go only where the SO's login is handed. The example pages show the same full flow per method,
 for the same reason.

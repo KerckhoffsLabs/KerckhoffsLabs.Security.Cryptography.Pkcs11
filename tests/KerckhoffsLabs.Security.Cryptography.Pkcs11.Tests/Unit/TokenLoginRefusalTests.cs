@@ -45,7 +45,7 @@ public sealed class TokenLoginRefusalTests : IDisposable
 
         for (int request = 0; request < 5; request++)
         {
-            var ex = Assert.Throws<Pkcs11AuthenticationException>(() => Slot.ShareOrLoginFromPinSource(Wrong));
+            var ex = Assert.Throws<Pkcs11AuthenticationException>(() => Slot.ShareOrLogin(LoginCredential.FromPinSource(Wrong)));
             Assert.Equal(CKR.CKR_PIN_INCORRECT, ex.ReturnValue);
         }
 
