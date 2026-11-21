@@ -119,7 +119,9 @@ succeeded would succeed with any PIN. A component that should work under the log
 instead, without a PIN: `login.Share()` from a `Pkcs11Login` it was given, or `slot.TryShareLogin(out
 Pkcs11Login? shared)` for the normal user's login held on the slot. Components that each need the user logged in, without
 knowing which goes first, call `slot.ShareOrLogin(LoginCredential.FromPinSource(() => ReadPinFromSecretStore("user-pin")))`: it shares the
-login if there is one and logs in otherwise, asking for the PIN only then. A security officer login is shared
+login if there is one and logs in otherwise, asking for the PIN only then. When all a component needs is one
+logged-in session, `slot.OpenLoggedInSession(LoginCredential.FromPinSource(...))` does that and opens the session in
+one call; the session then keeps the login, and disposing it logs out unless another holder remains. A security officer login is shared
 only through `login.Share()`: a share checks no PIN, so the SO's rights go only where the SO's login is handed. The example pages show the same full flow per method,
 for the same reason.
 

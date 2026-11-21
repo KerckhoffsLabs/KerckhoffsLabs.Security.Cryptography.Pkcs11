@@ -20,6 +20,11 @@ Out of scope:
   maintainers;
 - findings that require an already-compromised host, a malicious PKCS#11 module chosen by the
   application, or physical access to the token;
+- what a dump of the process's memory reveals. The library keeps no PIN, but it keeps an HMAC of each PIN a token
+  refused (so it is never sent twice), and, while a user login made with a PIN is held, of that PIN, under a random
+  key in the same memory: a dump is enough to find a short PIN by trying them all. This is a deliberate trade-off
+  against locking the token's PIN by repeating a stale one (see "A refused PIN is never sent twice" in
+  `docs/guide/security-model.md`);
 - code under `tests/` and `build/` that does not ship, unless it compromises the release pipeline.
 
 ## Reporting a vulnerability

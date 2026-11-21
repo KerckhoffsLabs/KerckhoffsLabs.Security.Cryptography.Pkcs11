@@ -774,6 +774,61 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         return new Pkcs11Login(this, TokenUser.User, username, hold);
     }
 
+    /// <summary>
+    /// Shares the normal user's login, or logs the normal user in when none is held, and opens a session under it, in
+    /// one call: <see cref="ShareOrLogin(LoginCredential, string?)"/>, then <see cref="Pkcs11Login.OpenSession()"/>,
+    /// then the login hold disposed, so the session is what keeps the login.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// For code that needs one logged-in session and nothing else of the login. Disposing the session releases its hold:
+    /// the token is logged out then, unless another holder remains (another session, or a <see cref="Pkcs11Login"/>
+    /// elsewhere in the application). To open several sessions under one login, or set
+    /// <see cref="Pkcs11Login.ContextAuthentication"/> before they open, keep the <see cref="Pkcs11Login"/> from
+    /// <see cref="ShareOrLogin(LoginCredential, string?)"/> instead.
+    /// </para>
+    /// <para>
+    /// A login this call made is logged out again if the session cannot open. Everything else is as for
+    /// <see cref="ShareOrLogin(LoginCredential, string?)"/> and <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.
+    /// </para>
+    /// <code>
+    /// using Pkcs11Session session = slot.OpenLoggedInSession(
+    ///     LoginCredential.FromPinSource(() => ReadPinFromSecretStore("user-pin")));
+    /// </code>
+    /// </remarks>
+    /// <param name="credential">The PIN (a <see cref="SecurePin"/> converts implicitly), a PIN source, or
+    /// <see cref="LoginCredential.Pinpad"/>; used only when no login is held to share.</param>
+    /// <param name="access">The session's access, exactly; <see langword="null"/> (the default) for read/write where the
+    /// token allows it, as <see cref="Pkcs11Login.OpenSession()"/> does.</param>
+    /// <param name="username">The account name for <c>C_LoginUser</c>; <see langword="null"/> (the default) for
+    /// <c>C_Login</c>.</param>
+    /// <param name="policy">The session's crypto policy; <see langword="null"/> for the default, as for
+    /// <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.</param>
+    /// <returns>The open session, which holds the login; the caller disposes it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="credential"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="username"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
+    /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
+    /// <exception cref="Pkcs11AuthenticationException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
+    /// <exception cref="Pkcs11ForeignLoginException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
+    /// <exception cref="Pkcs11TokenException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
+    /// <exception cref="Pkcs11SessionException">As for <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.</exception>
+    /// <exception cref="InvalidOperationException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
+    /// <exception cref="Pkcs11Exception">As for <see cref="ShareOrLogin(LoginCredential, string?)"/> and
+    /// <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.</exception>
+    public Pkcs11Session OpenLoggedInSession(LoginCredential credential, SessionAccess? access = null,
+        string? username = null, ICryptoPolicy? policy = null)
+    {
+        ArgumentNullException.ThrowIfNull(credential);
+        if (access is { } requested && !Enum.IsDefined(requested))
+            throw new ArgumentOutOfRangeException(nameof(access), requested, $"Not a defined {nameof(SessionAccess)} value.");
+
+        // The session takes a hold of its own; this one goes when the call returns, so the session is what keeps the
+        // login. If the session cannot open, disposing this hold logs out a login this call made.
+        using Pkcs11Login login = ShareOrLogin(credential, username);
+        return access is { } exact ? login.OpenSession(exact, policy) : login.OpenSession(policy);
+    }
+
     // PKCS#11 v3.2 C_InitToken: CKR_SESSION_EXISTS while the application has a session open with the token. From
     // the sessions the library has open through any load of the module, a login's anchor among them.
     private void ThrowIfSessionsExist()
