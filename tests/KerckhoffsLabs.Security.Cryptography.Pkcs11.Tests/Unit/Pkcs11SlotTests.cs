@@ -53,7 +53,7 @@ public sealed class Pkcs11SlotTests
         { CapturedOpenFlags = flags; session = OpenSessionId; return OpenRv; }
     }
 
-    private static Pkcs11Slot NewSlot(SlotFake fake) => new(fake.LowLevel, SlotId);
+    private static Pkcs11Slot NewSlot(SlotFake fake) => new(fake.Library, SlotId);
 
     // === Construction =====================================================
 
@@ -282,7 +282,7 @@ public sealed class Pkcs11SlotTests
     {
         using var fake = new SlotFake();
         var logger = new CapturingLogger();
-        var slot = new Pkcs11Slot(fake.LowLevel, SlotId, new CapturingLoggerFactory(logger));
+        var slot = new Pkcs11Slot(fake.Library, SlotId, new CapturingLoggerFactory(logger));
 
         using (slot.OpenSessionCore(policy: CryptoPolicy.NistApproved)) { }
         using (slot.OpenSessionCore()) { }

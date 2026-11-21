@@ -41,6 +41,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// without Y is not a public key. Verification needs that object too, and on such a key every verify
 /// overload throws the same error, whatever the signature's length or encoding.
 /// </para>
+/// <para>
+/// A private key with <c>CKA_ALWAYS_AUTHENTICATE</c> is re-authenticated for each signature with the PIN from its
+/// session's <see cref="Pkcs11Session.ContextAuthentication"/> (see <see cref="Pkcs11.ContextAuthentication"/>). The
+/// operations then also throw <see cref="System.Security.Cryptography.CryptographicException"/> (not the
+/// <see cref="System.InvalidOperationException"/> of <see cref="Pkcs11Key"/>'s own methods, which is its inner exception,
+/// so code written against the BCL type catches it) when the session has no source, or the
+/// pinpad on a token without a protected authentication path, or the PIN callback returned no PIN or a disposed one;
+/// and <see cref="Exceptions.Pkcs11AuthenticationException"/> when the token refuses the PIN, or refused it before
+/// (<c>CKR_PIN_INCORRECT</c>, not sent again). <see cref="Exceptions.Pkcs11LoginEndedException"/> means the login the
+/// key was found under has ended.
+/// </para>
 /// </remarks>
 [Obsolete("DSA is disallowed for signature generation by NIST FIPS 186-5 (2023) and is removed from modern " +
           "deployments. Use ECDsaPkcs11 (ECDSA) or MLDsaPkcs11 (ML-DSA). DSAPkcs11 remains only for interop " +
@@ -105,9 +116,18 @@ public sealed class DSAPkcs11 : DSA
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] CreateSignature(byte[] rgbHash)
     {
-        ArgumentNullException.ThrowIfNull(rgbHash);
-        var mech = new Mechanism(CKM.CKM_DSA);
-        return _key.Sign(mech, rgbHash);
+        try
+        {
+            ArgumentNullException.ThrowIfNull(rgbHash);
+            var mech = new Mechanism(CKM.CKM_DSA);
+            return _key.Sign(mech, rgbHash);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     /// <inheritdoc/>
@@ -321,13 +341,22 @@ public sealed class DSAPkcs11 : DSA
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
-        var combined = Pkcs11MechanismMap.DsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined.Type))
-            return _key.Sign(combined, data);
+        try
+        {
+            var combined = Pkcs11MechanismMap.DsaSign(hashAlgorithm);
+            if (_key.SupportsMechanism(combined.Type))
+                return _key.Sign(combined, data);
 
-        byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
-        var raw = new Mechanism(CKM.CKM_DSA);
-        return _key.Sign(raw, hash);
+            byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
+            var raw = new Mechanism(CKM.CKM_DSA);
+            return _key.Sign(raw, hash);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     // Every path that hashes on the managed side puts the hash to the session's policy, in the direction

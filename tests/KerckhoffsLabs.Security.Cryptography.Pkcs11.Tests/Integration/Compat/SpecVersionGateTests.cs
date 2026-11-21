@@ -95,7 +95,7 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
     {
         using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         using var pin = new SecurePin(_backend.UserPin.Span);
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => ws.Core.LoginUser(CKU.CKU_USER, pin, "user"));
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => ws.Core.SendLoginUser(CKU.CKU_USER, pin.Pin, "user"));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 

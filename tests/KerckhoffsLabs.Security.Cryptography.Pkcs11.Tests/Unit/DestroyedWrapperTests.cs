@@ -50,7 +50,7 @@ public sealed class DestroyedWrapperTests
         using Pkcs11Library library = module.Load();
         LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1);
-        using var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core);
+        using var session = new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core);
         body(session);
     }
 
@@ -86,6 +86,34 @@ public sealed class DestroyedWrapperTests
             Assert.Contains("Destroy()", ex.Message, StringComparison.Ordinal);
             Assert.Equal(callsAfterDestroy, module.TotalCalls);
             Assert.Equal([SecretKey.ObjectId], module.Destroyed);
+        });
+    }
+
+    // The target's handle goes into C_WrapKey too: once the target's own Destroy has succeeded, that handle may name
+    // another key, and wrapping it would export a key the caller never chose.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Wrap_OfATargetDestroyedOrDisposed_IsRefusedBeforeTheToken(bool destroyed)
+    {
+        using var module = new DestroyModule();
+        WithSession(module, session =>
+        {
+            using Pkcs11Key wrapping = new(session, new ObjectHandle(8UL), ObjectHandle.Invalid, CKK.CKK_AES, "kek", []);
+            using Pkcs11Key target = Secret(session);
+            if (destroyed)
+                target.Destroy();
+            else
+                target.Dispose();
+            int calls = module.TotalCalls;
+
+            var ex = Assert.Throws<ObjectDisposedException>(() => wrapping.Wrap(new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP), target));
+
+            if (destroyed)
+                Assert.Contains("Destroy()", ex.Message, StringComparison.Ordinal);
+            Assert.Equal(calls, module.TotalCalls);
+            Assert.Equal(0, module.CallCount("C_WrapKey"));
+            target.Dispose();
         });
     }
 

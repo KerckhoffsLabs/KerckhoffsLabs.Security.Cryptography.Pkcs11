@@ -355,6 +355,8 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="outputStream">Output stream where decrypted data should be written</param>
     /// <param name="bufferLength">Size of read buffer in bytes</param>
     /// <returns>Digest</returns>
+    // Sends no context login: it takes a bare handle, not a key whose CKA_ALWAYS_AUTHENTICATE is known, and nothing in
+    // the public API reaches it. A key that needs one makes the module answer CKR_USER_NOT_LOGGED_IN at the end.
     public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();

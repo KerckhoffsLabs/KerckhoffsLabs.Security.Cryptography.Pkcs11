@@ -54,7 +54,7 @@ public sealed class Pkcs11SessionCoreTests
         [
             ("GetSessionInfo", s => s.GetSessionInfo()),
             ("GetOperationState", s => s.GetOperationState()),
-            ("Logout", s => s.Logout()),
+            ("Logout", s => s.SendLogout()),
             ("CancelOperations", s => s.CancelOperations(0)),
             ("CancelFunction", s => s.CancelFunction()),
             ("GetFunctionStatus", s => s.GetFunctionStatus()),
@@ -76,22 +76,6 @@ public sealed class Pkcs11SessionCoreTests
     // === Argument-null guards (fire before any native call) =================================
 
     [Fact]
-    public void Login_NullPin_Throws()
-    {
-        using var fake = new SessionFake();
-        using var s = fake.CreateSession(SessionId);
-        Assert.Throws<ArgumentNullException>(() => s.Login(CKU.CKU_USER, null!));
-    }
-
-    [Fact]
-    public void InitPin_NullPin_Throws()
-    {
-        using var fake = new SessionFake();
-        using var s = fake.CreateSession(SessionId);
-        Assert.Throws<ArgumentNullException>(() => s.InitPin(null!));
-    }
-
-    [Fact]
     public void SetPin_NullArgs_Throw()
     {
         using var fake = new SessionFake();
@@ -102,13 +86,12 @@ public sealed class Pkcs11SessionCoreTests
     }
 
     [Fact]
-    public void LoginUser_NullArgs_Throw()
+    public void LoginUser_NullUsername_Throws()
     {
         using var fake = new SessionFake();
         using var s = fake.CreateSession(SessionId);
         using var pin = new SecurePin("1234");
-        Assert.Throws<ArgumentNullException>(() => s.LoginUser(CKU.CKU_USER, null!, "alice"));
-        Assert.Throws<ArgumentNullException>(() => s.LoginUser(CKU.CKU_USER, pin, null!));
+        Assert.Throws<ArgumentNullException>(() => s.SendLoginUser(CKU.CKU_USER, pin.Pin, null!));
     }
 
     [Fact]
@@ -195,7 +178,7 @@ public sealed class Pkcs11SessionCoreTests
         using var s = fake.CreateSession(SessionId);
         Assert.Null(Record.Exception(() =>
         {
-            s.Logout();
+            s.SendLogout();
             s.CancelOperations(0);
         }));
     }

@@ -3,11 +3,21 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.ThreadSafety;
 
 /// <summary>Cross-session concurrency over SoftHSM2 — thin wrapper over <see cref="SessionParallelTestCases"/>.</summary>
-/// <remarks>Only the single-session case runs here: the multi-session ones need several sessions logged in at once, but <c>OpenSession</c> logs every session in, and on a login-required token login state is shared by all of an application's sessions (PKCS#11 v3.2 §5.6), so the second C_Login returns CKR_USER_ALREADY_LOGGED_IN.</remarks>
 [Collection("SoftHsm")]
 public sealed class SessionParallelTests_SoftHsm(SoftHsmBackendFixture backend)
 {
     private readonly SoftHsmBackendFixture _backend = backend;
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void ParallelSessions_GenerateFindAndDestroyOwnKeys() =>
+        SessionParallelTestCases.Assert_ParallelSessions_GenerateFindAndDestroyOwnKeys(_backend);
+
+    // SoftHSM is not safe when one session's objects are freed while another reads them: see
+    // SoftHsmBackendFixture.SoftHsmSurvivesClosingASessionWhileAnotherReadsItsObjects.
+    // Reported upstream: https://github.com/softhsm/SoftHSMv2/issues/924
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SessionCloseRaceAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "SoftHSM crashes or answers CKR_ATTRIBUTE_VALUE_INVALID when a session's objects are freed while another session reads them")]
+    public void ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind() =>
+        SessionParallelTestCases.Assert_ClosingSessionsWithLiveObjects_WhileOtherSessionsSearch_LeavesNoObjectsBehind(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public async Task Dispose_RacingInFlightCallsOnTheSameSession_NeverReachesAClosedSession() =>

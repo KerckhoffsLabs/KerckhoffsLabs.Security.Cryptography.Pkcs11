@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -9,8 +8,7 @@ public sealed class Pkcs11SessionFindKeysTests_Mock(MockBackendFixture backend)
     private readonly MockBackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     // No OpenKey_NotFound case here: pkcs11-mock's C_FindObjectsInit honours only CKA_CLASS and
     // ignores the label, so OpenKey's per-key-class search always "finds" the mock's canned key, which

@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// How <see cref="Pkcs11Session.FindKeys"/> and <see cref="Pkcs11Session.FindObjects"/> read a found
-/// object's class, key type, label and id: one <c>C_GetAttributeValue</c> per object when the token
+/// object's class, key type, label, id and <c>CKA_PRIVATE</c>: one <c>C_GetAttributeValue</c> per object when the token
 /// answers cleanly, and the generic two-call read, with the same result, whenever it does not.
 /// </summary>
 /// <remarks>
@@ -226,14 +226,19 @@ public sealed class Pkcs11SessionHydrationTests
 
         protected override bool ReleasedByFinalize => true;
 
-        public void Add(Dictionary<CKA, byte[]> attributes) => _objects.Add(attributes);
+        // CKA_PRIVATE is a storage-object attribute every token answers; the one-call read asks for it too.
+        public void Add(Dictionary<CKA, byte[]> attributes)
+        {
+            attributes.TryAdd(CKA.CKA_PRIVATE, [0]);
+            _objects.Add(attributes);
+        }
 
         public SessionScope OpenSession()
         {
             Pkcs11Library library = Load();
             LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
             var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1);
-            return new SessionScope(new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core), library);
+            return new SessionScope(new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core), library);
         }
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;

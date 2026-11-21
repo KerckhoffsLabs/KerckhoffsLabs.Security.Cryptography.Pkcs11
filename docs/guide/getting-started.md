@@ -38,11 +38,18 @@ What each step does:
 
 1. **`Pkcs11Library.Load`** maps the module and initializes it. Dispose it last: the library calls
    `C_Finalize` when it is disposed, if it was the one that initialized the module.
-2. **`OpenSessionWithPin`** finds the token by label, opens a session and logs in. (A token that takes
-   no login, such as a software crypto token, is opened with `OpenSessionWithoutLogin` instead.) The session enforces
-   the default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
-   `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it as
-   the last argument; see [Using crypto policies](crypto-policies.md).
+2. **`GetSlotByTokenLabel`** finds the slot holding the token with that label. It throws
+   `Pkcs11TokenException` (`CKR_TOKEN_NOT_PRESENT`) when no token has the label, and refuses with
+   `Pkcs11AmbiguousTokenException`, naming the slots, when more than one does (see *Choosing the token* below).
+   **`slot.Login(TokenUser.User, pin)`** logs the normal user in and returns a
+   `Pkcs11Login`, and **`login.OpenSession()`** opens a read/write session of that login (read-only on a
+   write-protected token). (A token that takes
+   no login, such as a software crypto token, is used through `slot.OpenSession(SessionAccess.ReadOnly)`
+   instead; the slot's sessions take the access explicitly. A read-only session creates session objects, such as
+   the key below; pass `SessionAccess.ReadWrite` to create or change token objects.) The session enforces the
+   default [`Recommended`](policies/recommended.md) crypto policy: an insecure request throws
+   `CryptoPolicyViolationException` before it reaches the token. To choose another policy, pass it to
+   `OpenSession`; see [Using crypto policies](crypto-policies.md).
 3. **`GenerateAesKey`** creates the key on the token, sensitive and non-extractable, and allowed only to
    encrypt and decrypt. Each key-generation helper grants exactly one role; see
    [Key role separation](security-model.md#key-role-separation). The key is a **session object** and
@@ -51,30 +58,98 @@ What each step does:
 4. **`AesGcmPkcs11`** gives the key the shape of `System.Security.Cryptography.AesGcm`: the same
    constructor arguments (with a `Pkcs11Key` instead of key bytes) and the same `Encrypt` and `Decrypt`.
    The token does the work.
-5. **Disposal** releases everything in reverse order. Dispose sessions and keys deterministically
-   (`using`), rather than leaving them to the garbage collector.
+5. **Disposal** releases everything in reverse order. Dispose sessions, logins and keys deterministically
+   (`using`), rather than leaving them to the garbage collector. The token is logged out when the login and
+   every session opened from it have been disposed, in whatever order: disposing one of them logs out only
+   when it is the last.
+
+### Choosing the token
+
+Every lookup finds exactly one present token, or throws: `Pkcs11TokenException` (`CKR_TOKEN_NOT_PRESENT`) when
+none matches, `Pkcs11AmbiguousTokenException` (its `SlotIds` name the slots) when more than one does. None picks one for you,
+which would let whoever can initialize a token decide which one the application uses. None opens a session or
+logs in.
+
+| Lookup | Selects by | Example |
+|---|---|---|
+| `GetSlotByTokenLabel("signing-prod")` | the label given when the token was initialized | `signing-prod`, `NSS Certificate DB` |
+| `GetSlotByTokenSerial("0123456789abcdef")` | the token's serial number, which tells apart tokens sharing a label | |
+| `GetSlotByUri("pkcs11:token=signing-prod;serial=0123456789abcdef")` | a PKCS#11 URI (RFC 7512): token, manufacturer, serial, model, slot and library attributes | `pkcs11:manufacturer=SoftHSM%20project;token=signing-prod` |
+| `GetSlot(t => t.Label == "signing-prod" && t.Model == "SoftHSM v2")` | any test on the token's `TokenInfo` | |
+
+`slot.GetTokenUri()` gives the URI of a token (its manufacturer, model, serial number and label) to put in
+configuration. A token whose fields are not UTF-8 (or whose serial number, padding aside, is not printable ASCII)
+has no URI: `GetTokenUri()` refuses it with `Pkcs11TokenException` (`CKR_TOKEN_NOT_RECOGNIZED`) rather than leave
+the field out, which would name every token sharing the rest; select it with `GetSlot(...)`. A URI can also name a key or certificate on the token, by label (`object`), `id` and `type`
+(`public`, `private`, `secret-key`, `cert`): find the token and open the key from the same URI.
+
+```csharp
+var uri = Pkcs11Uri.Parse(config["Pkcs11:SigningKey"]);   // pkcs11:serial=0123456789abcdef;object=release-key;type=private
+Pkcs11Slot slot = library.GetSlotByUri(uri);
+using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+using Pkcs11Session session = login.OpenSession();
+using Pkcs11Key key = session.OpenKey(uri);   // refused if the URI names another token
+```
+
+`OpenKey(uri)` and `OpenCertificate(uri)` need the URI to name the object, by `object` or `id`; a URI with
+neither is refused rather than opening whichever key is alone on the token. As RFC 7512 reads it, an empty
+`object=` names an object whose label is empty: it is not a wildcard.
+
+Labels are not unique (a cloned card, two HSM partitions with the same name); a serial number is unique for a
+manufacturer and model. Keep the slot ID out of configuration: the module assigns it, may renumber it between
+runs, and a swapped card puts another token behind the same ID. A URI is read strictly: values are
+percent-encoded (`%20` for a space), and vendor (`x-…`) or unknown path attributes are refused rather than
+ignored; attribute names are case-insensitive, values are not (`type=Private` is refused). In the token, slot and library attributes,
+trailing spaces and NULs are padding, as in the fields they are compared with, and are not significant
+(`token=abc%20` is `token=abc`); `object` is matched exactly, as a `CKA_LABEL` is not padded. Unknown query attributes are ignored, as RFC 7512 asks, since a query
+attribute never selects, but each must still read `name=value` in RFC 7512's characters. A URI only selects: a PIN is never taken from one (`pin-value`, `pin-source`), nor a module
+loaded from one (`module-name`, `module-path`).
 
 ### In an application: load and log in once
 
 The example runs the whole flow in one method so you can read it in one place. An application doesn't
 load the module and log in for every operation. In PKCS#11 the login belongs to the application, not to
-the session: while one session is logged in, a second `OpenSessionWithPin` to the same token fails with
-`CKR_USER_ALREADY_LOGGED_IN`, which the library raises as `Pkcs11AuthenticationException`. Load the module
-and log in once at startup, keep the library and the session for the application's lifetime, and give the
-session to the code that opens keys and uses them. The example pages show the same full flow per method,
+the session: once the user is logged in, every session the application has on the token sees the login.
+Load the module and log in once at startup, keep the library and the `Pkcs11Login` for the application's
+lifetime, and open sessions from the login (`login.OpenSession()`) for the code that opens keys and uses
+them. A second `slot.Login` while the login is held is refused with `Pkcs11AuthenticationException`
+(`CKR_USER_ALREADY_LOGGED_IN` for the same user, `CKR_USER_ANOTHER_ALREADY_LOGGED_IN` for another), before the
+module and with no PIN sent: PKCS#11 cannot check a PIN against a login already made, so a second login that
+succeeded would succeed with any PIN. A component that should work under the login takes a share of it
+instead, without a PIN: `login.Share()` from a `Pkcs11Login` it was given, or `slot.TryShareLogin(out
+Pkcs11Login? shared)` for the normal user's login held on the slot. Components that each need the user logged in, without
+knowing which goes first, call `slot.ShareOrLoginFromPinSource(() => ReadPinFromSecretStore("user-pin"))`: it shares the
+login if there is one and logs in otherwise, asking for the PIN only then. A security officer login is shared
+only through `login.Share()`: a share checks no PIN, so the SO's rights go only where the SO's login is handed. The example pages show the same full flow per method,
 for the same reason.
 
 ## Handling errors
 
-Every exception the library throws derives from `System.Security.Cryptography.CryptographicException`, so
-code written against the BCL shapes, including generic code that has never heard of PKCS#11, catches token
-failures where it already catches everything else. Catch something narrower when you need more:
+Every exception the library throws for a failure of the token, the module or a policy derives from
+`System.Security.Cryptography.CryptographicException`, so code written against the BCL shapes, including generic
+code that has never heard of PKCS#11, catches token failures where it already catches everything else. Catch
+something narrower when you need more:
 
 - **`Pkcs11Exception`** is a failed PKCS#11 call. `ReturnValue` is the raw `CKR` code, and `Method` names
   the function that returned it. Its subclasses group the codes by cause, such as
   `Pkcs11AuthenticationException`, `Pkcs11SessionException` and `Pkcs11MechanismException`.
+  Three are raised by the library itself, for the login model and token lookups:
+  - `Pkcs11LoginEndedException` (`CKR_USER_NOT_LOGGED_IN`): the login a session, key or handle was used under
+    has ended. Log in again and open the object again.
+  - `Pkcs11ForeignLoginException`: the token is already logged in by something other than this library (another
+    component calling the module directly). Nothing is logged out.
+  - `Pkcs11AmbiguousTokenException`: a lookup matched more than one token; `SlotIds` names them.
 - **`CryptoPolicyViolationException`** is a request the session's crypto policy refused, before any call
   reached the token.
+
+Misuse of the API throws the usual BCL exceptions instead, which you fix in code rather than catch:
+`ArgumentException` and its subclasses for a bad argument, `FormatException` for a malformed PKCS#11 URI,
+`ObjectDisposedException` for an object you disposed, and `InvalidOperationException` for a call the object's
+state does not allow (a `CKA_ALWAYS_AUTHENTICATE` key on a session with no `ContextAuthentication`, say). A call
+that PKCS#11 itself forbids in the token's state, and that the module would refuse with a return code, is refused
+before the module with that same code instead, as a `Pkcs11Exception`: `CKR_SESSION_READ_ONLY` for a PIN change on
+a read-only session, `CKR_USER_ALREADY_LOGGED_IN` for a second login, `CKR_PIN_INCORRECT` for a PIN the token
+refused before. So the exception does not depend on which side noticed.
 
 The exception types are in the `KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions` namespace.
 

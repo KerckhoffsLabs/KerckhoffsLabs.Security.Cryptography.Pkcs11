@@ -103,6 +103,28 @@ public static class Settings
         Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_TOKEN") ?? "kl-bouncyhsm";
 
     /// <summary>
+    /// Label of the second token the BouncyHsm fixture creates, one that simulates a qualified area, for the
+    /// <c>CKA_ALWAYS_AUTHENTICATE</c> case only.
+    /// </summary>
+    public static string BouncyHsmQualifiedTokenLabel =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_QUALIFIED_TOKEN") ?? "kl-bouncyhsm-qa";
+
+    /// <summary>Normal-user PIN for the BouncyHsm qualified-area token.</summary>
+    public static string BouncyHsmQualifiedUserPin =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_QUALIFIED_USER_PIN") ?? "22222222";
+
+    /// <summary>SO PIN for the BouncyHsm qualified-area token.</summary>
+    public static string BouncyHsmQualifiedSoPin =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_QUALIFIED_SO_PIN") ?? "33333333";
+
+    /// <summary>
+    /// Signature PIN for the BouncyHsm qualified-area token: the PIN its <c>C_Login(CKU_CONTEXT_SPECIFIC)</c> takes.
+    /// Distinct from its user PIN, so the case shows the context login sends the PIN its source gives.
+    /// </summary>
+    public static string BouncyHsmQualifiedSignaturePin =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_BOUNCYHSM_QUALIFIED_SIGNATURE_PIN") ?? "44444444";
+
+    /// <summary>
     /// Optional path to a Craton HSM PKCS#11 library (craton-hsm-core) — another fully independent
     /// real backend. Falls back to the path the BuildCratonHsm MSBuild target places next to the
     /// test assembly. Tests that require it skip themselves when this resolves to null.

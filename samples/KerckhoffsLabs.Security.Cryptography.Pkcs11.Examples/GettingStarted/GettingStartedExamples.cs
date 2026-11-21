@@ -1,5 +1,4 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Examples;
 
@@ -23,9 +22,12 @@ public static class GettingStartedExamples
         // 1. Load the vendor's PKCS#11 module (a .so, .dylib or .dll).
         using Pkcs11Library library = Pkcs11Library.Load(modulePath);
 
-        // 2. Open a session on the token and log in as the normal user. The session enforces the
-        //    default Recommended crypto policy.
-        using Pkcs11Session session = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin);
+        // 2. Find the token's slot by its label, log in as the normal user, and open a session of that
+        //    login. The login belongs to the application: it stays until the login and every session
+        //    opened from it are disposed. The session enforces the default Recommended crypto policy.
+        Pkcs11Slot slot = library.GetSlotByTokenLabel(tokenLabel);
+        using Pkcs11Login login = slot.Login(TokenUser.User, pin);
+        using Pkcs11Session session = login.OpenSession();
 
         // 3. Generate an AES-256 key on the token: sensitive, non-extractable, encrypt/decrypt only.
         //    It is a session object, destroyed when the session closes; pass persistOnToken: true
@@ -43,9 +45,10 @@ public static class GettingStartedExamples
         byte[] decrypted = new byte[ciphertext.Length];
         aesGcm.Decrypt(nonce, ciphertext, tag, decrypted);
         return decrypted;
-        // 5. The using declarations dispose the adapter, key handle, session and library in reverse
-        //    order: the session closes, and the library calls C_Finalize if it was the one that
-        //    initialized the module.
+        // 5. The using declarations dispose the adapter, key handle, session, login and library in
+        //    reverse order: the session closes, the token is logged out once the login and its last
+        //    session are gone, and the library calls C_Finalize if it was the one that initialized
+        //    the module.
         #endregion
     }
 }

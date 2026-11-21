@@ -27,8 +27,7 @@ public sealed class SoftHsmV240ComplianceTests(SoftHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(ExpectV240), Skip = "Requires " + nameof(ExpectV240))]
     public void Module_ExposesNoV3xSurface()
     {
-        using var pin = new SecurePin(_backend.UserPin.Span);
-        using var session = _backend.Library.OpenSessionWithPin(_backend.TokenLabel, CKU.CKU_USER, pin);
+        using var session = _backend.OpenSession();
 
         // A v2.40 module negotiates neither the v3.0 message API nor the v3.2 additions.
         Assert.False(session.Core.SupportsMessageApi);

@@ -18,8 +18,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_OpenCryptoki(OpenCryptokiBacke
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()

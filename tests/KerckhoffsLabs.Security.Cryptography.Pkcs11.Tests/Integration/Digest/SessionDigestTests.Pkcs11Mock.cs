@@ -23,8 +23,7 @@ public sealed class SessionDigestTests(MockBackendFixture backend)
     [Fact]
     public void Digest_Sha1_ThrowsCryptoPolicyViolationException()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         var mechanism = new Mechanism(CKM.CKM_SHA_1);
         byte[] data = Encoding.UTF8.GetBytes("hello");
@@ -38,8 +37,7 @@ public sealed class SessionDigestTests(MockBackendFixture backend)
     [Fact]
     public void Digest_NullMechanism_Throws()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         Assert.Throws<ArgumentNullException>(() =>
             session.Digest(mechanism: null!, []));

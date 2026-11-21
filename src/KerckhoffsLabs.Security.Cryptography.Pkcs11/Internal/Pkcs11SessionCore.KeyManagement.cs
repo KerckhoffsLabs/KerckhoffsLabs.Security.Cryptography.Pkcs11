@@ -42,6 +42,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, in ckMechanism, template, out NativeCULong keyId);
         ThrowIfError(rv, OpGenerateKey);
+        RecordCreated(keyId);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -110,6 +111,8 @@ internal sealed partial class Pkcs11SessionCore
         // orphan with the caller's label. Whether to retry, and what to clean up first, is the caller's call.
         CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, in ckMechanism, publicKeyTemplate, privateKeyTemplate, out NativeCULong publicKeyId, out NativeCULong privateKeyId);
         ThrowIfError(rv, OpGenerateKeyPair);
+        RecordCreated(publicKeyId);
+        RecordCreated(privateKeyId);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(publicKeyAttributes);
@@ -235,6 +238,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, in ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, out NativeCULong unwrappedKey);
         ThrowIfError(rv, OpUnwrapKey);
+        RecordCreated(unwrappedKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -428,6 +432,7 @@ internal sealed partial class Pkcs11SessionCore
 
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, in ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, out NativeCULong derivedKey);
         ThrowIfError(rv, OpDeriveKey);
+        RecordCreated(derivedKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
         GC.KeepAlive(attributes);
@@ -437,6 +442,11 @@ internal sealed partial class Pkcs11SessionCore
         // SP800-108 sibling-key handles live in scope-owned slots the token wrote into; copy them
         // out before `scope` is disposed.
         mechanism.AbsorbOutput(mechParams);
+        if (_sessionObjects is not null && mechanism.Parameters is CkmSp800108KdfParams kdf)
+        {
+            foreach (ulong sibling in kdf.RawAdditionalDerivedKeyHandles)
+                RecordCreated((NativeCULong)sibling);
+        }
 
         return new ObjectHandle((ulong)derivedKey);
     }

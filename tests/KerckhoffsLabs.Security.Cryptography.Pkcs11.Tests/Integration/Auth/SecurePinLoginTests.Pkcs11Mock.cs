@@ -16,16 +16,14 @@ internal static class SecurePinLoginTestCases
             .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
         using var session = slot.OpenSessionCore();
         using var pin = new SecurePin(backend.UserPin.Span);
-        session.Login(CKU.CKU_USER, pin);
-        session.Logout();
+        session.SendLogin(CKU.CKU_USER, pin.Pin);
+        session.SendLogout();
     }
 
     internal static void Assert_Login_RejectsNullSecurePin(IPkcs11Backend backend)
     {
-        var slot = backend.Library.GetSlotList()
-            .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
-        using var session = slot.OpenSessionCore();
-        Assert.Throws<ArgumentNullException>(() => session.Login(CKU.CKU_USER, (SecurePin)null!));
+        // The core's login takes the PIN's bytes, so the null guard lives at the public entry point.
+        Assert.Throws<ArgumentNullException>(() => backend.Slot.Login(TokenUser.User, (SecurePin)null!));
     }
 }
 

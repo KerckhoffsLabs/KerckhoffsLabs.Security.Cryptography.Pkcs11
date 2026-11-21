@@ -150,7 +150,7 @@ internal static class TestKeys
             if (backend.RequiresUserLogin)
             {
                 using var pin = new SecurePin(backend.UserPin.Span);
-                session.Login(CKU.CKU_USER, pin);
+                session.SendLogin(CKU.CKU_USER, pin.Pin);
             }
             return session;
         }
@@ -176,10 +176,14 @@ internal static class TestKeys
 
         public void Dispose()
         {
-            if (backend.RequiresUserLogin)
-                session.LogoutAndDispose();
-            else
+            try
+            {
+                LogoutIfRequired(backend, session);
+            }
+            finally
+            {
                 session.Dispose();
+            }
         }
     }
 
@@ -192,7 +196,7 @@ internal static class TestKeys
     public static void LogoutIfRequired(IPkcs11Backend backend, Pkcs11SessionCore session)
     {
         if (backend.RequiresUserLogin)
-            session.Logout();
+            session.SendLogout();
     }
 
     /// <summary>

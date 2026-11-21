@@ -154,9 +154,8 @@ internal static class SessionParallelTestCases
             }
             catch
             {
-                // Disposed here only when the round can't start: a session left open stays logged in,
-                // and where login is shared by every session of the application (as PKCS#11 has it),
-                // the next test's C_Login then fails with CKR_USER_ALREADY_LOGGED_IN.
+                // Disposed here only when the round can't start: a session left open keeps the token's
+                // login alive until it is disposed, which would leak that login into the next test.
                 session.Dispose();
                 throw;
             }

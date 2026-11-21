@@ -136,7 +136,7 @@ public sealed class Rfc2898DeriveBytesPkcs11StateTests
             Pkcs11Library library = Load();
             LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
             var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1, policy: CryptoPolicy.AllowInsecure);
-            return new SessionScope(new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core), library);
+            return new SessionScope(new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core), library);
         }
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;

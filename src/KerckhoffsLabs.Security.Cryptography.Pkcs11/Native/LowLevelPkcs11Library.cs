@@ -30,7 +30,36 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
     /// use itself keeps the module from being finalized or unmapped.
     /// </summary>
     /// <param name="holdsOffFinalize"><see langword="false"/> only for a blocking <c>C_WaitForSlotEvent</c>.</param>
-    private ModuleCall EnterModule(bool holdsOffFinalize = true) => new(_module, holdsOffFinalize);
+    private ModuleCall EnterModule(bool holdsOffFinalize = true) => new(_module, holdsOffFinalize, _underOpenSession);
+
+    /// <summary>Set on a view from <see cref="ForSessionOutlivingItsLoad"/>.</summary>
+    private readonly bool _underOpenSession;
+
+    /// <summary>
+    /// A view of this library for one session that may outlive the disposal of this load of the module: a
+    /// token login's anchor session, which every load shares. Its calls still reach the module once this
+    /// library is disposed, which is sound only because each one is made while the session's handle is open
+    /// and referenced: that handle's use of the module keeps it initialized and mapped. The view is never
+    /// disposed and calls nothing on its own.
+    /// </summary>
+    /// <remarks>
+    /// Why the use is sound once the load is disposed: the load's module handle is only marked disposed; it is
+    /// released, and <c>C_Finalize</c> and the unmap run, when its last use goes. Every call on the anchor goes
+    /// through the session's lease, which takes a reference on the open <see cref="Pkcs11SessionHandle"/> first
+    /// (and fails once it is closed); that handle holds a use of the module, holding off <c>C_Finalize</c>, from
+    /// <c>C_OpenSession</c> until after its <c>C_CloseSession</c>. So while a call through this view can start,
+    /// the module is still initialized and mapped. Proved by <c>Pkcs11LoginTests.DisposingTheFirstLibrary_KeepsTheSecondsLogin</c>
+    /// (a second login's probe and the final <c>C_Logout</c> on the first library's anchor after that library is
+    /// disposed).
+    /// </remarks>
+    internal LowLevelPkcs11Library ForSessionOutlivingItsLoad() => new(this);
+
+    private LowLevelPkcs11Library(LowLevelPkcs11Library load)
+    {
+        _module = load._module;
+        _underOpenSession = true;
+        Pbkdf2PasswordLengthByReference = load.Pbkdf2PasswordLengthByReference;
+    }
 
     /// <summary>What has happened to a requested <c>C_Finalize</c> so far.</summary>
     internal (FinalizeOutcome Outcome, CKR ReturnValue) FinalizeStatus => _module.FinalizeStatus;

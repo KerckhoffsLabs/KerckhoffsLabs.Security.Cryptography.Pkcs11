@@ -20,7 +20,7 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
     // NSS's generic token is write-protected, so these token-object cases skip (see NssBackendFixture).
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()

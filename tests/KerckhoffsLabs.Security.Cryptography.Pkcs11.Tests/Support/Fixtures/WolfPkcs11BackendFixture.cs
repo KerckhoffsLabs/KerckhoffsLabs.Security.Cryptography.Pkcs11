@@ -113,6 +113,17 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
     public const bool WolfPkcs11SharesSessionObjectsAcrossSessions = false;
 
     /// <summary>
+    /// A capability, not a departure from PKCS#11: false while wolfPKCS11 has no context-specific login. Its
+    /// <c>C_Login</c> answers <c>CKU_CONTEXT_SPECIFIC</c> with <c>CKR_OPERATION_NOT_INITIALIZED</c> (<c>src/slot.c</c>),
+    /// and so that no key is marked for an authentication it cannot enforce, a template with
+    /// <c>CKA_ALWAYS_AUTHENTICATE = TRUE</c> is refused with <c>CKR_ATTRIBUTE_VALUE_INVALID</c> (<c>src/crypto.c</c>).
+    /// </summary>
+    public const bool WolfPkcs11TakesAContextSpecificLogin = false;
+
+    /// <summary>Gate for the <c>CKA_ALWAYS_AUTHENTICATE</c> cases: see <see cref="WolfPkcs11TakesAContextSpecificLogin"/>.</summary>
+    public static bool ContextLoginAvailable => WolfPkcs11Available && WolfPkcs11TakesAContextSpecificLogin;
+
+    /// <summary>
     /// False while the hash-and-sign mechanisms (every <c>CKM_SHA*_RSA_PKCS</c>, <c>CKM_SHA*_RSA_PKCS_PSS</c>
     /// and <c>CKM_ECDSA_SHA*</c>) and AES-ECB encryption work single-part only: <c>C_SignUpdate</c>,
     /// <c>C_VerifyUpdate</c> and <c>C_EncryptUpdate</c> return <c>CKR_MECHANISM_INVALID</c>, though PKCS#11 v3.2
@@ -263,9 +274,12 @@ public sealed class WolfPkcs11BackendFixture : IPkcs11Backend, IDisposable
 
             slot.InitTokenWithPin(new SecurePin(SoPin.Span), TokenLabel);
 
-            using (Pkcs11Session so = Library.OpenSessionWithPin(TokenLabel, CKU.CKU_SO, new SecurePin(SoPin.Span)))
+            // The SO sets the user PIN (C_InitPIN on its login's own read/write session); disposing the login logs out.
+            using (var soPin = new SecurePin(SoPin.Span))
+            using (Pkcs11Login so = slot.Login(TokenUser.SecurityOfficer, soPin))
+            using (var userPin = new SecurePin(UserPin.Span))
             {
-                so.InitPinWithPin(new SecurePin(UserPin.Span));
+                so.InitUserPinWithPin(userPin);
             }
 
             SlotId = (NativeCULong)slot.SlotId.Value;

@@ -35,6 +35,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// design. Public-key export reads <c>CKA_VALUE</c> from the public handle, which holds the
 /// FIPS 205 standard public-key encoding.
 /// </para>
+/// <para>
+/// A private key with <c>CKA_ALWAYS_AUTHENTICATE</c> is re-authenticated for each signature with the PIN from its
+/// session's <see cref="Pkcs11Session.ContextAuthentication"/> (see <see cref="Pkcs11.ContextAuthentication"/>). The
+/// operations then also throw <see cref="System.Security.Cryptography.CryptographicException"/> (not the
+/// <see cref="System.InvalidOperationException"/> of <see cref="Pkcs11Key"/>'s own methods, which is its inner exception,
+/// so code written against the BCL type catches it) when the session has no source, or the
+/// pinpad on a token without a protected authentication path, or the PIN callback returned no PIN or a disposed one;
+/// and <see cref="Exceptions.Pkcs11AuthenticationException"/> when the token refuses the PIN, or refused it before
+/// (<c>CKR_PIN_INCORRECT</c>, not sent again). <see cref="Exceptions.Pkcs11LoginEndedException"/> means the login the
+/// key was found under has ended.
+/// </para>
 /// </remarks>
 /// <param name="key">A token-resident SLH-DSA key (<see cref="CKK.CKK_SLH_DSA"/>).</param>
 /// <exception cref="ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
@@ -54,12 +65,21 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
         ReadOnlySpan<byte> context,
         Span<byte> destination)
     {
-        if (context.Length > 255)
-            throw new ArgumentException("SLH-DSA context must be at most 255 bytes.", nameof(context));
+        try
+        {
+            if (context.Length > 255)
+                throw new ArgumentException("SLH-DSA context must be at most 255 bytes.", nameof(context));
 
-        var mech = Pkcs11MechanismMap.SlhDsaSign(context: context);
-        byte[] sig = _key.Sign(mech, data);
-        CopyExact(sig, destination, Algorithm.SignatureSizeInBytes);
+            var mech = Pkcs11MechanismMap.SlhDsaSign(context: context);
+            byte[] sig = _key.Sign(mech, data);
+            CopyExact(sig, destination, Algorithm.SignatureSizeInBytes);
+        }
+        catch (InvalidOperationException ex) when (ex is not ObjectDisposedException)
+        {
+            // A context login that cannot be made (no source, a pinpad without a protected authentication
+            // path, no PIN): a CryptographicException, which code written against the BCL type catches.
+            throw new CryptographicException(ex.Message, ex);
+        }
     }
 
     /// <inheritdoc/>

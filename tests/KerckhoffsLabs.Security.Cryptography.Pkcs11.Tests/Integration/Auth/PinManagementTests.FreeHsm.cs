@@ -24,8 +24,7 @@ public sealed class PinManagementTests_FreeHsm(FreeHsmBackendFixture f)
         byte[] original = _backend.UserPin.ToArray();
         byte[] temp = Encoding.UTF8.GetBytes("87654321");
 
-        using (var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original)))
+        using (var session = _backend.OpenSession())
         {
             Exception? ex;
             using (var o = new SecurePin(original))
@@ -46,7 +45,6 @@ public sealed class PinManagementTests_FreeHsm(FreeHsmBackendFixture f)
         }
 
         // The original PIN still logs in.
-        using var again = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original));
+        using var again = _backend.OpenSession();
     }
 }

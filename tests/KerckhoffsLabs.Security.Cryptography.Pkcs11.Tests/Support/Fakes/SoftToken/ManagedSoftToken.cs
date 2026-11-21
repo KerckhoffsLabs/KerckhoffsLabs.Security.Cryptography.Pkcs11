@@ -23,6 +23,10 @@ internal sealed partial class ManagedSoftToken : FakeModule
     private ulong _nextHandle = 100;
     private readonly Dictionary<ulong, Dictionary<ulong, byte[]>> _objects = [];
     private readonly HashSet<ulong> _sessions = [];
+    private readonly HashSet<ulong> _readWriteSessions = [];
+
+    // The user logged in (login state is per application, PKCS#11 v3.2 section 5.6), reported by C_GetSessionInfo.
+    private CKU? _loggedIn;
     private readonly Dictionary<ulong, Queue<ulong>> _finds = [];
 
     // PKCS#11 "attribute unavailable" sentinel: (CK_ULONG)-1, all-ones at the platform's CK_ULONG
@@ -98,6 +102,8 @@ internal sealed partial class ManagedSoftToken : FakeModule
     {
         ulong id = (ulong)NewSessionHandle();
         _sessions.Add(id);
+        if (((ulong)flags & CKF.CKF_RW_SESSION) != 0)
+            _readWriteSessions.Add(id);
         session = (NativeCULong)id;
         return CKR.CKR_OK;
     }
@@ -106,6 +112,7 @@ internal sealed partial class ManagedSoftToken : FakeModule
     {
         ulong s = (ulong)session;
         _sessions.Remove(s);
+        _readWriteSessions.Remove(s);
         _ops.Remove(s);
         _finds.Remove(s);
         return CKR.CKR_OK;
@@ -113,11 +120,26 @@ internal sealed partial class ManagedSoftToken : FakeModule
 
     protected override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
     {
+        ulong s = (ulong)session;
+        bool readWrite = _readWriteSessions.Contains(s);
         info.SlotId = (NativeCULong)SlotId;
+        info.Flags = (NativeCULong)(CKF.CKF_SERIAL_SESSION | (readWrite ? CKF.CKF_RW_SESSION : 0));
+        info.State = (NativeCULong)(ulong)(_loggedIn switch
+        {
+            CKU.CKU_SO => CKS.CKS_RW_SO_FUNCTIONS,
+            CKU.CKU_USER => readWrite ? CKS.CKS_RW_USER_FUNCTIONS : CKS.CKS_RO_USER_FUNCTIONS,
+            _ => readWrite ? CKS.CKS_RW_PUBLIC_SESSION : CKS.CKS_RO_PUBLIC_SESSION,
+        });
         return CKR.CKR_OK;
     }
 
-    protected override CKR C_Login(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin) => CKR.CKR_OK;
+    protected override CKR C_Login(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin)
+    {
+        var user = (CKU)(ulong)userType;
+        if (user != CKU.CKU_CONTEXT_SPECIFIC)
+            _loggedIn = user;
+        return CKR.CKR_OK;
+    }
 
     /// <summary>Number of times <c>C_Logout</c> has been invoked. Used to assert logout-on-dispose.</summary>
     public int LogoutCallCount { get; private set; }
@@ -129,6 +151,8 @@ internal sealed partial class ManagedSoftToken : FakeModule
     protected override CKR C_Logout(NativeCULong session)
     {
         LogoutCallCount++;
+        if (LogoutResult == CKR.CKR_OK)
+            _loggedIn = null;
         return LogoutResult;
     }
 

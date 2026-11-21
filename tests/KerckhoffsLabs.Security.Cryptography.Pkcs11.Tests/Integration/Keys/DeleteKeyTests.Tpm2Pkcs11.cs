@@ -16,8 +16,7 @@ public sealed class DeleteKeyTests_Tpm2Pkcs11(Tpm2Pkcs11BackendFixture f)
     [Fact(SkipUnless = nameof(Tpm2Pkcs11BackendFixture.SecretKeyGenerationAvailable), SkipType = typeof(Tpm2Pkcs11BackendFixture), Skip = "tpm2-software/tpm2-pkcs11#564: C_GenerateKey is not implemented")]
     public void Delete_RemovesKeyFromToken()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
         string label = $"del-{Guid.NewGuid():N}";
         using (var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)

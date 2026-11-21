@@ -16,6 +16,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security
 /// </summary>
 internal static class InsecureOperationGateTestCases
 {
+    // Ends the login a case opened, from the case's finally (its using declaration closes the session after). A
+    // logout the module refuses (CKR_USER_NOT_LOGGED_IN, or the session already gone) is tolerated, so cleanup never
+    // hides the assertion that failed; any other exception is a real failure and propagates.
+    private static void LogOut(Pkcs11SessionCore session)
+    {
+        try
+        {
+            session.SendLogout();
+        }
+        catch (Pkcs11Exception)
+        {
+            // Not logged in any more, or the session is gone: nothing left to log out.
+        }
+    }
+
     // ---------------------------------------------------------------------------
     // Encrypt gate
     // ---------------------------------------------------------------------------

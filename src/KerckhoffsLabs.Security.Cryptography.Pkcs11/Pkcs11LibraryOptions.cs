@@ -179,6 +179,39 @@ public sealed class Pkcs11LibraryOptions
     /// </remarks>
     public Pkcs11CurveCatalog? CurveCatalog { get; init; }
 
+    /// <summary>
+    /// How long a PIN the token refused is kept from being sent again, or <see langword="null"/> (the default) for until
+    /// it is forgotten otherwise (see <see cref="Pkcs11Slot.ForgetRefusedPins"/>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A refused PIN is not sent to the token again, since every wrong PIN costs one of the PIN's retries. The library
+    /// sees the PIN change only when it is made through it: a new PIN put in the secret store and tried before the token
+    /// was changed stays refused after the change, until <see cref="Pkcs11Slot.ForgetRefusedPins"/> or the process ends
+    /// (or until more refusals than the slot keeps push it out: see <see cref="Pkcs11Slot.ForgetRefusedPins"/>).
+    /// </para>
+    /// <para>
+    /// Set a lifetime to have such a PIN tried again once it has passed. The cost: a PIN that is still wrong is then sent
+    /// once per lifetime, and each send takes one of its retries, so a stale PIN locks the token after as many lifetimes
+    /// as it has retries (unless a right PIN is entered in between). Leave it unset unless an outage until restart is
+    /// worse than that. Applied by each <see cref="Pkcs11Library"/> to the PINs it sends; refusals are shared by every
+    /// load of the module.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value is zero or negative.</exception>
+    public TimeSpan? RefusedPinLifetime
+    {
+        get => _refusedPinLifetime;
+        init
+        {
+            if (value is { } lifetime && lifetime <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(RefusedPinLifetime), value, "Must be positive, or null for no lifetime.");
+            _refusedPinLifetime = value;
+        }
+    }
+
+    private readonly TimeSpan? _refusedPinLifetime;
+
     // Strict UTF-8: a lone surrogate is refused rather than silently replaced with U+FFFD, which would
     // hand the module a configuration string different from the one the caller wrote.
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);

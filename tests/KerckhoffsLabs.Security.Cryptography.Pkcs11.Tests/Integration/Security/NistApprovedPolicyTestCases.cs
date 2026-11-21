@@ -15,10 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security
 internal static class NistApprovedPolicyTestCases
 {
     // A NistApproved session over the backend's own authentication model (no login on NSS's public token).
-    private static Pkcs11Session OpenFips(IPkcs11Backend backend) =>
-        backend.RequiresUserLogin
-            ? backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span), CryptoPolicy.NistApproved)
-            : backend.Library.OpenSessionWithoutLogin(backend.TokenLabel, CryptoPolicy.NistApproved);
+    private static Pkcs11Session OpenFips(IPkcs11Backend backend) => backend.OpenSession(CryptoPolicy.NistApproved);
 
     internal static void Assert_AesGcm_RoundTrips(IPkcs11Backend backend)
     {

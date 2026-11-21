@@ -10,8 +10,7 @@ public sealed class Pkcs11KeyMechanismTests_BouncyHsm(BouncyHsmBackendFixture ba
     private readonly BouncyHsmBackendFixture _backend = backend;
 
     private Pkcs11Session OpenSession() =>
-        _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        _backend.OpenSession();
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void RsaPkcs_SignVerify_RoundTrip()

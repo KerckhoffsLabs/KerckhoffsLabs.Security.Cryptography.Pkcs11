@@ -109,6 +109,18 @@ public sealed class BouncyHsmServerTests
     }
 
     [Fact]
+    public void RejectionMessage_RedactsTheSignaturePin()
+    {
+        string body = JsonSerializer.Serialize(new { title = "Bad token", detail = "signature sig-pin+4242" });
+
+        string message = BouncyHsmServer.RejectionMessage(400, "Bad Request", body, "user-pin-4711", "so-pin-0815", "sig-pin+4242");
+
+        Assert.Contains("Bad token", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("sig-pin+4242", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("4242", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RejectionMessage_WithAnEmptyPin_StillReportsTheReason()
     {
         string body = JsonSerializer.Serialize(new { title = "Bad token", detail = "so so-pin-0815" });

@@ -25,6 +25,64 @@ public sealed class SecurePinTests
     public void Constructor_RejectsNullString()
         => Assert.Throws<ArgumentNullException>(() => new SecurePin((string)null!));
 
+    /// <summary>
+    /// The string overload throws before the constructor it chains to runs its field initializers, so the instance is
+    /// half built, yet registered for finalization: its finalizer must not lock on, or zero, fields never assigned. An
+    /// exception on the finalizer thread ends the process, so the test host would die here.
+    /// </summary>
+    [Fact]
+    public void Constructor_RejectsNullString_FinalizerOfTheHalfBuiltInstanceIsSafe()
+    {
+        for (int i = 0; i < 16; i++)
+            ThrowOnNull();
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        static void ThrowOnNull() => Assert.Throws<ArgumentNullException>(() => new SecurePin((string)null!));
+    }
+
+    /// <summary>
+    /// The finalizer of an undisposed instance zeroes its buffer without taking the lock.
+    /// </summary>
+    [Fact]
+    public void Finalizer_OfAnUndisposedInstance_DoesNotThrow()
+    {
+        for (int i = 0; i < 16; i++)
+            Abandon();
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        static void Abandon() => _ = new SecurePin("1234");
+    }
+
+    /// <summary>
+    /// A use ends once: disposing it again must not end another use in progress, so the PIN stays readable for that one
+    /// and is still zeroed as it ends.
+    /// </summary>
+    [Fact]
+    public void Use_DisposedTwice_EndsOnlyOnce()
+    {
+        var pin = new SecurePin("1234");
+        SecurePin.Use first = pin.BeginUse();
+        SecurePin.Use second = pin.BeginUse();
+        pin.Dispose();
+
+        first.Dispose();
+        first.Dispose();
+
+        Assert.Equal("1234"u8.ToArray(), pin.Pin.ToArray());
+
+        second.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => pin.Pin.Length);
+    }
+
     [Fact]
     public void Constructor_FromSpan_RejectsEmpty()
         => Assert.Throws<ArgumentException>(() => new SecurePin(ReadOnlySpan<byte>.Empty));

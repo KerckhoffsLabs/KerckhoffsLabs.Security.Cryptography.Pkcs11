@@ -28,11 +28,17 @@ public sealed record SlotInfo
     /// <see cref="LibraryInfo.CryptokiVersion"/> for how <c>CK_VERSION</c> encodes the minor field.</summary>
     public Version FirmwareVersion { get; }
 
+    // The fields as the module reported them, padding removed (PaddedField.Raw), for comparisons.
+    internal string RawSlotDescription { get; }
+    internal string RawManufacturerId { get; }
+
     internal SlotInfo(NativeCULong slotId, CK_SLOT_INFO ck_slot_info)
     {
         SlotId = new SlotId((ulong)slotId);
-        SlotDescription = Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd();
-        ManufacturerId = Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd();
+        SlotDescription = Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd(' ', '\0');
+        ManufacturerId = Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd(' ', '\0');
+        RawSlotDescription = Internal.PaddedField.Raw(ck_slot_info.SlotDescription);
+        RawManufacturerId = Internal.PaddedField.Raw(ck_slot_info.ManufacturerId);
         SlotFlags = new SlotFlags((ulong)ck_slot_info.Flags);
         HardwareVersion = ck_slot_info.HardwareVersion.ToVersion();
         FirmwareVersion = ck_slot_info.FirmwareVersion.ToVersion();

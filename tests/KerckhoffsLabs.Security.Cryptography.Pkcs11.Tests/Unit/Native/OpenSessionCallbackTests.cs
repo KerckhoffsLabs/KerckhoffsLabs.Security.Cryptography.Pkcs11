@@ -1,7 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
@@ -18,9 +17,9 @@ public sealed class OpenSessionCallbackTests
     public void OpenSession_PassesNullApplicationAndNotify()
     {
         using var module = new OpenSessionModule();
-        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        using Pkcs11Library library = module.Load();
 
-        using (Pkcs11SessionCore session = new Pkcs11Slot(lowLevel, 0).OpenSessionCore())
+        using (Pkcs11SessionCore session = new Pkcs11Slot(library, 0).OpenSessionCore())
         {
             Assert.Equal(1, module.CallCount("C_OpenSession"));
         }

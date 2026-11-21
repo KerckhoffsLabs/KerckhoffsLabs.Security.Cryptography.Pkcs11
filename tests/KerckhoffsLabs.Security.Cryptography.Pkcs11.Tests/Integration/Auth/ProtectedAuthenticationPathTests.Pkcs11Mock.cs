@@ -6,16 +6,13 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 
 /// <summary>
-/// Coverage for the protected-authentication-path overloads: PKCS#11 signals
-/// "collect the PIN on the token's own pinpad" by passing <c>pPin = NULL_PTR</c>, and the interop
-/// layer already turns an empty span into a null pointer via <see langword="fixed"/> — what was missing was any
-/// public entry point that could produce an empty span at all, since every one required a non-empty
-/// <see cref="SecurePin"/>. pkcs11-mock does not advertise
-/// <see cref="TokenFlags.ProtectedAuthenticationPath"/> and its <c>C_Login</c>/<c>C_InitPIN</c>/
-/// <c>C_SetPIN</c>/<c>C_InitToken</c> all reject a null PIN pointer with
-/// <see cref="CKR.CKR_ARGUMENTS_BAD"/> (verified against vendor/pkcs11-mock/src/pkcs11-mock.c) — so
-/// getting exactly that return code back, rather than a managed-side guard throwing first, is direct
-/// proof the empty span reached the native call as NULL.
+/// Coverage for the protected-authentication-path overloads against a token without a pinpad. PKCS#11 signals "collect
+/// the PIN on the token's own pinpad" by passing <c>pPin = NULL_PTR</c>, and gives that a meaning only on a token with
+/// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. pkcs11-mock does not advertise it, and its
+/// <c>C_Login</c>/<c>C_InitPIN</c>/<c>C_SetPIN</c>/<c>C_InitToken</c> reject a null PIN pointer with
+/// <see cref="CKR.CKR_ARGUMENTS_BAD"/> (vendor/pkcs11-mock/src/pkcs11-mock.c). The internal send, which has no check of
+/// its own, gets exactly that code back: direct proof the empty span reaches the native call as NULL. Every public
+/// pinpad call, and the record's internal sends, are refused before the module instead, with nothing sent.
 /// </summary>
 [Collection("Mock")]
 public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
@@ -28,6 +25,13 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         Assert.Equal(CKR.CKR_ARGUMENTS_BAD, ex.ReturnValue);
     }
 
+    // The library's refusal of a pinpad call on a token without one: an InvalidOperationException, before the module.
+    private static void AssertRefusedNoPinpad(Action action)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(action);
+        Assert.Contains("no protected authentication path", ex.Message, StringComparison.Ordinal);
+    }
+
     // === Pkcs11SessionCore (internal) ===========================================
 
     [Fact]
@@ -36,66 +40,68 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
         using var session = slot.OpenSessionCore();
-        AssertArgumentsBad(() => session.Login(CKU.CKU_USER));
+        AssertArgumentsBad(() => session.SendLogin(CKU.CKU_USER, default));
     }
 
     [Fact]
-    public void SessionSetPin_NoArgs_ReachesNativeCallAsNull()
+    public void SessionSetPin_NoArgs_NoPinpad_RefusedBeforeTheModule()
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
         using var session = slot.OpenSessionCore();
-        AssertArgumentsBad(() => session.SetPin());
+        AssertRefusedNoPinpad(() => session.SetPin());
     }
 
     [Fact]
-    public void SessionInitPin_NoArg_ReachesNativeCallAsNull()
+    public void SessionInitPin_NoArg_NoPinpad_RefusedBeforeTheModule()
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
         using var session = slot.OpenSessionCore();
         // C_InitPIN requires an SO-authenticated session before it even looks at the PIN
-        // pointer, so log in with a real PIN first — only InitPin itself is under test.
+        // pointer, so log in with a real PIN first — only InitPin itself is under test. This is the send
+        // Pkcs11Login.InitUserPinWithPinpad makes on the SO login's anchor; that public path is
+        // LoginInitUserPinWithPinpad_NoPinpad_RefusedBeforeTheModule below.
         using var soPin = new SecurePin(_backend.SoPin.Span);
-        session.Login(CKU.CKU_SO, soPin);
+        session.SendLogin(CKU.CKU_SO, soPin.Pin);
 
-        AssertArgumentsBad(() => session.InitPin());
+        AssertRefusedNoPinpad(() => session.SendInitPin(default));
     }
 
     // === Pkcs11Slot (public) =================================================
 
     [Fact]
-    public void SlotInitTokenWithPinpad_NoPin_ReachesNativeCallAsNull()
+    public void SlotInitTokenWithPinpad_NoPinpad_RefusedBeforeTheModule()
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
 
-        // pkcs11-mock returns CKR_ARGUMENTS_BAD before touching any token state, so this is safe to
-        // run against the collection-shared mock instance.
-        AssertArgumentsBad(() => slot.InitTokenWithPinpad(_backend.TokenLabel));
+        // Refused before C_InitToken: the collection-shared mock token is untouched.
+        AssertRefusedNoPinpad(() => slot.InitTokenWithPinpad(_backend.TokenLabel));
     }
 
-    // === Pkcs11Library / Pkcs11Session (public) ===========================
+    // === Pkcs11Slot / Pkcs11Session (public) ==============================
+
+    // The login's own session is closed again when the login is refused.
+    [Fact]
+    public void SlotLoginWithPinpad_NoPinpad_RefusedBeforeTheModule() =>
+        AssertRefusedNoPinpad(() => _backend.Slot.LoginWithPinpad(TokenUser.User));
 
     [Fact]
-    public void LibraryOpenSessionWithPinpad_NoPin_ReachesNativeCallAsNull() =>
-        AssertArgumentsBad(() => _backend.Library.OpenSessionWithPinpad(_backend.TokenLabel, CKU.CKU_USER));
-
-    [Fact]
-    public void SessionSetPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
+    public void SessionSetPinWithPinpad_NoPinpad_RefusedBeforeTheModule()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var session = _backend.OpenSession();
 
-        AssertArgumentsBad(session.SetPinWithPinpad);
+        AssertRefusedNoPinpad(session.SetPinWithPinpad);
     }
 
+    // The SO login made with its PIN; only C_InitPIN on the pinpad is refused.
     [Fact]
-    public void SessionInitPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
+    public void LoginInitUserPinWithPinpad_NoPinpad_RefusedBeforeTheModule()
     {
-        using var session = _backend.Library.OpenSessionWithPin(
-            _backend.TokenLabel, CKU.CKU_SO, new SecurePin(_backend.SoPin.Span));
+        using var soPin = new SecurePin(_backend.SoPin.Span);
+        using Pkcs11Login login = _backend.Slot.Login(TokenUser.SecurityOfficer, soPin);
 
-        AssertArgumentsBad(session.InitPinWithPinpad);
+        AssertRefusedNoPinpad(login.InitUserPinWithPinpad);
     }
 }

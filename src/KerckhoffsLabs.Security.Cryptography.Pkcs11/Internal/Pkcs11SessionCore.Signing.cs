@@ -17,14 +17,19 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="mechanism">Signing mechanism.</param>
     /// <param name="keyHandle">Handle of the private/MAC key.</param>
     /// <param name="data">Data to sign.</param>
+    /// <param name="context">
+    /// The context login for a key with <c>CKA_ALWAYS_AUTHENTICATE</c>, prepared before the lease
+    /// (<see cref="ContextLogin.Prepare"/>), or <see langword="null"/>: sent between <c>C_SignInit</c> and
+    /// <c>C_Sign</c> (see <see cref="AuthenticateContext"/>).
+    /// </param>
     /// <returns>Signature bytes (size depends on key + mechanism).</returns>
-    public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
+    public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ContextLogin? context = null)
     {
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
         Enforce(mechanism, CryptoOperation.Sign);
-        return SignAfterPolicyCheck(mechanism, keyHandle, data);
+        return SignAfterPolicyCheck(mechanism, keyHandle, data, context);
     }
 
     /// <summary>
@@ -36,13 +41,13 @@ internal sealed partial class Pkcs11SessionCore
     /// <exception cref="CryptoPolicyViolationException">The policy refuses the combined mechanism for signing.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hash"/> is not supported.</exception>
     /// <exception cref="CryptographicException"><paramref name="digest"/> is not the length of a <paramref name="hash"/> digest.</exception>
-    internal byte[] SignPkcs1Digest(HashAlgorithmName hash, ObjectHandle keyHandle, ReadOnlySpan<byte> digest)
+    internal byte[] SignPkcs1Digest(HashAlgorithmName hash, ObjectHandle keyHandle, ReadOnlySpan<byte> digest, ContextLogin? context = null)
     {
         using var _ = AcquireExclusive();
 
         (CKM scheme, byte[] digestInfo) = Pkcs1DigestInfo.Encode(hash, digest);
         Enforce(new Mechanism(scheme), CryptoOperation.Sign);
-        return SignAfterPolicyCheck(RawRsaPkcs1(), keyHandle, digestInfo);
+        return SignAfterPolicyCheck(RawRsaPkcs1(), keyHandle, digestInfo, context);
     }
 
     // KLPKCS11008 warns a caller who selects CKM_RSA_PKCS, for its PKCS#1 v1.5 encryption. The two methods
@@ -52,9 +57,11 @@ internal sealed partial class Pkcs11SessionCore
     private static Mechanism RawRsaPkcs1() => new(CKM.CKM_RSA_PKCS);
 #pragma warning restore KLPKCS11008
 
-    private byte[] SignAfterPolicyCheck(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
+    private byte[] SignAfterPolicyCheck(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ContextLogin? context)
     {
         Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
+
+        CheckContextLogin(context);
 
         using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
@@ -62,12 +69,20 @@ internal sealed partial class Pkcs11SessionCore
         using var operation = BeginOperation("Sign");
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
         operation.Begin(CKF.CKF_SIGN, rv, OpSignInit);
+        AuthenticateContext(context);
 
         byte[] signature = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, lengthOnly, out len),
             OpSign,
             KnownOutputLength.OfSignature(mechanism.Type),
-            () => _pkcs11Library.C_SignInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId));
+            () =>
+            {
+                // A restarted operation is a new use of the key: it is authenticated again, with the same PIN.
+                CKR restarted = _pkcs11Library.C_SignInit(_sessionId, in ckMechanism, (NativeCULong)keyHandle.ObjectId);
+                if (restarted == CKR.CKR_OK)
+                    AuthenticateContext(context);
+                return restarted;
+            });
         operation.Completed();
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -365,6 +380,8 @@ internal sealed partial class Pkcs11SessionCore
     /// <param name="signature">Signature</param>
     /// <param name="bufferLength">Size of read buffer in bytes</param>
     /// <returns><see langword="true"/> if the signature verifies; <see langword="false"/> otherwise.</returns>
+    // Sends no context login: it takes a bare handle, not a key whose CKA_ALWAYS_AUTHENTICATE is known, and nothing in
+    // the public API reaches it. A key that needs one makes the module answer CKR_USER_NOT_LOGGED_IN at the end.
     public bool DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, int bufferLength)
     {
         using var _ = AcquireExclusive();
