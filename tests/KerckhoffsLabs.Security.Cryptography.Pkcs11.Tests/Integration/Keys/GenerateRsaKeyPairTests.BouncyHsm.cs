@@ -22,12 +22,7 @@ public sealed class GenerateRsaKeyPairTests_BouncyHsm(BouncyHsmBackendFixture ba
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(GenerateRsaKeyPairTestCases.ModulusBitsAboveTheMaximum), MemberType = typeof(GenerateRsaKeyPairTestCases))]
-    public void RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(string row)
-    {
-        if (row == "2^32 + 2048" && !BouncyHsmBackendFixture.BouncyHsmRefusesAKeyLengthAttributeAbove32Bits)
-            Assert.Skip("BouncyHsm cuts CKA_MODULUS_BITS to 32 bits and makes a 2048-bit key");
-        GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(_backend, row);
-    }
+    public void RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(string row) => GenerateRsaKeyPairTestCases.Assert_RsaKeyGen_ModulusBitsAboveTheMaximum_IsRefused(_backend, row);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(GenerateRsaKeyPairTestCases.PublicExponents), MemberType = typeof(GenerateRsaKeyPairTestCases))]

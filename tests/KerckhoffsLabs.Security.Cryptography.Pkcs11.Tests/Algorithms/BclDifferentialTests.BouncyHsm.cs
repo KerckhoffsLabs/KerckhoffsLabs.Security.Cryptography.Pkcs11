@@ -10,10 +10,9 @@ public sealed class BclDifferentialTests_BouncyHsm(BouncyHsmBackendFixture backe
 {
     private readonly BouncyHsmBackendFixture _backend = backend;
 
-    // No empty message while the server refuses to digest one: see BouncyHsmBackendFixture.BouncyHsmAcceptsEmptyDigest.
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(PropertyTestSupport.Hashes), MemberType = typeof(PropertyTestSupport))]
-    public void Digest_MatchesBcl(string hashName) => BclDifferentialTestCases.Assert_Digest_MatchesBcl(_backend, hashName, emptyData: BouncyHsmBackendFixture.BouncyHsmAcceptsEmptyDigest);
+    public void Digest_MatchesBcl(string hashName) => BclDifferentialTestCases.Assert_Digest_MatchesBcl(_backend, hashName);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(PropertyTestSupport.Hashes), MemberType = typeof(PropertyTestSupport))]
@@ -41,7 +40,7 @@ public sealed class BclDifferentialTests_BouncyHsm(BouncyHsmBackendFixture backe
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ChaCha20Poly1305_MatchesBcl() => BclDifferentialTestCases.Assert_ChaCha20Poly1305_MatchesBcl(_backend);
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.HkdfReadbackAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives an HKDF-derived key the base key's CKA_SENSITIVE and CKA_EXTRACTABLE")]
     [MemberData(nameof(PropertyTestSupport.Hashes), MemberType = typeof(PropertyTestSupport))]
     public void Hkdf_MatchesBcl(string hashName) => BclDifferentialTestCases.Assert_Hkdf_MatchesBcl(_backend, hashName);
 

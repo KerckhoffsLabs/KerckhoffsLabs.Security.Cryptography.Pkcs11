@@ -21,7 +21,7 @@ public sealed class BufferConventionTests_BouncyHsm(BouncyHsmBackendFixture back
         BufferConventionTestCases.Assert_EncryptFinal_WithNoUpdate_IsTheEmptyMessage(_backend, mode, refusal: CKR.CKR_GENERAL_ERROR);
     }
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.EmptyDigestAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm answers a digest of empty data with CKR_DATA_LEN_RANGE")]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.EmptyMultipartDigestAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm answers C_DigestFinal with no C_DigestUpdate with CKR_DATA_LEN_RANGE")]
     public void Digest_EmptyStream_IsTheHashOfNothing() => BufferConventionTestCases.Assert_Digest_EmptyStream_IsTheHashOfNothing(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]

@@ -362,10 +362,9 @@ internal static class ObjectConformanceTestCases
     // A module derives CKA_ALWAYS_SENSITIVE, CKA_NEVER_EXTRACTABLE and CKA_KEY_GEN_MECHANISM (§4.7): a key it
     // generated sensitive and unextractable has both flags TRUE and its generation mechanism; a key imported
     // with its value has both FALSE, and no generation mechanism (CK_UNAVAILABLE_INFORMATION).
-    // reported names the provenance attributes the backend reports; importedNeverExtractable records a backend
-    // that reports an imported, unextractable key as CKA_NEVER_EXTRACTABLE, importedKeyGenMechanism one that
-    // reports a generation mechanism for it.
-    internal static void Assert_ProvenanceAttributes_TellGeneratedFromImported(IPkcs11Backend backend, CKA[]? reported = null, bool importedNeverExtractable = false, ulong? importedKeyGenMechanism = null)
+    // reported names the provenance attributes the backend reports; importedKeyGenMechanism records a backend
+    // that reports a generation mechanism for an imported key.
+    internal static void Assert_ProvenanceAttributes_TellGeneratedFromImported(IPkcs11Backend backend, CKA[]? reported = null, ulong? importedKeyGenMechanism = null)
     {
         reported ??= [CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE, CKA.CKA_KEY_GEN_MECHANISM];
         backend.RequireMechanism(CKM.CKM_AES_KEY_GEN);
@@ -388,7 +387,7 @@ internal static class ObjectConformanceTestCases
                 if (!gen[1].CannotBeRead)
                 {
                     Assert.True(gen[1].GetValueAsBool(), "A key generated unextractable is not CKA_NEVER_EXTRACTABLE.");
-                    Assert.Equal(importedNeverExtractable, imp[1].GetValueAsBool());
+                    Assert.False(imp[1].GetValueAsBool(), "An imported key is CKA_NEVER_EXTRACTABLE.");
                 }
                 if (!gen[2].CannotBeRead)
                 {
