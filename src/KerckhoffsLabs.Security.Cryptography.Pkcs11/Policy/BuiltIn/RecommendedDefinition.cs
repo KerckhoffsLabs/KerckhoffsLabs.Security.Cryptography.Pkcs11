@@ -27,7 +27,12 @@ internal static class RecommendedDefinition
         $"If you have reviewed it, add it with {policy.WideningCall("AllowMechanism(...)")}.";
 
     /// <summary>Builds the Recommended policy.</summary>
-    internal static ComposedCryptoPolicy Create()
+    /// <param name="inspectKeys">
+    /// <see langword="false"/> leaves out the key-strength rule (<see cref="ExistingKeyStrength"/>), so sessions read
+    /// nothing from the token to describe a key. For tests over fake modules that answer no attributes; the built-in
+    /// policy always inspects keys.
+    /// </param>
+    internal static ComposedCryptoPolicy Create(bool inspectKeys = true)
     {
         // Only a false CKA_SENSITIVE is refused (KeyTemplateRule.RequireSensitive): an extractable key can
         // still be wrapped — exported encrypted under a KEK — which is the standard way to back up and
@@ -45,7 +50,8 @@ internal static class RecommendedDefinition
             .WithKeyTemplateRule(KeyTemplateRule.RequireSensitive(
                 "A key template with CKA_SENSITIVE=false is refused; non-extractable (CKA_EXTRACTABLE=false) stays the default.",
                 "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token."))
-            .WithKeyMaterialExportRule(KeyMaterialExportRule.Refuse());
+            .WithKeyMaterialExportRule(KeyMaterialExportRule.Refuse())
+            .WithKeyStrengthRule(inspectKeys ? ExistingKeyStrength.Recommended(BuildAllowedCurves()) : KeyStrengthRule.Unchecked);
         foreach ((CKM mechanism, MechanismRule rule) in BuildAllowedMechanisms()) b.AllowRule(mechanism, rule);
         foreach ((string name, AllowedHash hash) in BuildAllowedHashes()) b.AllowHash(name, hash.Operations, hash.Rationale);
         foreach ((string oid, string rationale) in BuildAllowedCurves()) b.AllowCurve(oid, rationale);

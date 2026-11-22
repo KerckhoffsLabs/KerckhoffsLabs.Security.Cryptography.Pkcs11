@@ -266,13 +266,14 @@ Per-family allow-list for the PRF named inside PBKDF2 / SP 800-108 / HKDF mechan
 
 ## Rules
 
-Beyond the allow-lists above, three rules apply: the modulus rule to RSA key-pair generation requests, the template rule to key templates the library creates keys from, and the export rule to every read of secret key material off the token.
+Beyond the allow-lists above, four rules apply: the modulus rule to RSA key-pair generation requests, the template rule to key templates the library creates keys from, the export rule to every read of secret key material off the token, and the key-strength rule to every key template, every key the token creates (a key that fails is destroyed) and every use of an existing key.
 
 | Rule | Rationale |
 |---|---|
 | RSA key-pair generation modulus | RSA key generation requires a modulus of at least 2048 bits (FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3). |
 | Key template (`CKA_SENSITIVE`) | CSPs must not be output in plaintext; a key template with CKA_SENSITIVE=false is refused (FIPS 140-3, ISO/IEC 19790 §7.9). |
 | Key-material export | Reading key material off the module in plaintext is not permitted (FIPS 140-3, ISO/IEC 19790 §7.9). |
+| Key strength | Each time an existing RSA or EC key is used, its modulus (CKA_MODULUS) or curve (CKA_EC_PARAMS) is read from the token: an RSA key must have at least 2048 bits and an EC key must be on the curve allow-list. Verifying an old signature is the one legacy use: RSA keys of 1024 to 2047 bits and curves with 160 <= len(n) < 224 (P-192) may still verify (SP 800-131A Rev.2 Table 2). A key whose modulus or named curve the token does not report is refused. Other key types are not judged by size. |
 
 ## Documented refusals
 
@@ -457,7 +458,6 @@ Documentation only: every item below is refused because it is absent from the al
 
 ## Known limits
 
-- The size and curve of keys already on the token are not inspected: using an existing key that would not pass generation (a short RSA modulus, a weak curve, …) is not refused. Only an ECDH key's type is checked.
 - Raw `CKM_ECDSA`, `CKM_RSA_PKCS` and `CKM_RSA_PKCS_PSS` sign a caller-computed digest; the hash that produced it is not visible to the policy.
 - NistApproved restricts what this library sends to the token. FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
 

@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
@@ -36,7 +37,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), "data"u8);
 
@@ -50,7 +51,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         session.Digest(new Mechanism(CKM.CKM_SHA256), "data"u8);
 
@@ -64,7 +65,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         session.Sign(new Mechanism(CKM.CKM_SHA512_HMAC), new ObjectHandle(1), "data"u8);
 
@@ -77,7 +78,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         session.Encrypt(Gcm(), new ObjectHandle(1), "data"u8);
 
@@ -109,7 +110,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE_LEN]).Dispose();
 
@@ -124,7 +125,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         long allocated = Allocated(() => session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE_LEN]).Dispose());
 
@@ -139,7 +140,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
         byte[] small = new byte[SmallInput];
         byte[] large = new byte[LargeInput];
 

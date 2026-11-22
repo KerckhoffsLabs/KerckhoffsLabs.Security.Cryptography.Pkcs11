@@ -195,7 +195,7 @@ public sealed class KeyStrengthGateTests
     }
 
     [Fact]
-    public void NistApproved_ReadsNoAttributes()
+    public void NistApproved_ReadsTheKeyOnce_AndAllowsAnyAesLength()
     {
         using var fake = new StrengthFake();
         fake.SetKey(Key, CKK.CKK_AES, 16);
@@ -203,16 +203,16 @@ public sealed class KeyStrengthGateTests
 
         Encrypt(session, Key);
 
-        Assert.Equal(0, fake.AttributeCalls);
+        Assert.Equal(1, fake.AttributeCalls);
         Assert.Equal(1, fake.EncryptInitCalls);
     }
 
     [Fact]
-    public void PlainCustomPolicy_DoesNotInspectKeys_ByDefault()
+    public void PlainCustomPolicy_DoesNotInspectKeys_ByDefault_TheBuiltInsDo()
     {
         Assert.False(((ICryptoPolicy)new AllowEverything()).InspectsKeys);
-        Assert.False(((ICryptoPolicy)CryptoPolicy.Recommended).InspectsKeys);
-        Assert.False(((ICryptoPolicy)CryptoPolicy.NistApproved).InspectsKeys);
+        Assert.True(((ICryptoPolicy)CryptoPolicy.Recommended).InspectsKeys);
+        Assert.True(((ICryptoPolicy)CryptoPolicy.NistApproved).InspectsKeys);
         Assert.True(((ICryptoPolicy)CryptoPolicy.Cnsa20).InspectsKeys);
     }
 
@@ -451,9 +451,24 @@ public sealed class KeyStrengthGateTests
         Assert.Equal(1, fake.SetOperationStateCalls);
     }
 
-    // A key type with no size attribute in the list is described by its type alone: one read.
+    // A key type described by its type alone (no size attribute, and not RSA or EC): one read.
     [Fact]
     public void KeyTypeWithoutASizeAttribute_IsReadOnce()
+    {
+        using var fake = new StrengthFake();
+        fake.Keys[Key.ObjectId] = new() { [CKA.CKA_KEY_TYPE] = (ulong)CKK.CKK_DES3 };
+        using var session = fake.CreateSession(policy: AllowAllButKeyStrength());
+
+        KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
+
+        Assert.Equal(CKK.CKK_DES3, request.KeyType);
+        Assert.Equal(1, fake.AttributeCalls);
+    }
+
+    // The one call asks for the modulus's length only; a token that answers it absent is final: one call, and the key is
+    // described as not reporting it.
+    [Fact]
+    public void RsaKeyWithoutAModulus_IsDescribedWithoutIt_InOneCall()
     {
         using var fake = new StrengthFake();
         fake.Keys[Key.ObjectId] = new() { [CKA.CKA_KEY_TYPE] = (ulong)CKK.CKK_RSA };
@@ -462,6 +477,7 @@ public sealed class KeyStrengthGateTests
         KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
 
         Assert.Equal(CKK.CKK_RSA, request.KeyType);
+        Assert.Null(request.ModulusBits);
         Assert.Equal(1, fake.AttributeCalls);
     }
 
@@ -583,6 +599,8 @@ public sealed class KeyStrengthGateTests
 
         Assert.Equal(CKK.CKK_RSA, request.KeyType);
         Assert.Equal(KeyStrengthSource.ExistingKey, request.Source);
+        Assert.Equal(CryptoOperation.Verify, request.Operation);
+        // The fake reports no modulus: the one-call read answers it absent.
         Assert.Equal(1, fake.AttributeCalls);
     }
 }

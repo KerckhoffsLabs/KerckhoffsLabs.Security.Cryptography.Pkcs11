@@ -151,11 +151,12 @@ public sealed record KeyAgreementKeyRequest(CKM Mechanism, CKK KeyType) : Policy
 }
 
 /// <summary>
-/// The strength of a key that is about to be created or used: its type, size and, for post-quantum keys, its
-/// parameter set. A policy that inspects keys (<c>InspectsKeys</c>) is asked before the library lets the
-/// token create or use the key; the built-in <c>Recommended</c> and <c>NistApproved</c> policies allow every one.
-/// A <see langword="null"/> property means the value was not reported (absent from the template, or the
-/// token would not say), which a strict policy can refuse.
+/// The strength of a key that is about to be created or used: its type, and the size its type is judged by (the
+/// length of a symmetric key, the parameter set of a post-quantum key, the levels of an HSS key, the modulus of an
+/// RSA key, the curve of an EC key), and for an existing key the operation it is about to be used for. A policy
+/// that inspects keys (<c>InspectsKeys</c>) is asked before the library lets the token create or use the key. A
+/// <see langword="null"/> property means the value was not reported (absent from the template, or the token would
+/// not say), which a strict policy can refuse.
 /// </summary>
 /// <param name="KeyType">The <c>CKA_KEY_TYPE</c>, or <see langword="null"/> when not reported.</param>
 /// <param name="Source">Where the description of the key comes from.</param>
@@ -170,6 +171,26 @@ public sealed record KeyStrengthRequest(CKK? KeyType, KeyStrengthSource Source) 
     /// <summary>The <c>CKA_HSS_LEVELS</c> of an HSS key, or <see langword="null"/> when not reported.</summary>
     public ulong? HssLevels { get; init; }
 
+    /// <summary>
+    /// The length in bits of an RSA key's modulus (<c>CKA_MODULUS</c>), or <see langword="null"/> for another key type
+    /// or when not reported. Read from the token for a created or existing key; a template is not described by it.
+    /// </summary>
+    public int? ModulusBits { get; init; }
+
+    /// <summary>
+    /// The named curve of an EC key (<c>CKA_EC_PARAMS</c>), or <see langword="null"/> for another key type, or when
+    /// the token did not report a named curve (absent, or explicit domain parameters). Read from the token for a
+    /// created or existing key; a template is not described by it.
+    /// </summary>
+    public Pkcs11ECCurve? Curve { get; init; }
+
+    /// <summary>
+    /// The operation an existing key is about to be used for, so a policy can allow a weaker key for one operation only
+    /// (verifying an old signature, say); <see langword="null"/> for a template, a created key, or a use that is not
+    /// one operation (<c>C_SetOperationState</c>).
+    /// </summary>
+    public CryptoOperation? Operation { get; init; }
+
     internal override string Describe()
     {
         string text = KeyType is { } type ? $"{KeyTypeNames.Of(type)} key" : "key of unknown type";
@@ -179,7 +200,12 @@ public sealed record KeyStrengthRequest(CKK? KeyType, KeyStrengthSource Source) 
             text += $", parameter set {ParameterSetName(KeyType, set)}";
         if (HssLevels is { } levels)
             text += $", {levels} levels";
-        return $"{text} ({SourceName(Source)})";
+        if (ModulusBits is { } bits)
+            text += $" of {bits} bits";
+        if (Curve is { } curve)
+            text += $" on {curve}";
+        string source = SourceName(Source);
+        return Operation is { } operation ? $"{text} ({source}, for {operation})" : $"{text} ({source})";
     }
 
     private static string ParameterSetName(CKK? keyType, ulong set) => keyType switch

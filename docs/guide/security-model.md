@@ -90,9 +90,10 @@ These are outside what the library can defend against, and outside the scope of
 <a id="known-limits"></a>
 ### Known limits
 
-- **Policies judge requests, not what is already on the token.** They check mechanisms, parameters and
-  *requested* key sizes and curves; they do not inspect the size or curve of an existing key (for ECDH,
-  the existing key's *type* is checked). `Cnsa20` is the exception: it inspects every key it uses.
+- **Policies judge the keys they use by what the token reports.** Each time an existing RSA or EC key is used,
+  the session reads its modulus or curve from the token and the policy judges it, at two extra
+  `C_GetAttributeValue` calls per keyed operation on such a key (`Cnsa20` reads every key's type and size). A token that reports
+  a value it does not hold defeats the check, as it can defeat every other.
 - **Raw-digest mechanisms** (`CKM_ECDSA`, `CKM_RSA_PKCS`, `CKM_RSA_PKCS_PSS`) sign a caller-computed
   digest; the policy cannot see which hash produced it.
 - **`CKM_AES_KEY_WRAP_PAD` is vendor-dependent**: wrapped keys may not move between tokens.
@@ -338,11 +339,13 @@ policy's known limits.
 > `CKM_AES_KEY_WRAP_PAD` is refused: its padding is vendor-defined (RFC 5649 on some tokens, KW over
 > PKCS#7 — not an SP 800-38F method — on others), so its approval cannot be established.
 
-**Known limits.** `Recommended` and `NistApproved` judge requests, not what is already on the token:
+**Known limits.** `Recommended` and `NistApproved`:
 
-- They check mechanisms, parameters and *requested* key sizes/curves. They do not inspect the size or curve
-  of existing keys — using an RSA-1024 or Brainpool key already on the token is not refused. (For ECDH, the
-  existing key's *type* is checked: `NistApproved` refuses an X25519/X448 key.)
+- Judge an existing RSA or EC key by its modulus or curve each time it is used, so an RSA-1024 or P-192 key
+  already on the token is refused (and a Brainpool key under `NistApproved`, which does not approve those curves).
+  `NistApproved` lets an RSA key of 1024 to 2047 bits, or a P-192 key, still
+  verify an old signature (SP 800-131A Rev.2 Table 2 legacy use). For ECDH, the existing key's *type* is checked
+  too: `NistApproved` refuses an X25519/X448 key.
 - Raw `CKM_ECDSA`, `CKM_RSA_PKCS` and `CKM_RSA_PKCS_PSS` sign a caller-computed digest; the policy cannot
   see which hash produced it.
 - `Recommended` allows `CKM_AES_KEY_WRAP_PAD`, but its meaning is vendor-dependent: RFC 5649 (KWP) on some

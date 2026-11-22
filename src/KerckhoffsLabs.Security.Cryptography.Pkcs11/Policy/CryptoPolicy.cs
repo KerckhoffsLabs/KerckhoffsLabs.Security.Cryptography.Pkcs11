@@ -17,9 +17,17 @@ public static class CryptoPolicy
     /// templates, and reading secret key material off the token.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// It inspects keys: each time an existing RSA or EC key is used, the session reads its modulus or curve from the
+    /// token, and refuses an RSA key under 2048 bits or an EC key off the curve allow-list, for every operation,
+    /// verification included. A key whose modulus or named curve the token does not report is refused. This costs one
+    /// <c>C_GetAttributeValue</c> call per keyed operation, two for an RSA or EC key.
+    /// </para>
+    /// <para>
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its rationale, the
     /// documented deny list — is at <c>docs/guide/policies/recommended.md</c> in the repository. To allow a reviewed
     /// mechanism, derive your own policy: <c>CryptoPolicy.Recommended.ToBuilder("MyApp").AllowMechanism(...).Build()</c>.
+    /// </para>
     /// </remarks>
     public static ComposedCryptoPolicy Recommended { get; } = RecommendedDefinition.Create();
 
@@ -45,11 +53,15 @@ public static class CryptoPolicy
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its NIST citation and
     /// the documented deny list — is at <c>docs/guide/policies/nist-approved.md</c> in the repository.
     /// </para>
-    /// <para>Known limits — the policy judges requests, not the token's contents:</para>
+    /// <para>
+    /// It inspects keys: each time an existing RSA or EC key is used, the session reads its modulus or curve from the
+    /// token and refuses an RSA key under 2048 bits or an EC key off the curve allow-list. Verifying an old signature
+    /// is the one legacy use (SP 800-131A Rev.2 Table 2): an RSA key of 1024 to 2047 bits, or a curve with
+    /// 160 &lt;= len(n) &lt; 224 such as P-192, may still verify. A key whose modulus or named curve the token does not
+    /// report is refused. This costs one <c>C_GetAttributeValue</c> call per keyed operation, two for an RSA or EC key.
+    /// </para>
+    /// <para>Known limits:</para>
     /// <list type="bullet">
-    /// <item><description>It judges mechanisms, parameters and <i>requested</i> key sizes and curves. It does
-    /// not inspect the size or curve of keys already on the token: using an existing RSA-1024 or Brainpool key
-    /// is not refused. (For ECDH the existing key's type is checked, so an X25519/X448 key is refused.)</description></item>
     /// <item><description>Raw <c>CKM_RSA_PKCS</c> signing and raw <c>CKM_ECDSA</c> cannot see which digest the
     /// caller pre-computed, so the digest is not checked.</description></item>
     /// </list>
@@ -63,7 +75,7 @@ public static class CryptoPolicy
     /// <summary>
     /// Allows only the NSA CNSA 2.0 algorithms at their CNSA 2.0 sizes: AES-256 in GCM (128-bit tag only) and
     /// KW/KWP, SHA-384/512 and HMAC over them, SP 800-108 and HKDF over SHA-384/512, ML-KEM-1024, ML-DSA-87,
-    /// single-level LMS (HSS) and XMSS. Unlike the other built-ins it inspects keys: AES keys must be 256 bits,
+    /// single-level LMS (HSS) and XMSS. It inspects every key it uses, not only RSA and EC: AES keys must be 256 bits,
     /// generic-secret, HKDF and HMAC keys at least 256 bits, ML-KEM keys ML-KEM-1024, ML-DSA keys ML-DSA-87 and
     /// HSS keys single-level, both in a template and on every use of an existing key; a key the token creates is
     /// read back and destroyed if it fails. <b>Refuses</b> RSA, DSA, ECDSA, EdDSA, ECDH, X25519/X448, DH, SLH-DSA,

@@ -62,7 +62,8 @@ internal static class NistApprovedDefinition
                 "FIPS 140-3 (ISO/IEC 19790 §7.9): CSPs must not be output in plaintext; CKA_SENSITIVE=false is refused."))
             .WithKeyMaterialExportRule(KeyMaterialExportRule.Refuse(
                 "Reading key material off the module in plaintext is not permitted (FIPS 140-3, ISO/IEC 19790 §7.9).",
-                kind => $"FIPS 140-3 (ISO/IEC 19790 §7.9): reading the {kind} off the module in plaintext is not permitted."));
+                kind => $"FIPS 140-3 (ISO/IEC 19790 §7.9): reading the {kind} off the module in plaintext is not permitted."))
+            .WithKeyStrengthRule(ExistingKeyStrength.NistApproved(BuildAllowedCurves()));
         foreach ((CKM mechanism, MechanismRule rule) in BuildAllowedMechanisms()) b.AllowRule(mechanism, rule);
         foreach ((string name, AllowedHash hash) in BuildAllowedHashes()) b.AllowHash(name, hash.Operations, hash.Rationale);
         foreach ((string oid, string rationale) in BuildAllowedCurves()) b.AllowCurve(oid, rationale);

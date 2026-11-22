@@ -153,8 +153,8 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Wrap);
-        EnforceKeyStrength(wrappingKeyHandle, KeyStrengthSource.ExistingKey);
-        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(wrappingKeyHandle, KeyStrengthSource.ExistingKey, CryptoOperation.Wrap);
+        EnforceKeyStrength(keyHandle, KeyStrengthSource.ExistingKey, CryptoOperation.Wrap);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
@@ -236,7 +236,7 @@ internal sealed partial class Pkcs11SessionCore
 
 
         Enforce(mechanism, CryptoOperation.Unwrap);
-        EnforceKeyStrength(unwrappingKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(unwrappingKeyHandle, KeyStrengthSource.ExistingKey, CryptoOperation.Unwrap);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
@@ -437,7 +437,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(mechanism, CryptoOperation.Derive, attributes);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
-        EnforceKeyStrength(baseKeyHandle, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(baseKeyHandle, KeyStrengthSource.ExistingKey, CryptoOperation.Derive);
         EnforceTemplateKeyStrength(null, attributes);
         // An SP800-108 derivation also makes one key per additional derived-key template: each is a created
         // key, judged like the main one.

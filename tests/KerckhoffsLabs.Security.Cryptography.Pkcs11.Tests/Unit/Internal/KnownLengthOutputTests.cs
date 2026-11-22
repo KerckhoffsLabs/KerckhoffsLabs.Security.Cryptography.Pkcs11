@@ -3,6 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -21,7 +22,7 @@ public sealed class KnownLengthOutputTests
     {
         using var module = new OutputModule { Produces = 20 };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] digest = session.Digest(new Mechanism(CKM.CKM_SHA256), "data"u8);
 
@@ -34,7 +35,7 @@ public sealed class KnownLengthOutputTests
     {
         using var module = new OutputModule { Produces = 40 };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] digest = session.Digest(new Mechanism(CKM.CKM_SHA256), "data"u8);
 
@@ -48,7 +49,7 @@ public sealed class KnownLengthOutputTests
     {
         using var module = new OutputModule { Produces = 40, EndsOnBufferTooSmall = true };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] digest = session.Digest(new Mechanism(CKM.CKM_SHA256), "data"u8);
 
@@ -61,7 +62,7 @@ public sealed class KnownLengthOutputTests
     {
         using var module = new OutputModule { Produces = 40, EndsOnBufferTooSmall = true };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] mac = session.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), new ObjectHandle(1), "data"u8);
 
@@ -75,7 +76,7 @@ public sealed class KnownLengthOutputTests
     {
         using var module = new OutputModule { Produces = 64, Reports = 144, TakesOnlyAnExactBuffer = true };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] signature = session.Sign(new Mechanism(CKM.CKM_EDDSA), new ObjectHandle(1), "data"u8);
 
@@ -88,7 +89,7 @@ public sealed class KnownLengthOutputTests
     {
         using var module = new OutputModule { Produces = 114 };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] signature = session.Sign(new Mechanism(CKM.CKM_EDDSA), new ObjectHandle(1), "data"u8);
 
@@ -103,7 +104,7 @@ public sealed class KnownLengthOutputTests
     {
         using var module = new OutputModule { Produces = 114, LeavesTheLengthOnBufferTooSmall = true };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] signature = session.Sign(new Mechanism(CKM.CKM_EDDSA), new ObjectHandle(1), "data"u8);
 

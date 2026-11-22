@@ -109,7 +109,7 @@ public sealed class KeyStrengthInspectionTests
 
         Assert.Equal("Recommended", plain.Name);
         Assert.True(plain.AllowsOverride);
-        Assert.False(plain.InspectsKeys);
+        Assert.True(plain.InspectsKeys);
         Assert.Throws<ArgumentNullException>(() => new PassThrough(null!));
     }
 

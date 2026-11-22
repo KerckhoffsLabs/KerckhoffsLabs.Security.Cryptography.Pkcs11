@@ -259,7 +259,7 @@ key-strength	CKK_AES 16 bytes	allow
 key-strength	CKK_AES 24 bytes	allow	
 key-strength	CKK_AES 32 bytes	allow	
 key-strength	CKK_AES null bytes	allow	
-key-strength	CKK_EC	allow	
+key-strength	CKK_EC	deny	The token did not report a named curve for the EC key (CKA_EC_PARAMS absent, or explicit domain parameters), so it can't be checked.
 key-strength	CKK_GENERIC_SECRET 16 bytes	allow	
 key-strength	CKK_GENERIC_SECRET 32 bytes	allow	
 key-strength	CKK_GENERIC_SECRET 64 bytes	allow	
@@ -279,7 +279,7 @@ key-strength	CKK_ML_KEM CKP_ML_KEM_1024	allow
 key-strength	CKK_ML_KEM CKP_ML_KEM_512	allow	
 key-strength	CKK_ML_KEM CKP_ML_KEM_768	allow	
 key-strength	CKK_ML_KEM null	allow	
-key-strength	CKK_RSA	allow	
+key-strength	CKK_RSA	deny	The token did not report the RSA key's modulus (CKA_MODULUS), so its length can't be checked.
 key-strength	CKK_SHA384_HMAC 16 bytes	allow	
 key-strength	CKK_SHA384_HMAC 32 bytes	allow	
 key-strength	CKK_SHA384_HMAC 64 bytes	allow	
