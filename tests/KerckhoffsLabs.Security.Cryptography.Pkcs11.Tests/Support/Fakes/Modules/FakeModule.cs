@@ -107,11 +107,9 @@ internal abstract unsafe partial class FakeModule : IDisposable
         var copy = new Pkcs11LibraryOptions { Policy = policy };
         if (options is null)
             return copy;
-        foreach (PropertyInfo property in typeof(Pkcs11LibraryOptions).GetProperties(BindingFlags.Instance | BindingFlags.Public))
-        {
-            if (property.Name != nameof(Pkcs11LibraryOptions.Policy) && property.CanWrite)
-                property.SetValue(copy, property.GetValue(options));
-        }
+        foreach (PropertyInfo property in typeof(Pkcs11LibraryOptions).GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                     .Where(p => p.Name != nameof(Pkcs11LibraryOptions.Policy) && p.CanWrite))
+            property.SetValue(copy, property.GetValue(options));
         return copy;
     }
 

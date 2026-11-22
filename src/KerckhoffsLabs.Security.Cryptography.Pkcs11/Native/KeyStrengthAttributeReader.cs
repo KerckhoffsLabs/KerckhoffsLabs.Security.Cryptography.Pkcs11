@@ -50,10 +50,10 @@ internal readonly record struct KeyStrengthAttributeValues(
 /// </para>
 /// <para>
 /// An entry the module left as it was handed out (one that stops at the first attribute the key lacks, which PKCS#11
-/// does not allow) is <i>unanswered</i>, not absent, and so is a byte array the module could not fit
-/// (<c>CKR_BUFFER_TOO_SMALL</c> marks it <c>CK_UNAVAILABLE_INFORMATION</c>, as it marks an absent one): the caller asks
-/// for it again alone. An entry the module marked <c>CK_UNAVAILABLE_INFORMATION</c> otherwise is answered: absent,
-/// sensitive or unavailable.
+/// does not allow) is <i>unanswered</i>, not absent, and so is a byte array the module could not fit, whether it
+/// reports that with <c>CK_UNAVAILABLE_INFORMATION</c> under <c>CKR_BUFFER_TOO_SMALL</c> (PKCS#11 v3.2) or with the
+/// value's real length (many modules): the caller asks for it again alone. An entry the module marked
+/// <c>CK_UNAVAILABLE_INFORMATION</c> otherwise is answered: absent, sensitive or unavailable.
 /// </para>
 /// <para>
 /// Values are read from the buffers this method handed out, never from the pointers the module writes back into the
@@ -138,8 +138,11 @@ internal static unsafe class KeyStrengthAttributeReader
         ulong length = (ulong)template[index].valueLen;
         if (length > 0 && length <= (ulong)capacity)
             return new ReadOnlySpan<byte>(buffer, (int)length).ToArray();
-        // Untouched (the full length handed out), or possibly too long for the buffer under CKR_BUFFER_TOO_SMALL.
-        if (length == (ulong)capacity + 1 || (tooSmallPossible && CK.IsCkInformationUnavailable(length)))
+        // CK_UNAVAILABLE_INFORMATION is absent or sensitive, unless the call answered CKR_BUFFER_TOO_SMALL, where it
+        // also marks a value too long for the buffer (PKCS#11 v3.2). Any other length past the capacity is the entry
+        // left untouched, or a value too long for the buffer reported with its real length, as SoftHSM2, Kryoptic and
+        // openCryptoki do for an RSA-16384 modulus: either way, ask for it again alone.
+        if (CK.IsCkInformationUnavailable(length) ? tooSmallPossible : length > (ulong)capacity)
             unanswered |= attribute;
         return null;
     }
