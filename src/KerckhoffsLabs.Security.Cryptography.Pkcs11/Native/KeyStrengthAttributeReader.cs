@@ -50,10 +50,12 @@ internal readonly record struct KeyStrengthAttributeValues(
 /// </para>
 /// <para>
 /// An entry the module left as it was handed out (one that stops at the first attribute the key lacks, which PKCS#11
-/// does not allow) is <i>unanswered</i>, not absent, and so is a byte array the module could not fit, whether it
-/// reports that with <c>CK_UNAVAILABLE_INFORMATION</c> under <c>CKR_BUFFER_TOO_SMALL</c> (PKCS#11 v3.2) or with the
-/// value's real length (many modules): the caller asks for it again alone. An entry the module marked
-/// <c>CK_UNAVAILABLE_INFORMATION</c> otherwise is answered: absent, sensitive or unavailable.
+/// does not allow) is <i>unanswered</i>, not absent, and the caller asks for it again alone. So is a byte array marked
+/// <c>CK_UNAVAILABLE_INFORMATION</c> by a call that did not answer <c>CKR_OK</c>: PKCS#11 v3.2 marks a value too long
+/// for its buffer that way, as it marks an absent one, and when both happen in one call the module may return either
+/// code (SoftHSM2 returns <c>CKR_ATTRIBUTE_TYPE_INVALID</c>), so the return value cannot tell them apart. A byte array
+/// reported longer than its buffer is unanswered too. A <c>CK_ULONG</c> always fits, so its
+/// <c>CK_UNAVAILABLE_INFORMATION</c> is final: absent, sensitive or unavailable.
 /// </para>
 /// <para>
 /// Values are read from the buffers this method handed out, never from the pointers the module writes back into the
@@ -107,7 +109,8 @@ internal static unsafe class KeyStrengthAttributeReader
             or CKR.CKR_BUFFER_TOO_SMALL))
             return rv;
 
-        bool tooSmallPossible = rv == CKR.CKR_BUFFER_TOO_SMALL;
+        // Any code but CKR_OK can hide a CKR_BUFFER_TOO_SMALL behind another (see the remarks).
+        bool tooSmallPossible = rv != CKR.CKR_OK;
         var unanswered = KeyStrengthAttribute.None;
         ulong? keyType = UlongAt(template, 0, ulongs, ulongSize, KeyStrengthAttribute.KeyType, ref unanswered);
         ulong? valueLen = UlongAt(template, 1, ulongs, ulongSize, KeyStrengthAttribute.ValueLen, ref unanswered);
@@ -138,10 +141,9 @@ internal static unsafe class KeyStrengthAttributeReader
         ulong length = (ulong)template[index].valueLen;
         if (length > 0 && length <= (ulong)capacity)
             return new ReadOnlySpan<byte>(buffer, (int)length).ToArray();
-        // CK_UNAVAILABLE_INFORMATION is absent or sensitive, unless the call answered CKR_BUFFER_TOO_SMALL, where it
-        // also marks a value too long for the buffer (PKCS#11 v3.2). Any other length past the capacity is the entry
-        // left untouched, or a value too long for the buffer reported with its real length, as SoftHSM2, Kryoptic and
-        // openCryptoki do for an RSA-16384 modulus: either way, ask for it again alone.
+        // CK_UNAVAILABLE_INFORMATION marks an absent value and one too long for the buffer alike; only a call that answered
+        // CKR_OK rules the latter out. Any other length past the capacity is the entry left untouched, or a value too long
+        // reported with its length. Either way, ask for it again alone.
         if (CK.IsCkInformationUnavailable(length) ? tooSmallPossible : length > (ulong)capacity)
             unanswered |= attribute;
         return null;
