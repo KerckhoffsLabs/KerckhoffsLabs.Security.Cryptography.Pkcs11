@@ -197,34 +197,37 @@ internal static class PolicyCatalogueMarkdown
             Line();
         }
 
-        Line("## Known limits");
-        Line();
-        if (!catalogue.KeyStrength.InspectsKeys)
-            Line($"- {Escape(KeysNotInspectedLimit)}");
-        if (RawDigestMechanisms.Any(catalogue.AllowedMechanisms.ContainsKey))
-            Line($"- {Escape(RawDigestLimit)}");
-        if (isRecommendedFamily)
-        {
-            foreach (string limit in RecommendedKnownLimits)
-                Line($"- {Escape(limit)}");
-        }
-        if (isNistApproved)
-        {
-            foreach (string limit in FipsKnownLimits)
-                Line($"- {Escape(limit)}");
-        }
-        if (isCnsa20)
-        {
-            foreach (string limit in Cnsa20KnownLimits)
-                Line($"- {Escape(limit)}");
-        }
-        Line();
+        RenderKnownLimits(sb, catalogue);
 
         Line("---");
         Line();
         Line(Footer);
 
         return sb.ToString();
+    }
+
+    // === Known limits ===
+
+    private static void RenderKnownLimits(StringBuilder sb, PolicyCatalogue catalogue)
+    {
+        void Line(string text = "") => sb.Append(text).Append('\n');
+
+        Line("## Known limits");
+        Line();
+        if (!catalogue.KeyStrength.InspectsKeys)
+            Line($"- {Escape(KeysNotInspectedLimit)}");
+        if (RawDigestMechanisms.Any(catalogue.AllowedMechanisms.ContainsKey))
+            Line($"- {Escape(RawDigestLimit)}");
+        IEnumerable<string> policyLimits = catalogue.Documentation switch
+        {
+            PolicyDocumentation.Recommended => RecommendedKnownLimits,
+            PolicyDocumentation.NistApproved => FipsKnownLimits,
+            PolicyDocumentation.Cnsa20 => Cnsa20KnownLimits,
+            _ => [],
+        };
+        foreach (string limit in policyLimits)
+            Line($"- {Escape(limit)}");
+        Line();
     }
 
     // === Allowed mechanisms ===

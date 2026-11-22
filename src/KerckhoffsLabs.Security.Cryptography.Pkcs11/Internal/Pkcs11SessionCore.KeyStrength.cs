@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -126,10 +128,8 @@ internal sealed partial class Pkcs11SessionCore
             return true;
 
         bool statesAClass = false;
-        foreach (ObjectAttribute attribute in template)
+        foreach (ObjectAttribute attribute in template.Where(a => a.Type == CKA.CKA_CLASS))
         {
-            if (attribute.Type != CKA.CKA_CLASS)
-                continue;
             statesAClass = true;
             if (UlongOrNull(attribute) is not { } objectClass
                 || (CKO)objectClass is CKO.CKO_SECRET_KEY or CKO.CKO_PRIVATE_KEY or CKO.CKO_PUBLIC_KEY)
@@ -220,7 +220,7 @@ internal sealed partial class Pkcs11SessionCore
     /// </summary>
     private string DestroyRefused(ICryptoPolicy policy, ReadOnlySpan<ObjectHandle> created)
     {
-        string failures = string.Empty;
+        StringBuilder? failures = null;
         foreach (ObjectHandle handle in created)
         {
             if (handle.IsInvalid)
@@ -241,9 +241,11 @@ internal sealed partial class Pkcs11SessionCore
                 continue;
 
             Log.PolicyCleanupFailed(_logger, (ulong)_sessionId, policy.Name, handle.ObjectId);
-            failures += $" The refused key (handle {handle.ObjectId}) could not be destroyed and remains on the token: {rv}.";
+            (failures ??= new StringBuilder()).Append(
+                CultureInfo.InvariantCulture,
+                $" The refused key (handle {handle.ObjectId}) could not be destroyed and remains on the token: {rv}.");
         }
-        return failures;
+        return failures?.ToString() ?? string.Empty;
     }
 
     // A CKA_VALUE_LEN of 0 or beyond int is no key's length: reported as unknown, which a strict policy refuses.

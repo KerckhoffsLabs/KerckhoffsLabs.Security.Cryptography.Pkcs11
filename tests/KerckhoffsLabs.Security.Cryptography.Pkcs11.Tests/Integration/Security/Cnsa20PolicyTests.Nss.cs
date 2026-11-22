@@ -9,8 +9,11 @@ public sealed class Cnsa20PolicyTests_Nss(NssBackendFixture backend)
     private readonly NssBackendFixture _backend = backend;
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Aes256Gcm_RoundTrips() =>
+    public void Aes256Gcm_RoundTrips()
+    {
+        _backend.RequireClassicAesGcm();
         Cnsa20PolicyTestCases.Assert_Aes256Gcm_RoundTrips(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Aes128_IsRefused_AtGeneration_BeforeTheToken() =>
@@ -21,8 +24,11 @@ public sealed class Cnsa20PolicyTests_Nss(NssBackendFixture backend)
         Cnsa20PolicyTestCases.Assert_Aes128FromAnotherPolicy_IsRefused_AtUse(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void AesKw_UnwrapsAes256() =>
+    public void AesKw_UnwrapsAes256()
+    {
+        _backend.RequireClassicAesGcm(); // the unwrapped key is checked with AES-GCM
         Cnsa20PolicyTestCases.Assert_AesKw_UnwrapsAes256(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void AesKw_UnwrapOfAes128_IsRefused_AndLeavesNoKey() =>

@@ -67,12 +67,14 @@ internal static class Cnsa20PolicyTestCases
     private static void DestroyByLabel(IPkcs11Backend backend, params string[] labels)
     {
         using var session = backend.OpenSession();
-        foreach (string label in labels)
+        foreach (ObjectTemplate filter in labels.Select(label => ObjectTemplate.Empty().Label(label).Build()))
         {
-            using var filter = ObjectTemplate.Empty().Label(label).Build();
-            using var found = session.FindObjects(filter);
-            foreach (var obj in found)
-                obj.Destroy();
+            using (filter)
+            using (var found = session.FindObjects(filter))
+            {
+                foreach (var obj in found)
+                    obj.Destroy();
+            }
         }
     }
 
