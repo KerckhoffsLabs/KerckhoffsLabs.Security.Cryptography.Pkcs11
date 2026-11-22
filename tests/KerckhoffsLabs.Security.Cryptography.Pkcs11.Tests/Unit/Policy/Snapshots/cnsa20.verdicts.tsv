@@ -200,8 +200,8 @@ key-agreement-key	CKK_BLAKE2B_512_HMAC	deny	Key agreement with a CKK_BLAKE2B_512
 key-agreement-key	CKK_BLOWFISH	deny	Key agreement with a CKK_BLOWFISH key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_CAMELLIA	deny	Key agreement with a CKK_CAMELLIA key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_CAST	deny	Key agreement with a CKK_CAST key is not on the Cnsa20 allow-list (not reviewed).
+key-agreement-key	CKK_CAST128	deny	Key agreement with a CKK_CAST128 key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_CAST3	deny	Key agreement with a CKK_CAST3 key is not on the Cnsa20 allow-list (not reviewed).
-key-agreement-key	CKK_CAST5	deny	Key agreement with a CKK_CAST128 key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_CDMF	deny	Key agreement with a CKK_CDMF key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_CHACHA20	deny	Key agreement with a CKK_CHACHA20 key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_DES	deny	Key agreement with a CKK_DES key is not on the Cnsa20 allow-list (not reviewed).
@@ -209,7 +209,7 @@ key-agreement-key	CKK_DES2	deny	Key agreement with a CKK_DES2 key is not on the 
 key-agreement-key	CKK_DES3	deny	Key agreement with a CKK_DES3 key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_DH	deny	Key agreement with a CKK_DH key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_DSA	deny	Key agreement with a CKK_DSA key is not on the Cnsa20 allow-list (not reviewed).
-key-agreement-key	CKK_ECDSA	deny	Key agreement with a CKK_EC key is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM replaces ECDH. Use CKM_ML_KEM with an ML-KEM-1024 key.
+key-agreement-key	CKK_EC	deny	Key agreement with a CKK_EC key is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM replaces ECDH. Use CKM_ML_KEM with an ML-KEM-1024 key.
 key-agreement-key	CKK_EC_EDWARDS	deny	Key agreement with a CKK_EC_EDWARDS key is not on the Cnsa20 allow-list (not reviewed).
 key-agreement-key	CKK_EC_MONTGOMERY	deny	Key agreement with a CKK_EC_MONTGOMERY key is not allowed: CNSA 2.0 has no elliptic-curve or finite-field key agreement; ML-KEM replaces ECDH. Use CKM_ML_KEM with an ML-KEM-1024 key.
 key-agreement-key	CKK_GENERIC_SECRET	deny	Key agreement with a CKK_GENERIC_SECRET key is not on the Cnsa20 allow-list (not reviewed).

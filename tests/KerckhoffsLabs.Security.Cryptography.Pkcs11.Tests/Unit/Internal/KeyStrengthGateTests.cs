@@ -527,7 +527,7 @@ public sealed class KeyStrengthGateTests
         using Pkcs11Library library = fake.Load();
         LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
         var core = new Pkcs11SessionCore(lowLevel, slotId: default, sessionId: 1, loggerFactory: null, policy: AllowAllButKeyStrength());
-        using var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), core);
+        using var session = new Pkcs11Session(library, new Pkcs11Slot(library, slotId: 1), core);
         using var key = new Pkcs11Key(session, Key, ObjectHandle.Invalid, CKK.CKK_RSA, "k", [0x01]);
         var pss = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32));
 

@@ -71,8 +71,8 @@ public static class CryptoPolicy
     /// <c>CKM_AES_KEY_WRAP_PAD</c>, DES/TDEA, SHA-1, SHA-224, SHA-256, SHA-512/t, SHA-3, PBKDF2, every key type
     /// outside the list above, and a key whose type, length, parameter set or HSS levels the token does not report.
     /// <b>Denies by default:</b> anything not on its allow-list, including every vendor-defined mechanism, is
-    /// refused. Also refuses non-sensitive key templates and reading secret key material off the token. A session
-    /// opened under this policy refuses every <c>UsePolicy</c> override.
+    /// refused. Also refuses non-sensitive key templates and reading secret key material off the token. As a
+    /// library's policy, every session of the library refuses every <c>UsePolicy</c> override.
     /// </summary>
     /// <remarks>
     /// <para>

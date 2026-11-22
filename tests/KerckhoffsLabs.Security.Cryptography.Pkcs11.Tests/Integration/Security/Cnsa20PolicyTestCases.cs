@@ -16,14 +16,26 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security
 /// <remarks>
 /// Keys that must outlive a session are token objects with a unique label, destroyed in <c>finally</c>.
 /// A case that needs a "key made under another policy" generates it under the default policy and opens it
-/// by label under <see cref="CryptoPolicy.Cnsa20"/>.
+/// by label on a session under a <see cref="CryptoPolicy.Cnsa20"/> lease.
 /// </remarks>
 internal static class Cnsa20PolicyTestCases
 {
-    private static Pkcs11Session OpenCnsa20(IPkcs11Backend backend) =>
-        backend.RequiresUserLogin
-            ? backend.Library.OpenSessionWithPin(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span), CryptoPolicy.Cnsa20)
-            : backend.Library.OpenSessionWithoutLogin(backend.TokenLabel, CryptoPolicy.Cnsa20);
+    // A session over the backend's own authentication model, under Cnsa20 for its whole life: the fixture's library is
+    // shared, so a lease rather than the library's policy. Disposing the session ends the lease.
+    private static Pkcs11Session OpenCnsa20(IPkcs11Backend backend)
+    {
+        Pkcs11Session session = backend.OpenSession();
+        try
+        {
+            _ = session.UsePolicy(CryptoPolicy.Cnsa20);
+            return session;
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
+    }
 
     private static string NewLabel(string kind) => $"cnsa20-{kind}-{Guid.NewGuid():N}";
 

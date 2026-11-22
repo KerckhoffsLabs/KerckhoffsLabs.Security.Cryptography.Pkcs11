@@ -36,8 +36,8 @@ public sealed class Cnsa20PolicyTests
     [Fact]
     public void Cnsa20_RefusesOverride()
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.Cnsa20);
+        using var library = ManagedToken.NewLibrary(CryptoPolicy.Cnsa20);
+        using var session = ManagedToken.OpenSession(library);
         Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
     }
 
