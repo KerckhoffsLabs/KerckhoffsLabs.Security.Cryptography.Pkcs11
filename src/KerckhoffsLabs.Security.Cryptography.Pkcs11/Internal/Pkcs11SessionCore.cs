@@ -647,6 +647,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
     {
         ThrowIfUnusable();
         ArgumentNullException.ThrowIfNull(policy);
+        KeyStrengthInspection.ThrowIfJudgedWithoutInspecting(policy, nameof(policy));
         if (!_basePolicy.AllowsOverride)
             throw new InvalidOperationException(
                 $"This session is under the {_basePolicy.Name} policy, the library's, which does not allow overrides.");

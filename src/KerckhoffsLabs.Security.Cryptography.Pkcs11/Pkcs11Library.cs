@@ -139,7 +139,9 @@ public sealed class Pkcs11Library : IDisposable
     /// configure their own <see cref="Pkcs11Library"/>.
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
-    /// <exception cref="ArgumentException"><paramref name="libraryPath"/> is <see langword="null"/> or empty.</exception>
+    /// <exception cref="ArgumentException"><paramref name="libraryPath"/> is <see langword="null"/> or empty; or
+    /// <see cref="Pkcs11LibraryOptions.Policy"/> judges key strength but its <see cref="ICryptoPolicy.InspectsKeys"/>
+    /// is <see langword="false"/> (a wrapper that does not forward it), so its key-size rules would never run.</exception>
     /// <exception cref="DllNotFoundException">
     /// The module was not found where <paramref name="libraryPath"/> says to look, or was found but could not be
     /// loaded (a missing dependency, for example). For a bare name the message says the current directory was
@@ -210,6 +212,9 @@ public sealed class Pkcs11Library : IDisposable
     /// Pass <see langword="null"/> (the default) for no logging and a standard initialization.
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
+    /// <exception cref="ArgumentException"><see cref="Pkcs11LibraryOptions.Policy"/> judges key strength but its
+    /// <see cref="ICryptoPolicy.InspectsKeys"/> is <see langword="false"/> (a wrapper that does not forward it), so its
+    /// key-size rules would never run; nothing is loaded.</exception>
     /// <exception cref="EntryPointNotFoundException">
     /// The host executable does not export <c>C_GetFunctionList</c>.
     /// </exception>
@@ -235,6 +240,8 @@ public sealed class Pkcs11Library : IDisposable
         CurveCatalog = options?.CurveCatalog ?? Pkcs11CurveCatalog.Default;
         RefusedPinLifetime = options?.RefusedPinLifetime;
         Policy = options?.Policy ?? CryptoPolicy.Recommended;
+        // Before anything is loaded, so a refused policy leaves nothing to release.
+        KeyStrengthInspection.ThrowIfJudgedWithoutInspecting(Policy, nameof(options));
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");
 

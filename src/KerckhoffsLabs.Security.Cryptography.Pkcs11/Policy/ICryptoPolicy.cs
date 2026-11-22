@@ -30,7 +30,9 @@ public interface ICryptoPolicy
 
     /// <summary>
     /// Whether sessions under this policy read each key's type and size from the token and submit them as
-    /// <see cref="KeyStrengthRequest"/>s. A policy that delegates to another must forward this.
+    /// <see cref="KeyStrengthRequest"/>s. A policy that delegates to another must forward this, as
+    /// <see cref="DelegatingCryptoPolicy"/> does: one that judges key strength while this is <see langword="false"/> is
+    /// refused when it is installed (<see cref="Pkcs11LibraryOptions.Policy"/>, <c>UsePolicy</c>).
     /// </summary>
     bool InspectsKeys => false;
 

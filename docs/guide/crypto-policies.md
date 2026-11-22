@@ -86,8 +86,9 @@ using var cnsa = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, Crypt
   mechanisms, but a policy derived from it that allows them again would not judge those keys.
 - Some tokens (SoftHSM2) do not report `CKA_VALUE_LEN` on unwrapped secret keys; under `Cnsa20` those unwraps
   are refused.
-- A custom policy that wraps `Cnsa20` must forward `InspectsKeys`, or key sizes are no longer checked (see
-  [Writing your own policy](#writing-your-own-policy)).
+- A custom policy that wraps `Cnsa20` must forward `InspectsKeys`, or key sizes are no longer checked.
+  `DelegatingCryptoPolicy` forwards it, and a policy that judges key strength without it is refused when it is
+  installed (see [Writing your own policy](#writing-your-own-policy)).
 
 ## Handling a refusal
 
@@ -358,27 +359,31 @@ inspecting keys.
 ## Writing your own policy
 
 `ICryptoPolicy` is essentially a single method over a closed set of request types. Delegate to a built-in for what you
-do not decide, and deny what you do not recognise, so request kinds added in later versions fail closed:
+do not decide, and deny what you do not recognise, so request kinds added in later versions fail closed.
+
+To wrap another policy, derive from `DelegatingCryptoPolicy`. It forwards `Name`, `AllowsOverride` and `InspectsKeys`
+to the policy it wraps (`Inner`), and you decide requests in `Evaluate`:
 
 ```csharp
-sealed class NoExportAfterHours(ICryptoPolicy inner, TimeProvider clock) : ICryptoPolicy
+sealed class NoExportAfterHours(ICryptoPolicy inner, TimeProvider clock) : DelegatingCryptoPolicy(inner)
 {
-    public string Name => $"{inner.Name}+NoExportAfterHours";
-    public bool AllowsOverride => false;
-    public bool InspectsKeys => inner.InspectsKeys;
+    public override string Name => $"{Inner.Name}+NoExportAfterHours";
+    public override bool AllowsOverride => false;
 
-    public PolicyDecision Evaluate(PolicyRequest request) => request switch
+    public override PolicyDecision Evaluate(PolicyRequest request) => request switch
     {
         KeyMaterialExportRequest when clock.GetLocalNow().Hour is < 8 or >= 18 =>
             PolicyDecision.Deny("Reading secrets off the token is allowed during business hours only."),
-        _ => inner.Evaluate(request),
+        _ => Inner.Evaluate(request),
     };
 }
 ```
 
-Forward `InspectsKeys` as well: it defaults to `false`, and a session only reads a key's type and size from the
-token when its policy says it inspects keys, so a wrapper that leaves it out silently turns off `Cnsa20`'s
-key-size checks.
+A wrapper written straight on `ICryptoPolicy` must forward `InspectsKeys` itself. It defaults to `false`, and a
+session reads a key's type and size from the token only when its policy says it inspects keys, so leaving it out
+would turn off `Cnsa20`'s key-size checks. Such a wrapper is refused when it is installed, as the library's policy
+or a `UsePolicy` lease: the library puts a few key-strength requests to it, in memory, and an `ArgumentException`
+names the fix if it decides them differently by size while `InspectsKeys` is `false`.
 
 Prefer deriving a `ComposedCryptoPolicy` when an allow-list change is all you need: it keeps the
 built-in's parameter checks and refusal wording, and its catalogue can be documented.

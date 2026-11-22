@@ -101,7 +101,10 @@ internal static class PolicyCatalogueMarkdown
             + "mechanisms, but a policy derived from it that allows them again would not judge those keys.",
         "Some tokens (SoftHSM2) do not report `CKA_VALUE_LEN` on unwrapped secret keys; under Cnsa20 those unwraps are "
             + "refused.",
-        "A custom policy that wraps Cnsa20 must forward `InspectsKeys`, or key sizes are no longer checked.",
+        "A custom policy that wraps Cnsa20 must forward `InspectsKeys`, or key sizes are no longer checked. "
+            + "`DelegatingCryptoPolicy` forwards it, and a policy that judges key strength without it is refused when it "
+            + "is installed; a rule that depends on state the install-time check does not reach (time, a counter) can "
+            + "still slip past it.",
     ];
 
     /// <summary>Renders <paramref name="catalogue"/> as the full Markdown catalogue page for the policy named <paramref name="policyName"/>.</summary>

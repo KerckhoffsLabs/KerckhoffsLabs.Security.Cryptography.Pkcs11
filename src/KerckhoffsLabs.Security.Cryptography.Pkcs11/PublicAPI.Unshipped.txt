@@ -2356,3 +2356,10 @@ override KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.T
 override sealed KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest? other) -> bool
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.operator !=(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? right) -> bool
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.operator ==(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest? right) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.DelegatingCryptoPolicy(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy! inner) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.Inner.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy!
+abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.Evaluate(KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyRequest! request) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.PolicyDecision
+virtual KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.AllowsOverride.get -> bool
+virtual KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.InspectsKeys.get -> bool
+virtual KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.Name.get -> string!
