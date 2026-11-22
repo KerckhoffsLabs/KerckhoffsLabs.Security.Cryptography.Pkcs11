@@ -88,6 +88,9 @@ public static class CryptoPolicy
     /// <list type="bullet">
     /// <item><description>LMS (HSS) and XMSS are allowed for any signing. CNSA 2.0 allows them only for software and
     /// firmware signing; the policy cannot see what is signed, so restricting them is the application's job.</description></item>
+    /// <item><description>LMS is a single-level HSS key (<c>CKM_HSS</c>, <c>CKA_HSS_LEVELS</c> = 1), as PKCS#11 has no
+    /// LMS mechanism of its own. Its public key and signatures carry HSS's 4-byte prefix (RFC 8554); a verifier that
+    /// expects raw LMS strips it.</description></item>
     /// <item><description>It fails closed: a key whose attributes the token does not report is refused, which may
     /// refuse a compliant key on a token that hides them.</description></item>
     /// <item><description>Each keyed operation costs one extra <c>C_GetAttributeValue</c> call (up to three on a

@@ -74,6 +74,11 @@ using var cnsa = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, Crypt
 - **LMS and XMSS are allowed for any signing.** CNSA 2.0 allows them only for software and firmware signing; the
   policy cannot see what is being signed, so restricting them to that use is the application's job. Their
   parameter sets are not checked: CNSA 2.0 approves them all (LMS SHA-256/192 recommended).
+- **LMS is a single-level HSS key.** PKCS#11 has no LMS mechanism of its own, so LMS is `CKM_HSS` with
+  `CKA_HSS_LEVELS` = 1; multi-level HSS, which CNSA 2.0 excludes, is refused. The public key and signatures are in
+  the HSS encoding (RFC 8554): the LMS encoding with a 4-byte prefix, the level count (1) before the public key and
+  the count of signed public keys (0) before each signature. A verifier that expects raw LMS, such as some
+  firmware boot code, strips those 4 bytes.
 - **It is not a certification.** It restricts what this library sends to the token; it does not certify or
   validate the application or the token. Its table follows the NSA CNSA 2.0 and Quantum Computing FAQ,
   Ver. 2.2 (October 2026).

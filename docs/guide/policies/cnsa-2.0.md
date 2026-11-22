@@ -400,6 +400,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 - Cnsa20 restricts what this library sends to the token; it is not a CNSA 2.0 certification or validation of the application or the token.
 - LMS (`CKM_HSS`) and XMSS (`CKM_XMSS`) are allowed for any signing. CNSA 2.0 allows them only for software and firmware signing; the policy cannot see what is being signed, so restricting them to that use is the application's job.
+- LMS is used as a single-level HSS key (`CKM_HSS`, `CKA_HSS_LEVELS` = 1): PKCS#11 has no LMS mechanism of its own. Its public key and signatures are in the HSS encoding (RFC 8554), which is the LMS encoding with a 4-byte prefix: the level count (1) before the public key, and the count of signed public keys (0) before each signature. A verifier that expects raw LMS, such as some firmware boot code, strips those 4 bytes.
 - It fails closed: a key whose type, length, parameter set or HSS levels the token does not report (absent, sensitive or unavailable) is refused, so a token that hides these attributes cannot use a compliant key.
 - Each keyed operation costs one extra `C_GetAttributeValue` call (up to three on a module that does not answer every attribute of a read, as PKCS#11 requires), because the key is read again on every use rather than cached.
 - `C_SetOperationState` restores a saved operation whose own mechanism and key are not inspected; only the key handles passed to it are.
