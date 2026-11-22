@@ -64,8 +64,10 @@ another application is refused too.
 | `Cnsa20` | refused | refused | the CNSA 2.0 size (see below) |
 
 `NistApproved`'s exception is SP 800-131A Rev.2 Table 2's legacy use: verification only, never signing,
-decryption or key agreement. The session reads the modulus (`CKA_MODULUS`) or the curve (`CKA_EC_PARAMS`) from the
-token in the same `C_GetAttributeValue` call as the key's type, so each keyed operation costs one extra call. Both
+decryption or key agreement. The session reads the key's type and the length of its modulus (`CKA_MODULUS`) or curve
+(`CKA_EC_PARAMS`) in one `C_GetAttributeValue` call, then the value in a second, into a buffer of exactly that length:
+two extra calls per keyed operation on an RSA or EC key, one on any other. (The value is never read into a buffer that
+might be too short: some modules, NSS among them, copy the whole value whatever buffer they are given.) Both
 are public attributes every token reports; a key whose modulus or named curve the token does not report (or whose
 curve is given by explicit domain parameters) is refused, as its strength can't be checked.
 

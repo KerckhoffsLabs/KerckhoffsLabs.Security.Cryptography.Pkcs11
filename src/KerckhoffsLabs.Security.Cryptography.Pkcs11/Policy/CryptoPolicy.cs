@@ -21,7 +21,7 @@ public static class CryptoPolicy
     /// It inspects keys: each time an existing RSA or EC key is used, the session reads its modulus or curve from the
     /// token, and refuses an RSA key under 2048 bits or an EC key off the curve allow-list, for every operation,
     /// verification included. A key whose modulus or named curve the token does not report is refused. This costs one
-    /// <c>C_GetAttributeValue</c> call per keyed operation.
+    /// <c>C_GetAttributeValue</c> call per keyed operation, two for an RSA or EC key.
     /// </para>
     /// <para>
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its rationale, the
@@ -58,7 +58,7 @@ public static class CryptoPolicy
     /// token and refuses an RSA key under 2048 bits or an EC key off the curve allow-list. Verifying an old signature
     /// is the one legacy use (SP 800-131A Rev.2 Table 2): an RSA key of 1024 to 2047 bits, or a curve with
     /// 160 &lt;= len(n) &lt; 224 such as P-192, may still verify. A key whose modulus or named curve the token does not
-    /// report is refused. This costs one <c>C_GetAttributeValue</c> call per keyed operation.
+    /// report is refused. This costs one <c>C_GetAttributeValue</c> call per keyed operation, two for an RSA or EC key.
     /// </para>
     /// <para>Known limits:</para>
     /// <list type="bullet">

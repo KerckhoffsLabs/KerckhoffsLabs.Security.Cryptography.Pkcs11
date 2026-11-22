@@ -465,11 +465,10 @@ public sealed class KeyStrengthGateTests
         Assert.Equal(1, fake.AttributeCalls);
     }
 
-    // An RSA key's modulus left unavailable by a call that did not answer CKR_OK may only have been too long for the
-    // one-call buffer, so it is asked for again alone (the generic reader: its length, then its value) before the key
-    // is described as not reporting it.
+    // The one call asks for the modulus's length only; a token that answers it absent is final: one call, and the key is
+    // described as not reporting it.
     [Fact]
-    public void RsaKeyWithoutAModulus_IsAskedForItAgain_ThenDescribedWithoutIt()
+    public void RsaKeyWithoutAModulus_IsDescribedWithoutIt_InOneCall()
     {
         using var fake = new StrengthFake();
         fake.Keys[Key.ObjectId] = new() { [CKA.CKA_KEY_TYPE] = (ulong)CKK.CKK_RSA };
@@ -479,7 +478,7 @@ public sealed class KeyStrengthGateTests
 
         Assert.Equal(CKK.CKK_RSA, request.KeyType);
         Assert.Null(request.ModulusBits);
-        Assert.Equal(3, fake.AttributeCalls);
+        Assert.Equal(1, fake.AttributeCalls);
     }
 
     [Theory]
@@ -601,7 +600,7 @@ public sealed class KeyStrengthGateTests
         Assert.Equal(CKK.CKK_RSA, request.KeyType);
         Assert.Equal(KeyStrengthSource.ExistingKey, request.Source);
         Assert.Equal(CryptoOperation.Verify, request.Operation);
-        // The fake reports no modulus: the one-call read, then the modulus asked for again alone (two calls).
-        Assert.Equal(3, fake.AttributeCalls);
+        // The fake reports no modulus: the one-call read answers it absent.
+        Assert.Equal(1, fake.AttributeCalls);
     }
 }

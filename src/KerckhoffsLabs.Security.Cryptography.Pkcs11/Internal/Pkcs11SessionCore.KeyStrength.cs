@@ -49,11 +49,12 @@ internal sealed partial class Pkcs11SessionCore
     /// rather than being left to the token. A device or session error propagates, which stops the operation too.
     /// </summary>
     /// <remarks>
-    /// One call asks for all of them (<see cref="KeyStrengthAttributeReader"/>): a key has the ones its type uses, and
-    /// the token answers the others as absent, each on its own (PKCS#11 v3.2 C_GetAttributeValue). A module that does
-    /// not, and leaves the type or what that type is judged by unanswered, is asked again for that attribute alone, so
-    /// it costs at most two more reads and is judged the same; an attribute the token answers as absent is not asked for
-    /// again. Nothing is cached: a handle can name another key later.
+    /// One call asks for the type, the size attributes and the lengths of the modulus and the domain parameters
+    /// (<see cref="KeyStrengthAttributeReader"/>): a key has the ones its type uses, and the token answers the others as
+    /// absent, each on its own (PKCS#11 v3.2 C_GetAttributeValue). An RSA or EC key's modulus or domain parameters are then
+    /// read in a second call, into a buffer of exactly the length reported. A module that leaves the type or what that
+    /// type is judged by unanswered is asked again for that attribute alone, and is judged the same; an attribute the
+    /// token answers as absent is not asked for again. Nothing is cached: a handle can name another key later.
     /// </remarks>
     private KeyStrengthRequest ReadKeyStrength(ObjectHandle key, KeyStrengthSource source, CryptoOperation? operation = null)
     {
@@ -66,15 +67,15 @@ internal sealed partial class Pkcs11SessionCore
         if (rv is not (CKR.CKR_OK or CKR.CKR_ATTRIBUTE_TYPE_INVALID or CKR.CKR_ATTRIBUTE_SENSITIVE or CKR.CKR_BUFFER_TOO_SMALL))
             ThrowIfError(rv, OpGetAttributeValue);
 
-        ulong? type = read.KeyType ?? (read.IsUnanswered(KeyStrengthAttribute.KeyType) ? ReadUlongOrNull(key, CKA.CKA_KEY_TYPE) : null);
+        ulong? type = read.KeyType ?? (read.IsUnanswered(UnansweredAttributes.KeyType) ? ReadUlongOrNull(key, CKA.CKA_KEY_TYPE) : null);
         CKK? keyType = type is { } t ? (CKK)t : null;
         CKA? size = SizeAttributeOf(keyType);
-        (ulong? value, KeyStrengthAttribute slot) = size switch
+        (ulong? value, UnansweredAttributes slot) = size switch
         {
-            CKA.CKA_VALUE_LEN => (read.ValueLen, KeyStrengthAttribute.ValueLen),
-            CKA.CKA_PARAMETER_SET => (read.ParameterSet, KeyStrengthAttribute.ParameterSet),
-            CKA.CKA_HSS_LEVELS => (read.HssLevels, KeyStrengthAttribute.HssLevels),
-            _ => (null, KeyStrengthAttribute.None),
+            CKA.CKA_VALUE_LEN => (read.ValueLen, UnansweredAttributes.ValueLen),
+            CKA.CKA_PARAMETER_SET => (read.ParameterSet, UnansweredAttributes.ParameterSet),
+            CKA.CKA_HSS_LEVELS => (read.HssLevels, UnansweredAttributes.HssLevels),
+            _ => (null, UnansweredAttributes.None),
         };
         if (size is { } attribute && value is null && read.IsUnanswered(slot))
             value = ReadUlongOrNull(key, attribute);
@@ -84,13 +85,13 @@ internal sealed partial class Pkcs11SessionCore
         {
             CKK.CKK_RSA => request with
             {
-                ModulusBits = BitLength(read.Modulus
-                    ?? (read.IsUnanswered(KeyStrengthAttribute.Modulus) ? ReadBytesOrNull(key, CKA.CKA_MODULUS) : null)),
+                ModulusBits = BitLength(ReadValueOrNull(key, CKA.CKA_MODULUS, read.ModulusLength,
+                    read.IsUnanswered(UnansweredAttributes.Modulus))),
             },
             CKK.CKK_EC => request with
             {
-                Curve = NamedCurveOf(read.EcParams
-                    ?? (read.IsUnanswered(KeyStrengthAttribute.EcParams) ? ReadBytesOrNull(key, CKA.CKA_EC_PARAMS) : null)),
+                Curve = NamedCurveOf(ReadValueOrNull(key, CKA.CKA_EC_PARAMS, read.EcParamsLength,
+                    read.IsUnanswered(UnansweredAttributes.EcParams))),
             },
             _ => request,
         };
@@ -122,8 +123,26 @@ internal sealed partial class Pkcs11SessionCore
         }
     }
 
-    // One byte-array attribute through the generic reader: for a value the one-call read could not settle (longer than
-    // its buffer, or a module that left it unanswered). Null when the token does not report it.
+    // The value of a byte-array attribute whose length the one-call read reported: read into a buffer of exactly that
+    // length, never a guess a module could copy past (KeyStrengthAttributeReader). An unanswered length, or a value that
+    // did not come back at that length, is read again through the generic reader. Null when the token does not report it.
+    private byte[]? ReadValueOrNull(ObjectHandle key, CKA attribute, int? length, bool unanswered)
+    {
+        if (length is not { } exact)
+            return unanswered ? ReadBytesOrNull(key, attribute) : null;
+
+        CKR rv = KeyStrengthAttributeReader.ReadExact(_pkcs11Library, _sessionId, (NativeCULong)key.ObjectId, attribute, exact,
+            out byte[]? value);
+        if (value is not null)
+            return value;
+        if (rv is not (CKR.CKR_OK or CKR.CKR_ATTRIBUTE_TYPE_INVALID or CKR.CKR_ATTRIBUTE_SENSITIVE or CKR.CKR_BUFFER_TOO_SMALL
+            or CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID))
+            ThrowIfError(rv, OpGetAttributeValue);
+        return rv == CKR.CKR_BUFFER_TOO_SMALL ? ReadBytesOrNull(key, attribute) : null;
+    }
+
+    // One byte-array attribute through the generic reader (its length, then its value): for a length the one-call read
+    // left unanswered, or a value that changed length between the two calls. Null when the token does not report it.
     private byte[]? ReadBytesOrNull(ObjectHandle key, CKA attribute)
     {
         try
@@ -366,23 +385,19 @@ internal sealed partial class Pkcs11SessionCore
     /// </summary>
     /// <remarks>
     /// Only those answers say "this value is not available", which an inspecting policy refuses as unreported; so
-    /// does a handle the token does not know, for which this returns <see langword="false"/>, every value
-    /// <see langword="null"/>. Any other failure of the read (a device, session or library error) is the token's
-    /// error, not the key's: it propagates, still before the operation the read guards reaches the token.
+    /// does a handle the token does not know, which leaves every value <see langword="null"/>. Any other failure of the
+    /// read (a device, session or library error) is the token's error, not the key's: it propagates, still before the
+    /// operation the read guards reaches the token.
     /// </remarks>
-    /// <returns><see langword="false"/> when the token does not know the handle; <see langword="true"/> otherwise.</returns>
     /// <exception cref="Pkcs11Exception">The read failed for a reason other than the value being unavailable.</exception>
-    private bool ReadUlongsOrNull(ObjectHandle key, ReadOnlySpan<CKA> attributes, Span<ulong?> values)
+    private void ReadUlongsOrNull(ObjectHandle key, ReadOnlySpan<CKA> attributes, Span<ulong?> values)
     {
         using var _ = AcquireExclusive();
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue");
 
         CKR rv = UlongAttributeReader.Read(_pkcs11Library, _sessionId, (NativeCULong)key.ObjectId, attributes, values);
-        if (rv is CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID)
-            return false;
         if (rv is not (CKR.CKR_OK or CKR.CKR_ATTRIBUTE_TYPE_INVALID or CKR.CKR_ATTRIBUTE_SENSITIVE
-            or CKR.CKR_BUFFER_TOO_SMALL))
+            or CKR.CKR_BUFFER_TOO_SMALL or CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID))
             ThrowIfError(rv, OpGetAttributeValue);
-        return true;
     }
 }

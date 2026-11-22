@@ -91,8 +91,8 @@ These are outside what the library can defend against, and outside the scope of
 ### Known limits
 
 - **Policies judge the keys they use by what the token reports.** Each time an existing RSA or EC key is used,
-  the session reads its modulus or curve from the token and the policy judges it, at one extra
-  `C_GetAttributeValue` call per keyed operation (`Cnsa20` reads every key's type and size). A token that reports
+  the session reads its modulus or curve from the token and the policy judges it, at two extra
+  `C_GetAttributeValue` calls per keyed operation on such a key (`Cnsa20` reads every key's type and size). A token that reports
   a value it does not hold defeats the check, as it can defeat every other.
 - **Raw-digest mechanisms** (`CKM_ECDSA`, `CKM_RSA_PKCS`, `CKM_RSA_PKCS_PSS`) sign a caller-computed
   digest; the policy cannot see which hash produced it.
