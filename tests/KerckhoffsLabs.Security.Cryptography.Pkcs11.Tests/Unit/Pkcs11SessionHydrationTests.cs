@@ -12,8 +12,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// How <see cref="Pkcs11Session.FindKeys"/> and <see cref="Pkcs11Session.FindObjects"/> read a found
-/// object's class, key type, label, id and <c>CKA_PRIVATE</c>: one <c>C_GetAttributeValue</c> per object when the token
-/// answers cleanly, and the generic two-call read, with the same result, whenever it does not.
+/// object's class, key type, label, id and <c>CKA_PRIVATE</c>: two <c>C_GetAttributeValue</c> per object when the token
+/// answers cleanly (the fixed-size attributes with the lengths of the label and the id, then those at exactly their
+/// lengths; one when both are empty), and the generic two-call read, with the same result, whenever it does not. A label
+/// or id is never read into a buffer shorter than the value, which a module that copies whatever it is given (NSS) would
+/// overrun.
 /// </summary>
 /// <remarks>
 /// A round trip per object is the cost a network HSM charges for every key a search returns, so the
@@ -27,7 +30,7 @@ public sealed class Pkcs11SessionHydrationTests
     private static readonly byte[] AesKeyType = ULong((ulong)CKK.CKK_AES);
 
     [Fact]
-    public void FindKeys_ReadsEachKeyInOneCall()
+    public void FindKeys_ReadsEachKeyInTwoCalls()
     {
         using var module = new IdentityModule();
         for (int i = 0; i < 3; i++)
@@ -43,7 +46,7 @@ public sealed class Pkcs11SessionHydrationTests
             Assert.Equal([(byte)i, 0xAA], keys[i].Id.ToArray());
             Assert.Equal(CKK.CKK_AES, keys[i].KeyType);
         }
-        Assert.Equal(3, module.CallCount("C_GetAttributeValue"));
+        Assert.Equal(6, module.CallCount("C_GetAttributeValue"));
     }
 
     // A certificate is stored with its key's CKA_ID, so a search by id finds both. FindKeys returns the key
@@ -68,7 +71,7 @@ public sealed class Pkcs11SessionHydrationTests
     }
 
     [Fact]
-    public void FindObjects_ReadsEachObjectInOneCall()
+    public void FindObjects_ReadsEachObjectInTwoCalls()
     {
         using var module = new IdentityModule();
         module.Add(SecretKey("first", [0x01]));
@@ -79,7 +82,7 @@ public sealed class Pkcs11SessionHydrationTests
 
         Assert.Equal(["first", "second"], objects.Select(o => o.Label));
         Assert.All(objects, o => Assert.Equal(CKO.CKO_SECRET_KEY, o.ObjectClass));
-        Assert.Equal(2, module.CallCount("C_GetAttributeValue"));
+        Assert.Equal(4, module.CallCount("C_GetAttributeValue"));
     }
 
     // Same decoding as the generic reader: trailing NUL padding trimmed, an empty label is "", an
@@ -98,29 +101,48 @@ public sealed class Pkcs11SessionHydrationTests
 
         Assert.Equal(expected, Assert.Single(keys).Label);
         Assert.True(keys[0].Id.IsEmpty);
-        Assert.Equal(1, module.CallCount("C_GetAttributeValue"));
+        // An empty label and an empty id need no second call.
+        Assert.Equal(stored.Length == 0 ? 1 : 2, module.CallCount("C_GetAttributeValue"));
     }
 
-    // Each case makes the one-call read unusable. The result must be what the generic reader gives,
-    // and nothing may throw that did not throw before: one failed attempt, then its two calls.
+    // Each case makes the value read unusable. The result must be what the generic reader gives, and nothing may throw
+    // that did not throw before: the two calls of the attempt, then the generic reader's two.
     [Theory]
-    [InlineData(Quirk.LongLabel)]
-    [InlineData(Quirk.ReportsOkForTooSmallBuffer)]
+    [InlineData(Quirk.ReportsAnotherLengthOnRead)]
     [InlineData(Quirk.ReportsUnavailableWithOk)]
-    public void UnusableOneCallRead_FallsBackToTheGenericReader(Quirk quirk)
+    public void UnusableValueRead_FallsBackToTheGenericReader(Quirk quirk)
     {
-        string label = quirk == Quirk.ReportsUnavailableWithOk ? "short" : new string('L', ObjectIdentityReader.LabelCapacity + 72);
         using var module = new IdentityModule { Quirk = quirk };
-        module.Add(SecretKey(label, [0x07]));
+        module.Add(SecretKey("short", [0x07]));
+        using var session = module.OpenSession();
+
+        using var keys = session.FindKeys();
+
+        Pkcs11Key key = Assert.Single(keys);
+        Assert.Equal("short", key.Label);
+        Assert.Equal([0x07], key.Id.ToArray());
+        Assert.Equal(CKK.CKK_AES, key.KeyType);
+        Assert.Equal(4, module.CallCount("C_GetAttributeValue"));
+    }
+
+    // A module that copies the whole value whatever the buffer (NSS softoken's NSC_GetAttributeValue) is never handed a
+    // buffer shorter than the value: a long label and a long id are read at their own lengths, in the same two calls.
+    [Fact]
+    public void LongValues_AreReadAtTheirLengths_NeverIntoAShorterBuffer()
+    {
+        string label = new('L', 1000);
+        byte[] id = Enumerable.Range(0, 300).Select(i => (byte)(i % 256)).ToArray();
+        using var module = new IdentityModule { Quirk = Quirk.CopiesWholeValue };
+        module.Add(SecretKey(label, id));
         using var session = module.OpenSession();
 
         using var keys = session.FindKeys();
 
         Pkcs11Key key = Assert.Single(keys);
         Assert.Equal(label, key.Label);
-        Assert.Equal([0x07], key.Id.ToArray());
-        Assert.Equal(CKK.CKK_AES, key.KeyType);
-        Assert.Equal(3, module.CallCount("C_GetAttributeValue"));
+        Assert.Equal(id, key.Id.ToArray());
+        Assert.Equal(0, module.Overruns);
+        Assert.Equal(2, module.CallCount("C_GetAttributeValue"));
     }
 
     // A data object has no CKA_ID, so the token answers CKR_ATTRIBUTE_TYPE_INVALID and the generic
@@ -176,24 +198,27 @@ public sealed class Pkcs11SessionHydrationTests
         using var keys = session.FindKeys();
 
         Assert.Equal("real", Assert.Single(keys).Label);
-        Assert.Equal(1, module.CallCount("C_GetAttributeValue"));
+        Assert.Equal(2, module.CallCount("C_GetAttributeValue"));
     }
 
     public enum Quirk
     {
         None,
 
-        /// <summary>The label does not fit the one-call buffer: <c>CKR_BUFFER_TOO_SMALL</c>, as the spec says.</summary>
-        LongLabel,
+        /// <summary>The value read gets <c>CKR_OK</c> and a label length other than the one first reported.</summary>
+        ReportsAnotherLengthOnRead,
 
-        /// <summary>A buffer too small for the label gets <c>CKR_OK</c> and the full length, and nothing written.</summary>
-        ReportsOkForTooSmallBuffer,
-
-        /// <summary>The label is reported as <c>CK_UNAVAILABLE_INFORMATION</c> under <c>CKR_OK</c>.</summary>
+        /// <summary>The value read reports the label as <c>CK_UNAVAILABLE_INFORMATION</c> under <c>CKR_OK</c>.</summary>
         ReportsUnavailableWithOk,
 
         /// <summary>The module writes the real label and then points the template entry at a decoy.</summary>
         RedirectsLabelPointer,
+
+        /// <summary>
+        /// The module copies the whole value whatever <c>ulValueLen</c> says, as NSS softoken does; the fake counts the
+        /// copies that would have run past the buffer (<see cref="IdentityModule.Overruns"/>) instead of making them.
+        /// </summary>
+        CopiesWholeValue,
     }
 
     private static Dictionary<CKA, byte[]> SecretKey(string label, byte[] id) => new()
@@ -223,6 +248,9 @@ public sealed class Pkcs11SessionHydrationTests
         private int _next;
 
         public Quirk Quirk { get; init; }
+
+        /// <summary>Copies a <see cref="Quirk.CopiesWholeValue"/> module would have made past the caller's buffer.</summary>
+        public int Overruns { get; private set; }
 
         protected override bool ReleasedByFinalize => true;
 
@@ -275,23 +303,32 @@ public sealed class Pkcs11SessionHydrationTests
                     continue;
                 }
 
-                bool oneCallLabel = type == CKA.CKA_LABEL && attribute.value != IntPtr.Zero
-                    && (ulong)attribute.valueLen == ObjectIdentityReader.LabelCapacity;
-                if (oneCallLabel && Quirk == Quirk.ReportsUnavailableWithOk)
+                if (Quirk == Quirk.CopiesWholeValue && attribute.value != IntPtr.Zero
+                    && (ulong)attribute.valueLen < (ulong)value.Length)
+                {
+                    Overruns++;
+                    attribute.valueLen = (NativeCULong)(ulong)value.Length;
+                    continue;
+                }
+
+                // The identity reader's value read asks for the label and the id alone; the generic reader asks for
+                // every attribute at once.
+                bool valueReadLabel = type == CKA.CKA_LABEL && attribute.value != IntPtr.Zero && template.Length <= 2;
+                if (valueReadLabel && Quirk == Quirk.ReportsUnavailableWithOk)
                 {
                     attribute.valueLen = NativeCULong.MaxValue;
                     continue;
                 }
-                if (oneCallLabel && Quirk == Quirk.ReportsOkForTooSmallBuffer && value.Length > ObjectIdentityReader.LabelCapacity)
+                if (valueReadLabel && Quirk == Quirk.ReportsAnotherLengthOnRead)
                 {
-                    attribute.valueLen = (NativeCULong)(ulong)value.Length;
+                    attribute.valueLen = (NativeCULong)(ulong)(value.Length + 1);
                     continue;
                 }
 
                 CKR answer = AnswerAttribute(ref attribute, value);
                 if (answer != CKR.CKR_OK)
                     rv = answer;
-                else if (oneCallLabel && Quirk == Quirk.RedirectsLabelPointer)
+                else if (valueReadLabel && Quirk == Quirk.RedirectsLabelPointer)
                     attribute.value = Marshal.UnsafeAddrOfPinnedArrayElement(Decoy, 0);
             }
             return rv;
