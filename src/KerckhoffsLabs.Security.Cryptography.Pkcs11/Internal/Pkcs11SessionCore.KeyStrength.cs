@@ -2,7 +2,10 @@ using System.Globalization;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+
+using static KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.Pkcs11Operations;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
@@ -21,8 +24,8 @@ internal sealed partial class Pkcs11SessionCore
     /// </summary>
     /// <remarks>
     /// Nothing is cached: a handle can be reused for a different key (destroyed and recreated, or another
-    /// session's object), so each guarded call reads the key the handle names now. The reads cost one or
-    /// two <c>C_GetAttributeValue</c> sequences, and only under an inspecting policy.
+    /// session's object), so each guarded call reads the key the handle names now. The read is one
+    /// <c>C_GetAttributeValue</c> call (see <see cref="ReadKeyStrength"/>), and only under an inspecting policy.
     /// </remarks>
     /// <exception cref="CryptoPolicyViolationException">The policy refused the key.</exception>
     internal void EnforceKeyStrength(ObjectHandle key, KeyStrengthSource source)
@@ -34,18 +37,45 @@ internal sealed partial class Pkcs11SessionCore
     }
 
     /// <summary>
-    /// Describes <paramref name="key"/> from the token: its <c>CKA_KEY_TYPE</c>, then the one attribute that
+    /// Describes <paramref name="key"/> from the token: its <c>CKA_KEY_TYPE</c>, and the one attribute that
     /// gives the size of a key of that type. A value the token will not report becomes
     /// <see langword="null"/>, which an inspecting policy refuses, so an unreadable key fails closed at the
     /// policy rather than being left to the token. A device or session error propagates (see
-    /// <see cref="ReadUlongOrNull"/>), which stops the operation too.
+    /// <see cref="ReadUlongsOrNull"/>), which stops the operation too.
     /// </summary>
+    /// <remarks>
+    /// One call asks for the type and every size attribute (<see cref="StrengthAttributes"/>): a key has the
+    /// one its type uses and the token answers the others as absent, each on its own (PKCS#11 v3.2
+    /// C_GetAttributeValue). A module that does not, and leaves the type or the size the type uses unanswered,
+    /// is asked again for that attribute alone, so it costs at most two more calls and is judged the same.
+    /// </remarks>
     private KeyStrengthRequest ReadKeyStrength(ObjectHandle key, KeyStrengthSource source)
     {
-        CKK? keyType = ReadUlongOrNull(key, CKA.CKA_KEY_TYPE) is { } type ? (CKK)type : null;
+        Span<ulong?> values = stackalloc ulong?[StrengthAttributes.Length];
+        if (!ReadUlongsOrNull(key, StrengthAttributes, values))
+            return Describe(null, source, null, null);
+
+        ulong? type = values[0] ?? ReadUlongOrNull(key, CKA.CKA_KEY_TYPE);
+        CKK? keyType = type is { } t ? (CKK)t : null;
         CKA? size = SizeAttributeOf(keyType);
-        return Describe(keyType, source, size, size is { } attribute ? ReadUlongOrNull(key, attribute) : null);
+        ulong? value = size switch
+        {
+            CKA.CKA_VALUE_LEN => values[1],
+            CKA.CKA_PARAMETER_SET => values[2],
+            CKA.CKA_HSS_LEVELS => values[3],
+            _ => null,
+        };
+        if (size is { } attribute && value is null)
+            value = ReadUlongOrNull(key, attribute);
+        return Describe(keyType, source, size, value);
     }
+
+    /// <summary>
+    /// What <see cref="ReadKeyStrength"/> asks for in one call: the type, then every attribute
+    /// <see cref="SizeAttributeOf"/> can name, at the indexes it reads them from.
+    /// </summary>
+    private static readonly CKA[] StrengthAttributes =
+        [CKA.CKA_KEY_TYPE, CKA.CKA_VALUE_LEN, CKA.CKA_PARAMETER_SET, CKA.CKA_HSS_LEVELS];
 
     /// <summary>
     /// The one attribute that gives the size of a key of <paramref name="keyType"/>, or
@@ -254,34 +284,41 @@ internal sealed partial class Pkcs11SessionCore
     private static int? LengthOf(ulong? valueLen) => valueLen is { } len and > 0 and <= int.MaxValue ? (int)len : null;
 
     /// <summary>
-    /// One <c>CK_ULONG</c> attribute of <paramref name="key"/>, or <see langword="null"/> when the token does
-    /// not report it: unreadable (sensitive, unknown to the object, <c>CK_UNAVAILABLE_INFORMATION</c>), a
-    /// value of <c>CK_UNAVAILABLE_INFORMATION</c>, the wrong length, or a handle the token does not know.
+    /// <see cref="ReadUlongsOrNull"/> for one attribute: its value, or <see langword="null"/> when the token does
+    /// not report it, or does not know the handle.
     /// </summary>
-    /// <remarks>
-    /// Only those answers say "this value is not available", which an inspecting policy refuses as unreported.
-    /// Any other failure of the read (a device, session or library error) is the token's error, not the key's:
-    /// it propagates unchanged, still before the operation the read guards reaches the token.
-    /// </remarks>
     /// <exception cref="Pkcs11Exception">The read failed for a reason other than the value being unavailable.</exception>
     private ulong? ReadUlongOrNull(ObjectHandle key, CKA attribute)
     {
-        try
-        {
-            using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(key, [attribute]);
-            if (attrs[0].CannotBeRead)
-                return null;
-            ulong value = attrs[0].GetValueAsUlong();
-            return CK.IsCkInformationUnavailable(value) ? null : value;
-        }
-        catch (Pkcs11AttributeException)
-        {
-            return null;
-        }
-        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_ATTRIBUTE_SENSITIVE or CKR.CKR_ATTRIBUTE_TYPE_INVALID
-                                             or CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID)
-        {
-            return null;
-        }
+        Span<ulong?> value = stackalloc ulong?[1];
+        ReadUlongsOrNull(key, [attribute], value);
+        return value[0];
+    }
+
+    /// <summary>
+    /// <c>CK_ULONG</c> attributes of <paramref name="key"/>, in one <c>C_GetAttributeValue</c> call: each value, or
+    /// <see langword="null"/> when the token does not report it: unreadable (sensitive, unknown to the object), a
+    /// value of <c>CK_UNAVAILABLE_INFORMATION</c>, or the wrong length.
+    /// </summary>
+    /// <remarks>
+    /// Only those answers say "this value is not available", which an inspecting policy refuses as unreported; so
+    /// does a handle the token does not know, for which this returns <see langword="false"/>, every value
+    /// <see langword="null"/>. Any other failure of the read (a device, session or library error) is the token's
+    /// error, not the key's: it propagates, still before the operation the read guards reaches the token.
+    /// </remarks>
+    /// <returns><see langword="false"/> when the token does not know the handle; <see langword="true"/> otherwise.</returns>
+    /// <exception cref="Pkcs11Exception">The read failed for a reason other than the value being unavailable.</exception>
+    private bool ReadUlongsOrNull(ObjectHandle key, ReadOnlySpan<CKA> attributes, Span<ulong?> values)
+    {
+        using var _ = AcquireExclusive();
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue");
+
+        CKR rv = UlongAttributeReader.Read(_pkcs11Library, _sessionId, (NativeCULong)key.ObjectId, attributes, values);
+        if (rv is CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID)
+            return false;
+        if (rv is not (CKR.CKR_OK or CKR.CKR_ATTRIBUTE_TYPE_INVALID or CKR.CKR_ATTRIBUTE_SENSITIVE
+            or CKR.CKR_BUFFER_TOO_SMALL))
+            ThrowIfError(rv, OpGetAttributeValue);
+        return true;
     }
 }

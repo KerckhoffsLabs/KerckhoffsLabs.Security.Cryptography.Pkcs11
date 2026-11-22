@@ -402,7 +402,7 @@ Documentation only: every item below is refused because it is absent from the al
 - LMS (`CKM_HSS`) and XMSS (`CKM_XMSS`) are allowed for any signing. CNSA 2.0 intends them for software and firmware signing; the policy cannot see what is being signed, so restricting them to that use is the application's job.
 - XMSS parameter sets are not checked.
 - It fails closed: a key whose type, length, parameter set or HSS levels the token does not report (absent, sensitive or unavailable) is refused, so a token that hides these attributes cannot use a compliant key.
-- Each keyed operation costs one or two extra `C_GetAttributeValue` calls, because the key is read again on every use rather than cached.
+- Each keyed operation costs one extra `C_GetAttributeValue` call (up to three on a module that does not answer every attribute of a read, as PKCS#11 requires), because the key is read again on every use rather than cached.
 - `C_SetOperationState` restores a saved operation whose own mechanism and key are not inspected; only the key handles passed to it are.
 - Keys returned through TLS/SSL3 key-and-MAC parameters are not judged after creation. Cnsa20 refuses those mechanisms, but a policy derived from it that allows them again would not judge those keys.
 - Some tokens (SoftHSM2) do not report `CKA_VALUE_LEN` on unwrapped secret keys; under Cnsa20 those unwraps are refused.

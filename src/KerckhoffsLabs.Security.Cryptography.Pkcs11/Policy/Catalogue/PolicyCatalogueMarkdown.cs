@@ -92,8 +92,9 @@ internal static class PolicyCatalogueMarkdown
         "XMSS parameter sets are not checked.",
         "It fails closed: a key whose type, length, parameter set or HSS levels the token does not report (absent, "
             + "sensitive or unavailable) is refused, so a token that hides these attributes cannot use a compliant key.",
-        "Each keyed operation costs one or two extra `C_GetAttributeValue` calls, because the key is read again on "
-            + "every use rather than cached.",
+        "Each keyed operation costs one extra `C_GetAttributeValue` call (up to three on a module that does not "
+            + "answer every attribute of a read, as PKCS#11 requires), because the key is read again on every use "
+            + "rather than cached.",
         "`C_SetOperationState` restores a saved operation whose own mechanism and key are not inspected; only the key "
             + "handles passed to it are.",
         "Keys returned through TLS/SSL3 key-and-MAC parameters are not judged after creation. Cnsa20 refuses those "

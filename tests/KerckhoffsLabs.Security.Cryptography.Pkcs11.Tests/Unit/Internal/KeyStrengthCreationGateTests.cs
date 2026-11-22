@@ -46,7 +46,7 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
     {
         public Dictionary<ulong, Dictionary<CKA, ulong?>> Keys { get; } = [];
 
-        /// <summary>Raw <c>C_GetAttributeValue</c> calls, not reads: a read of one template is two calls.</summary>
+        /// <summary>Raw <c>C_GetAttributeValue</c> calls: one describes a key (its type and size together).</summary>
         public int GetAttributeValueCalls { get; private set; }
 
         public int GenerateKeyCalls { get; private set; }
@@ -280,8 +280,8 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
 
         Assert.Equal(Created, key.ObjectId);
         Assert.Empty(fake.Destroyed);
-        // The post-check reads the key the token made, even when the template already passed: two reads.
-        Assert.Equal(4, fake.GetAttributeValueCalls);
+        // The post-check reads the key the token made, even when the template already passed: one call.
+        Assert.Equal(1, fake.GetAttributeValueCalls);
     }
 
     [Fact]
@@ -469,8 +469,8 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         ObjectHandle derived = session.DeriveKey(hkdf, StrongAes, AesTemplate());
 
         Assert.True(derived.IsInvalid);
-        // The base key's two reads only.
-        Assert.Equal(4, fake.GetAttributeValueCalls);
+        // The base key's read only.
+        Assert.Equal(1, fake.GetAttributeValueCalls);
         Assert.Empty(fake.Destroyed);
     }
 
@@ -551,8 +551,8 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         Assert.Equal(Created, key.ObjectId);
         Assert.Empty(fake.Destroyed);
         Assert.Equal([SiblingA, SiblingB], kdf.RawAdditionalDerivedKeyHandles);
-        // The base key, the main key and both siblings: two reads (four calls) each.
-        Assert.Equal(16, fake.GetAttributeValueCalls);
+        // The base key, the main key and both siblings: one call each.
+        Assert.Equal(4, fake.GetAttributeValueCalls);
     }
 
     // A slot the token left at CK_INVALID_HANDLE is no key: skipped, while the others are still judged.
@@ -567,7 +567,7 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         session.DeriveKey(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdf), StrongAes, AesTemplate());
 
         Assert.Empty(fake.Destroyed);
-        Assert.Equal(12, fake.GetAttributeValueCalls);
+        Assert.Equal(3, fake.GetAttributeValueCalls);
     }
 
     [Fact]
@@ -626,7 +626,7 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
 
         Assert.Equal(Created, key.ObjectId);
         Assert.Equal(1, fake.CreateObjectCalls);
-        Assert.Equal(4, fake.GetAttributeValueCalls);
+        Assert.Equal(1, fake.GetAttributeValueCalls);
         Assert.Empty(fake.Destroyed);
     }
 

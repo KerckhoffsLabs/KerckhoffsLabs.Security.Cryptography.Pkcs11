@@ -23,7 +23,7 @@ public sealed class KeyStrengthGateTests
 
     /// <summary>
     /// Answers each key's attributes from <see cref="Keys"/> and counts the reads and the calls that use a
-    /// key. Every read of one attribute is two <c>C_GetAttributeValue</c> calls (length, then value).
+    /// key. Describing a key is one <c>C_GetAttributeValue</c> call, for its type and size together.
     /// </summary>
     private sealed class StrengthFake : SessionTestModule
     {
@@ -36,8 +36,14 @@ public sealed class KeyStrengthGateTests
         /// <summary>When set, every <c>C_GetAttributeValue</c> call fails with this return value.</summary>
         public CKR? ReadFailure { get; set; }
 
-        /// <summary>Attribute reads, each the two-call sequence for one template.</summary>
-        public int AttributeReads => _getAttributeValueCalls / 2;
+        /// <summary>Raw <c>C_GetAttributeValue</c> calls.</summary>
+        public int AttributeCalls => _getAttributeValueCalls;
+
+        /// <summary>
+        /// When set, the module stops at the first attribute a key lacks, answering <c>CKR_ATTRIBUTE_TYPE_INVALID</c>
+        /// and leaving every later entry of the template untouched, which PKCS#11 v3.2 does not allow but some modules do.
+        /// </summary>
+        public bool StopsAtFirstMissing { get; set; }
 
         public int EncryptInitCalls { get; private set; }
 
@@ -53,9 +59,17 @@ public sealed class KeyStrengthGateTests
             _getAttributeValueCalls++;
             if (ReadFailure is { } failure)
                 return failure;
-            return Keys.TryGetValue((ulong)objectHandle, out var values)
-                ? KeyStrengthAttributes.Answer(template, values, Sensitive)
-                : CKR.CKR_OBJECT_HANDLE_INVALID;
+            if (!Keys.TryGetValue((ulong)objectHandle, out var values))
+                return CKR.CKR_OBJECT_HANDLE_INVALID;
+            if (StopsAtFirstMissing)
+            {
+                for (int i = 0; i < template.Length; i++)
+                {
+                    if (!values.ContainsKey((CKA)(ulong)template[i].type))
+                        return KeyStrengthAttributes.Answer(template[..(i + 1)], values, Sensitive);
+                }
+            }
+            return KeyStrengthAttributes.Answer(template, values, Sensitive);
         }
 
         protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
@@ -163,7 +177,7 @@ public sealed class KeyStrengthGateTests
 
         Encrypt(session, Key);
 
-        Assert.Equal(0, fake.AttributeReads);
+        Assert.Equal(0, fake.AttributeCalls);
         Assert.Equal(1, fake.EncryptInitCalls);
     }
 
@@ -176,7 +190,7 @@ public sealed class KeyStrengthGateTests
 
         Encrypt(session, Key);
 
-        Assert.Equal(0, fake.AttributeReads);
+        Assert.Equal(0, fake.AttributeCalls);
         Assert.Equal(1, fake.EncryptInitCalls);
     }
 
@@ -189,7 +203,7 @@ public sealed class KeyStrengthGateTests
 
         Encrypt(session, Key);
 
-        Assert.Equal(0, fake.AttributeReads);
+        Assert.Equal(0, fake.AttributeCalls);
         Assert.Equal(1, fake.EncryptInitCalls);
     }
 
@@ -214,7 +228,7 @@ public sealed class KeyStrengthGateTests
 
         Assert.Equal(CKK.CKK_AES, request.KeyType);
         Assert.Equal(16, request.ValueLengthBytes);
-        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(1, fake.AttributeCalls);
         Assert.Equal(0, fake.EncryptInitCalls);
     }
 
@@ -228,7 +242,7 @@ public sealed class KeyStrengthGateTests
 
         Encrypt(session, Key);
 
-        Assert.Equal(0, fake.AttributeReads);
+        Assert.Equal(0, fake.AttributeCalls);
         Assert.Equal(1, fake.EncryptInitCalls);
     }
 
@@ -392,7 +406,7 @@ public sealed class KeyStrengthGateTests
         Encrypt(session, Key);
         Encrypt(session, Key);
 
-        Assert.Equal(4, fake.AttributeReads);
+        Assert.Equal(2, fake.AttributeCalls);
         Assert.Equal(2, fake.EncryptInitCalls);
 
         fake.SetKey(Key, CKK.CKK_AES, 16);
@@ -412,7 +426,7 @@ public sealed class KeyStrengthGateTests
 
         session.Encrypt(new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], 128)), Key, input, output);
 
-        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(1, fake.AttributeCalls);
         Assert.Equal(1, fake.EncryptInitCalls);
     }
 
@@ -427,13 +441,13 @@ public sealed class KeyStrengthGateTests
         KeyStrengthRequest request = RefusedRequest(() => session.SetOperationState([0x01], Key, ObjectHandle.Invalid));
 
         Assert.Equal(16, request.ValueLengthBytes);
-        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(1, fake.AttributeCalls);
         Assert.Equal(0, fake.SetOperationStateCalls);
 
         fake.SetKey(Key, CKK.CKK_AES, 32);
         session.SetOperationState([0x01], ObjectHandle.Invalid, Key);
 
-        Assert.Equal(4, fake.AttributeReads);
+        Assert.Equal(2, fake.AttributeCalls);
         Assert.Equal(1, fake.SetOperationStateCalls);
     }
 
@@ -448,7 +462,7 @@ public sealed class KeyStrengthGateTests
         KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
 
         Assert.Equal(CKK.CKK_RSA, request.KeyType);
-        Assert.Equal(1, fake.AttributeReads);
+        Assert.Equal(1, fake.AttributeCalls);
     }
 
     [Theory]
@@ -465,7 +479,41 @@ public sealed class KeyStrengthGateTests
         Assert.Equal(type, request.KeyType);
         Assert.Equal(set, request.ParameterSet);
         Assert.Null(request.ValueLengthBytes);
-        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(1, fake.AttributeCalls);
+    }
+
+    // A module that stops at the first attribute the key lacks (CKA_VALUE_LEN, before CKA_PARAMETER_SET in the one
+    // call) leaves the parameter set unanswered: it is asked for alone, never taken as the zero its buffer would
+    // otherwise hold, and the key is judged as on any other module.
+    [Theory]
+    [InlineData(CKK.CKK_ML_KEM, (ulong)CkpMlKem.CKP_ML_KEM_512)]
+    [InlineData(CKK.CKK_ML_DSA, (ulong)CkpMlDsa.CKP_ML_DSA_44)]
+    public void ModuleThatStopsAtTheFirstMissingAttribute_IsAskedForTheSizeAgain(CKK type, ulong set)
+    {
+        using var fake = new StrengthFake { StopsAtFirstMissing = true };
+        fake.Keys[Key.ObjectId] = new() { [CKA.CKA_KEY_TYPE] = (ulong)type, [CKA.CKA_PARAMETER_SET] = set };
+        using var session = fake.CreateSession(policy: AllowAllButKeyStrength());
+
+        KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
+
+        Assert.Equal(type, request.KeyType);
+        Assert.Equal(set, request.ParameterSet);
+        Assert.Equal(2, fake.AttributeCalls);
+    }
+
+    // The size the type uses comes first among the size attributes, so even such a module answers an AES key in
+    // one call.
+    [Fact]
+    public void ModuleThatStopsAtTheFirstMissingAttribute_AnswersAnAesKeyInOneCall()
+    {
+        using var fake = new StrengthFake { StopsAtFirstMissing = true };
+        fake.SetKey(Key, CKK.CKK_AES, 16);
+        using var session = fake.CreateSession(policy: AllowAllButKeyStrength());
+
+        KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
+
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal(1, fake.AttributeCalls);
     }
 
     [Fact]
@@ -478,7 +526,7 @@ public sealed class KeyStrengthGateTests
         KeyStrengthRequest request = RefusedRequest(() => Encrypt(session, Key));
 
         Assert.Equal(2UL, request.HssLevels);
-        Assert.Equal(2, fake.AttributeReads);
+        Assert.Equal(1, fake.AttributeCalls);
     }
 
     [Fact]
@@ -535,6 +583,6 @@ public sealed class KeyStrengthGateTests
 
         Assert.Equal(CKK.CKK_RSA, request.KeyType);
         Assert.Equal(KeyStrengthSource.ExistingKey, request.Source);
-        Assert.Equal(1, fake.AttributeReads);
+        Assert.Equal(1, fake.AttributeCalls);
     }
 }

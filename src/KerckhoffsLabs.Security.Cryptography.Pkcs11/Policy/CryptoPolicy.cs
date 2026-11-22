@@ -91,7 +91,8 @@ public static class CryptoPolicy
     /// <item><description>XMSS parameter sets are not checked.</description></item>
     /// <item><description>It fails closed: a key whose attributes the token does not report is refused, which may
     /// refuse a compliant key on a token that hides them.</description></item>
-    /// <item><description>Each keyed operation costs one or two extra <c>C_GetAttributeValue</c> calls.</description></item>
+    /// <item><description>Each keyed operation costs one extra <c>C_GetAttributeValue</c> call (up to three on a
+    /// module that does not answer every attribute of a read, as PKCS#11 requires).</description></item>
     /// <item><description><c>C_SetOperationState</c> restores a saved operation whose own mechanism and key are not
     /// inspected; only the key handles passed to it are.</description></item>
     /// <item><description>Keys returned through TLS/SSL3 key-and-MAC parameters are not judged after creation.
