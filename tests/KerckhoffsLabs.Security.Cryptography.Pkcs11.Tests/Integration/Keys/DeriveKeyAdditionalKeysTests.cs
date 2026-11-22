@@ -113,8 +113,8 @@ public sealed class DeriveKeyAdditionalKeysTests
     public void NonSensitiveSibling_UnderRecommended_IsRefusedBeforeTheToken()
     {
         var token = new ManagedSoftToken();
-        using var library = token.Load();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.Recommended);
+        using var library = token.Load(new Pkcs11LibraryOptions { Policy = CryptoPolicy.Recommended });
+        using var session = ManagedToken.OpenSession(library);
 
         using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("sp800108-base-policy").Value(BaseKeyBytes).Derive().Build();
@@ -136,8 +136,8 @@ public sealed class DeriveKeyAdditionalKeysTests
     [Fact]
     public void SiblingOmittingSensitiveAndExtractable_GetsTheSecureDefaults()
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.Recommended);
+        using var library = ManagedToken.NewLibrary(CryptoPolicy.Recommended);
+        using var session = ManagedToken.OpenSession(library);
 
         using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("sp800108-base-defaults").Value(BaseKeyBytes).Derive().Build();
@@ -174,8 +174,8 @@ public sealed class DeriveKeyAdditionalKeysTests
     public void NonSensitiveSibling_UnderAllowInsecure_IsStillDerived()
     {
         var token = new ManagedSoftToken();
-        using var library = token.Load();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.AllowInsecure);
+        using var library = token.Load(new Pkcs11LibraryOptions { Policy = CryptoPolicy.AllowInsecure });
+        using var session = ManagedToken.OpenSession(library);
 
         using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("sp800108-base-insecure").Value(BaseKeyBytes).Derive().Build();

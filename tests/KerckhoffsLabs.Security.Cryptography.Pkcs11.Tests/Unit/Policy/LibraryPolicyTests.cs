@@ -8,8 +8,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
-/// <see cref="Pkcs11LibraryOptions.Policy"/>: a library policy that allows overrides is the default a session's own
-/// policy replaces; one that does not is a ceiling every session of the library enforces as well as its own.
+/// <see cref="Pkcs11LibraryOptions.Policy"/>: every session of the library enforces it. A scoped <c>UsePolicy</c> lease
+/// can lift or tighten it where it allows overrides, and is refused where it does not.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
 public sealed class LibraryPolicyTests
@@ -24,14 +24,12 @@ public sealed class LibraryPolicyTests
     // NistApproved allows it.
     private static readonly MechanismUseRequest AesGcmDecrypt = new(new Mechanism(CKM.CKM_AES_GCM), CryptoOperation.Decrypt);
 
-    private sealed class NoEncryptPolicy : ICryptoPolicy
+    // A custom policy that allows no override, as one built with AllowsOverride(false) would be.
+    private sealed class NoOverridePolicy : ICryptoPolicy
     {
-        public string Name => "NoEncrypt";
-        public bool AllowsOverride => true;
-        public PolicyDecision Evaluate(PolicyRequest request)
-            => request is MechanismUseRequest { Operation: CryptoOperation.Encrypt }
-                ? PolicyDecision.Deny("no encryption")
-                : CryptoPolicy.AllowInsecure.Evaluate(request);
+        public string Name => "NoOverride";
+        public bool AllowsOverride => false;
+        public PolicyDecision Evaluate(PolicyRequest request) => CryptoPolicy.Recommended.Evaluate(request);
     }
 
     private static Pkcs11Library Load(ICryptoPolicy? policy)
@@ -53,7 +51,7 @@ public sealed class LibraryPolicyTests
     }
 
     [Fact]
-    public void NoLibraryPolicy_IsRecommended_AndASessionWithoutOneEnforcesIt()
+    public void NoLibraryPolicy_IsRecommended_AndEverySessionEnforcesIt()
     {
         using var library = Load(policy: null);
         using var session = ManagedToken.OpenSession(library);
@@ -62,78 +60,74 @@ public sealed class LibraryPolicyTests
         Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
+    // Every way of opening a session: a login's, a slot's, and the one-call form.
     [Fact]
-    public void LibraryPolicyAllowingOverrides_ASessionPolicyReplacesIt()
+    public void EverySessionOfTheLibrary_EnforcesItsPolicy()
     {
-        using var library = Load(CryptoPolicy.Recommended);
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.AllowInsecure);
+        using var library = Load(CryptoPolicy.AllowInsecure);
+        Pkcs11Slot slot = Slot(library);
+        using var fromLogin = ManagedToken.OpenSession(library);
+        using var fromSlot = slot.OpenSession(SessionAccess.ReadOnly);
+        using var oneCall = slot.OpenLoggedInSession(LoginCredential.FromPinSource(() => new SecurePin("1234")));
 
-        Assert.Same(CryptoPolicy.AllowInsecure, session.Policy);
-        Assert.True(session.IsAllowedByPolicy(AesEcb));
+        Assert.Same(CryptoPolicy.AllowInsecure, fromLogin.Policy);
+        Assert.Same(CryptoPolicy.AllowInsecure, fromSlot.Policy);
+        Assert.Same(CryptoPolicy.AllowInsecure, oneCall.Policy);
+        Assert.True(fromLogin.IsAllowedByPolicy(AesEcb));
     }
 
     [Fact]
-    public void LibraryPolicyAllowingNoOverride_ASessionWithoutOneEnforcesIt_AndRefusesLeases()
+    public void LibraryPolicyAllowingOverrides_ALeaseLiftsItForItsScope()
+    {
+        using var library = Load(CryptoPolicy.Recommended);
+        using var session = ManagedToken.OpenSession(library);
+
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            Assert.True(session.IsAllowedByPolicy(AesEcb));
+
+        Assert.False(session.IsAllowedByPolicy(AesEcb));
+        Assert.Same(CryptoPolicy.Recommended, session.Policy);
+    }
+
+    [Fact]
+    public void LibraryPolicyAllowingOverrides_ALeaseTightensItForItsScope()
+    {
+        using var library = Load(CryptoPolicy.Recommended);
+        using var session = ManagedToken.OpenSession(library);
+
+        using (session.UsePolicy(CryptoPolicy.NistApproved))
+            Assert.False(session.IsAllowedByPolicy(ChaChaPoly));
+
+        Assert.True(session.IsAllowedByPolicy(ChaChaPoly));
+    }
+
+    public static TheoryData<string> NoOverridePolicies() => ["NistApproved", "NoOverride"];
+
+    // The point of a library policy that allows no override: no code that opens a session gets past it.
+    [Theory]
+    [MemberData(nameof(NoOverridePolicies))]
+    public void LibraryPolicyAllowingNoOverride_EverySessionRefusesEveryLease(string name)
+    {
+        ICryptoPolicy policy = name == "NistApproved" ? CryptoPolicy.NistApproved : new NoOverridePolicy();
+        using var library = Load(policy);
+        using var fromLogin = ManagedToken.OpenSession(library);
+        using var fromSlot = Slot(library).OpenSession(SessionAccess.ReadOnly);
+
+        foreach (Pkcs11Session session in new[] { fromLogin, fromSlot })
+        {
+            Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
+            Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.Recommended));
+            Assert.Same(policy, session.Policy);
+        }
+    }
+
+    [Fact]
+    public void NistApprovedLibrary_RefusesWhatNistApprovedRefuses()
     {
         using var library = Load(CryptoPolicy.NistApproved);
         using var session = ManagedToken.OpenSession(library);
 
-        Assert.Same(CryptoPolicy.NistApproved, session.Policy);
         Assert.False(session.IsAllowedByPolicy(ChaChaPoly));
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
-    }
-
-    // The point of the ceiling: code that opens its session with a looser policy does not get past the library's.
-    [Fact]
-    public void Ceiling_ALooserSessionPolicy_DoesNotLoosenIt()
-    {
-        using var library = Load(CryptoPolicy.NistApproved);
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.AllowInsecure);
-
-        Assert.False(session.IsAllowedByPolicy(ChaChaPoly));
-        Assert.False(session.Policy.AllowsOverride);
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
-        Assert.Equal("AllowInsecure within NistApproved", session.Policy.Name);
-    }
-
-    [Fact]
-    public void Ceiling_AStricterSessionPolicy_NarrowsIt()
-    {
-        using var library = Load(CryptoPolicy.NistApproved);
-        using var session = ManagedToken.OpenSession(library, new NoEncryptPolicy());
-
-        Assert.False(session.IsAllowedByPolicy(new MechanismUseRequest(new Mechanism(CKM.CKM_AES_GCM), CryptoOperation.Encrypt)));
         Assert.True(session.IsAllowedByPolicy(AesGcmDecrypt));
-    }
-
-    [Fact]
-    public void Ceiling_ItsRefusal_NamesTheLibrarysPolicy()
-    {
-        using var library = Load(CryptoPolicy.NistApproved);
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.AllowInsecure);
-
-        PolicyDecision decision = session.Policy.Evaluate(ChaChaPoly);
-
-        Assert.False(decision.IsAllowed);
-        Assert.EndsWith("(the library's NistApproved policy)", decision.Reason);
-    }
-
-    [Fact]
-    public void Ceiling_AppliesToASlotSessionToo()
-    {
-        using var library = Load(CryptoPolicy.NistApproved);
-        using var session = Slot(library).OpenSession(SessionAccess.ReadOnly, CryptoPolicy.AllowInsecure);
-
-        Assert.False(session.IsAllowedByPolicy(ChaChaPoly));
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
-    }
-
-    [Fact]
-    public void Ceiling_TheLibrarysOwnPolicyAsTheSessionPolicy_IsNotWrapped()
-    {
-        using var library = Load(CryptoPolicy.NistApproved);
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.NistApproved);
-
-        Assert.Same(CryptoPolicy.NistApproved, session.Policy);
     }
 }

@@ -73,7 +73,7 @@ public sealed class CryptoPolicyBuilder
         return b;
     }
 
-    /// <summary>Sets whether a session opened under the built policy accepts <c>UsePolicy</c> overrides.</summary>
+    /// <summary>Sets whether a session under the built policy (as the library's) accepts <c>UsePolicy</c> overrides.</summary>
     /// <param name="allows"><see langword="true"/> to accept overrides.</param>
     public CryptoPolicyBuilder AllowsOverride(bool allows)
     {

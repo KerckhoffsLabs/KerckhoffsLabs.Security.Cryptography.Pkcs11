@@ -48,19 +48,11 @@ public sealed class Pkcs11Library : IDisposable
     /// <see cref="CryptoPolicy.Recommended"/> when none was set.
     /// </summary>
     /// <remarks>
-    /// A session opened with no policy of its own enforces this one. When it allows overrides
-    /// (<see cref="ICryptoPolicy.AllowsOverride"/>), a session opened with a policy of its own enforces that one instead;
-    /// when it does not, it is a ceiling: the session enforces both, and refuses every <c>UsePolicy</c> lease.
+    /// Every session of the library enforces it. When it allows overrides (<see cref="ICryptoPolicy.AllowsOverride"/>,
+    /// as <see cref="CryptoPolicy.Recommended"/> does), a session can lift or tighten it for a scope with a
+    /// <see cref="Pkcs11Session.UsePolicy"/> lease; when it does not, every lease is refused.
     /// </remarks>
     public ICryptoPolicy Policy { get; }
-
-    /// <summary>The policy a session opened with <paramref name="policy"/> (or none) enforces. See <see cref="Policy"/>.</summary>
-    internal ICryptoPolicy SessionPolicy(ICryptoPolicy? policy)
-    {
-        if (policy is null || ReferenceEquals(policy, Policy))
-            return Policy;
-        return Policy.AllowsOverride ? policy : new CeilingCryptoPolicy(Policy, policy);
-    }
 
     private LowLevelPkcs11Library? _pkcs11Library;
 

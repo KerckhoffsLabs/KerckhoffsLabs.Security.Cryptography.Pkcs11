@@ -280,7 +280,8 @@ public sealed class AnchorLendingTests : IDisposable
         ContextAuthentication context = ContextAuthentication.FromPinSource(_ => new SecurePin(_module.ExpectedPin));
         login.ContextAuthentication = context;
 
-        using Pkcs11Session session = login.OpenSession(policy: CryptoPolicy.NistApproved);
+        using Pkcs11Session session = login.OpenSession();
+        using IDisposable lease = session.UsePolicy(CryptoPolicy.NistApproved);
 
         AssertLent(session, AnchorId);
         Assert.Same(CryptoPolicy.NistApproved, session.Policy);
@@ -368,7 +369,8 @@ public sealed class AnchorLendingTests : IDisposable
         ulong key = _module.AddObject(CKO.CKO_SECRET_KEY, "key", isPrivate: false, keyType: CKK.CKK_AES);
         using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
         List<ulong> made;
-        using (Pkcs11Session session = login.OpenSession(policy: CryptoPolicy.AllowInsecure))
+        using (Pkcs11Session session = login.OpenSession())
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             AssertLent(session, AnchorId);
             made = CreateThrough(session.Core, function, onToken, key);
@@ -392,7 +394,8 @@ public sealed class AnchorLendingTests : IDisposable
         using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
         int before = _module.CreatedObjects.Count;
         ulong shared;
-        using (Pkcs11Session session = login.OpenSession(policy: CryptoPolicy.AllowInsecure))
+        using (Pkcs11Session session = login.OpenSession())
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             (byte[] ciphertext, ObjectHandle sharedKey) = session.Core.EncapsulateKey(
                 new Mechanism(CKM.CKM_ML_KEM), new ObjectHandle(key), [token]);

@@ -42,7 +42,7 @@ public sealed class KeyMaterialExportRule
     /// </list>
     /// <para>
     /// Prefer a policy allowing an export as a scoped lease (<c>Pkcs11Session.UsePolicy</c>) around the code that
-    /// needs it, over the policy a session is opened with: every caller of a session can read what its policy allows.
+    /// needs it, over the library's policy: every caller of a session can read what its policy allows.
     /// </para>
     /// </remarks>
     /// <param name="kinds">The kinds that may be read. Copied at call time; must be non-empty and defined.</param>

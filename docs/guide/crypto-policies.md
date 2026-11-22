@@ -28,47 +28,27 @@ each release's verdicts are pinned by a committed snapshot in the repository. A 
 copies the built-in's rules from the library version it runs with, so it follows those revisions too. Check the
 release notes and test the operations your application depends on when you upgrade.
 
-The policy is chosen when the session is opened:
+The policy is chosen once, when the library is loaded, preferably from configuration. Every session of the
+library enforces it; `Pkcs11Library.Policy` returns it.
 
 ```csharp
-using var library = Pkcs11Library.Load(modulePath);
-using var pin = new SecurePin(pinFromYourSecretStore);   // from your secret store, never from code
-using Pkcs11Login login = library.GetSlotByTokenLabel(tokenLabel).Login(TokenUser.User, pin);
-
 // Default: Recommended.
-using var session = login.OpenSession();
+using var library = Pkcs11Library.Load(modulePath);
 
-// NistApproved: overrides are refused for the session's lifetime.
-using var fips = login.OpenSession(policy: CryptoPolicy.NistApproved);
-```
-
-> `NistApproved` restricts what this library sends to the token; it is not a FIPS 140-3 certification, which
-> also requires a validated module operating in its approved mode.
-
-### Setting the policy for the whole library
-
-To hold an application to a policy whatever its code passes to `OpenSession`, set it when the library is loaded,
-from configuration:
-
-```csharp
-using var library = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions
+// NistApproved: every session of this library enforces it, and every UsePolicy lease is refused.
+using var fips = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions
 {
     Policy = CryptoPolicy.NistApproved,
 });
 ```
 
-Every session of the library then enforces it. What a session's own `policy:` does depends on whether the
-library's policy allows overrides (`ICryptoPolicy.AllowsOverride`):
+A session can step outside the library's policy for a scope only through a `UsePolicy` lease (see
+[Allowing one more thing](#allowing-one-more-thing)). That works only if the library's policy allows overrides
+(`ICryptoPolicy.AllowsOverride`): `Recommended` does; `NistApproved` and a policy built with `AllowsOverride(false)`
+refuse every lease, so no code that opens a session gets past them.
 
-| Library policy | A session opened with no policy | A session opened with `policy: p` | `session.UsePolicy(...)` |
-|---|---|---|---|
-| Allows overrides (`Recommended`, the default) | enforces the library's | enforces `p` instead | allowed, if `p` allows it |
-| Allows none (`NistApproved`, or `AllowsOverride(false)`) | enforces the library's | enforces both: an operation goes ahead only if each allows it | refused |
-
-So under a `NistApproved` library, `login.OpenSession(policy: CryptoPolicy.AllowInsecure)` still refuses
-everything `NistApproved` refuses, and a stricter session policy narrows it further. The refusal's reason
-ends with `(the library's NistApproved policy)` when the library's policy was the one that refused.
-`Pkcs11Library.Policy` returns the library's policy.
+> `NistApproved` restricts what this library sends to the token; it is not a FIPS 140-3 certification, which
+> also requires a validated module operating in its approved mode.
 
 ## Handling a refusal
 
@@ -102,7 +82,7 @@ ComposedCryptoPolicy policy = CryptoPolicy.Recommended.ToBuilder("MyApp")
         "Vendor HSM signature scheme, reviewed for our release signing.")
     .Build();
 
-using var session = login.OpenSession(policy: policy);
+using var library = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions { Policy = policy });
 ```
 
 | Refused | Narrow opt-in on `CryptoPolicyBuilder` |
@@ -123,7 +103,7 @@ the mechanism first to replace it. ECDH mechanisms require
 Prefer allowing the one mechanism you need, for legacy use only (`AllowMechanismForLegacyUse`). For one legacy
 operation with no reviewed alternative, lift the policy for a single scoped block. The lease applies to the
 whole session — every thread using it — and for its duration allows everything, including reading secrets
-off the token and non-sensitive key templates. It is refused on a `NistApproved` session:
+off the token and non-sensitive key templates. It is refused under a `NistApproved` library:
 
 ```csharp
 using (session.UsePolicy(CryptoPolicy.AllowInsecure))
@@ -177,7 +157,7 @@ justification.
 #### Where to apply the opt-in
 
 An export rule allows the read to every caller of every session whose policy carries it. So keep it off the
-policy your sessions are opened with, and apply it only where the bytes are needed:
+library's policy, and apply it only where the bytes are needed:
 
 - **A scoped lease around the code that needs the bytes**, when nothing else uses the session meanwhile. The
   lease applies to the whole session (every thread using it, not just the caller's) until it is disposed:
@@ -190,12 +170,12 @@ policy your sessions are opened with, and apply it only where the bytes are need
   }
   ```
 
-- **A session of its own**, opened with the export policy, for code that runs the export on its own threads (a
-  drop-in layer whose agreement, KEM or KDF interface returns bytes) or for a session opened under a policy that
-  refuses leases (`AllowsOverride` false, such as `NistApproved`). Keep long-lived keys the scopes do not admit
-  out of it.
+- **A library of its own**, the module loaded a second time with the export policy as its `Policy`, for code
+  that runs the export on its own threads (a drop-in layer whose agreement, KEM or KDF interface returns bytes)
+  or where the main library's policy refuses leases (`AllowsOverride` false, such as `NistApproved`). Keep
+  long-lived keys the scopes do not admit out of its sessions.
 
-Build the export policy from the session's own (`ToBuilder`), so the lease or session loosens nothing but the
+Build the export policy from the library's own (`ToBuilder`), so the lease or library loosens nothing but the
 export.
 
 <a id="private-key-scope"></a>

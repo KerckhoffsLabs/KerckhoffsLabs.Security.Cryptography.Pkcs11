@@ -35,8 +35,8 @@ public sealed class AesCcmPkcs11Tests_Managed
     private static void WithImportedCcm(
         byte[] key, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("ccm").Value(key).Encrypt().Decrypt().Build();
         using var key1 = session.ImportKey(tpl);

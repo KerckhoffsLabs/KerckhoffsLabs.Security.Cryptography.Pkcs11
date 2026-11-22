@@ -44,7 +44,7 @@ The high-level API is **secure by default**:
 
 1. **Application → library** (the public API). The library assumes the caller is the party authorised to
    use the session it opened, and protects the caller from *mistakes*, not from itself: a caller can
-   always lift the policy with `UsePolicy(CryptoPolicy.AllowInsecure)` unless the session was opened under
+   always lift the policy with `UsePolicy(CryptoPolicy.AllowInsecure)` unless the library was loaded under
    a policy that forbids overrides (`CryptoPolicy.NistApproved`).
 2. **Library → PKCS#11 module** (P/Invoke and native memory). Everything the module writes or reports is
    validated before use; everything the library hands it is marshalled with the layouts and `CK_ULONG`
@@ -62,7 +62,7 @@ fact that the token did so. Choose a token whose enforcement you trust for the k
 
 | Control | Where it is enforced |
 |---|---|
-| Crypto policy check before every operation | `Pkcs11Session` (the policy chosen at open, or a scoped `Pkcs11Session.UsePolicy` lease); `CryptoPolicy.Recommended`, `CryptoPolicy.NistApproved` |
+| Crypto policy check before every operation | `Pkcs11Session` (the library's policy, `Pkcs11LibraryOptions.Policy`, or a scoped `Pkcs11Session.UsePolicy` lease); `CryptoPolicy.Recommended`, `CryptoPolicy.NistApproved` |
 | Build-time warnings for insecure choices | `[Obsolete]` on legacy adapters, weak curves and the PBKDF2 constructors with weak defaults (`KLPKCS11001`–`KLPKCS11007`, `KLPKCS11011`); analyzers for insecure values (`KLPKCS11008`–`KLPKCS11010`); a warning at every key-material export opt-in (`KLPKCS11012`) |
 | Sensitive, non-extractable keys by default | `Pkcs11Session.GenerateAesKey`, `GenerateRsaSigningKeyPair`, … ; `SecretKeyTemplateBuilder` and `PrivateKeyTemplateBuilder` defaults |
 | One role per generated key | the `Pkcs11Session` key-generation helpers ([Key role separation](#key-role-separation)) |
@@ -290,17 +290,16 @@ using Pkcs11Session reading = login.OpenSession(SessionAccess.ReadOnly);
 <a id="crypto-policies"></a>
 ## Crypto policies
 
-Every session enforces a **crypto policy**, chosen when it is opened:
+Every session enforces a **crypto policy**: the library's, chosen when it is loaded.
 
 ```csharp
-// The login comes from slot.Login(TokenUser.User, pin), with the PIN from your secret store.
 // Default: Recommended — refuses broken algorithms, weak keys, and plaintext key export.
-using var session = login.OpenSession();
+using var library = Pkcs11Library.Load(modulePath);
 
-// FIPS: only NIST-approved functions; overrides are refused for the session's lifetime.
-using var fips = login.OpenSession(policy: CryptoPolicy.NistApproved);
+// FIPS: only NIST-approved functions, in every session; overrides are refused.
+using var fips = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions { Policy = CryptoPolicy.NistApproved });
 
-// Legacy interop for one operation (not available on a NistApproved session):
+// Legacy interop for one operation, on a session of the first library (refused under NistApproved):
 using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
 ```
 
@@ -359,7 +358,7 @@ ComposedCryptoPolicy reviewed = CryptoPolicy.Recommended.ToBuilder("MyApp")
         [CryptoOperation.Sign, CryptoOperation.Verify],
         "Vendor HSM signature scheme, reviewed for our release signing.")
     .Build();
-using var session = login.OpenSession(policy: reviewed);
+using var library = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions { Policy = reviewed });
 
 // One-off legacy interop: lift the policy for a single, scoped operation.
 using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy archive */ }

@@ -50,16 +50,14 @@ public sealed class Pkcs11LibraryOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A policy that allows overrides (<see cref="ICryptoPolicy.AllowsOverride"/>, as
-    /// <see cref="CryptoPolicy.Recommended"/> does) is the library's default: a session opened with a policy of
-    /// its own enforces that one instead, and a session may take a <c>UsePolicy</c> lease.
+    /// This is the only place a session's policy is chosen. A policy that allows overrides
+    /// (<see cref="ICryptoPolicy.AllowsOverride"/>, as <see cref="CryptoPolicy.Recommended"/> does) lets a session
+    /// take a scoped <see cref="Pkcs11Session.UsePolicy"/> lease, for one legacy operation, say.
     /// </para>
     /// <para>
     /// A policy that does not (<see cref="CryptoPolicy.NistApproved"/>, or one built with
-    /// <c>AllowsOverride(false)</c>) is a ceiling for the whole library: a session opened with a policy of its own
-    /// enforces both, so an operation goes ahead only if each allows it, and every <c>UsePolicy</c> lease is refused.
-    /// Set it here, from configuration, to hold an application to a policy whatever its code passes when it opens a
-    /// session.
+    /// <c>AllowsOverride(false)</c>) holds for every session of the library: every lease is refused. Set it here,
+    /// from configuration, to hold an application to a policy whatever its code does.
     /// </para>
     /// </remarks>
     public ICryptoPolicy? Policy { get; init; }

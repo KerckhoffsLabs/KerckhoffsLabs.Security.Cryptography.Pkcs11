@@ -61,8 +61,8 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <summary>Whether this session may change the token: read-only or read/write.</summary>
     /// <remarks>
     /// The access the session has, as the module reports it: the one asked for when it was named
-    /// (<see cref="Pkcs11Slot.OpenSession(SessionAccess, ICryptoPolicy?)"/>,
-    /// <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>), which are refused otherwise; for
+    /// (<see cref="Pkcs11Slot.OpenSession(SessionAccess)"/>,
+    /// <see cref="Pkcs11Login.OpenSession(SessionAccess)"/>), which are refused otherwise; for
     /// <see cref="Pkcs11Login.OpenSession()"/>, read/write where the token allowed it.
     /// </remarks>
     public SessionAccess Access { get; }
@@ -177,8 +177,8 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// The crypto policy currently enforced by this session: the one it was opened with, unless a
-    /// <see cref="UsePolicy"/> lease is active.
+    /// The crypto policy currently enforced by this session: the library's (<see cref="Pkcs11Library.Policy"/>), unless
+    /// a <see cref="UsePolicy"/> lease is active.
     /// </summary>
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
     public ICryptoPolicy Policy
@@ -196,7 +196,7 @@ public sealed partial class Pkcs11Session : IDisposable
     /// using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
     /// </code>
     /// Open leases form a stack: the most recently opened lease still open decides the policy, and the
-    /// session's own policy applies once none is open. Disposing a lease withdraws only that lease, so
+    /// library's policy applies once none is open. Disposing a lease withdraws only that lease, so
     /// disposing them out of order never re-instates a policy whose lease is already closed. The override
     /// applies to the whole session, not per thread.
     /// </summary>
@@ -204,8 +204,8 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <returns>A lease that withdraws this override when disposed (idempotent).</returns>
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="policy"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">The session was opened under a policy whose
-    /// <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.NistApproved</c>).</exception>
+    /// <exception cref="InvalidOperationException">The library's policy (<see cref="Pkcs11Library.Policy"/>) allows no
+    /// override: its <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.NistApproved</c>).</exception>
     public IDisposable UsePolicy(ICryptoPolicy policy)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

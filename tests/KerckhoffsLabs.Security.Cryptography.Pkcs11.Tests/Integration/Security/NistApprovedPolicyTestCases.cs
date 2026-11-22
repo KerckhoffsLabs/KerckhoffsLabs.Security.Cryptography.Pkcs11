@@ -14,8 +14,23 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security
 /// </summary>
 internal static class NistApprovedPolicyTestCases
 {
-    // A NistApproved session over the backend's own authentication model (no login on NSS's public token).
-    private static Pkcs11Session OpenFips(IPkcs11Backend backend) => backend.OpenSession(CryptoPolicy.NistApproved);
+    // A session over the backend's own authentication model (no login on NSS's public token), under NistApproved for
+    // its whole life: the fixture's library is shared, so a lease rather than the library's policy. Disposing the
+    // session ends the lease.
+    private static Pkcs11Session OpenFips(IPkcs11Backend backend)
+    {
+        Pkcs11Session session = backend.OpenSession();
+        try
+        {
+            _ = session.UsePolicy(CryptoPolicy.NistApproved);
+            return session;
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
+    }
 
     internal static void Assert_AesGcm_RoundTrips(IPkcs11Backend backend)
     {

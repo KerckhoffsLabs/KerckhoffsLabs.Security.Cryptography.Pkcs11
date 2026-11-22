@@ -60,14 +60,13 @@ public interface IPkcs11Backend
     /// another session of the test holds one), so the token is logged out again when the last such session is disposed
     /// (and every test starts from the public state); otherwise a session without a login. Shared, backend-agnostic test cases call this instead of
     /// hard-coding the login path.</summary>
-    /// <param name="policy">The crypto policy the session enforces; <see langword="null"/> for the default.</param>
-    Pkcs11Session OpenSession(ICryptoPolicy? policy = null)
+    Pkcs11Session OpenSession()
     {
         if (!RequiresUserLogin)
-            return this.Slot.OpenSession(SessionAccess.ReadWrite, policy);
+            return this.Slot.OpenSession(SessionAccess.ReadWrite);
 
         using Pkcs11Login login = this.Slot.ShareOrLogin(LoginCredential.FromPinSource(() => new SecurePin(UserPin.Span)));
-        return login.OpenSession(SessionAccess.ReadWrite, policy);
+        return login.OpenSession(SessionAccess.ReadWrite);
     }
 
     /// <summary>True if the backend can generate and operate ML-DSA (FIPS 204) keys. Defaults to the

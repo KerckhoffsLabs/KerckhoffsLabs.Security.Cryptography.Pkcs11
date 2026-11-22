@@ -215,8 +215,8 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     private static void WithNistApprovedEcDsa(Action<ECDsaPkcs11> body)
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.NistApproved);
+        using var library = ManagedToken.NewLibrary(CryptoPolicy.NistApproved);
+        using var session = ManagedToken.OpenSession(library);
         using var key = session.GenerateEcSigningKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ec = new ECDsaPkcs11(key);
         body(ec);

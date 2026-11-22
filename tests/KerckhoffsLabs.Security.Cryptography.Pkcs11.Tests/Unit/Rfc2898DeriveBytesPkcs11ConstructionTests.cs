@@ -53,8 +53,8 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     private static byte[] PasswordSentBy(Func<Pkcs11Session, Rfc2898DeriveBytesPkcs11> create)
     {
         var policy = new PasswordCapturingPolicy();
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         using var kdf = create(session);
 
         var ex = Assert.IsType<Pkcs11Exception>(Record.Exception(() => kdf.GetBytes(16)), exactMatch: false);
@@ -96,8 +96,8 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     private static byte[] PasswordSentByOneShot(Action<Pkcs11Session> derive)
     {
         var policy = new PasswordCapturingPolicy();
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
 
         var ex = Assert.IsType<Pkcs11Exception>(Record.Exception(() => derive(session)), exactMatch: false);
         Assert.Equal(CKR.CKR_MECHANISM_INVALID, ex.ReturnValue);
@@ -121,8 +121,8 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     public void CharOneShots_UnpairedSurrogate_ThrowsBeforeAnythingIsSent()
     {
         var policy = new PasswordCapturingPolicy();
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         const string password = "pass\uD800word";
 
         Assert.Throws<EncoderFallbackException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password.AsSpan(), Salt, 1000, HashAlgorithmName.SHA256, 16));
@@ -182,8 +182,8 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     public void Instance_LendsItsPasswordUntilDisposed()
     {
         var policy = new PasswordCapturingPolicy();
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         var kdf = new Rfc2898DeriveBytesPkcs11(session, "password", Salt, 1000, HashAlgorithmName.SHA256);
         Assert.ThrowsAny<Pkcs11Exception>(() => kdf.GetBytes(16));
         CkmPkcs5Pbkd2Params borrowed = Assert.Single(policy.Parameters);
@@ -197,8 +197,8 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     public void OneShots_ReleaseTheirPasswordBeforeReturning()
     {
         var policy = new PasswordCapturingPolicy();
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
 
         Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password", Salt, 1000, HashAlgorithmName.SHA256, 16));

@@ -475,10 +475,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// session that keeps a login (<see cref="Pkcs11Login.OpenSession()"/>) is read/write where the
     /// token allows it, and this one asks for what the caller says.
     /// </param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means the library's
-    /// (<see cref="Pkcs11Library.Policy"/>); a library policy that allows no override is enforced as well. See
-    /// <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>The open session; the caller disposes it.</returns>
+    /// <returns>The open session, under the library's crypto policy (<see cref="Pkcs11Library.Policy"/>); the caller
+    /// disposes it.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
     /// <exception cref="ObjectDisposedException">The library is disposed.</exception>
     /// <exception cref="Pkcs11SessionException">A read-only session while this application has the Security Officer
@@ -493,12 +491,12 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// token objects it then refuses.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
-    public Pkcs11Session OpenSession(SessionAccess access, ICryptoPolicy? policy = null)
+    public Pkcs11Session OpenSession(SessionAccess access)
     {
         ThrowIfUndefined(access);
         ObjectDisposedException.ThrowIf(_library.IsDisposed, _library);
 
-        Pkcs11SessionCore core = ExactAccess(OpenSessionCore(access == SessionAccess.ReadWrite, _library.SessionPolicy(policy)), access);
+        Pkcs11SessionCore core = ExactAccess(OpenSessionCore(access == SessionAccess.ReadWrite), access);
         return new Pkcs11Session(_library, this, core, access);
     }
 
@@ -790,7 +788,7 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// </para>
     /// <para>
     /// A login this call made is logged out again if the session cannot open. Everything else is as for
-    /// <see cref="ShareOrLogin(LoginCredential, string?)"/> and <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.
+    /// <see cref="ShareOrLogin(LoginCredential, string?)"/> and <see cref="Pkcs11Login.OpenSession(SessionAccess)"/>.
     /// </para>
     /// <code>
     /// using Pkcs11Session session = slot.OpenLoggedInSession(
@@ -803,9 +801,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// token allows it, as <see cref="Pkcs11Login.OpenSession()"/> does.</param>
     /// <param name="username">The account name for <c>C_LoginUser</c>; <see langword="null"/> (the default) for
     /// <c>C_Login</c>.</param>
-    /// <param name="policy">The session's crypto policy; <see langword="null"/> for the default, as for
-    /// <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.</param>
-    /// <returns>The open session, which holds the login; the caller disposes it.</returns>
+    /// <returns>The open session, which holds the login, under the library's crypto policy
+    /// (<see cref="Pkcs11Library.Policy"/>); the caller disposes it.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="credential"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="username"/> is empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
@@ -813,12 +810,12 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// <exception cref="Pkcs11AuthenticationException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
     /// <exception cref="Pkcs11ForeignLoginException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
     /// <exception cref="Pkcs11TokenException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
-    /// <exception cref="Pkcs11SessionException">As for <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.</exception>
+    /// <exception cref="Pkcs11SessionException">As for <see cref="Pkcs11Login.OpenSession(SessionAccess)"/>.</exception>
     /// <exception cref="InvalidOperationException">As for <see cref="ShareOrLogin(LoginCredential, string?)"/>.</exception>
     /// <exception cref="Pkcs11Exception">As for <see cref="ShareOrLogin(LoginCredential, string?)"/> and
-    /// <see cref="Pkcs11Login.OpenSession(SessionAccess, ICryptoPolicy?)"/>.</exception>
+    /// <see cref="Pkcs11Login.OpenSession(SessionAccess)"/>.</exception>
     public Pkcs11Session OpenLoggedInSession(LoginCredential credential, SessionAccess? access = null,
-        string? username = null, ICryptoPolicy? policy = null)
+        string? username = null)
     {
         ArgumentNullException.ThrowIfNull(credential);
         if (access is { } requested && !Enum.IsDefined(requested))
@@ -827,7 +824,7 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         // The session takes a hold of its own; this one goes when the call returns, so the session is what keeps the
         // login. If the session cannot open, disposing this hold logs out a login this call made.
         using Pkcs11Login login = ShareOrLogin(credential, username);
-        return access is { } exact ? login.OpenSession(exact, policy) : login.OpenSession(policy);
+        return access is { } exact ? login.OpenSession(exact) : login.OpenSession();
     }
 
     // PKCS#11 v3.2 C_InitToken: CKR_SESSION_EXISTS while the application has a session open with the token. From
@@ -860,8 +857,8 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     /// (<c>CKF_SERIAL_SESSION | CKF_RW_SESSION</c>). When <see langword="false"/>, opens a
     /// read-only session — token-object creation will fail per PKCS#11 spec.
     /// </param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means the library's
+    /// (<see cref="Pkcs11Library.Policy"/>).</param>
     /// <param name="anchor">
     /// Whether this is the anchor session of the slot's login record: left open by the library's disposal,
     /// and able to call the module after it (see <see cref="LowLevelPkcs11Library.ForSessionOutlivingItsLoad"/>).
@@ -870,6 +867,7 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
     internal Pkcs11SessionCore OpenSessionCore(bool readWrite = true, ICryptoPolicy? policy = null, bool anchor = false)
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "OpenSessionCore");
+        policy ??= _library.Policy;
 
         // PKCS#11 v3.2 C_OpenSession: CKR_SESSION_READ_WRITE_SO_EXISTS for a read-only session while the SO is
         // logged in. Known from the login record; an SO login made outside the library is left to the module.
@@ -934,7 +932,7 @@ public sealed class Pkcs11Slot : IEquatable<Pkcs11Slot>
         try
         {
             Log.SessionOpened(_logger, readWrite ? "read-write" : "read-only", (ulong)sessionId, (ulong)_slotId,
-                (policy ?? CryptoPolicy.Recommended).Name);
+                policy.Name);
 
             LowLevelPkcs11Library calls = anchor ? _pkcs11Library.ForSessionOutlivingItsLoad() : _pkcs11Library;
             return new Pkcs11SessionCore(calls, _slotId, sessionHandle, _loggerFactory, policy);
