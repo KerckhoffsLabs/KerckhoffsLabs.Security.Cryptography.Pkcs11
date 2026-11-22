@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 // These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
@@ -404,11 +405,11 @@ public sealed class Pkcs11SessionCoreLifecycleTests
     {
         using var fake = new LifecycleFake();
         using var s = fake.CreateSession(SessionId);
-        Assert.Same(CryptoPolicy.Recommended, s.Policy);
+        Assert.Same(TestPolicies.RecommendedWithoutKeyInspection, s.Policy);
         var insecure = s.UsePolicy(CryptoPolicy.AllowInsecure);
         Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
         insecure.Dispose();
-        Assert.Same(CryptoPolicy.Recommended, s.Policy);
+        Assert.Same(TestPolicies.RecommendedWithoutKeyInspection, s.Policy);
     }
 
     [Fact]
@@ -430,7 +431,7 @@ public sealed class Pkcs11SessionCoreLifecycleTests
         }
 
         // Restored to gated after the scope.
-        Assert.Same(CryptoPolicy.Recommended, s.Policy);
+        Assert.Same(TestPolicies.RecommendedWithoutKeyInspection, s.Policy);
         var gatedAgain = new Mechanism(CKM.CKM_DES_KEY_GEN);
         Assert.Throws<CryptoPolicyViolationException>(() => s.GenerateKey(gatedAgain, []));
     }
@@ -440,7 +441,7 @@ public sealed class Pkcs11SessionCoreLifecycleTests
     {
         using var fake = new LifecycleFake();
         using var s = fake.CreateSession(SessionId);
-        Assert.Same(CryptoPolicy.Recommended, s.Policy);
+        Assert.Same(TestPolicies.RecommendedWithoutKeyInspection, s.Policy);
         using (s.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
@@ -450,7 +451,7 @@ public sealed class Pkcs11SessionCoreLifecycleTests
             // CryptoPolicy.Recommended.
             Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
         }
-        Assert.Same(CryptoPolicy.Recommended, s.Policy);
+        Assert.Same(TestPolicies.RecommendedWithoutKeyInspection, s.Policy);
     }
 
     [Fact]

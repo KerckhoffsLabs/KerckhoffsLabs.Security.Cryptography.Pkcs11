@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -285,7 +286,7 @@ public sealed class AnchorLendingTests : IDisposable
 
         AssertLent(session, AnchorId);
         Assert.Same(CryptoPolicy.NistApproved, session.Policy);
-        Assert.Same(CryptoPolicy.Recommended, Assert.IsType<Pkcs11SessionCore>(Record.Anchor).Policy);
+        Assert.Same(TestPolicies.RecommendedWithoutKeyInspection, Assert.IsType<Pkcs11SessionCore>(Record.Anchor).Policy);
         Assert.Same(context, session.ContextAuthentication);
         Assert.Null(Record.Anchor!.ContextAuthentication);
     }

@@ -6,6 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -100,7 +101,7 @@ public sealed class Pkcs11SessionCoreMessageAndMiscTests
     public void MessageEncrypt_FullGcmTag_IsAllowedByThePolicy()
     {
         using var fake = new MessageFake { Ciphertext = [1, 2] };
-        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.Recommended);
+        using var s = fake.CreateSession(SessionId, policy: TestPolicies.RecommendedWithoutKeyInspection);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
         Assert.Equal(new byte[] { 1, 2 },

@@ -2363,3 +2363,9 @@ abstract KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPoli
 virtual KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.AllowsOverride.get -> bool
 virtual KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.InspectsKeys.get -> bool
 virtual KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.DelegatingCryptoPolicy.Name.get -> string!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.ModulusBits.get -> int?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.ModulusBits.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Curve.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Curve.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Operation.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoOperation?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Operation.init -> void

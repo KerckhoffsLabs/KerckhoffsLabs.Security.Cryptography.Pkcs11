@@ -2,6 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -33,9 +34,12 @@ internal abstract class SessionTestModule : FakeModule
     /// <summary>A session on slot 0 of this module, as the library would hand out after <c>C_OpenSession</c>.</summary>
     /// <param name="sessionId">The session's handle; a fresh one that routes to this module when omitted.</param>
     /// <param name="loggerFactory">Passed to the session.</param>
-    /// <param name="policy">The session's policy; <see cref="CryptoPolicy.Recommended"/> when omitted.</param>
+    /// <param name="policy">
+    /// The session's policy; when omitted, <see cref="CryptoPolicy.Recommended"/>, or for a module that answers no
+    /// attributes <see cref="TestPolicies.RecommendedWithoutKeyInspection"/> (see <see cref="FakeModule.DefaultPolicy"/>).
+    /// </param>
     public Pkcs11SessionCore CreateSession(ulong? sessionId = null, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
-        => new(LowLevel, slotId: default, sessionId ?? (ulong)NewSessionHandle(), loggerFactory, policy);
+        => new(LowLevel, slotId: default, sessionId ?? (ulong)NewSessionHandle(), loggerFactory, policy ?? DefaultPolicy);
 
     protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
 

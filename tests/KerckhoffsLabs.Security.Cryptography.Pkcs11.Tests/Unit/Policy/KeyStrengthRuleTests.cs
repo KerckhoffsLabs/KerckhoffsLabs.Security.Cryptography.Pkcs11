@@ -13,12 +13,16 @@ public class KeyStrengthRuleTests
     [Theory]
     [InlineData("Recommended")]
     [InlineData("NistApproved")]
-    public void BuiltIns_AllowEveryKeyStrengthRequest_AndDoNotInspect(string name)
+    public void BuiltIns_Inspect_AndJudgeOnlyExistingRsaAndEcKeysBySize(string name)
     {
         ComposedCryptoPolicy p = name == "Recommended" ? CryptoPolicy.Recommended : CryptoPolicy.NistApproved;
-        Assert.False(p.InspectsKeys);
+        Assert.True(p.InspectsKeys);
+        // Every size of the other key types is allowed, and so is a key whose type the token did not report.
         Assert.True(p.Evaluate(new KeyStrengthRequest(CKK.CKK_AES, KeyStrengthSource.ExistingKey) { ValueLengthBytes = 16 }).IsAllowed);
-        Assert.True(p.Evaluate(new KeyStrengthRequest(null, KeyStrengthSource.CreatedKey)).IsAllowed);
+        Assert.True(p.Evaluate(new KeyStrengthRequest(null, KeyStrengthSource.ExistingKey)).IsAllowed);
+        // A template or a created key: generation is judged by the generation rules, an import at its first use.
+        Assert.True(p.Evaluate(new KeyStrengthRequest(CKK.CKK_RSA, KeyStrengthSource.CreatedKey) { ModulusBits = 1024 }).IsAllowed);
+        Assert.False(p.Evaluate(new KeyStrengthRequest(CKK.CKK_RSA, KeyStrengthSource.ExistingKey) { ModulusBits = 1024, Operation = CryptoOperation.Sign }).IsAllowed);
     }
 
     [Fact]

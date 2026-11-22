@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -23,7 +24,7 @@ public sealed class EmptyFinalPartTests
     {
         using var module = new StreamModule();
         using Pkcs11Library library = module.Load();
-        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         Assert.Equal(Payload, Decrypt(session));
         Assert.Equal(Payload, Decrypt(session));
@@ -37,7 +38,7 @@ public sealed class EmptyFinalPartTests
     {
         using var module = new StreamModule();
         using Pkcs11Library library = module.Load();
-        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         Assert.Equal(Payload, Encrypt(session));
         Assert.Equal(Payload, Encrypt(session));

@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
@@ -82,7 +83,37 @@ internal abstract unsafe partial class FakeModule : IDisposable
     public int CallCount(string function) => _calls.GetValueOrDefault(function);
 
     /// <summary>Loads this module through the real loader and initializes it, as <c>Pkcs11Library.Load</c> would.</summary>
-    public Pkcs11Library Load(Pkcs11LibraryOptions? options = null) => new(ResolveExport, options);
+    /// <remarks>
+    /// A module that does not model keys (<see cref="ModelsKeys"/>) gets
+    /// <see cref="TestPolicies.RecommendedWithoutKeyInspection"/> when <paramref name="options"/> names no policy, as
+    /// <c>Recommended</c> reads each RSA or EC key's modulus or curve before using it.
+    /// </remarks>
+    public Pkcs11Library Load(Pkcs11LibraryOptions? options = null) => new(ResolveExport, WithDefaultPolicy(options));
+
+    /// <summary>The policy a session or library over this module gets when the test names none.</summary>
+    internal ICryptoPolicy? DefaultPolicy => ModelsKeys ? null : TestPolicies.RecommendedWithoutKeyInspection;
+
+    /// <summary>
+    /// Whether this module describes its keys as a token does (type, and the modulus, curve or length a key's strength
+    /// is judged by), so sessions over it can run under the built-in <c>Recommended</c>. Most fakes answer only the
+    /// attributes their test needs, and get <see cref="TestPolicies.RecommendedWithoutKeyInspection"/> instead.
+    /// </summary>
+    protected internal virtual bool ModelsKeys => false;
+
+    private Pkcs11LibraryOptions? WithDefaultPolicy(Pkcs11LibraryOptions? options)
+    {
+        if (options?.Policy is not null || DefaultPolicy is not { } policy)
+            return options;
+        var copy = new Pkcs11LibraryOptions { Policy = policy };
+        if (options is null)
+            return copy;
+        foreach (PropertyInfo property in typeof(Pkcs11LibraryOptions).GetProperties(BindingFlags.Instance | BindingFlags.Public))
+        {
+            if (property.Name != nameof(Pkcs11LibraryOptions.Policy) && property.CanWrite)
+                property.SetValue(copy, property.GetValue(options));
+        }
+        return copy;
+    }
 
     /// <summary>Binds this module through the real loader without initializing it.</summary>
     public LowLevelPkcs11Library LoadLowLevel() => new(ResolveExport);

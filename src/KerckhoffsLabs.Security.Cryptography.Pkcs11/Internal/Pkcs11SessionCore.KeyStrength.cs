@@ -28,54 +28,118 @@ internal sealed partial class Pkcs11SessionCore
     /// <c>C_GetAttributeValue</c> call (see <see cref="ReadKeyStrength"/>), and only under an inspecting policy.
     /// </remarks>
     /// <exception cref="CryptoPolicyViolationException">The policy refused the key.</exception>
-    internal void EnforceKeyStrength(ObjectHandle key, KeyStrengthSource source)
+    /// <param name="key">The key the operation uses.</param>
+    /// <param name="source">Where the description comes from: <see cref="KeyStrengthSource.ExistingKey"/> here.</param>
+    /// <param name="operation">
+    /// The operation the key is about to be used for, which a policy may judge a key by (an old key allowed to verify
+    /// only); <see langword="null"/> when the use is not one operation.
+    /// </param>
+    internal void EnforceKeyStrength(ObjectHandle key, KeyStrengthSource source, CryptoOperation? operation)
     {
         if (!InspectsKeys)
             return;
 
-        Enforce(ReadKeyStrength(key, source));
+        Enforce(ReadKeyStrength(key, source, operation));
     }
 
     /// <summary>
-    /// Describes <paramref name="key"/> from the token: its <c>CKA_KEY_TYPE</c>, and the one attribute that
-    /// gives the size of a key of that type. A value the token will not report becomes
-    /// <see langword="null"/>, which an inspecting policy refuses, so an unreadable key fails closed at the
-    /// policy rather than being left to the token. A device or session error propagates (see
-    /// <see cref="ReadUlongsOrNull"/>), which stops the operation too.
+    /// Describes <paramref name="key"/> from the token: its <c>CKA_KEY_TYPE</c>, the size attribute its type is judged
+    /// by, and for an RSA or EC key its modulus or curve. A value the token will not report becomes
+    /// <see langword="null"/>, which an inspecting policy can refuse, so an unreadable key fails closed at the policy
+    /// rather than being left to the token. A device or session error propagates, which stops the operation too.
     /// </summary>
     /// <remarks>
-    /// One call asks for the type and every size attribute (<see cref="StrengthAttributes"/>): a key has the
-    /// one its type uses and the token answers the others as absent, each on its own (PKCS#11 v3.2
-    /// C_GetAttributeValue). A module that does not, and leaves the type or the size the type uses unanswered,
-    /// is asked again for that attribute alone, so it costs at most two more calls and is judged the same.
+    /// One call asks for all of them (<see cref="KeyStrengthAttributeReader"/>): a key has the ones its type uses, and
+    /// the token answers the others as absent, each on its own (PKCS#11 v3.2 C_GetAttributeValue). A module that does
+    /// not, and leaves the type or what that type is judged by unanswered, is asked again for that attribute alone, so
+    /// it costs at most two more reads and is judged the same; an attribute the token answers as absent is not asked for
+    /// again. Nothing is cached: a handle can name another key later.
     /// </remarks>
-    private KeyStrengthRequest ReadKeyStrength(ObjectHandle key, KeyStrengthSource source)
+    private KeyStrengthRequest ReadKeyStrength(ObjectHandle key, KeyStrengthSource source, CryptoOperation? operation = null)
     {
-        Span<ulong?> values = stackalloc ulong?[StrengthAttributes.Length];
-        if (!ReadUlongsOrNull(key, StrengthAttributes, values))
-            return Describe(null, source, null, null);
+        using var _ = AcquireExclusive();
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue");
 
-        ulong? type = values[0] ?? ReadUlongOrNull(key, CKA.CKA_KEY_TYPE);
+        CKR rv = KeyStrengthAttributeReader.Read(_pkcs11Library, _sessionId, (NativeCULong)key.ObjectId, out KeyStrengthAttributeValues read);
+        if (rv is CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID)
+            return new KeyStrengthRequest(null, source) { Operation = operation };
+        if (rv is not (CKR.CKR_OK or CKR.CKR_ATTRIBUTE_TYPE_INVALID or CKR.CKR_ATTRIBUTE_SENSITIVE or CKR.CKR_BUFFER_TOO_SMALL))
+            ThrowIfError(rv, OpGetAttributeValue);
+
+        ulong? type = read.KeyType ?? (read.IsUnanswered(KeyStrengthAttribute.KeyType) ? ReadUlongOrNull(key, CKA.CKA_KEY_TYPE) : null);
         CKK? keyType = type is { } t ? (CKK)t : null;
         CKA? size = SizeAttributeOf(keyType);
-        ulong? value = size switch
+        (ulong? value, KeyStrengthAttribute slot) = size switch
         {
-            CKA.CKA_VALUE_LEN => values[1],
-            CKA.CKA_PARAMETER_SET => values[2],
-            CKA.CKA_HSS_LEVELS => values[3],
-            _ => null,
+            CKA.CKA_VALUE_LEN => (read.ValueLen, KeyStrengthAttribute.ValueLen),
+            CKA.CKA_PARAMETER_SET => (read.ParameterSet, KeyStrengthAttribute.ParameterSet),
+            CKA.CKA_HSS_LEVELS => (read.HssLevels, KeyStrengthAttribute.HssLevels),
+            _ => (null, KeyStrengthAttribute.None),
         };
-        if (size is { } attribute && value is null)
+        if (size is { } attribute && value is null && read.IsUnanswered(slot))
             value = ReadUlongOrNull(key, attribute);
-        return Describe(keyType, source, size, value);
+
+        KeyStrengthRequest request = Describe(keyType, source, size, value) with { Operation = operation };
+        return keyType switch
+        {
+            CKK.CKK_RSA => request with
+            {
+                ModulusBits = BitLength(read.Modulus
+                    ?? (read.IsUnanswered(KeyStrengthAttribute.Modulus) ? ReadBytesOrNull(key, CKA.CKA_MODULUS) : null)),
+            },
+            CKK.CKK_EC => request with
+            {
+                Curve = NamedCurveOf(read.EcParams
+                    ?? (read.IsUnanswered(KeyStrengthAttribute.EcParams) ? ReadBytesOrNull(key, CKA.CKA_EC_PARAMS) : null)),
+            },
+            _ => request,
+        };
     }
 
-    /// <summary>
-    /// What <see cref="ReadKeyStrength"/> asks for in one call: the type, then every attribute
-    /// <see cref="SizeAttributeOf"/> can name, at the indexes it reads them from.
-    /// </summary>
-    private static readonly CKA[] StrengthAttributes =
-        [CKA.CKA_KEY_TYPE, CKA.CKA_VALUE_LEN, CKA.CKA_PARAMETER_SET, CKA.CKA_HSS_LEVELS];
+    // The length in bits of a big-endian integer, leading zero bytes ignored; null when there is none.
+    private static int? BitLength(byte[]? bigEndian)
+    {
+        if (bigEndian is null)
+            return null;
+        int first = Array.FindIndex(bigEndian, b => b != 0);
+        if (first < 0)
+            return null;
+        return ((bigEndian.Length - first - 1) * 8) + (32 - System.Numerics.BitOperations.LeadingZeroCount((uint)bigEndian[first]));
+    }
+
+    // The named curve CKA_EC_PARAMS gives, or null for explicit domain parameters or bytes that are not a curve OID.
+    private static Pkcs11ECCurve? NamedCurveOf(byte[]? ecParams)
+    {
+        if (ecParams is null)
+            return null;
+        try
+        {
+            return Pkcs11ECCurve.FromEcParams(ecParams);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    // One byte-array attribute through the generic reader: for a value the one-call read could not settle (longer than
+    // its buffer, or a module that left it unanswered). Null when the token does not report it.
+    private byte[]? ReadBytesOrNull(ObjectHandle key, CKA attribute)
+    {
+        try
+        {
+            using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(key, [attribute]);
+            return attrs[0].CannotBeRead ? null : attrs[0].GetValueAsByteArray();
+        }
+        catch (Pkcs11AttributeException)
+        {
+            return null;
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_OBJECT_HANDLE_INVALID or CKR.CKR_KEY_HANDLE_INVALID)
+        {
+            return null;
+        }
+    }
 
     /// <summary>
     /// The one attribute that gives the size of a key of <paramref name="keyType"/>, or

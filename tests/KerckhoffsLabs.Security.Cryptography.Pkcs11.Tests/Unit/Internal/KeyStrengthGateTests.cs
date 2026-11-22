@@ -195,7 +195,7 @@ public sealed class KeyStrengthGateTests
     }
 
     [Fact]
-    public void NistApproved_ReadsNoAttributes()
+    public void NistApproved_ReadsTheKeyOnce_AndAllowsAnyAesLength()
     {
         using var fake = new StrengthFake();
         fake.SetKey(Key, CKK.CKK_AES, 16);
@@ -203,16 +203,16 @@ public sealed class KeyStrengthGateTests
 
         Encrypt(session, Key);
 
-        Assert.Equal(0, fake.AttributeCalls);
+        Assert.Equal(1, fake.AttributeCalls);
         Assert.Equal(1, fake.EncryptInitCalls);
     }
 
     [Fact]
-    public void PlainCustomPolicy_DoesNotInspectKeys_ByDefault()
+    public void PlainCustomPolicy_DoesNotInspectKeys_ByDefault_TheBuiltInsDo()
     {
         Assert.False(((ICryptoPolicy)new AllowEverything()).InspectsKeys);
-        Assert.False(((ICryptoPolicy)CryptoPolicy.Recommended).InspectsKeys);
-        Assert.False(((ICryptoPolicy)CryptoPolicy.NistApproved).InspectsKeys);
+        Assert.True(((ICryptoPolicy)CryptoPolicy.Recommended).InspectsKeys);
+        Assert.True(((ICryptoPolicy)CryptoPolicy.NistApproved).InspectsKeys);
         Assert.True(((ICryptoPolicy)CryptoPolicy.Cnsa20).InspectsKeys);
     }
 

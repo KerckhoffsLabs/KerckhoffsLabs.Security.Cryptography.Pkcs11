@@ -6,6 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using Microsoft.Extensions.Logging;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
@@ -49,7 +50,7 @@ public sealed class ModuleLoadsTests
         using var module = new SharedStateModule();
         Pkcs11Library first = module.Load();
         Pkcs11Library second = module.Load();
-        var session = new Pkcs11SessionCore(second.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
+        var session = new Pkcs11SessionCore(second.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         first.Dispose();
 
@@ -133,7 +134,7 @@ public sealed class ModuleLoadsTests
     {
         using var module = new SharedStateModule();
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         library.Dispose();
 

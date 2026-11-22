@@ -231,9 +231,9 @@ internal sealed partial class Pkcs11SessionCore
         // the key it was started with live inside the opaque state blob and are not inspected; that gap
         // exists under every policy.
         if (!encryptionKey.IsInvalid)
-            EnforceKeyStrength(encryptionKey, KeyStrengthSource.ExistingKey);
+            EnforceKeyStrength(encryptionKey, KeyStrengthSource.ExistingKey, null);
         if (!authenticationKey.IsInvalid)
-            EnforceKeyStrength(authenticationKey, KeyStrengthSource.ExistingKey);
+            EnforceKeyStrength(authenticationKey, KeyStrengthSource.ExistingKey, null);
 
         CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
         ThrowIfError(rv, OpSetOperationState);

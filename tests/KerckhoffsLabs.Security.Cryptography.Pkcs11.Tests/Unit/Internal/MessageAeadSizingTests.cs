@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -23,7 +24,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] ciphertext = session.MessageEncrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16), [0xAD], Payload);
 
@@ -36,7 +37,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] plaintext = session.MessageDecrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]), [0xAD], Payload);
 
@@ -50,7 +51,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] ciphertext = session.MessageEncrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16), [0xAD], []);
 
@@ -64,7 +65,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule { Expands = 16 };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         byte[] ciphertext = session.MessageEncrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16), [0xAD], Payload);
 

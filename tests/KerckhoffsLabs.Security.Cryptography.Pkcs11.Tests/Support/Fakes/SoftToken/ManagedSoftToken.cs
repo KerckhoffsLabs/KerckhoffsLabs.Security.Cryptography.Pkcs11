@@ -18,6 +18,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 internal sealed partial class ManagedSoftToken : FakeModule
 {
     public const string TokenLabel = "managed-soft-token";
+
+    /// <inheritdoc/>
+    /// <remarks>It does: it keeps every key's attributes, as a token does.</remarks>
+    protected internal override bool ModelsKeys => true;
     private const ulong SlotId = 0;
 
     private ulong _nextHandle = 100;

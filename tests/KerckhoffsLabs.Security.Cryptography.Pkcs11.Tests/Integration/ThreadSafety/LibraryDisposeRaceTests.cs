@@ -3,6 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.ThreadSafety;
 
@@ -49,7 +50,7 @@ public sealed class LibraryDisposeRaceTests
     {
         using var module = new ParkingModule();
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         Task call = Task.Run(() => session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), "data"u8), Token);
         Assert.True(module.Entered.Wait(Generous, Token), "the call never reached the module");
@@ -124,7 +125,7 @@ public sealed class LibraryDisposeRaceTests
     {
         using var module = new ParkingModule();
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore(), policy: TestPolicies.RecommendedWithoutKeyInspection);
 
         Task logout = Task.Run(session.SendLogout, Token);
         Assert.True(module.Entered.Wait(Generous, Token), "the logout never reached the module");

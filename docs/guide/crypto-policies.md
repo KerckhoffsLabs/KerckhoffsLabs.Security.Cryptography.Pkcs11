@@ -52,6 +52,26 @@ refuse every lease, so no code that opens a session gets past them.
 > `NistApproved` restricts what this library sends to the token; it is not a FIPS 140-3 certification, which
 > also requires a validated module operating in its approved mode.
 
+### Keys already on the token
+
+Every built-in judges a key each time it is used, not only when it is generated, so a weak key imported or made by
+another application is refused too.
+
+| Policy | Existing RSA key | Existing EC key | Other key types |
+|---|---|---|---|
+| `Recommended` | at least 2048 bits, for every operation | on the curve allow-list (128-bit security or more), for every operation | any size |
+| `NistApproved` | at least 2048 bits; 1024 to 2047 bits may still **verify** an old signature | on the curve allow-list (P-224 and up); P-192 may still **verify** | any size |
+| `Cnsa20` | refused | refused | the CNSA 2.0 size (see below) |
+
+`NistApproved`'s exception is SP 800-131A Rev.2 Table 2's legacy use: verification only, never signing,
+decryption or key agreement. The session reads the modulus (`CKA_MODULUS`) or the curve (`CKA_EC_PARAMS`) from the
+token in the same `C_GetAttributeValue` call as the key's type, so each keyed operation costs one extra call. Both
+are public attributes every token reports; a key whose modulus or named curve the token does not report (or whose
+curve is given by explicit domain parameters) is refused, as its strength can't be checked.
+
+To use a weak key on purpose, migrating it off the token for example, take a scoped
+`UsePolicy(CryptoPolicy.AllowInsecure)` lease under `Recommended`. `NistApproved` refuses the lease.
+
 ### CNSA 2.0
 
 `CryptoPolicy.Cnsa20` allows only the NSA CNSA 2.0 suite: AES-256 in GCM (128-bit tag only) and KW/KWP,
@@ -59,13 +79,13 @@ SHA-384/512 and HMAC over them, SP 800-108 and HKDF over SHA-384/512, ML-KEM-102
 LMS (HSS) and XMSS. RSA, elliptic curves, SLH-DSA, HashML-DSA, the other AES modes, SHA-256 and PBKDF2 are
 refused; the [catalogue](policies/cnsa-2.0.md) gives the CNSA 2.0 alternative for each.
 
-It is the only built-in that **inspects keys**. The session reads each key's `CKA_KEY_TYPE` and its
-`CKA_VALUE_LEN`, `CKA_PARAMETER_SET` or `CKA_HSS_LEVELS`: in the template before the token creates a key, from
-the key the token created (destroying it if it fails), and from an existing key each time it is used. A key
-generated as AES-128 or ML-DSA-65 under `Recommended` is refused when used under `Cnsa20`.
+It **inspects every key** it uses. The session reads each key's `CKA_KEY_TYPE` and its `CKA_VALUE_LEN`,
+`CKA_PARAMETER_SET` or `CKA_HSS_LEVELS`: in the template before the token creates a key, from the key the token
+created (destroying it if it fails), and from an existing key each time it is used. A key generated as AES-128 or
+ML-DSA-65 under `Recommended` is refused when used under `Cnsa20`.
 
 ```csharp
-using var cnsa = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, CryptoPolicy.Cnsa20);
+using var library = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions { Policy = CryptoPolicy.Cnsa20 });
 ```
 
 - **It fails closed.** A key whose type, length, parameter set or HSS levels the token does not report (absent,

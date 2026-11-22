@@ -52,7 +52,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(mechanism, CryptoOperation.Encapsulate);
         EnforceKeyAgreementKey(mechanism, encapsulatingPublicKey);
-        EnforceKeyStrength(encapsulatingPublicKey, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(encapsulatingPublicKey, KeyStrengthSource.ExistingKey, CryptoOperation.Encapsulate);
         EnforceTemplateKeyStrength(null, sharedKeyTemplate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
@@ -158,7 +158,7 @@ internal sealed partial class Pkcs11SessionCore
 
         Enforce(mechanism, CryptoOperation.Decapsulate);
         EnforceKeyAgreementKey(mechanism, decapsulatingPrivateKey);
-        EnforceKeyStrength(decapsulatingPrivateKey, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(decapsulatingPrivateKey, KeyStrengthSource.ExistingKey, CryptoOperation.Decapsulate);
         EnforceTemplateKeyStrength(null, sharedKeyTemplate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
@@ -213,8 +213,8 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(mechanism);
         Enforce(mechanism, CryptoOperation.Wrap);
-        EnforceKeyStrength(wrappingKey, KeyStrengthSource.ExistingKey);
-        EnforceKeyStrength(keyToWrap, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(wrappingKey, KeyStrengthSource.ExistingKey, CryptoOperation.Wrap);
+        EnforceKeyStrength(keyToWrap, KeyStrengthSource.ExistingKey, CryptoOperation.Wrap);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
@@ -258,7 +258,7 @@ internal sealed partial class Pkcs11SessionCore
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(unwrappedKeyTemplate);
         Enforce(mechanism, CryptoOperation.Unwrap);
-        EnforceKeyStrength(unwrappingKey, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(unwrappingKey, KeyStrengthSource.ExistingKey, CryptoOperation.Unwrap);
         EnforceTemplateKeyStrength(null, unwrappedKeyTemplate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
@@ -315,7 +315,7 @@ internal sealed partial class Pkcs11SessionCore
 
         ArgumentNullException.ThrowIfNull(mechanism);
         Enforce(mechanism, CryptoOperation.Verify);
-        EnforceKeyStrength(verificationKey, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(verificationKey, KeyStrengthSource.ExistingKey, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature");
 
@@ -358,7 +358,7 @@ internal sealed partial class Pkcs11SessionCore
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be a positive number.", nameof(bufferLength));
         Enforce(mechanism, CryptoOperation.Verify);
-        EnforceKeyStrength(verificationKey, KeyStrengthSource.ExistingKey);
+        EnforceKeyStrength(verificationKey, KeyStrengthSource.ExistingKey, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature(stream)");
 

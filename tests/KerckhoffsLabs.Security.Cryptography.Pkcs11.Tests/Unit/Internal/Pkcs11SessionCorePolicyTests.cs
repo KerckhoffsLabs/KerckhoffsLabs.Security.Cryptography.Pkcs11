@@ -46,7 +46,7 @@ public sealed class Pkcs11SessionCorePolicyTests
     public void DefaultPolicy_IsRecommended()
     {
         using var module = new BareModule();
-        using var session = module.CreateSession(1);
+        using var session = new Pkcs11SessionCore(module.LowLevel, slotId: default, sessionId: 1);
         Assert.Same(CryptoPolicy.Recommended, session.Policy);
     }
 
