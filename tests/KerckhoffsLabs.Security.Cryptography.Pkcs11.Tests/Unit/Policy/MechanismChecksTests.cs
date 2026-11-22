@@ -20,6 +20,7 @@ public sealed class MechanismChecksTests
         RsaKeyGeneration = RsaKeyGenerationRule.Minimum(2048),
         KeyTemplate = KeyTemplateRule.RequireSensitive(),
         KeyMaterialExport = KeyMaterialExportRule.Refuse(),
+        KeyStrength = KeyStrengthRule.Unchecked,
         DocumentedRefusedMechanisms = FrozenDictionary<CKM, DocumentedRefusal>.Empty,
         DocumentedRefusedHashes = FrozenDictionary<string, DocumentedRefusal>.Empty,
         DocumentedRefusedCurves = FrozenDictionary<string, DocumentedRefusal>.Empty,

@@ -204,6 +204,9 @@ public sealed partial class Pkcs11Session : IDisposable
     /// <returns>A lease that withdraws this override when disposed (idempotent).</returns>
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="policy"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="policy"/> judges key strength but its
+    /// <see cref="ICryptoPolicy.InspectsKeys"/> is <see langword="false"/> (a wrapper that does not forward it), so
+    /// its key-size rules would never run.</exception>
     /// <exception cref="InvalidOperationException">The library's policy (<see cref="Pkcs11Library.Policy"/>) allows no
     /// override: its <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.NistApproved</c>).</exception>
     public IDisposable UsePolicy(ICryptoPolicy policy)

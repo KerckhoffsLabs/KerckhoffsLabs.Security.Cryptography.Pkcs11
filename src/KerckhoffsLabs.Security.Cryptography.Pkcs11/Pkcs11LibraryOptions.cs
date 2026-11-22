@@ -59,6 +59,12 @@ public sealed class Pkcs11LibraryOptions
     /// <c>AllowsOverride(false)</c>) holds for every session of the library: every lease is refused. Set it here,
     /// from configuration, to hold an application to a policy whatever its code does.
     /// </para>
+    /// <para>
+    /// A policy that judges key strength but whose <see cref="ICryptoPolicy.InspectsKeys"/> is <see langword="false"/>
+    /// is refused at load: sessions would never ask it about a key, so its key-size rules would not run. The usual
+    /// cause is a wrapper around <see cref="CryptoPolicy.Cnsa20"/> that does not forward it; derive wrappers from
+    /// <see cref="DelegatingCryptoPolicy"/>, which does.
+    /// </para>
     /// </remarks>
     public ICryptoPolicy? Policy { get; init; }
 

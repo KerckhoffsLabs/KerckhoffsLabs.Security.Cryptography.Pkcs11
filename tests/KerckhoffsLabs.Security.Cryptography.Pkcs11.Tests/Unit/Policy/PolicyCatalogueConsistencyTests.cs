@@ -16,12 +16,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 /// </summary>
 public sealed class PolicyCatalogueConsistencyTests
 {
-    public static TheoryData<string> Catalogues => ["Recommended", "NistApproved"];
+    public static TheoryData<string> Catalogues => ["Recommended", "NistApproved", "Cnsa20"];
 
     private static PolicyCatalogue CatalogueFor(string name) => name switch
     {
         "Recommended" => CryptoPolicy.Recommended.Catalogue,
         "NistApproved" => CryptoPolicy.NistApproved.Catalogue,
+        "Cnsa20" => CryptoPolicy.Cnsa20.Catalogue,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -111,6 +112,7 @@ public sealed class PolicyCatalogueConsistencyTests
     {
         "Recommended" => CryptoPolicy.Recommended,
         "NistApproved" => CryptoPolicy.NistApproved,
+        "Cnsa20" => CryptoPolicy.Cnsa20,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -126,6 +128,7 @@ public sealed class PolicyCatalogueConsistencyTests
         RsaKeyGeneration = c.RsaKeyGeneration,
         KeyTemplate = c.KeyTemplate,
         KeyMaterialExport = c.KeyMaterialExport,
+        KeyStrength = c.KeyStrength,
         UnlistedMechanismHint = c.UnlistedMechanismHint,
         DocumentedRefusedMechanisms = FrozenDictionary<CKM, DocumentedRefusal>.Empty,
         DocumentedRefusedHashes = FrozenDictionary<string, DocumentedRefusal>.Empty,
@@ -195,6 +198,7 @@ public sealed class PolicyCatalogueConsistencyTests
     {
         "Recommended" => CryptoPolicy.Recommended,
         "NistApproved" => CryptoPolicy.NistApproved,
+        "Cnsa20" => CryptoPolicy.Cnsa20,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 

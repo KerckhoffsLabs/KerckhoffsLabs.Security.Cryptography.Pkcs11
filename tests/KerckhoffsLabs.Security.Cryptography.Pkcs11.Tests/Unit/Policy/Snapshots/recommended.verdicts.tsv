@@ -255,6 +255,42 @@ key-agreement-key	CKK_X2RATCHET	deny	Key agreement with a CKK_X2RATCHET key is n
 key-agreement-key	CKK_X9_42_DH	deny	Key agreement with a CKK_X9_42_DH key is not on the Recommended allow-list (not reviewed).
 key-agreement-key	CKK_XMSS	deny	Key agreement with a CKK_XMSS key is not on the Recommended allow-list (not reviewed).
 key-agreement-key	CKK_XMSSMT	deny	Key agreement with a CKK_XMSSMT key is not on the Recommended allow-list (not reviewed).
+key-strength	CKK_AES 16 bytes	allow	
+key-strength	CKK_AES 24 bytes	allow	
+key-strength	CKK_AES 32 bytes	allow	
+key-strength	CKK_AES null bytes	allow	
+key-strength	CKK_EC	allow	
+key-strength	CKK_GENERIC_SECRET 16 bytes	allow	
+key-strength	CKK_GENERIC_SECRET 32 bytes	allow	
+key-strength	CKK_GENERIC_SECRET 64 bytes	allow	
+key-strength	CKK_GENERIC_SECRET null bytes	allow	
+key-strength	CKK_HKDF 16 bytes	allow	
+key-strength	CKK_HKDF 32 bytes	allow	
+key-strength	CKK_HKDF 64 bytes	allow	
+key-strength	CKK_HKDF null bytes	allow	
+key-strength	CKK_HSS levels 1	allow	
+key-strength	CKK_HSS levels 2	allow	
+key-strength	CKK_HSS levels null	allow	
+key-strength	CKK_ML_DSA CKP_ML_DSA_44	allow	
+key-strength	CKK_ML_DSA CKP_ML_DSA_65	allow	
+key-strength	CKK_ML_DSA CKP_ML_DSA_87	allow	
+key-strength	CKK_ML_DSA null	allow	
+key-strength	CKK_ML_KEM CKP_ML_KEM_1024	allow	
+key-strength	CKK_ML_KEM CKP_ML_KEM_512	allow	
+key-strength	CKK_ML_KEM CKP_ML_KEM_768	allow	
+key-strength	CKK_ML_KEM null	allow	
+key-strength	CKK_RSA	allow	
+key-strength	CKK_SHA384_HMAC 16 bytes	allow	
+key-strength	CKK_SHA384_HMAC 32 bytes	allow	
+key-strength	CKK_SHA384_HMAC 64 bytes	allow	
+key-strength	CKK_SHA384_HMAC null bytes	allow	
+key-strength	CKK_SHA512_HMAC 16 bytes	allow	
+key-strength	CKK_SHA512_HMAC 32 bytes	allow	
+key-strength	CKK_SHA512_HMAC 64 bytes	allow	
+key-strength	CKK_SHA512_HMAC null bytes	allow	
+key-strength	CKK_XMSS	allow	
+key-strength	CKK_XMSSMT	allow	
+key-strength	unknown type	allow	
 mechanism	CKM_ACTI	allow: -	CKM_ACTI is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
 mechanism	CKM_ACTI_KEY_GEN	allow: -	CKM_ACTI_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
 mechanism	CKM_AES_CBC	allow: -	CKM_AES_CBC is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM.
