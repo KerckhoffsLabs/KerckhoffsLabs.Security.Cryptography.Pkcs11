@@ -13,8 +13,8 @@ internal static class Cnsa20Wording
     internal const string KeyStrengthRationale =
         "Every key is inspected when it is created and each time it is used: AES keys must be AES-256 (CKA_VALUE_LEN = 32); " +
         "generic-secret, HKDF and HMAC-SHA-384/512 keys must hold a secret of at least 256 bits; ML-KEM keys must be ML-KEM-1024 " +
-        "and ML-DSA keys ML-DSA-87 (CKA_PARAMETER_SET); HSS keys must be single-level LMS (CKA_HSS_LEVELS = 1); XMSS keys are " +
-        "allowed. Every other key type is refused, and so is a key whose type, length, parameter set or HSS levels the token " +
+        "and ML-DSA keys ML-DSA-87 (CKA_PARAMETER_SET); HSS keys must be single-level, that is LMS (CKA_HSS_LEVELS = 1), as CNSA 2.0 " +
+        "excludes multi-tree HSS; LMS and XMSS keys of any parameter set are allowed, as CNSA 2.0 approves them all. Every other key type is refused, and so is a key whose type, length, parameter set or HSS levels the token " +
         "does not report.";
 
     private const string Cnsa = "CNSA 2.0";

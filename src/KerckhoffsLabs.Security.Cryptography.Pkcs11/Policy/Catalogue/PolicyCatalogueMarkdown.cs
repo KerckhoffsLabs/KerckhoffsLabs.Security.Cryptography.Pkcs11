@@ -86,10 +86,9 @@ internal static class PolicyCatalogueMarkdown
     [
         "Cnsa20 restricts what this library sends to the token; it is not a CNSA 2.0 certification or validation "
             + "of the application or the token.",
-        "LMS (`CKM_HSS`) and XMSS (`CKM_XMSS`) are allowed for any signing. CNSA 2.0 intends them for software and "
-            + "firmware signing; the policy cannot see what is being signed, so restricting them to that use is the "
+        "LMS (`CKM_HSS`) and XMSS (`CKM_XMSS`) are allowed for any signing. CNSA 2.0 allows them only for software "
+            + "and firmware signing; the policy cannot see what is being signed, so restricting them to that use is the "
             + "application's job.",
-        "XMSS parameter sets are not checked.",
         "It fails closed: a key whose type, length, parameter set or HSS levels the token does not report (absent, "
             + "sensitive or unavailable) is refused, so a token that hides these attributes cannot use a compliant key.",
         "Each keyed operation costs one extra `C_GetAttributeValue` call (up to three on a module that does not "

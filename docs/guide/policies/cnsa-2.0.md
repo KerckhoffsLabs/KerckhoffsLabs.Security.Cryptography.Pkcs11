@@ -6,7 +6,7 @@ An allow-list of the NSA CNSA 2.0 algorithms at their CNSA 2.0 sizes (see the ba
 
 > **`Cnsa20` is not a certification.** It restricts what this library sends to the token; it does not certify or validate the application or the token for CNSA 2.0.
 >
-> Baseline: NSA CNSA 2.0 (CSA Sept 2022; FAQ v2.2) — cited from secondary sources pending verification against the NSA documents; FIPS 197, FIPS 180-4, FIPS 203, FIPS 204, SP 800-208, SP 800-38D, SP 800-38F, SP 800-108r1, SP 800-56C Rev.2
+> Baseline: NSA CNSA 2.0 and Quantum Computing FAQ Ver. 2.2 (October 2026, U/OO/6072712-26, PP-26-3194) and CSA "Announcing the Commercial National Security Algorithm Suite 2.0" (PP-22-1338, Sept 2022 Ver. 1.0; the FAQ prevails where they differ); FIPS 197, FIPS 180-4, FIPS 203, FIPS 204, SP 800-208, SP 800-38D, SP 800-38F, SP 800-108r1, SP 800-56C Rev.2
 
 ## Allowed mechanisms
 
@@ -47,13 +47,13 @@ An allow-list of the NSA CNSA 2.0 algorithms at their CNSA 2.0 sizes (see the ba
 
 | Mechanism | Operations | Legacy operations | Parameter check | Rationale |
 |---|---|---|---|---|
-| `CKM_HSS` | Sign, Verify | — | — | CNSA 2.0 LMS (single-level HSS) / XMSS (SP 800-208) |
+| `CKM_HSS` | Sign, Verify | — | — | CNSA 2.0 LMS / XMSS (SP 800-208), all parameter sets, for software and firmware signing; LMS as a single-level CKM_HSS key, as PKCS#11 has no LMS mechanism of its own (the FAQ excludes multi-tree HSS) |
 | `CKM_HSS_KEY_PAIR_GEN` | GenerateKeyPair | — | — | CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) |
 | `CKM_ML_DSA` | Sign, Verify | — | — | CNSA 2.0 ML-DSA-87 (FIPS 204) |
 | `CKM_ML_DSA_KEY_PAIR_GEN` | GenerateKeyPair | — | — | CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) |
 | `CKM_ML_KEM` | Encapsulate, Decapsulate | — | — | CNSA 2.0 ML-KEM-1024 (FIPS 203) |
 | `CKM_ML_KEM_KEY_PAIR_GEN` | GenerateKeyPair | — | — | CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) |
-| `CKM_XMSS` | Sign, Verify | — | — | CNSA 2.0 LMS (single-level HSS) / XMSS (SP 800-208) |
+| `CKM_XMSS` | Sign, Verify | — | — | CNSA 2.0 LMS / XMSS (SP 800-208), all parameter sets, for software and firmware signing; LMS as a single-level CKM_HSS key, as PKCS#11 has no LMS mechanism of its own (the FAQ excludes multi-tree HSS) |
 | `CKM_XMSS_KEY_PAIR_GEN` | GenerateKeyPair | — | — | CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208) |
 
 ## Allowed hashes
@@ -98,7 +98,7 @@ Beyond the allow-lists above, four rules apply: the modulus rule to RSA key-pair
 | RSA key-pair generation modulus | RSA key generation is refused: RSA is not part of CNSA 2.0. |
 | Key template (`CKA_SENSITIVE`) | Keys stay on the token: a key template with CKA_SENSITIVE=false is refused (CNSA 2.0 policy). |
 | Key-material export | Reading key material off the token in plaintext is refused (CNSA 2.0 policy); wrap it with AES-256 KW/KWP or GCM instead. |
-| Key strength | Every key is inspected when it is created and each time it is used: AES keys must be AES-256 (CKA_VALUE_LEN = 32); generic-secret, HKDF and HMAC-SHA-384/512 keys must hold a secret of at least 256 bits; ML-KEM keys must be ML-KEM-1024 and ML-DSA keys ML-DSA-87 (CKA_PARAMETER_SET); HSS keys must be single-level LMS (CKA_HSS_LEVELS = 1); XMSS keys are allowed. Every other key type is refused, and so is a key whose type, length, parameter set or HSS levels the token does not report. |
+| Key strength | Every key is inspected when it is created and each time it is used: AES keys must be AES-256 (CKA_VALUE_LEN = 32); generic-secret, HKDF and HMAC-SHA-384/512 keys must hold a secret of at least 256 bits; ML-KEM keys must be ML-KEM-1024 and ML-DSA keys ML-DSA-87 (CKA_PARAMETER_SET); HSS keys must be single-level, that is LMS (CKA_HSS_LEVELS = 1), as CNSA 2.0 excludes multi-tree HSS; LMS and XMSS keys of any parameter set are allowed, as CNSA 2.0 approves them all. Every other key type is refused, and so is a key whose type, length, parameter set or HSS levels the token does not report. |
 
 ## Documented refusals
 
@@ -187,19 +187,19 @@ Documentation only: every item below is refused because it is absent from the al
 | `CKM_SHA256_HMAC` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA256_HMAC_GENERAL` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA256_KEY_GEN` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. | CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN |
-| `CKM_SHA3_224` | CNSA 2.0 allows only SHA-384 and SHA-512. | CKM_SHA384 or CKM_SHA512 |
+| `CKM_SHA3_224` | SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_SHA384 or CKM_SHA512 |
 | `CKM_SHA3_224_HMAC` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_224_HMAC_GENERAL` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_224_KEY_GEN` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. | CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN |
-| `CKM_SHA3_256` | CNSA 2.0 allows only SHA-384 and SHA-512. | CKM_SHA384 or CKM_SHA512 |
+| `CKM_SHA3_256` | SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_SHA384 or CKM_SHA512 |
 | `CKM_SHA3_256_HMAC` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_256_HMAC_GENERAL` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_256_KEY_GEN` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. | CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN |
-| `CKM_SHA3_384` | CNSA 2.0 allows only SHA-384 and SHA-512. | CKM_SHA384 or CKM_SHA512 |
+| `CKM_SHA3_384` | SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_SHA384 or CKM_SHA512 |
 | `CKM_SHA3_384_HMAC` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_384_HMAC_GENERAL` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_384_KEY_GEN` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. | CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN |
-| `CKM_SHA3_512` | CNSA 2.0 allows only SHA-384 and SHA-512. | CKM_SHA384 or CKM_SHA512 |
+| `CKM_SHA3_512` | SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_SHA384 or CKM_SHA512 |
 | `CKM_SHA3_512_HMAC` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_512_HMAC_GENERAL` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those. | CKM_SHA384_HMAC or CKM_SHA512_HMAC |
 | `CKM_SHA3_512_KEY_GEN` | CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC keys only for those. | CKM_SHA384_KEY_GEN, CKM_SHA512_KEY_GEN or CKM_GENERIC_SECRET_KEY_GEN |
@@ -249,17 +249,17 @@ Documentation only: every item below is refused because it is absent from the al
 
 | Mechanism | Reason | Alternative |
 |---|---|---|
-| `CKM_HASH_ML_DSA` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA224` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA256` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA384` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA3_224` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA3_256` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA3_384` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA3_512` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHA512` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHAKE128` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_HASH_ML_DSA_SHAKE256` | CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87. | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA224` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA256` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA384` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA3_224` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA3_256` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA3_384` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA3_512` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHA512` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHAKE128` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
+| `CKM_HASH_ML_DSA_SHAKE256` | HashML-DSA is not allowed in CNSA 2.0 "at the present time": it "offers no additional functionality over existing CNSA hash functions combined in a standard way with ML-DSA-87" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA with an ML-DSA-87 key |
 | `CKM_HASH_SLH_DSA` | HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA with an ML-DSA-87 key |
 | `CKM_HASH_SLH_DSA_SHA224` | HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA with an ML-DSA-87 key |
 | `CKM_HASH_SLH_DSA_SHA256` | HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA with an ML-DSA-87 key |
@@ -271,10 +271,10 @@ Documentation only: every item below is refused because it is absent from the al
 | `CKM_HASH_SLH_DSA_SHA512` | HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA with an ML-DSA-87 key |
 | `CKM_HASH_SLH_DSA_SHAKE128` | HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA with an ML-DSA-87 key |
 | `CKM_HASH_SLH_DSA_SHAKE256` | HashSLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA with an ML-DSA-87 key |
-| `CKM_SLH_DSA` | SLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing |
-| `CKM_SLH_DSA_KEY_PAIR_GEN` | SLH-DSA (FIPS 205) is not part of CNSA 2.0. | CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing |
-| `CKM_XMSSMT` | CNSA 2.0 allows single-tree XMSS, not the multi-tree XMSS^MT (SP 800-208). | CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN |
-| `CKM_XMSSMT_KEY_PAIR_GEN` | CNSA 2.0 allows single-tree XMSS, not the multi-tree XMSS^MT (SP 800-208). | CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN |
+| `CKM_SLH_DSA` | SLH-DSA (FIPS 205) "is not part of CNSA and is not approved for any use in NSS" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing |
+| `CKM_SLH_DSA_KEY_PAIR_GEN` | SLH-DSA (FIPS 205) "is not part of CNSA and is not approved for any use in NSS" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing |
+| `CKM_XMSSMT` | From SP 800-208, CNSA 2.0 allows LMS and XMSS only; "the multi-tree algorithms HSS and XMSSMT are not allowed" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN |
+| `CKM_XMSSMT_KEY_PAIR_GEN` | From SP 800-208, CNSA 2.0 allows LMS and XMSS only; "the multi-tree algorithms HSS and XMSSMT are not allowed" (NSA CNSA 2.0 FAQ Ver. 2.2). | CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN |
 
 #### RSA encryption
 
@@ -323,9 +323,9 @@ Documentation only: every item below is refused because it is absent from the al
 | `SHA1` | CNSA 2.0 allows only SHA-384 and SHA-512. | SHA384 or SHA512 |
 | `SHA224` | CNSA 2.0 allows only SHA-384 and SHA-512. | SHA384 or SHA512 |
 | `SHA256` | CNSA 2.0 allows only SHA-384 and SHA-512. | SHA384 or SHA512 |
-| `SHA3-256` | CNSA 2.0 allows only SHA-384 and SHA-512. | SHA384 or SHA512 |
-| `SHA3-384` | CNSA 2.0 allows only SHA-384 and SHA-512. | SHA384 or SHA512 |
-| `SHA3-512` | CNSA 2.0 allows only SHA-384 and SHA-512. | SHA384 or SHA512 |
+| `SHA3-256` | SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2). | SHA384 or SHA512 |
+| `SHA3-384` | SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2). | SHA384 or SHA512 |
+| `SHA3-512` | SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2). | SHA384 or SHA512 |
 
 ### EC curves
 
@@ -376,7 +376,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 | PRF | Reason | Alternative |
 |---|---|---|
-| `CKM_AES_CMAC` | CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
+| `CKM_AES_CMAC` | This policy allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF. CNSA 2.0 admits KDFs composed of its hashes or block ciphers (NSA CNSA 2.0 FAQ Ver. 2.2), so an AES-256-CMAC KDF would comply; it is not enabled here. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
 | `CKM_SHA224` | CNSA 2.0 allows only SHA-384 and SHA-512. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
 | `CKM_SHA224_HMAC` | CNSA 2.0 allows only SHA-384 and SHA-512. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
 | `CKM_SHA256` | CNSA 2.0 allows only SHA-384 and SHA-512. | HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF) |
@@ -399,8 +399,7 @@ Documentation only: every item below is refused because it is absent from the al
 ## Known limits
 
 - Cnsa20 restricts what this library sends to the token; it is not a CNSA 2.0 certification or validation of the application or the token.
-- LMS (`CKM_HSS`) and XMSS (`CKM_XMSS`) are allowed for any signing. CNSA 2.0 intends them for software and firmware signing; the policy cannot see what is being signed, so restricting them to that use is the application's job.
-- XMSS parameter sets are not checked.
+- LMS (`CKM_HSS`) and XMSS (`CKM_XMSS`) are allowed for any signing. CNSA 2.0 allows them only for software and firmware signing; the policy cannot see what is being signed, so restricting them to that use is the application's job.
 - It fails closed: a key whose type, length, parameter set or HSS levels the token does not report (absent, sensitive or unavailable) is refused, so a token that hides these attributes cannot use a compliant key.
 - Each keyed operation costs one extra `C_GetAttributeValue` call (up to three on a module that does not answer every attribute of a read, as PKCS#11 requires), because the key is read again on every use rather than cached.
 - `C_SetOperationState` restores a saved operation whose own mechanism and key are not inspected; only the key handles passed to it are.

@@ -71,12 +71,12 @@ using var cnsa = library.OpenSessionWithPin(tokenLabel, CKU.CKU_USER, pin, Crypt
 - **It fails closed.** A key whose type, length, parameter set or HSS levels the token does not report (absent,
   sensitive or unavailable) is refused: the reason says the token did not report it, so CNSA 2.0 compliance
   can't be verified. On a token that hides these attributes, compliant keys cannot be used.
-- **LMS and XMSS are allowed for any signing.** CNSA 2.0 intends them for software and firmware signing; the
-  policy cannot see what is being signed, so restricting them to that use is the application's job. XMSS
-  parameter sets are not checked.
+- **LMS and XMSS are allowed for any signing.** CNSA 2.0 allows them only for software and firmware signing; the
+  policy cannot see what is being signed, so restricting them to that use is the application's job. Their
+  parameter sets are not checked: CNSA 2.0 approves them all (LMS SHA-256/192 recommended).
 - **It is not a certification.** It restricts what this library sends to the token; it does not certify or
-  validate the application or the token. Its CNSA 2.0 citations come from secondary sources and are pending
-  verification against the NSA documents.
+  validate the application or the token. Its table follows the NSA CNSA 2.0 and Quantum Computing FAQ,
+  Ver. 2.2 (October 2026).
 - **Each keyed operation costs one extra `C_GetAttributeValue` call** (its type and size read together; up to three
   on a module that does not answer every attribute of a read, as PKCS#11 requires); keys are read again on every
   use, never cached.

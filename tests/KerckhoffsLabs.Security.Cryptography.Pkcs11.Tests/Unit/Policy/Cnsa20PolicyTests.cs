@@ -199,7 +199,8 @@ public sealed class Cnsa20PolicyTests
     public void Cnsa20_CmacPrfRefusal_IsFamilyNeutral()
     {
         DocumentedRefusal refusal = Policy.Catalogue.DocumentedRefusedPrfs[nameof(CKM.CKM_AES_CMAC)];
-        Assert.Equal("CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF.", refusal.Reason);
+        Assert.StartsWith("This policy allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF.", refusal.Reason,
+            StringComparison.Ordinal);
 
         PolicyDecision hkdf = Evaluate(new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_AES_CMAC)),
             CryptoOperation.Derive);
@@ -322,8 +323,12 @@ public sealed class Cnsa20PolicyTests
     }
 
     [Fact]
-    public void Baseline_SaysTheNsaSourcesAreUnverified()
-        => Assert.Contains("pending verification against the NSA documents", Cnsa20Definition.Baseline, StringComparison.Ordinal);
+    public void Baseline_CitesTheNsaDocuments()
+    {
+        Assert.Contains("FAQ Ver. 2.2 (October 2026, U/OO/6072712-26, PP-26-3194)", Cnsa20Definition.Baseline, StringComparison.Ordinal);
+        Assert.Contains("PP-22-1338", Cnsa20Definition.Baseline, StringComparison.Ordinal);
+        Assert.DoesNotContain("pending verification", Cnsa20Definition.Baseline, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void GeneratedDoc_StatesTheKeyStrengthRule_AndTheKnownLimits()

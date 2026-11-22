@@ -77,8 +77,8 @@ public static class CryptoPolicy
     /// <remarks>
     /// <para>
     /// This restricts what the library sends to the token. It is <b>not</b> a CNSA 2.0 certification or
-    /// validation of the application or the token. The CNSA 2.0 citations come from secondary sources and are
-    /// pending verification against the NSA documents.
+    /// validation of the application or the token. Its table follows the NSA CNSA 2.0 and Quantum Computing FAQ,
+    /// Ver. 2.2 (October 2026).
     /// </para>
     /// <para>
     /// The full generated catalogue, with every allowed and documented-refused item and its alternative, is at
@@ -86,9 +86,8 @@ public static class CryptoPolicy
     /// </para>
     /// <para>Known limits:</para>
     /// <list type="bullet">
-    /// <item><description>LMS (HSS) and XMSS are allowed for any signing. CNSA 2.0 intends them for software and
+    /// <item><description>LMS (HSS) and XMSS are allowed for any signing. CNSA 2.0 allows them only for software and
     /// firmware signing; the policy cannot see what is signed, so restricting them is the application's job.</description></item>
-    /// <item><description>XMSS parameter sets are not checked.</description></item>
     /// <item><description>It fails closed: a key whose attributes the token does not report is refused, which may
     /// refuse a compliant key on a token that hides them.</description></item>
     /// <item><description>Each keyed operation costs one extra <c>C_GetAttributeValue</c> call (up to three on a

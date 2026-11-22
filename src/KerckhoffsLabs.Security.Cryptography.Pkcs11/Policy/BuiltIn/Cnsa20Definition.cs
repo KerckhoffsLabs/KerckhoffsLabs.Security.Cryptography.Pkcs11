@@ -12,8 +12,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
 /// <remarks>
 /// <para>
 /// CNSA 2.0 names algorithms and sizes, not modes. Where it is silent the policy stays narrow: AES only as GCM
-/// (128-bit tag) and KW/KWP, SHA-384/512 only, HMAC and the SP 800-108 / HKDF KDFs only over SHA-384/512 (needed to
-/// turn an ML-KEM shared secret into an AES key on the token), and pure ML-DSA only (no HashML-DSA).
+/// (128-bit tag) and KW/KWP, HMAC and the SP 800-108 / HKDF KDFs only over SHA-384/512 (needed to turn an ML-KEM
+/// shared secret into an AES key on the token). The FAQ also admits KDFs "composed of CNSA 2.0 hashes or block
+/// ciphers", so an AES-256-CMAC KDF would comply; this policy does not enable it.
 /// </para>
 /// <para>
 /// Key sizes are judged by <see cref="Cnsa20Wording.JudgeKeyStrength"/> through <see cref="KeyStrengthRequest"/>,
@@ -29,7 +30,8 @@ internal static class Cnsa20Definition
 {
     /// <summary>The sources this table reflects.</summary>
     internal const string Baseline =
-        "NSA CNSA 2.0 (CSA Sept 2022; FAQ v2.2) — cited from secondary sources pending verification against the NSA documents; " +
+        "NSA CNSA 2.0 and Quantum Computing FAQ Ver. 2.2 (October 2026, U/OO/6072712-26, PP-26-3194) and CSA \"Announcing the " +
+        "Commercial National Security Algorithm Suite 2.0\" (PP-22-1338, Sept 2022 Ver. 1.0; the FAQ prevails where they differ); " +
         "FIPS 197, FIPS 180-4, FIPS 203, FIPS 204, SP 800-208, SP 800-38D, SP 800-38F, SP 800-108r1, SP 800-56C Rev.2";
 
     private const S Cipher = S.Encrypt | S.Decrypt | S.Wrap | S.Unwrap;
@@ -108,7 +110,10 @@ internal static class Cnsa20Definition
         // --- Post-quantum: ML-KEM-1024, ML-DSA-87, LMS / XMSS; sizes are the key-strength rule's ---
         Allow(S.Encapsulate | S.Decapsulate, "CNSA 2.0 ML-KEM-1024 (FIPS 203)", CKM.CKM_ML_KEM);
         Allow(Signature, "CNSA 2.0 ML-DSA-87 (FIPS 204)", CKM.CKM_ML_DSA);
-        Allow(Signature, "CNSA 2.0 LMS (single-level HSS) / XMSS (SP 800-208)", CKM.CKM_HSS, CKM.CKM_XMSS);
+        Allow(Signature,
+            "CNSA 2.0 LMS / XMSS (SP 800-208), all parameter sets, for software and firmware signing; LMS as a single-level " +
+            "CKM_HSS key, as PKCS#11 has no LMS mechanism of its own (the FAQ excludes multi-tree HSS)",
+            CKM.CKM_HSS, CKM.CKM_XMSS);
         Allow(S.GenerateKeyPair, "CNSA 2.0 ML-KEM-1024 / ML-DSA-87 (FIPS 203 / 204), LMS / XMSS (SP 800-208)",
             CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_HSS_KEY_PAIR_GEN, CKM.CKM_XMSS_KEY_PAIR_GEN);
 
@@ -166,9 +171,10 @@ internal static class Cnsa20Definition
             CKM.CKM_ECDH1_DERIVE, CKM.CKM_ECDH1_COFACTOR_DERIVE, CKM.CKM_DH_PKCS_DERIVE, CKM.CKM_DH_PKCS_KEY_PAIR_GEN);
 
         // --- Other post-quantum signatures ---
-        Refuse("SLH-DSA (FIPS 205) is not part of CNSA 2.0.", "CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing",
+        Refuse("SLH-DSA (FIPS 205) \"is not part of CNSA and is not approved for any use in NSS\" (NSA CNSA 2.0 FAQ Ver. 2.2).", "CKM_ML_DSA (ML-DSA-87), or CKM_HSS / CKM_XMSS for firmware signing",
             CKM.CKM_SLH_DSA, CKM.CKM_SLH_DSA_KEY_PAIR_GEN);
-        Refuse("CNSA 2.0 allows pure ML-DSA-87 only; the NSA CNSA 2.0 FAQ is reported to see no benefit in pre-hashing over SHA-384/512 with ML-DSA-87.",
+        Refuse("HashML-DSA is not allowed in CNSA 2.0 \"at the present time\": it \"offers no additional functionality over existing " +
+            "CNSA hash functions combined in a standard way with ML-DSA-87\" (NSA CNSA 2.0 FAQ Ver. 2.2).",
             MlDsa,
             CKM.CKM_HASH_ML_DSA, CKM.CKM_HASH_ML_DSA_SHA224, CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_HASH_ML_DSA_SHA384,
             CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_HASH_ML_DSA_SHA3_384,
@@ -177,7 +183,8 @@ internal static class Cnsa20Definition
             CKM.CKM_HASH_SLH_DSA, CKM.CKM_HASH_SLH_DSA_SHA224, CKM.CKM_HASH_SLH_DSA_SHA256, CKM.CKM_HASH_SLH_DSA_SHA384,
             CKM.CKM_HASH_SLH_DSA_SHA512, CKM.CKM_HASH_SLH_DSA_SHA3_224, CKM.CKM_HASH_SLH_DSA_SHA3_256, CKM.CKM_HASH_SLH_DSA_SHA3_384,
             CKM.CKM_HASH_SLH_DSA_SHA3_512, CKM.CKM_HASH_SLH_DSA_SHAKE128, CKM.CKM_HASH_SLH_DSA_SHAKE256);
-        Refuse("CNSA 2.0 allows single-tree XMSS, not the multi-tree XMSS^MT (SP 800-208).", "CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN",
+        Refuse("From SP 800-208, CNSA 2.0 allows LMS and XMSS only; \"the multi-tree algorithms HSS and XMSSMT are not allowed\" " +
+            "(NSA CNSA 2.0 FAQ Ver. 2.2).", "CKM_XMSS / CKM_XMSS_KEY_PAIR_GEN",
             CKM.CKM_XMSSMT, CKM.CKM_XMSSMT_KEY_PAIR_GEN);
 
         // --- Symmetric ciphers other than AES-256 GCM / KW / KWP ---
@@ -197,8 +204,8 @@ internal static class Cnsa20Definition
 
         // --- Hashes and HMACs other than SHA-384 / SHA-512 ---
         Refuse("CNSA 2.0 allows only SHA-384 and SHA-512.", Sha384Or512,
-            CKM.CKM_SHA_1, CKM.CKM_SHA224, CKM.CKM_SHA256, CKM.CKM_SHA512_224, CKM.CKM_SHA512_256, CKM.CKM_SHA512_T,
-            CKM.CKM_SHA3_224, CKM.CKM_SHA3_256, CKM.CKM_SHA3_384, CKM.CKM_SHA3_512);
+            CKM.CKM_SHA_1, CKM.CKM_SHA224, CKM.CKM_SHA256, CKM.CKM_SHA512_224, CKM.CKM_SHA512_256, CKM.CKM_SHA512_T);
+        Refuse(Sha3Reason, Sha384Or512, CKM.CKM_SHA3_224, CKM.CKM_SHA3_256, CKM.CKM_SHA3_384, CKM.CKM_SHA3_512);
         Refuse("CNSA 2.0 allows only SHA-384 and SHA-512, so HMAC only over those.", HmacSha384Or512,
             CKM.CKM_SHA_1_HMAC, CKM.CKM_SHA_1_HMAC_GENERAL, CKM.CKM_SHA224_HMAC, CKM.CKM_SHA224_HMAC_GENERAL,
             CKM.CKM_SHA256_HMAC, CKM.CKM_SHA256_HMAC_GENERAL,
@@ -223,6 +230,11 @@ internal static class Cnsa20Definition
         return refused.ToFrozenDictionary();
     }
 
+    // The FAQ's "Can I use SHA-3 as a hash?" and "Under what circumstances is SHA-3 available for use?".
+    private const string Sha3Reason =
+        "SHA-3 is not a CNSA 2.0 general-purpose hash: it is allowed only where an approved algorithm's own standard calls it, " +
+        "and SHA3-384/512 for a vendor's internal hardware integrity checks such as secure boot (NSA CNSA 2.0 FAQ Ver. 2.2).";
+
     // --- Hashes (HashUseRequest) ---
 
     private static FrozenDictionary<string, AllowedHash> BuildAllowedHashes() => new Dictionary<string, AllowedHash>(StringComparer.Ordinal)
@@ -234,15 +246,16 @@ internal static class Cnsa20Definition
     private static FrozenDictionary<string, DocumentedRefusal> BuildDocumentedRefusedHashes()
     {
         var refusal = new DocumentedRefusal("CNSA 2.0 allows only SHA-384 and SHA-512.", "SHA384 or SHA512");
+        var sha3 = new DocumentedRefusal(Sha3Reason, "SHA384 or SHA512");
         return new Dictionary<string, DocumentedRefusal>(StringComparer.Ordinal)
         {
             ["MD5"] = refusal,
             ["SHA1"] = refusal,
             ["SHA224"] = refusal,
             ["SHA256"] = refusal,
-            ["SHA3-256"] = refusal,
-            ["SHA3-384"] = refusal,
-            ["SHA3-512"] = refusal,
+            ["SHA3-256"] = sha3,
+            ["SHA3-384"] = sha3,
+            ["SHA3-512"] = sha3,
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
@@ -296,7 +309,8 @@ internal static class Cnsa20Definition
             CKM.CKM_SHA3_224_HMAC, CKM.CKM_SHA3_256_HMAC, CKM.CKM_SHA3_384_HMAC, CKM.CKM_SHA3_512_HMAC,
         }.ToDictionary(p => p.ToString(), _ => refusal, StringComparer.Ordinal);
         prfs[nameof(CKM.CKM_AES_CMAC)] = new DocumentedRefusal(
-            "CNSA 2.0 allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF.",
+            "This policy allows only HMAC-SHA-384/512 (or SHA-384/512 itself for HKDF) as a KDF PRF. CNSA 2.0 admits KDFs " +
+            "composed of its hashes or block ciphers (NSA CNSA 2.0 FAQ Ver. 2.2), so an AES-256-CMAC KDF would comply; it is not enabled here.",
             "HMAC-SHA-384 or HMAC-SHA-512 (or SHA-384 / SHA-512 for HKDF)");
         return prfs.ToFrozenDictionary(StringComparer.Ordinal);
     }
