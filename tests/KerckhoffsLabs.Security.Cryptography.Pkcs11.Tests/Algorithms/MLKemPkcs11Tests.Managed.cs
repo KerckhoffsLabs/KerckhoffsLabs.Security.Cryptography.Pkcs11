@@ -190,8 +190,8 @@ public sealed class MLKemPkcs11Tests_Managed
     public void SharedSecretExport_IsCheckedOnItsOwn_BeforeTheToken()
     {
         var policy = new NoExportPolicy();
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         using var key = GenerateMlKem(session, CkpMlKem.CKP_ML_KEM_768);
         using var mlkem = new MLKemPkcs11(key);
         byte[] ciphertext = BclCiphertextFor(mlkem);

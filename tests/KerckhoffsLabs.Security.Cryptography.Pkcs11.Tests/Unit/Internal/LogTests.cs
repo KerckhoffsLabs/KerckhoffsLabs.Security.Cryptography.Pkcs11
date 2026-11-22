@@ -214,8 +214,8 @@ public sealed class LogTests
 
     private static (Pkcs11Library Library, Pkcs11Session Session) OpenLogged(CapturingLogger log, ICryptoPolicy policy)
     {
-        var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(log) });
-        return (library, ManagedToken.OpenSession(library, policy));
+        var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(log), Policy = policy });
+        return (library, ManagedToken.OpenSession(library));
     }
 
     private static Pkcs11Key ImportIkm(Pkcs11Session session)

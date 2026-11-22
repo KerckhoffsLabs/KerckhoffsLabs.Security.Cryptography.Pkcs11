@@ -164,8 +164,8 @@ public sealed class Pkcs11SessionCorePolicyTests
     public void NistApproved_AesCbcEmptyInput_ShortCircuits_WithoutTouchingTheToken()
     {
         var token = new Support.Fakes.SoftToken.ManagedSoftToken();
-        using var library = token.Load();
-        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library, CryptoPolicy.NistApproved);
+        using var library = token.Load(new Pkcs11LibraryOptions { Policy = CryptoPolicy.NistApproved });
+        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
         using var key = session.GenerateAesKey(256);
         using var aes = new AesPkcs11(key);
 
@@ -265,8 +265,8 @@ public sealed class Pkcs11SessionCorePolicyTests
         var policy = new RecordingPolicy(r => r is KeyMaterialExportRequest
             ? PolicyDecision.Deny("no export")
             : CryptoPolicy.AllowInsecure.Evaluate(r));
-        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
-        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library, policy);
+        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary(policy);
+        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(
             session, "placeholder-password"u8.ToArray(), new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32));
@@ -280,8 +280,8 @@ public sealed class Pkcs11SessionCorePolicyTests
     [Fact]
     public void Pbkdf2_UnderAllowInsecure_PassesThePolicy_AndReachesTheToken()
     {
-        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
-        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library, CryptoPolicy.AllowInsecure);
+        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary(CryptoPolicy.AllowInsecure);
+        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
 
         // The managed soft token does not implement CKM_PKCS5_PBKD2, so a token error (not a policy
         // refusal) is the proof that every policy check passed and the call reached C_GenerateKey.
@@ -296,8 +296,8 @@ public sealed class Pkcs11SessionCorePolicyTests
     public void Pbkdf2Key_RaisesNoExportCheck_AndReachesTheTokenUnderRecommended()
     {
         var policy = new RecordingPolicy(CryptoPolicy.Recommended.Evaluate);
-        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary();
-        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library, policy);
+        using var library = Support.Fakes.SoftToken.ManagedToken.NewLibrary(policy);
+        using var session = Support.Fakes.SoftToken.ManagedToken.OpenSession(library);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
 
         // The managed soft token does not implement CKM_PKCS5_PBKD2, so a token error (not a policy

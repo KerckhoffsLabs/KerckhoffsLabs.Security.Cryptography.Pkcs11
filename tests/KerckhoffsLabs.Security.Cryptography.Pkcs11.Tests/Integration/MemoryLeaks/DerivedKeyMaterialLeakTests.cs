@@ -97,8 +97,8 @@ public sealed class DerivedKeyMaterialLeakTests
     [Fact]
     public void Sp800108SiblingDefaults_LeaveNothingInUnmanagedMemory()
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.Recommended);
+        using var library = ManagedToken.NewLibrary(CryptoPolicy.Recommended);
+        using var session = ManagedToken.OpenSession(library);
         using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf-sibling-leak").Value(KeyBytes).Derive().Build();
         using var baseKey = session.ImportKey(baseTpl);

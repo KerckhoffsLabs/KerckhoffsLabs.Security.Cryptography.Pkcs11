@@ -39,8 +39,8 @@ public sealed class RSAPkcs11Tests_Managed
 
     private static void WithRsaUnder(ICryptoPolicy policy, Action<RSAPkcs11> body)
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         using var key = session.GenerateRsaSigningKeyPair(modulusBits: 2048);
         using var rsa = new RSAPkcs11(key);
         body(rsa);

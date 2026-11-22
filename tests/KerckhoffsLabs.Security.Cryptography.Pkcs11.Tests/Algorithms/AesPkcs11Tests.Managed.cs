@@ -159,8 +159,8 @@ public sealed class AesPkcs11_Managed
     [Fact]
     public void Cbc_EmptyInput_IsJudgedForItsOwnDirection()
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, new NoEncryptPolicy());
+        using var library = ManagedToken.NewLibrary(new NoEncryptPolicy());
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(Key256).Encrypt().Decrypt().Build();
         using var key = session.ImportKey(tpl);
         using var aes = new AesPkcs11(key);

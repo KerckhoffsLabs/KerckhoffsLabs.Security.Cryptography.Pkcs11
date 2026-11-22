@@ -596,8 +596,8 @@ public sealed class Pkcs11KeyAsymmetricTests
     [MemberData(nameof(Policies))]
     public void DeriveSecretAgreement_ThenHkdfOnTheToken_MatchesBcl(string policy)
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy == "NistApproved" ? CryptoPolicy.NistApproved : CryptoPolicy.Recommended);
+        using var library = ManagedToken.NewLibrary(policy == "NistApproved" ? CryptoPolicy.NistApproved : CryptoPolicy.Recommended);
+        using var session = ManagedToken.OpenSession(library);
         using var alice = session.GenerateEcKeyAgreementKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 

@@ -60,8 +60,8 @@ public sealed class KeyMaterialExportOptInTests
 
     private static void WithSession(ICryptoPolicy policy, Action<Pkcs11Session> body)
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         body(session);
     }
 
@@ -329,8 +329,8 @@ public sealed class KeyMaterialExportOptInTests
     public void DeriveBytes_TokenReturnsWrongLength_ThrowsCryptographicException(int skew)
     {
         var token = new ManagedSoftToken();
-        using var library = token.Load();
-        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var library = token.Load(new Pkcs11LibraryOptions { Policy = OptIn(KeyMaterialExportKind.KdfOutput) });
+        using var session = ManagedToken.OpenSession(library);
         using var ikm = ImportIkm(session);
         token.ValueLengthSkew = skew;
 
@@ -343,8 +343,8 @@ public sealed class KeyMaterialExportOptInTests
     public void HkdfDeriveKey_TokenReturnsWrongLength_ThrowsCryptographicException(int skew)
     {
         var token = new ManagedSoftToken();
-        using var library = token.Load();
-        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var library = token.Load(new Pkcs11LibraryOptions { Policy = OptIn(KeyMaterialExportKind.KdfOutput) });
+        using var session = ManagedToken.OpenSession(library);
         using var ikm = ImportIkm(session);
         token.ValueLengthSkew = skew; // after the import, whose CKA_VALUE read is not under test
 
@@ -355,8 +355,8 @@ public sealed class KeyMaterialExportOptInTests
     public void DeriveBytes_Sp800108Counter_TokenReturnsWrongLength_Throws()
     {
         var token = new ManagedSoftToken();
-        using var library = token.Load();
-        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var library = token.Load(new Pkcs11LibraryOptions { Policy = OptIn(KeyMaterialExportKind.KdfOutput) });
+        using var session = ManagedToken.OpenSession(library);
         using var ikm = ImportIkm(session);
         token.ValueLengthSkew = 1;
         var mechanism = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF,
@@ -1292,8 +1292,8 @@ public sealed class KeyMaterialExportOptInTests
     public void ReentrantLoggerSink_DuringReadBack_IsNotTagged()
     {
         var sink = new ReentrantLogger();
-        using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(sink) });
-        using var session = ManagedToken.OpenSession(library, OptIn(KeyMaterialExportKind.KdfOutput));
+        using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(sink), Policy = OptIn(KeyMaterialExportKind.KdfOutput) });
+        using var session = ManagedToken.OpenSession(library);
         using var ikm = ImportIkm(session);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Extractable().Sensitive(false).Build();
 

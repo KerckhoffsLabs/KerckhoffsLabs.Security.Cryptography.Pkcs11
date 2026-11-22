@@ -3,34 +3,27 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security;
 
 /// <summary>
-/// The policy is chosen when the session is opened; a scoped <c>UsePolicy</c> lease can swap it for
-/// a single operation, unless the session's policy forbids overrides.
+/// The session enforces the library's policy; a scoped <c>UsePolicy</c> lease can swap it for a single
+/// operation. A library policy that forbids overrides is covered by <c>LibraryPolicyTests</c>.
 /// </summary>
 [Collection("Mock")]
 public sealed class UsePolicyTests(MockBackendFixture backend)
 {
     private readonly MockBackendFixture _backend = backend;
 
-    private Pkcs11Session Open(ICryptoPolicy? policy) => _backend.OpenSession(policy);
+    private Pkcs11Session Open() => _backend.OpenSession();
 
     [Fact]
-    public void NullPolicy_MeansRecommended()
+    public void TheDefaultLibraryPolicy_IsRecommended()
     {
-        using var session = Open(null);
+        using var session = Open();
         Assert.Same(CryptoPolicy.Recommended, session.Policy);
-    }
-
-    [Fact]
-    public void InjectedPolicy_IsTheSessionPolicy()
-    {
-        using var session = Open(CryptoPolicy.AllowInsecure);
-        Assert.Same(CryptoPolicy.AllowInsecure, session.Policy);
     }
 
     [Fact]
     public void UsePolicy_SwapsWithinScope_AndRestores()
     {
-        using var session = Open(null);
+        using var session = Open();
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Same(CryptoPolicy.AllowInsecure, session.Policy);
         Assert.Same(CryptoPolicy.Recommended, session.Policy);
@@ -39,7 +32,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void NestedLeases_RestoreInLifoOrder()
     {
-        using var session = Open(null);
+        using var session = Open();
         var outer = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var inner = session.UsePolicy(CryptoPolicy.Recommended);
         inner.Dispose();
@@ -51,7 +44,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void OutOfOrderDisposal_NeverLeavesAWeakerPolicyActive()
     {
-        using var session = Open(null);
+        using var session = Open();
         var outer = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var inner = session.UsePolicy(CryptoPolicy.Recommended);
         outer.Dispose();                                           // inner is still open: its policy stays in force
@@ -63,7 +56,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void OutOfOrderDisposal_OfAWeakerOuterLease_KeepsTheInnerLeaseInForce()
     {
-        using var session = Open(null);
+        using var session = Open();
         var outer = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var inner = session.UsePolicy(CryptoPolicy.Recommended);
         outer.Dispose();
@@ -78,7 +71,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void DisposingAMiddleLease_LeavesTheTopRemainingLeaseInForce()
     {
-        using var session = Open(null);
+        using var session = Open();
         var first = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var middle = session.UsePolicy(CryptoPolicy.Recommended);
         var top = session.UsePolicy(CryptoPolicy.AllowInsecure);
@@ -96,7 +89,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void DisposingAMiddleLease_UnderAStricterTop_KeepsTheTop()
     {
-        using var session = Open(null);
+        using var session = Open();
         var first = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var middle = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var top = session.UsePolicy(CryptoPolicy.Recommended);
@@ -114,7 +107,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void DoubleDispose_IsANoOp()
     {
-        using var session = Open(null);
+        using var session = Open();
         var lease = session.UsePolicy(CryptoPolicy.AllowInsecure);
         lease.Dispose();
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
@@ -127,7 +120,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void DisposeAfterSessionDispose_IsANoOp()
     {
-        var session = Open(null);
+        var session = Open();
         var lease = session.UsePolicy(CryptoPolicy.AllowInsecure);
         session.Dispose();
 
@@ -137,31 +130,7 @@ public sealed class UsePolicyTests(MockBackendFixture backend)
     [Fact]
     public void UsePolicy_RejectsNull()
     {
-        using var session = Open(null);
+        using var session = Open();
         Assert.Throws<ArgumentNullException>(() => session.UsePolicy(null!));
-    }
-
-    [Fact]
-    public void UsePolicy_IsRefused_WhenTheBasePolicyForbidsOverrides()
-    {
-        using var session = Open(new NoOverridePolicy());
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.Recommended));
-    }
-
-    private sealed class NoOverridePolicy : ICryptoPolicy
-    {
-        public string Name => "NoOverride";
-        public bool AllowsOverride => false;
-        public PolicyDecision Evaluate(PolicyRequest request) => CryptoPolicy.Recommended.Evaluate(request);
-    }
-
-    [Fact]
-    public void NistApprovedSession_RefusesEveryOverride()
-    {
-        using var session = Open(CryptoPolicy.NistApproved);
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
-        Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.Recommended));
-        Assert.Same(CryptoPolicy.NistApproved, session.Policy);
     }
 }

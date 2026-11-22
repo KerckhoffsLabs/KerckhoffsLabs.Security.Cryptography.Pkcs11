@@ -20,9 +20,9 @@ takes two deliberate steps, both visible in the code:
    `#pragma warning disable KLPKCS11004` … `#pragma warning restore KLPKCS11004`. Never suppress it for
    the whole project. See [Diagnostics](../diagnostics.md).
 2. **Lift the policy for one scoped operation**, with `using (session.UsePolicy(CryptoPolicy.AllowInsecure))`.
-   The lease ends with the block, and the session is back under its own policy afterwards. While it is
+   The lease ends with the block, and the session is back under the library's policy afterwards. While it is
    open it lifts every check **for the whole session**, on every thread using it, so do the legacy step
-   on a session of its own. A session opened under `NistApproved` refuses the lease altogether. Narrower
+   on a session of its own. Under a `NistApproved` library, every session refuses the lease. Narrower
    still: a policy derived from `Recommended` that allows only the one legacy mechanism for `Decrypt`, as
    the [AES block modes](aes.md) page shows.
 

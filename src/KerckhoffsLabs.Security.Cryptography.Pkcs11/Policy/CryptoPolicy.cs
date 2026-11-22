@@ -33,8 +33,8 @@ public static class CryptoPolicy
     /// (SP 800-38D §5.2.1.2: shorter tags need application conditions a policy cannot verify) and AES-CCM
     /// MACs at least 64 bits (SP 800-38C Appendix B.2). <b>Denies by default:</b> refuses every mechanism, hash, curve, KDF and PRF
     /// not on its allow-list, including every vendor-defined mechanism, whether or not it also appears in
-    /// the documented (but non-enforcing) deny list. A session opened under this policy refuses every
-    /// <c>UsePolicy</c> override.
+    /// the documented (but non-enforcing) deny list. As a library's policy, every session of the library
+    /// refuses every <c>UsePolicy</c> override.
     /// </summary>
     /// <remarks>
     /// <para>

@@ -65,13 +65,13 @@ public static class AesModeExamples
                 "each archive is signed separately, which supplies the integrity CBC lacks.")
             .Build();
 
-        // 2. Load the module and log in, under that policy. The module path and token label come from
-        //    configuration; the PIN from your secret store (see ReadPinFromEnvironment in Getting
-        //    started), never from code.
-        using Pkcs11Library library = Pkcs11Library.Load(modulePath);
+        // 2. Load the module under that policy, which every session of the library enforces, and log
+        //    in. The module path and token label come from configuration; the PIN from your secret
+        //    store (see ReadPinFromEnvironment in Getting started), never from code.
+        using Pkcs11Library library = Pkcs11Library.Load(modulePath, new Pkcs11LibraryOptions { Policy = legacyFormat });
         Pkcs11Slot slot = library.GetSlotByTokenLabel(tokenLabel);
         using Pkcs11Login login = slot.Login(TokenUser.User, pin);
-        using Pkcs11Session session = login.OpenSession(policy: legacyFormat);
+        using Pkcs11Session session = login.OpenSession();
 
         // 3. Open the AES key that is already on the token, by its CKA_LABEL (OpenKey(id) finds it by
         //    CKA_ID instead). It throws if no key, or more than one, matches.

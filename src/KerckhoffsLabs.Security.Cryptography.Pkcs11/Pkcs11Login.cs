@@ -123,16 +123,16 @@ public sealed class Pkcs11Login : IDisposable
     /// Read-only where the token refuses read/write: a write-protected token, one whose login session had to be
     /// read-only, or one with no read/write session left for this application and the login's own session lent
     /// already. Read <see cref="Pkcs11Session.Access"/> for which, or pass the access to
-    /// <see cref="OpenSession(SessionAccess, ICryptoPolicy?)"/> to get exactly that or a refusal. A Security Officer
+    /// <see cref="OpenSession(SessionAccess)"/> to get exactly that or a refusal. A Security Officer
     /// login allows only read/write sessions.
     /// </para>
     /// <para>
-    /// Otherwise as <see cref="OpenSession(SessionAccess, ICryptoPolicy?)"/>: see its remarks on the login's own
+    /// Otherwise as <see cref="OpenSession(SessionAccess)"/>: see its remarks on the login's own
     /// session, lent on a token that allows no more sessions.
     /// </para>
     /// </remarks>
     /// <returns>
-    /// The open session, under <see cref="CryptoPolicy.Recommended"/>; the caller disposes it. Disposing it closes it (or, for a lent session, hands it back) and
+    /// The open session, under the library's crypto policy (<see cref="Pkcs11Library.Policy"/>); the caller disposes it. Disposing it closes it (or, for a lent session, hands it back) and
     /// releases its hold: it logs out only when it is the login's last holder.
     /// </returns>
     /// <exception cref="Pkcs11LoginEndedException">
@@ -145,27 +145,7 @@ public sealed class Pkcs11Login : IDisposable
     /// is lent already (dispose that session first); the message says so.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
-    public Pkcs11Session OpenSession() => Open(access: null, policy: null);
-
-    /// <summary>
-    /// Opens a session that keeps this login, under <paramref name="policy"/>: read/write where the token allows it,
-    /// read-only where it does not, as <see cref="OpenSession()"/>.
-    /// </summary>
-    /// <inheritdoc cref="OpenSession()" path="/remarks"/>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>The open session; the caller disposes it (see <see cref="OpenSession()"/>).</returns>
-    /// <exception cref="Pkcs11LoginEndedException">
-    /// The login has ended: logged out, its logout pending (its last holder gone, the logout waiting for operations in
-    /// flight), or reported gone by the module.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">This login, or the library it came through, is disposed.</exception>
-    /// <exception cref="Pkcs11SessionException">
-    /// <c>CKR_SESSION_COUNT</c>, from the module, when the token allows no more sessions and the login's own session
-    /// is lent already (dispose that session first); the message says so.
-    /// </exception>
-    /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
-    public Pkcs11Session OpenSession(ICryptoPolicy? policy) => Open(access: null, policy);
+    public Pkcs11Session OpenSession() => Open(access: null);
 
     /// <summary>
     /// Opens a session with the token, read-only or read/write as <paramref name="access"/> says, that keeps this login
@@ -177,7 +157,7 @@ public sealed class Pkcs11Login : IDisposable
     /// (<c>C_OpenSession</c> answers <c>CKR_SESSION_COUNT</c>; the token's advertised limits are not consulted, as they
     /// are optional and not always right), that session is <b>lent</b> as the session returned: a token that allows
     /// one session can still be used with a login, one working session at a time. A lent session is used like any
-    /// other, with its own <paramref name="policy"/> and <see cref="Pkcs11Session.ContextAuthentication"/>, and
+    /// other, with its own <see cref="Pkcs11Session.UsePolicy"/> leases and <see cref="Pkcs11Session.ContextAuthentication"/>, and
     /// <see cref="Pkcs11Session.GetSessionInfo"/> answers for the login's session, the module's truth. It is lent only
     /// for the access it has: a <see cref="SessionAccess.ReadOnly"/> request is refused where the login's session is
     /// read/write (use <see cref="OpenSession()"/>, which takes it as it is). Disposing it hands the session back to the login (see
@@ -197,10 +177,8 @@ public sealed class Pkcs11Login : IDisposable
     /// allows only read/write sessions. <see cref="OpenSession()"/> picks read/write where the token
     /// allows it instead.
     /// </param>
-    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>
-    /// The open session; the caller disposes it. Disposing it closes it (or, for a lent session, hands it back) and
+    /// The open session, under the library's crypto policy (<see cref="Pkcs11Library.Policy"/>); the caller disposes it. Disposing it closes it (or, for a lent session, hands it back) and
     /// releases its hold: it logs out only when it is the login's last holder.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="access"/> is not a defined value.</exception>
@@ -221,15 +199,15 @@ public sealed class Pkcs11Login : IDisposable
     /// session, which is closed: the session is of the access asked for, or none.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_OpenSession</c>.</exception>
-    public Pkcs11Session OpenSession(SessionAccess access, ICryptoPolicy? policy = null)
+    public Pkcs11Session OpenSession(SessionAccess access)
     {
         if (!Enum.IsDefined(access))
             throw new ArgumentOutOfRangeException(nameof(access), access, "Not a defined SessionAccess value.");
-        return Open(access, policy);
+        return Open(access);
     }
 
     // Both OpenSession overloads: access as asked, or null for read/write where the token allows it.
-    private Pkcs11Session Open(SessionAccess? access, ICryptoPolicy? policy)
+    private Pkcs11Session Open(SessionAccess? access)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         Pkcs11Library library = Slot.Library;
@@ -237,6 +215,7 @@ public sealed class Pkcs11Login : IDisposable
 
         // Taken first, so the login cannot go between the session opening and the session holding it. Both the share
         // and the core are released if anything fails (the core first), and handed to the session once it is built.
+        ICryptoPolicy policy = library.Policy;
         using var share = new Owned<LoginHold>(_hold.Record.Share(_hold, library));
         using var core = new Owned<Pkcs11SessionCore>(access is { } requested
             ? OpenCore(share.Value, library, requested, policy, exact: true)
@@ -253,7 +232,7 @@ public sealed class Pkcs11Login : IDisposable
     // The default access: read/write where the token allows it. The login's own session tells: it fell back to
     // read-only where the token refused read/write. A token write-protected since, or with no read/write session left
     // and the login's own session not lendable, is answered read-only too.
-    private Pkcs11SessionCore OpenDefaultCore(LoginHold share, Pkcs11Library library, ICryptoPolicy? policy)
+    private Pkcs11SessionCore OpenDefaultCore(LoginHold share, Pkcs11Library library, ICryptoPolicy policy)
     {
         if (_hold.Record.Anchor is { IsReadWrite: false })
             return OpenCore(share, library, SessionAccess.ReadOnly, policy, exact: false);
@@ -275,7 +254,7 @@ public sealed class Pkcs11Login : IDisposable
     // login, which the loan is recorded against. With exact, the session has exactly the access asked for, or none: a
     // read-only one the module opened for read/write is refused, and so is lending a read/write login session for a
     // read-only request.
-    private Pkcs11SessionCore OpenCore(LoginHold share, Pkcs11Library library, SessionAccess access, ICryptoPolicy? policy,
+    private Pkcs11SessionCore OpenCore(LoginHold share, Pkcs11Library library, SessionAccess access, ICryptoPolicy policy,
         bool exact)
     {
         try

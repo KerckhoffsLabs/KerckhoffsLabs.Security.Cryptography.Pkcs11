@@ -22,8 +22,9 @@ public interface ICryptoPolicy
     string Name { get; }
 
     /// <summary>
-    /// When <see langword="false"/>, a session opened under this policy refuses every
-    /// <c>UsePolicy</c> lease, so the policy holds for the session's whole lifetime.
+    /// When <see langword="false"/>, a session under this policy (the library's, <see cref="Pkcs11LibraryOptions.Policy"/>)
+    /// refuses every <c>UsePolicy</c> lease, so the policy holds for every session of the library, for its whole
+    /// lifetime.
     /// </summary>
     bool AllowsOverride { get; }
 

@@ -15,8 +15,8 @@ internal static class Pkcs11BackendExtensions
     /// <see cref="IPkcs11Backend.OpenSession"/> for a test that holds its fixture by its concrete type, which does not
     /// see the interface's default implementation. A fixture that implements it itself is called directly.
     /// </summary>
-    internal static Pkcs11Session OpenSession(this IPkcs11Backend backend, ICryptoPolicy? policy = null)
-        => backend.OpenSession(policy);
+    internal static Pkcs11Session OpenSession(this IPkcs11Backend backend)
+        => backend.OpenSession();
 
     /// <summary>
     /// Skips the test when the backend does not advertise <paramref name="mechanism"/> in its

@@ -73,8 +73,8 @@ public sealed class Rfc2898DeriveBytesPkcs11StateTests
     [Fact]
     public void StaticPbkdf2_EmptyDestination_MakesNoTokenCall()
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.AllowInsecure);
+        using var library = ManagedToken.NewLibrary(CryptoPolicy.AllowInsecure);
+        using var session = ManagedToken.OpenSession(library);
 
         Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Password, Salt, Span<byte>.Empty, 1000, HashAlgorithmName.SHA256);
     }

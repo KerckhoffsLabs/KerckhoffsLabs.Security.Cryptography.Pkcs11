@@ -256,7 +256,7 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
     /// permanent. SoftHSM and NSS don't exhibit this, so the retry lives here rather than in the
     /// shared <see cref="IPkcs11Backend.OpenSession"/> default.
     /// </summary>
-    public Pkcs11Session OpenSession(ICryptoPolicy? policy = null)
+    public Pkcs11Session OpenSession()
     {
         const int maxAttempts = 3;
         for (int attempt = 1; ; attempt++)
@@ -264,7 +264,7 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
             try
             {
                 using Pkcs11Login login = this.Slot.ShareOrLogin(LoginCredential.FromPinSource(() => new SecurePin(UserPin.Span)));
-                return login.OpenSession(SessionAccess.ReadWrite, policy);
+                return login.OpenSession(SessionAccess.ReadWrite);
             }
             catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_GENERAL_ERROR && attempt < maxAttempts)
             {

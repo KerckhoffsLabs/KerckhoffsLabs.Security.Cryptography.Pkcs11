@@ -10,16 +10,18 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftTo
 /// </summary>
 internal static class ManagedToken
 {
-    public static Pkcs11Library NewLibrary() => new ManagedSoftToken().Load();
+    /// <summary>A library over a new token; its sessions enforce <paramref name="policy"/>, or the default when null.</summary>
+    public static Pkcs11Library NewLibrary(ICryptoPolicy? policy = null)
+        => new ManagedSoftToken().Load(policy is null ? null : new Pkcs11LibraryOptions { Policy = policy });
 
     /// <summary>
     /// A read/write session of a user login (a share of the login held, if another session holds one): the token is
     /// logged out when the last such session is disposed.
     /// </summary>
-    public static Pkcs11Session OpenSession(Pkcs11Library library, ICryptoPolicy? policy = null)
+    public static Pkcs11Session OpenSession(Pkcs11Library library)
     {
         using Pkcs11Login login = library.GetSlotByTokenLabel(ManagedSoftToken.TokenLabel)
             .ShareOrLogin(LoginCredential.FromPinSource(() => new SecurePin("1234")));
-        return login.OpenSession(SessionAccess.ReadWrite, policy);
+        return login.OpenSession(SessionAccess.ReadWrite);
     }
 }

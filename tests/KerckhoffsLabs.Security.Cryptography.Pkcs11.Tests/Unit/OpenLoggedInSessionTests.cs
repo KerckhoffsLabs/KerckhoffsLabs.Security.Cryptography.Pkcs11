@@ -80,13 +80,11 @@ public sealed class OpenLoggedInSessionTests : IDisposable
     }
 
     [Fact]
-    public void TheUsernameAndPolicy_ReachTheLoginAndTheSession()
+    public void TheUsername_ReachesTheLogin()
     {
-        using Pkcs11Session session = Slot.OpenLoggedInSession(
-            FromSecretStore(), username: "alice", policy: CryptoPolicy.NistApproved);
+        using Pkcs11Session session = Slot.OpenLoggedInSession(FromSecretStore(), username: "alice");
 
         Assert.Equal("alice", session.LoginInfo!.Username);
-        Assert.Same(CryptoPolicy.NistApproved, session.Policy);
     }
 
     // The login this call made goes with the session that could not open, so nothing keeps the token logged in.

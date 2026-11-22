@@ -51,8 +51,8 @@ public sealed class KdfOutputExportPolicyTests
     public void ByteResult_IsRefusedByTheExportCheck_BeforeAnythingIsDerived(string call)
     {
         var policy = new NoExportPolicy();
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, policy);
+        using var library = ManagedToken.NewLibrary(policy);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(new byte[32]).Derive().Build();
         using var key = session.ImportKey(tpl);
         policy.Seen.Clear();

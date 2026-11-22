@@ -649,7 +649,7 @@ internal sealed partial class Pkcs11SessionCore : IDisposable
         ArgumentNullException.ThrowIfNull(policy);
         if (!_basePolicy.AllowsOverride)
             throw new InvalidOperationException(
-                $"This session was opened under the {_basePolicy.Name} policy, which does not allow overrides.");
+                $"This session is under the {_basePolicy.Name} policy, the library's, which does not allow overrides.");
 
         var lease = new PolicyLease(this, policy);
         lock (_policyLock)

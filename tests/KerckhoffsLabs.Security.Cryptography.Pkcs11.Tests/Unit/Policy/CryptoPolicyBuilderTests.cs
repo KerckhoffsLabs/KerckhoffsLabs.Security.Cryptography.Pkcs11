@@ -393,8 +393,8 @@ public sealed class CryptoPolicyBuilderTests
     [Fact]
     public void ASessionUnderANistApprovedDerivedPolicy_RefusesOverrides()
     {
-        using var library = ManagedToken.NewLibrary();
-        using var session = ManagedToken.OpenSession(library, CryptoPolicy.NistApproved.ToBuilder("FipsPlus").Build());
+        using var library = ManagedToken.NewLibrary(CryptoPolicy.NistApproved.ToBuilder("FipsPlus").Build());
+        using var session = ManagedToken.OpenSession(library);
         Assert.Throws<InvalidOperationException>(() => session.UsePolicy(CryptoPolicy.AllowInsecure));
     }
 

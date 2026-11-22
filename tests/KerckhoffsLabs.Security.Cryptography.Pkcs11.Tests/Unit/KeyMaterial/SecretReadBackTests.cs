@@ -49,9 +49,12 @@ public sealed class SecretReadBackTests
     // Runs body over an opted-in session, an HKDF base key and the ephemeral key factory a read-back would use.
     private static void WithReadBack(ILogger? logger, Action<Pkcs11Session, Func<Pkcs11Key>> body)
     {
-        using var library = new ManagedSoftToken().Load(
-            logger is null ? null : new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(logger) });
-        using var session = ManagedToken.OpenSession(library, KdfOptIn);
+        using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions
+        {
+            Policy = KdfOptIn,
+            LoggerFactory = logger is null ? null : new CapturingLoggerFactory(logger),
+        });
+        using var session = ManagedToken.OpenSession(library);
         using var ikmTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(Ikm).Derive().Build();
         using var ikm = session.ImportKey(ikmTemplate);
         using var template = Pkcs11.Algorithms.DerivedKeyMaterial.ExtractableSecretTemplate(Length);

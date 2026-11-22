@@ -194,7 +194,7 @@ one (the kind and the policy name, never the secret). Every kind is scoped by th
 the call must name the scope: `KdfOutput` by base key
 ([the base-key scope](guide/crypto-policies.md#kdfoutput-base-key-scope)), `EcdhSharedSecret` and `KemSharedSecret` by
 private key ([the private-key scope](guide/crypto-policies.md#private-key-scope)). Apply the policy as a scoped
-`UsePolicy` lease or on a session of its own, not as the policy your sessions are opened with
+`UsePolicy` lease or on a library of its own, not as the policy of the library your sessions come from
 ([where to apply it](guide/crypto-policies.md#where-to-apply-an-export-opt-in)).
 
 <a id="KLPKCS11013"></a>
