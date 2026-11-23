@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
@@ -54,6 +55,18 @@ internal interface IReadBackGrant : IDisposable
 /// <param name="grant">The session's half of the read-back (the tag, the export report and the exclusive lease), released on dispose.</param>
 internal sealed class SecretReadBack(IReadBackGrant grant) : IDisposable
 {
+    /// <summary>
+    /// A session-scoped, extractable, non-sensitive generic secret of <paramref name="length"/> bytes, so its
+    /// <c>CKA_VALUE</c> can be read back. Created inside a <see cref="SecretReadBack"/>, the policy judges it as that
+    /// read-back (<see cref="KeyTemplateRequest.ReadBackFor"/>).
+    /// </summary>
+    internal static ObjectTemplate ExtractableSecretTemplate(int length) =>
+        ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(length)
+            .Extractable()
+            .Sensitive(false)
+            .Build();
+
     /// <summary>
     /// Creates the ephemeral, extractable key holding the secret, reads its <c>CKA_VALUE</c>, checks it and
     /// destroys the key: the single read-back flow behind every byte-returning path.

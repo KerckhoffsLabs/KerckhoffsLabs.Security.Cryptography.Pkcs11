@@ -57,7 +57,7 @@ public sealed class SecretReadBackTests
         using var session = ManagedToken.OpenSession(library);
         using var ikmTemplate = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(Ikm).Derive().Build();
         using var ikm = session.ImportKey(ikmTemplate);
-        using var template = Pkcs11.Algorithms.DerivedKeyMaterial.ExtractableSecretTemplate(Length);
+        using var template = SecretReadBack.ExtractableSecretTemplate(Length);
         var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
             CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, [1, 2, 3], [4, 5]));
         body(session, () => ikm.Derive(mechanism, template));

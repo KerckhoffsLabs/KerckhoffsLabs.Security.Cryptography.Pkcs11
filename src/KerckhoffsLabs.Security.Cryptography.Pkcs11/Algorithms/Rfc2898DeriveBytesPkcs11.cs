@@ -414,7 +414,13 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         // plaintext KDF output (a FIPS-style policy) relies on.
         using SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
         var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf));
-        using var template = DerivedKeyMaterial.ExtractableSecretTemplate(length);
+        // A session-scoped, extractable, non-sensitive generic secret, so its CKA_VALUE can be read back. Built from
+        // the public template API: what SecretReadBack.ExtractableSecretTemplate builds for the core's read-backs.
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(length)
+            .Extractable()
+            .Sensitive(false)
+            .Build();
         return readBack.Read(() => session.GenerateKey(mechanism, template), length, ReadBackFailures.KdfOutput);
     }
 

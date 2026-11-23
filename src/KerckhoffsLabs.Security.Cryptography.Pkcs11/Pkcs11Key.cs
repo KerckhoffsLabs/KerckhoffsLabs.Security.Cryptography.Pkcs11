@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
@@ -1328,7 +1329,13 @@ public sealed partial class Pkcs11Key : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
         RequireKdfOutputMechanism(mechanism);
 
-        return Algorithms.DerivedKeyMaterial.DeriveAndRead(this, mechanism, length);
+        // The export check comes first: it is what a policy that allows extractable templates but not
+        // plaintext KDF output (a FIPS-style policy) relies on.
+        // The base key is judged too: KDF output over a key the token has always protected would reproduce every
+        // key derived from it (KdfBaseKeyScope).
+        using SecretReadBack readBack = _session.BeginReadBack(KeyMaterialExportKind.KdfOutput, this);
+        using var template = SecretReadBack.ExtractableSecretTemplate(length);
+        return readBack.Read(() => DeriveCore(mechanism, template), length, ReadBackFailures.KdfOutput);
     }
 
     // DeriveBytes' allow-list. The parameters must be the KDF's own: the session raises a key-agreement KDF

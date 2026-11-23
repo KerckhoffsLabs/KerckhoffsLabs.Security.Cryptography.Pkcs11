@@ -227,7 +227,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     private byte[] DeriveExtractable(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int length)
     {
         var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
-        return DerivedKeyMaterial.DeriveAndRead(_key, new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p), length);
+        return _key.DeriveBytes(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p), length);
     }
 
     // The UTF-8 bytes of a char label or context: in the caller's stack buffer when they fit, otherwise

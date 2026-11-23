@@ -217,7 +217,7 @@ public sealed partial class Pkcs11Key
         AgreementPeer peer = ValidateAgreementPeer(peerSubjectPublicKeyInfo, operation);
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, peer.PublicData));
         // The private key itself remains non-extractable; only the ephemeral secret object is not.
-        using var template = Algorithms.DerivedKeyMaterial.ExtractableSecretTemplate(peer.SecretLength);
+        using var template = SecretReadBack.ExtractableSecretTemplate(peer.SecretLength);
 
         // Z is a field element, always the field size long (SEC 1 §2.3.5; RFC 7748 §5 for X25519 / X448):
         // a token that drops its leading zero bytes (SoftHSM2 did before 8bc65b5) or returns more would
