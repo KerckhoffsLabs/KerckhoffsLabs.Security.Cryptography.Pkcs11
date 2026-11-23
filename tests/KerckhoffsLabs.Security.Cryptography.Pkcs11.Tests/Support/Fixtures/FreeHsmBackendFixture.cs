@@ -22,6 +22,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// (<c>FHSM_CONF</c>) selects the permissive mode, in which the non-approved mechanisms the build
 /// dispatches (RSA PKCS#1 v1.5, SHA-1, ...) run instead of being refused. The shared fixture PINs meet
 /// its PIN rule (4 to 64 bytes); five wrong PINs in a row lock the PIN, so nothing here logs in with one.
+///
+/// <c>SignEdDsaContextTests</c> has no FreeHSM wrapper: the module signs pure Ed25519 / Ed448 only and refuses a
+/// <c>CK_EDDSA_PARAMS</c> with a context or <c>phFlag</c> (<c>CKR_MECHANISM_PARAM_INVALID</c>) by design, rather than
+/// sign something other than what was asked.
 /// </summary>
 public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
 {
