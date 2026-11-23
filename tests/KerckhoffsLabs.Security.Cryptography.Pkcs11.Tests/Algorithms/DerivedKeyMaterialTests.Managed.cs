@@ -9,7 +9,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.SoftToken;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
-/// <c>DerivedKeyMaterial.DeriveAndRead</c>, the read-back shared by the byte-returning KDF adapters,
+/// <see cref="Pkcs11Key.DeriveBytes"/>, the read-back the byte-returning KDF adapters share,
 /// over the managed token and reached through <see cref="SP800108HmacCounterKdfPkcs11"/>. Covers the
 /// ephemeral key's cleanup and which exception surfaces when reading or destroying it fails.
 /// </summary>

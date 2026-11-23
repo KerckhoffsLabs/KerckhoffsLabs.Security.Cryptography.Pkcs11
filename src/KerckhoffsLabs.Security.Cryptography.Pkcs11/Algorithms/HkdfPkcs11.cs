@@ -80,7 +80,7 @@ public static class HkdfPkcs11
         if (outputLength > prf.MaxOutputLength)
             throw new ArgumentOutOfRangeException(nameof(outputLength), MaxOutputMessage(prf));
 
-        return DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), outputLength);
+        return ikm.DeriveBytes(HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), outputLength);
     }
 
     /// <summary>
@@ -105,7 +105,7 @@ public static class HkdfPkcs11
         Prf prf = PrfFor(hashAlgorithmName);
         RequireOutputLength(output, prf);
 
-        FillFrom(DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), output.Length), output);
+        FillFrom(ikm.DeriveBytes(HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), output.Length), output);
     }
 
     /// <summary>
@@ -158,7 +158,7 @@ public static class HkdfPkcs11
         RequireHkdfKey(ikm, nameof(ikm));
         Prf prf = PrfFor(hashAlgorithmName);
 
-        return DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prf.HashLength);
+        return ikm.DeriveBytes(HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prf.HashLength);
     }
 
     /// <summary>
@@ -185,7 +185,7 @@ public static class HkdfPkcs11
         if (prk.Length < prf.HashLength)
             throw new ArgumentException(PrkTooShortMessage(prf), nameof(prk));
 
-        FillFrom(DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prf.HashLength), prk);
+        FillFrom(ikm.DeriveBytes(HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prf.HashLength), prk);
         return prf.HashLength;
     }
 
@@ -246,7 +246,7 @@ public static class HkdfPkcs11
             throw new ArgumentOutOfRangeException(nameof(outputLength), MaxOutputMessage(prf));
         RequirePrkLength(prk, prf);
 
-        return DerivedKeyMaterial.DeriveAndRead(prk, HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), outputLength);
+        return prk.DeriveBytes(HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), outputLength);
     }
 
     /// <summary>
@@ -271,7 +271,7 @@ public static class HkdfPkcs11
         RequireOutputLength(output, prf);
         RequirePrkLength(prk, prf);
 
-        FillFrom(DerivedKeyMaterial.DeriveAndRead(prk, HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), output.Length), output);
+        FillFrom(prk.DeriveBytes(HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), output.Length), output);
     }
 
     /// <summary>
