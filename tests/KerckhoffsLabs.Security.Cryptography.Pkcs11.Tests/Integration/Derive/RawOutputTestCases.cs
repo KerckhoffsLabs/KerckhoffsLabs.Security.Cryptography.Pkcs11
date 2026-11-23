@@ -1,7 +1,6 @@
 using System.Buffers.Binary;
 using System.Formats.Asn1;
 using System.Security.Cryptography;
-using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
@@ -165,7 +164,7 @@ internal static class RawOutputTestCases
         var ecParams = new AsnWriter(AsnEncodingRules.DER);
         ecParams.WriteObjectIdentifier(vector.Oid);
         using var template = ObjectTemplate.ForPrivateKey(CKK.CKK_EC_MONTGOMERY)
-            .Label(label).Id(Encoding.ASCII.GetBytes(label)).Derive()
+            .Label(label).Id(TestKeys.IdFor(label)).Derive()
             .Attribute(CKA.CKA_EC_PARAMS, ecParams.Encode()).Attribute(CKA.CKA_VALUE, vector.AlicePrivate)
             .Extractable().Sensitive(false)
             .OnToken(backend.SupportsTokenObjects).Build();
