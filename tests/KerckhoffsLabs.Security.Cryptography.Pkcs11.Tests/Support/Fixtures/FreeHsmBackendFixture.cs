@@ -50,7 +50,7 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>
     /// False while <c>C_CreateObject</c> refuses a DSA key with <c>CKR_TEMPLATE_INCONSISTENT</c>. 2.8.0 generates DSA key
     /// pairs and signs and verifies with them, but has no import path for <c>CKK_DSA</c>, public or private, so a
-    /// Wycheproof public key or a certificate's private key cannot be put on the token.
+    /// Wycheproof public key or a certificate's private key cannot be put on the token. afchine1337/freehsm#42.
     /// </summary>
     public const bool FreeHsmImportsDsaKeys = false;
 
@@ -62,6 +62,7 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c> (<c>ike_aux_key</c> in <c>src/fhsm_pkcs11.c</c> checks the derive usage, as
     /// for HKDF's salt key). PKCS#11 v3.2 §6.64.4 asks only that <c>hKeygxy</c> be a <c>CKK_GENERIC_SECRET</c>: its value
     /// is data for the prf, not a base key. NSS and Kryoptic take it without <c>CKA_DERIVE</c>.
+    /// afchine1337/freehsm#43.
     /// </summary>
     public const bool FreeHsmTakesAnIkeGxyKeyWithoutDerive = false;
 
@@ -72,7 +73,7 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// False while the IKE derivations take a <c>CKK_GENERIC_SECRET</c> base key with <c>bDataAsKey</c> FALSE
     /// (<c>ike_prf_key_type_ok</c> admits it beside the HMAC key types). PKCS#11 v3.2 §6.64.3: the base key "must be of
     /// type CKK_GENERIC_SECRET if bDataAsKey is TRUE and the key type of the underlying prf if bDataAsKey is FALSE";
-    /// Kryoptic answers <c>CKR_KEY_TYPE_INCONSISTENT</c>.
+    /// Kryoptic answers <c>CKR_KEY_TYPE_INCONSISTENT</c>. afchine1337/freehsm#43.
     /// </summary>
     public const bool FreeHsmRefusesAGenericSecretIkeBaseKey = false;
 

@@ -25,9 +25,10 @@ public sealed class RawChaCha20Tests_FreeHsm(FreeHsmBackendFixture backend)
     // FreeHSM sizes the 64-bit counter's room as 2^64 - 1 - start blocks, one short of 2^64 - start
     // (ctr_blocks_max = UINT64_MAX - start in the CKM_CHACHA20 init of src/fhsm_pkcs11.c; the 32-bit layout counts
     // 2^32 - start). So it refuses the 64-bit counter's last block with CKR_DATA_LEN_RANGE: 2^64 - 1 has room for none.
+    // afchine1337/freehsm#41.
     public void CounterBoundary_Wycheproof(int tcId) =>
         RawChaCha20TestCases.Assert_CounterBoundary_Wycheproof(_backend, tcId,
             refusesBecause: tcId is 19 or 20 or 21 or 23 or 24 or 25
-                ? "FreeHSM refuses the 64-bit counter's last block (CKR_DATA_LEN_RANGE): its room is counted one block short."
+                ? "FreeHSM refuses the 64-bit counter's last block (CKR_DATA_LEN_RANGE): its room is counted one block short (afchine1337/freehsm#41)."
                 : null);
 }
