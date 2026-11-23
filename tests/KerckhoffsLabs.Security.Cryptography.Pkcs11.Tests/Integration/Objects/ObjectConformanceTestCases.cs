@@ -756,6 +756,85 @@ internal static class ObjectConformanceTestCases
         });
     }
 
+    // === Curve25519 keys that do not match their curve ==========================
+
+    public static TheoryData<string> MismatchedCurve25519Keys =>
+    [
+        "Ed25519 private key with the X25519 OID", "X25519 private key with the Ed25519 OID",
+        "Ed25519 private key of 31 bytes", "Ed25519 private key of 33 bytes",
+        "X25519 private key of 31 bytes", "X25519 private key of 33 bytes",
+    ];
+
+    // DER of id-X25519 (1.3.101.110) and id-Ed25519 (1.3.101.112), the CKA_EC_PARAMS of RFC 8410 keys.
+    private static readonly byte[] X25519Params = [0x06, 0x03, 0x2B, 0x65, 0x6E];
+    private static readonly byte[] Ed25519Params = [0x06, 0x03, 0x2B, 0x65, 0x70];
+
+    // An Edwards or Montgomery private key is its curve's 32-byte scalar or seed (PKCS#11 v3.2 §6.3.6, §6.3.8), and
+    // its CKA_EC_PARAMS names that curve. C_CreateObject of one whose CKA_EC_PARAMS names the other curve, or whose
+    // CKA_VALUE is 31 or 33 bytes, is refused (§4.1.1: ATTRIBUTE_VALUE_INVALID, or the more specific
+    // TEMPLATE_INCONSISTENT, DOMAIN_PARAMS_INVALID, CURVE_NOT_SUPPORTED or KEY_SIZE_RANGE) and creates nothing. Each
+    // row first imports a valid key of the same type, so a token that imports no such key skips rather than counting
+    // as a refusal. acceptedBecause records a backend that creates the key anyway: the row skips with that reason, and
+    // fails once the backend refuses it, so the declaration goes. alsoAccepted adds the codes a backend refuses the
+    // row with beyond those. NSS refuses all six from 3.134 (bug 2090359).
+    internal static void Assert_MismatchedCurve25519Key_IsRefused(IPkcs11Backend backend, string row, string? acceptedBecause = null, CKR[]? alsoAccepted = null)
+    {
+        bool edwards = row.StartsWith("Ed25519", StringComparison.Ordinal);
+        byte[] ownParams = edwards ? Ed25519Params : X25519Params;
+        (byte[] ecParams, int length) = row switch
+        {
+            _ when row.EndsWith("OID", StringComparison.Ordinal) => (edwards ? X25519Params : Ed25519Params, 32),
+            _ when row.EndsWith("31 bytes", StringComparison.Ordinal) => (ownParams, 31),
+            _ => (ownParams, 33),
+        };
+
+        WithSession(backend, session =>
+        {
+            string label = $"kl-curve25519-{Guid.NewGuid():N}";
+            using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+            using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, edwards ? CKK.CKK_EC_EDWARDS : CKK.CKK_EC_MONTGOMERY);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+            using var attrUsage = new ObjectAttribute(edwards ? CKA.CKA_SIGN : CKA.CKA_DERIVE, true);
+            using var attrOwnParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, ownParams);
+            using var attrParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, ecParams);
+            using var attrValidValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+            using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(length));
+            List<ObjectAttribute> valid = [attrClass, attrKeyType, attrToken, attrLabel, attrSensitive, attrUsage, attrOwnParams, attrValidValue];
+            List<ObjectAttribute> mismatched = [attrClass, attrKeyType, attrToken, attrLabel, attrSensitive, attrUsage, attrParams, attrValue];
+
+            try
+            {
+                session.DestroyObject(session.CreateObject(valid));
+            }
+            catch (Pkcs11Exception ex)
+            {
+                Assert.Skip($"The token does not import a valid {(edwards ? "Ed25519" : "X25519")} private key ({ex.ReturnValue}).");
+            }
+
+            ObjectHandle? created = null;
+            CKR? refused = null;
+            try { created = session.CreateObject(mismatched); }
+            catch (Pkcs11Exception ex) { refused = ex.ReturnValue; }
+            if (created is { } handle)
+                session.DestroyObject(handle);
+
+            if (acceptedBecause is not null)
+            {
+                if (created is not null)
+                    Assert.Skip(acceptedBecause);
+                Assert.Fail($"{row}: the backend now refuses it ({refused}); drop its acceptedBecause (\"{acceptedBecause}\").");
+            }
+
+            Assert.True(refused is not null, $"{row}: C_CreateObject made the key.");
+            CKR[] accepted = [CKR.CKR_ATTRIBUTE_VALUE_INVALID, CKR.CKR_TEMPLATE_INCONSISTENT, CKR.CKR_DOMAIN_PARAMS_INVALID,
+                              CKR.CKR_CURVE_NOT_SUPPORTED, CKR.CKR_KEY_SIZE_RANGE, .. alsoAccepted ?? []];
+            Assert.True(accepted.Contains(refused!.Value), $"{row}: C_CreateObject returned {refused}, expected one of {string.Join(", ", accepted)}.");
+            Assert.Empty(session.FindAllObjects([attrLabel]));
+        });
+    }
+
     public static TheoryData<string> IncompleteTemplates =>
     [
         "RSA key pair without CKA_MODULUS_BITS", "EC key pair without CKA_EC_PARAMS", "RSA public key without CKA_MODULUS",
