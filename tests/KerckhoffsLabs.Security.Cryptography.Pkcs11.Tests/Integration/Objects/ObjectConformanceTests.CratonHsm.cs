@@ -147,5 +147,5 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
     [MemberData(nameof(ObjectConformanceTestCases.MismatchedCurve25519Keys), MemberType = typeof(ObjectConformanceTestCases))]
     public void MismatchedCurve25519Key_IsRefused(string row) =>
         ObjectConformanceTestCases.Assert_MismatchedCurve25519Key_IsRefused(_backend, row,
-            acceptedBecause: "Craton HSM stores an Ed25519 or X25519 private key whose CKA_EC_PARAMS name the other curve, or whose CKA_VALUE is 31 or 33 bytes.");
+            acceptedBecause: "Craton HSM stores an Ed25519 or X25519 private key whose CKA_EC_PARAMS name the other curve, or whose CKA_VALUE is 31 or 33 bytes (craton-co/craton-hsm-core#109).");
 }

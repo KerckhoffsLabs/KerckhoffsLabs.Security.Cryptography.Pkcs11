@@ -153,6 +153,6 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
     public void MismatchedCurve25519Key_IsRefused(string row) =>
         ObjectConformanceTestCases.Assert_MismatchedCurve25519Key_IsRefused(_backend, row,
             acceptedBecause: row.StartsWith("Ed25519", StringComparison.Ordinal)
-                ? "SoftHSM stores an Ed25519 private key whose CKA_EC_PARAMS name X25519, or whose CKA_VALUE is 31 or 33 bytes."
+                ? "SoftHSM stores an Ed25519 private key whose CKA_EC_PARAMS name X25519, or whose CKA_VALUE is 31 or 33 bytes (softhsm/SoftHSMv2#932)."
                 : null);
 }
