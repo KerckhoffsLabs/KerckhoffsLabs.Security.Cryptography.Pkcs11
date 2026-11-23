@@ -36,7 +36,7 @@
          bundled compiler currently reports AssemblyVersion 5.0.0.0, so Microsoft.CodeAnalysis.CSharp
          5.3.0+ (AssemblyVersion 5.3.0.0+) fails CS9057 on every consumer, not just docfx's own
          metadata step. Raise this only once the SDK's bundled compiler catches up. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.12.0" PrivateAssets="all" />
   </ItemGroup>
 </Project>

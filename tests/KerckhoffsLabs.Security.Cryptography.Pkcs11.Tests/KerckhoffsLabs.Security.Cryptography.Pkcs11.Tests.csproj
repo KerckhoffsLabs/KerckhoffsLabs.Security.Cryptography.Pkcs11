@@ -56,7 +56,7 @@
          Sonar shows as 0% covered. The command-line exclude-by-attribute option only appends to the
          defaults, so only a config file can remove it. A config file also turns off coverlet.MTP's
          dependency-based exclude filters, hence the explicit Include there. -->
-    <PackageReference Include="coverlet.MTP" Version="10.1.0" />
+    <PackageReference Include="coverlet.MTP" Version="10.1.1" />
     <!-- Property-based testing for BclDifferentialTestCases: generates inputs for the Algorithms adapters
          and the BCL alike, and on a failure shrinks them to a minimal case and reports the seed that
          reproduces it. -->
