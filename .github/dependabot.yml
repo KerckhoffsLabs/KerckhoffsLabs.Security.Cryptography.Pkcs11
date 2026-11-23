@@ -22,6 +22,15 @@ updates:
       # newer Roslyn than the SDK's bundled compiler fails CS9057 on every consumer. Raise it by hand
       # once the .NET 10 SDK's compiler catches up.
       - dependency-name: Microsoft.CodeAnalysis.CSharp
+      # The library targets net10.0 (an LTS): it depends on the lowest Microsoft.Extensions version it needs, so a
+      # .NET 10 app is not pulled onto the next major's packages (Logging.Abstractions 11 brings
+      # DependencyInjection.Abstractions and DiagnosticSource 11 with it, which replace an ASP.NET Core 10 app's own).
+      - dependency-name: Microsoft.Extensions.*
+        update-types: ["version-update:semver-major"]
+      # Versioned with the SDK, and runs inside the build: it moves to the next major with the pinned SDK
+      # (global.json), by hand.
+      - dependency-name: Microsoft.SourceLink.GitHub
+        update-types: ["version-update:semver-major"]
     groups:
       nuget:
         applies-to: version-updates
