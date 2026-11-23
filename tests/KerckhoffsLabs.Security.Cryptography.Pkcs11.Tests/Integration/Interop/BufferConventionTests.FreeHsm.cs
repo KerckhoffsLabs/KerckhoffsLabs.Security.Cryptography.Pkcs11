@@ -9,14 +9,10 @@ public sealed class BufferConventionTests_FreeHsm(FreeHsmBackendFixture backend)
 {
     private readonly FreeHsmBackendFixture _backend = backend;
 
+    // Before 2.8.0 FreeHSM could not decrypt AES-GCM in parts (afchine1337/freehsm#35).
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(BufferConventionTestCases.MultipartFinals), MemberType = typeof(BufferConventionTestCases))]
-    public void MultipartFinal_BufferTooSmall_KeepsTheOperation(string operation)
-    {
-        if (operation == "AES-GCM decrypt")
-            Assert.Skip("FreeHSM answers a C_DecryptFinal into a buffer too small for the AES-GCM plaintext with CKR_ENCRYPTED_DATA_INVALID.");
-        BufferConventionTestCases.Assert_MultipartFinal_BufferTooSmall_KeepsTheOperation(_backend, operation);
-    }
+    public void MultipartFinal_BufferTooSmall_KeepsTheOperation(string operation) => BufferConventionTestCases.Assert_MultipartFinal_BufferTooSmall_KeepsTheOperation(_backend, operation);
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(BufferConventionTestCases.EmptyEncryptions), MemberType = typeof(BufferConventionTestCases))]

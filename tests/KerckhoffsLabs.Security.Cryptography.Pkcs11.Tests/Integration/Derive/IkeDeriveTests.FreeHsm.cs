@@ -11,7 +11,7 @@ public sealed class IkeDeriveTests_FreeHsm(FreeHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void IkePrf_MatchesReference() => IkeDeriveTestCases.Assert_IkePrf_MatchesReference(_backend);
 
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.Ike1PrfAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM wants CKA_DERIVE on hKeygxy (" + nameof(FreeHsmBackendFixture.FreeHsmTakesAnIkeGxyKeyWithoutDerive) + ")")]
     public void Ike1Prf_MatchesReference() => IkeDeriveTestCases.Assert_Ike1Prf_MatchesReference(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
@@ -26,7 +26,7 @@ public sealed class IkeDeriveTests_FreeHsm(FreeHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void IkePrf_MatchesBclViaSignProbe() => IkeDeriveTestCases.Assert_IkePrf_MatchesBclViaSignProbe(_backend);
 
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.Ike1PrfAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM wants CKA_DERIVE on hKeygxy (" + nameof(FreeHsmBackendFixture.FreeHsmTakesAnIkeGxyKeyWithoutDerive) + ")")]
     public void Ike1Prf_MatchesBclViaSignProbe() => IkeDeriveTestCases.Assert_Ike1Prf_MatchesBclViaSignProbe(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
@@ -36,7 +36,8 @@ public sealed class IkeDeriveTests_FreeHsm(FreeHsmBackendFixture backend)
     public void Ike2PrfPlusDerive_MatchesBclViaSignProbe() => IkeDeriveTestCases.Assert_Ike2PrfPlusDerive_MatchesBclViaSignProbe(_backend);
 
     // Not shared with NSS: NSS's sftkike.c never checks the base key's CKA_KEY_TYPE at all, so this
-    // negative case isn't a shared cross-backend assertion — see IkeDeriveTestCases's doc comment.
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    // negative case isn't a shared cross-backend assertion — see IkeDeriveTestCases's doc comment. FreeHSM does
+    // not check it either (see FreeHsmBackendFixture.FreeHsmRefusesAGenericSecretIkeBaseKey).
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.IkeBaseKeyTypeCheckAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM takes a generic secret as the IKE base key (" + nameof(FreeHsmBackendFixture.FreeHsmRefusesAGenericSecretIkeBaseKey) + ")")]
     public void IkePrf_RejectsGenericSecretBaseKey() => IkeDeriveTestCases.Assert_IkePrf_RejectsGenericSecretBaseKey(_backend);
 }

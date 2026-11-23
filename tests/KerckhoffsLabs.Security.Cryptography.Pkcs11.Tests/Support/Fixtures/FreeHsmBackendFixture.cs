@@ -39,12 +39,6 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when <paramref name="mechanism"/> appears in the token's mechanism list.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
-    /// <inheritdoc/>
-    // Multi-part AES-GCM encryption works, but C_DecryptUpdate/C_DecryptFinal never hand the tag (the last
-    // ulTagBits/8 bytes of the ciphertext) to the cipher, so C_DecryptFinal refuses every ciphertext with
-    // CKR_ENCRYPTED_DATA_INVALID. Single-part AES-GCM is unaffected. afchine1337/freehsm#35.
-    public bool SupportsMultipartAesGcm => false;
-
     private const int SlotNumber = 0;
 
     private readonly string _stateDir = string.Empty;
@@ -54,64 +48,36 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
         BuiltLibraryPath() is not null;
 
     /// <summary>
-    /// False while a template's <c>CKA_CLASS</c> and <c>CKA_KEY_TYPE</c> are not checked against each other on key-pair
-    /// generation and import: <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with <c>CKK_RSA</c> for the private key or
-    /// <c>CKO_PRIVATE_KEY</c> for the public one, and <c>C_CreateObject</c> of a <c>CKO_SECRET_KEY</c> of type
-    /// <c>CKK_EC</c> or a <c>CKO_PRIVATE_KEY</c> of type <c>CKK_AES</c>, answer <c>CKR_OK</c>. PKCS#11 v3.2 §5.18.2 and
-    /// §4.1.1 point 5: <c>CKR_TEMPLATE_INCONSISTENT</c>. v2.7.0 refuses the <c>C_GenerateKey</c> and
-    /// <c>C_DeriveKey</c> rows.
+    /// False while <c>C_CreateObject</c> refuses a DSA key with <c>CKR_TEMPLATE_INCONSISTENT</c>. 2.8.0 generates DSA key
+    /// pairs and signs and verifies with them, but has no import path for <c>CKK_DSA</c>, public or private, so a
+    /// Wycheproof public key or a certificate's private key cannot be put on the token.
     /// </summary>
-    public const bool FreeHsmChecksKeyPairAndImportTemplates = false;
+    public const bool FreeHsmImportsDsaKeys = false;
 
-    /// <summary>The rows of the inconsistent-template case that <see cref="FreeHsmChecksKeyPairAndImportTemplates"/> covers.</summary>
-    internal static bool IsKeyPairOrImportTemplateRow(string inconsistent) =>
-        inconsistent is "EC key pair with an RSA private key" or "EC key pair with a private-key class for the public key"
-            or "secret key of type CKK_EC" or "private key of type CKK_AES";
+    /// <summary>Gate for the cases that import a DSA key: see <see cref="FreeHsmImportsDsaKeys"/>.</summary>
+    public static bool DsaImportAvailable => FreeHsmAvailable && FreeHsmImportsDsaKeys;
 
     /// <summary>
-    /// False while <c>C_CreateObject</c> of an EC private key without <c>CKA_EC_PARAMS</c> answers
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c>, where PKCS#11 v3.2 §6.3.4 says the attribute must be given (§4.1.1 point 4:
-    /// <c>CKR_TEMPLATE_INCOMPLETE</c>). Nothing is created. v2.7.0 answers <c>CKR_TEMPLATE_INCOMPLETE</c> for key-pair
-    /// generation without <c>CKA_MODULUS_BITS</c> or <c>CKA_EC_PARAMS</c>.
+    /// False while <c>CKM_IKE1_PRF_DERIVE</c> refuses an <c>hKeygxy</c> without <c>CKA_DERIVE</c> with
+    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c> (<c>ike_aux_key</c> in <c>src/fhsm_pkcs11.c</c> checks the derive usage, as
+    /// for HKDF's salt key). PKCS#11 v3.2 §6.64.4 asks only that <c>hKeygxy</c> be a <c>CKK_GENERIC_SECRET</c>: its value
+    /// is data for the prf, not a base key. NSS and Kryoptic take it without <c>CKA_DERIVE</c>.
     /// </summary>
-    public const bool FreeHsmReportsAnEcPrivateKeyWithoutParamsAsIncomplete = false;
+    public const bool FreeHsmTakesAnIkeGxyKeyWithoutDerive = false;
+
+    /// <summary>Gate for the <c>CKM_IKE1_PRF_DERIVE</c> cases: see <see cref="FreeHsmTakesAnIkeGxyKeyWithoutDerive"/>.</summary>
+    public static bool Ike1PrfAvailable => FreeHsmAvailable && FreeHsmTakesAnIkeGxyKeyWithoutDerive;
 
     /// <summary>
-    /// False while <c>C_CopyObject</c> of an AES key with a new <c>CKA_VALUE</c> is refused with
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c>. PKCS#11 v3.2 §4.1.3 and §4.1.1 point 3: <c>CKR_ATTRIBUTE_READ_ONLY</c>. The
-    /// value is not changed, and <c>C_SetAttributeValue</c> of key material answers <c>CKR_ATTRIBUTE_READ_ONLY</c>.
+    /// False while the IKE derivations take a <c>CKK_GENERIC_SECRET</c> base key with <c>bDataAsKey</c> FALSE
+    /// (<c>ike_prf_key_type_ok</c> admits it beside the HMAC key types). PKCS#11 v3.2 §6.64.3: the base key "must be of
+    /// type CKK_GENERIC_SECRET if bDataAsKey is TRUE and the key type of the underlying prf if bDataAsKey is FALSE";
+    /// Kryoptic answers <c>CKR_KEY_TYPE_INCONSISTENT</c>.
     /// </summary>
-    public const bool FreeHsmRefusesNewKeyMaterialInACopyAsReadOnly = false;
+    public const bool FreeHsmRefusesAGenericSecretIkeBaseKey = false;
 
-    /// <summary>
-    /// False while a data object's <c>CKA_OBJECT_ID</c> is refused: <c>C_CreateObject</c> with it answers
-    /// <c>CKR_ATTRIBUTE_TYPE_INVALID</c> (v2.7.0; earlier versions took it and dropped it). PKCS#11 v3.2 Table 20 gives
-    /// every data object a <c>CKA_OBJECT_ID</c> (default empty). <c>CKA_VALUE</c> and <c>CKA_APPLICATION</c> are kept
-    /// and copied.
-    /// </summary>
-    public const bool FreeHsmKeepsCkaObjectId = false;
-
-    /// <summary>Gate for the data object copy case: see <see cref="FreeHsmKeepsCkaObjectId"/>.</summary>
-    public static bool DataObjectIdAvailable => FreeHsmAvailable && FreeHsmKeepsCkaObjectId;
-
-    /// <summary>
-    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> on P-256 refuses a peer value that is no point (1 KiB, or a DER
-    /// length that lies) with <c>CKR_ATTRIBUTE_VALUE_INVALID</c>: the peer value is a mechanism parameter, so PKCS#11
-    /// v3.2 §6.3.16 and §5.1.6 make it <c>CKR_MECHANISM_PARAM_INVALID</c>. No key is made. v2.7.0 refuses
-    /// <c>CKD_NULL</c> with shared data and a <c>CKA_VALUE_LEN</c> above the secret as specified.
-    /// afchine1337/freehsm#37 (E1).
-    /// </summary>
-    public const bool FreeHsmRefusesABadEcdhPeerAsAParameter = false;
-
-    /// <summary>
-    /// False while a private key gets every usage of its class that the template does not turn off: an Edwards key
-    /// unwrapped with <c>CKA_SIGN</c> alone reports <c>CKA_DERIVE = TRUE</c>, and a Montgomery key unwrapped with
-    /// <c>CKA_DERIVE</c> alone reports <c>CKA_SIGN = TRUE</c> (<c>fhsm_compute_usage</c> in <c>src/fhsm_pkcs11.c</c>
-    /// starts every <c>CKO_PRIVATE_KEY</c> from decrypt, sign, unwrap and derive). PKCS#11 v3.2 defaults
-    /// <c>CKA_DERIVE</c> to FALSE. <c>C_GenerateKeyPair</c> clears it for Edwards keys only, so a generated P-256 or
-    /// X25519 key has the same extra usage; the unwrap path clears nothing. afchine1337/freehsm#34.
-    /// </summary>
-    public const bool FreeHsmGrantsAnUnwrappedKeyOnlyTheUsageAsked = false;
+    /// <summary>Gate for the IKE base-key-type case: see <see cref="FreeHsmRefusesAGenericSecretIkeBaseKey"/>.</summary>
+    public static bool IkeBaseKeyTypeCheckAvailable => FreeHsmAvailable && FreeHsmRefusesAGenericSecretIkeBaseKey;
 
     public FreeHsmBackendFixture()
     {
