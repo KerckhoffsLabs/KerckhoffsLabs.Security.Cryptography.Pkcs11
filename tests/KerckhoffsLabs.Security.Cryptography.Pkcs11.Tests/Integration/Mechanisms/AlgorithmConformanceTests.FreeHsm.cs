@@ -50,9 +50,10 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void DigestKey_IsTheDigestOfTheKeysValue() => AlgorithmConformanceTestCases.Assert_DigestKey_IsTheDigestOfTheKeysValue(_backend);
 
-    // FreeHSM refuses CKD_SHA256_KDF with CKR_ARGUMENTS_BAD.
+    // FreeHSM does not offer the X9.63 KDFs, and refuses CKD_SHA256_KDF with CKR_MECHANISM_PARAM_INVALID from 2.8.0
+    // (CKR_ARGUMENTS_BAD before, afchine1337/freehsm#37 E2).
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
-    public void Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData() => AlgorithmConformanceTestCases.Assert_Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData(_backend, refused: CKR.CKR_ARGUMENTS_BAD);
+    public void Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData() => AlgorithmConformanceTestCases.Assert_Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData(_backend, refused: CKR.CKR_MECHANISM_PARAM_INVALID);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void EcdhCofactor_OnP256_AgreesThePlainSecret() => AlgorithmConformanceTestCases.Assert_EcdhCofactor_OnP256_AgreesThePlainSecret(_backend);
@@ -114,14 +115,10 @@ public sealed class AlgorithmConformanceTests_FreeHsm(FreeHsmBackendFixture back
     [MemberData(nameof(AlgorithmConformanceTestCases.PssParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(string fault) => AlgorithmConformanceTestCases.Assert_RsaPss_ParameterOutOfRange_IsMechanismParamInvalid(_backend, fault);
 
+    // Before 2.8.0 FreeHSM refused a peer value that is no point with CKR_ATTRIBUTE_VALUE_INVALID (afchine1337/freehsm#37 E1).
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
-    {
-        if (fault is "a 1 KiB peer value" or "a DER length that lies" && !FreeHsmBackendFixture.FreeHsmRefusesABadEcdhPeerAsAParameter)
-            Assert.Skip("FreeHSM refuses a peer value that is no point with CKR_ATTRIBUTE_VALUE_INVALID");
-        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
-    }
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault) => AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);

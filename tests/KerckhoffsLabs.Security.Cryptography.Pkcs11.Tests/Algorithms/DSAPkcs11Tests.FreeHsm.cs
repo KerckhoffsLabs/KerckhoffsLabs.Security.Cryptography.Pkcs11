@@ -51,7 +51,7 @@ public sealed class DSAPkcs11Tests_FreeHsm(FreeHsmBackendFixture f)
     [InlineData(DSASignatureFormat.Rfc3279DerSequence)]
     public void Sha224_EveryOverload_RoundTrips_AndRejectsTampering(DSASignatureFormat format) => DSAPkcs11TestCases.Assert_Sha224_EveryOverload_RoundTrips_AndRejectsTampering(_backend, format);
 
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.DsaImportAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM cannot import a DSA key (" + nameof(FreeHsmBackendFixture.FreeHsmImportsDsaKeys) + ")")]
     public void Sha224_WycheproofVector_Verifies_AndTamperedDoesNot() => DSAPkcs11TestCases.Assert_Sha224_WycheproofVector_Verifies_AndTamperedDoesNot(_backend);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]

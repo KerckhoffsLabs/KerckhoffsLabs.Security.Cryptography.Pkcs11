@@ -13,7 +13,7 @@ public sealed class Pkcs11CertificateExtensionsTests_FreeHsm(FreeHsmBackendFixtu
 {
     private readonly IPkcs11Backend _backend = backend;
 
-    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
+    [Fact(SkipUnless = nameof(FreeHsmBackendFixture.DsaImportAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "FreeHSM cannot import a DSA key (" + nameof(FreeHsmBackendFixture.FreeHsmImportsDsaKeys) + ")")]
     public void GetDSAPrivateKey_SignsForTheCertificate() => WithSession(Pkcs11CertificateExtensionsTestCases.Assert_GetDSAPrivateKey_SignsForTheCertificate);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]

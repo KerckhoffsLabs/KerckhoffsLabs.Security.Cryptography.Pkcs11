@@ -35,21 +35,15 @@ public sealed class OperationStateTests_FreeHsm(FreeHsmBackendFixture backend)
     [MemberData(nameof(OperationStateTestCases.UsesOfADestroyedKey), MemberType = typeof(OperationStateTestCases))]
     public void DestroyedKey_IsRefused(string use) => OperationStateTestCases.Assert_DestroyedKey_IsRefused(_backend, use);
 
+    // Before 2.8.0 FreeHSM answered a partial plaintext block with CKR_FUNCTION_FAILED and a partial ciphertext block
+    // with CKR_ENCRYPTED_DATA_INVALID (afchine1337/freehsm#37 B1, B2).
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.PartialBlockEncryptions), MemberType = typeof(OperationStateTestCases))]
-    public void PartialBlock_Encrypt_IsDataLenRange(CKM mechanism, int length)
-    {
-        // FreeHSM answers a partial plaintext block with CKR_FUNCTION_FAILED.
-        OperationStateTestCases.Assert_PartialBlock_Encrypt_IsDataLenRange(_backend, mechanism, length, CKR.CKR_FUNCTION_FAILED);
-    }
+    public void PartialBlock_Encrypt_IsDataLenRange(CKM mechanism, int length) => OperationStateTestCases.Assert_PartialBlock_Encrypt_IsDataLenRange(_backend, mechanism, length);
 
     [Theory(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     [MemberData(nameof(OperationStateTestCases.PartialBlockDecryptions), MemberType = typeof(OperationStateTestCases))]
-    public void PartialBlock_Decrypt_IsEncryptedDataLenRange(CKM mechanism, int length)
-    {
-        // FreeHSM answers a partial ciphertext block with CKR_ENCRYPTED_DATA_INVALID.
-        OperationStateTestCases.Assert_PartialBlock_Decrypt_IsEncryptedDataLenRange(_backend, mechanism, length, CKR.CKR_ENCRYPTED_DATA_INVALID);
-    }
+    public void PartialBlock_Decrypt_IsEncryptedDataLenRange(CKM mechanism, int length) => OperationStateTestCases.Assert_PartialBlock_Decrypt_IsEncryptedDataLenRange(_backend, mechanism, length);
 
     [Fact(SkipUnless = nameof(FreeHsmBackendFixture.FreeHsmAvailable), SkipType = typeof(FreeHsmBackendFixture), Skip = "Requires " + nameof(FreeHsmBackendFixture.FreeHsmAvailable))]
     public void LegacyParallelFunctions_AreNotParallel() => OperationStateTestCases.Assert_LegacyParallelFunctions_AreNotParallel(_backend);
