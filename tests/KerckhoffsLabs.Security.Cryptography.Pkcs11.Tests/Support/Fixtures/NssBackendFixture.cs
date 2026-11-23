@@ -134,10 +134,13 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     public static bool MultipartClassicAesGcmAvailable => ClassicAesGcmAvailable && SupportsMultipartClassicAesGcm;
 
     /// <summary>True when the backend will derive a readable (extractable, non-sensitive) key whose
-    /// value can be read back. NSS softoken refuses with <see cref="CKR.CKR_KEY_FUNCTION_NOT_PERMITTED"/>
-    /// — it only derives non-extractable keys, a deliberate policy against exposing derived key
-    /// material. The byte-returning KDF overloads need a readable derived key and so skip here; the
-    /// on-token non-extractable derive still runs and exercises the KDF operation on NSS.</summary>
+    /// value can be read back. NSS softoken's HKDF and SP 800-108 KDFs refuse with
+    /// <see cref="CKR.CKR_KEY_FUNCTION_NOT_PERMITTED"/> — they only derive non-extractable keys, a deliberate
+    /// policy against exposing derived key material. The byte-returning overloads of those KDFs need a readable
+    /// derived key and so skip here; the on-token non-extractable derive still runs and exercises the KDF
+    /// operation on NSS. Not every mechanism is refused: the IKE PRFs (<c>sftkike.c</c>) and PBKDF2 (a
+    /// <c>C_GenerateKey</c> mechanism on NSS) give a readable key, so their read-back cases run on NSS
+    /// (checked on 3.134).</summary>
     public static bool SupportsExtractableDerive => false;
 
     /// <summary>Gate for KDF cases that read the derived key's value back to compare against the BCL.</summary>
