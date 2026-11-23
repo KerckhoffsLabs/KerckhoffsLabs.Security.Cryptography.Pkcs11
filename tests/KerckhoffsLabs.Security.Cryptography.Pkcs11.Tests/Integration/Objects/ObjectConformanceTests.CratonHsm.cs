@@ -141,4 +141,11 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
             Assert.Skip("Craton HSM generates a key pair with a CKA_UNIQUE_ID in the private key's template");
         ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
     }
+
+    // Craton HSM checks neither the curve nor the length of an imported Ed25519 or X25519 private key.
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.MismatchedCurve25519Keys), MemberType = typeof(ObjectConformanceTestCases))]
+    public void MismatchedCurve25519Key_IsRefused(string row) =>
+        ObjectConformanceTestCases.Assert_MismatchedCurve25519Key_IsRefused(_backend, row,
+            acceptedBecause: "Craton HSM stores an Ed25519 or X25519 private key whose CKA_EC_PARAMS name the other curve, or whose CKA_VALUE is 31 or 33 bytes.");
 }

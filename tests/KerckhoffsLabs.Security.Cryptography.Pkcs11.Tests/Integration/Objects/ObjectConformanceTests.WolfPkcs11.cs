@@ -113,4 +113,8 @@ public sealed class ObjectConformanceTests_WolfPkcs11(WolfPkcs11BackendFixture b
     [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     [MemberData(nameof(ObjectConformanceTestCases.RefusedKeyPairs), MemberType = typeof(ObjectConformanceTestCases))]
     public void RefusedKeyPairGeneration_LeavesNothing(string refused) => ObjectConformanceTestCases.Assert_RefusedKeyPairGeneration_LeavesNothing(_backend, refused);
+
+    [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    [MemberData(nameof(ObjectConformanceTestCases.MismatchedCurve25519Keys), MemberType = typeof(ObjectConformanceTestCases))]
+    public void MismatchedCurve25519Key_IsRefused(string row) => ObjectConformanceTestCases.Assert_MismatchedCurve25519Key_IsRefused(_backend, row);
 }
