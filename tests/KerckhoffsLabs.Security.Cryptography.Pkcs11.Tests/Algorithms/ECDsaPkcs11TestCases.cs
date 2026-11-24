@@ -693,6 +693,39 @@ internal static class ECDsaPkcs11TestCases
         });
     }
 
+    // Raw CKM_ECDSA on P-521 with a digest shorter than the 66-byte field: SHA-1's 20 bytes, SHA-224's 28 and
+    // SHA-256's 32. FIPS 186-5 §6.4.1 takes such a digest whole as the integer e (only a digest longer than the
+    // order is truncated), so the token's signature verifies under the BCL, a BCL signature verifies on the token,
+    // and neither verifies for a changed digest. RustCrypto's bits2field refuses a digest under half the field,
+    // which a module that passes the digest straight through answers with CKR_DATA_LEN_RANGE.
+    internal static void Assert_P521_SignHash_ShortDigest_InteroperatesWithBcl(IPkcs11Backend backend, int digestLength)
+    {
+        PropertyTestSupport.RequireBclCurve("P-521");
+        byte[] digest = RandomNumberGenerator.GetBytes(digestLength);
+        byte[] changed = [.. digest];
+        changed[0] ^= 0x01;
+
+        WithEcDsa(backend, "P-521", ec =>
+        {
+            byte[] signature = ec.SignHash(digest);
+            Assert.Equal(132, signature.Length);
+            using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+            Assert.True(bcl.VerifyHash(digest, signature), "The BCL refuses the token's signature.");
+            Assert.True(ec.VerifyHash(digest, signature), "The token refuses its own signature.");
+            Assert.False(ec.VerifyHash(changed, signature), "The token's signature verified for a changed digest.");
+        });
+
+        using ECDsa signer = ECDsa.Create(BclECCurve.NamedCurves.nistP521);
+        byte[] bclSignature = signer.SignHash(digest);
+        ECParameters pub = signer.ExportParameters(includePrivateParameters: false);
+        var vector = new WycheproofVector("nistP521", Convert.ToHexString(pub.Q.X!), Convert.ToHexString(pub.Q.Y!), "", "");
+        WithVectorKey(backend, vector, ec =>
+        {
+            Assert.True(ec.VerifyHash(digest, bclSignature), "The token refuses the BCL's signature.");
+            Assert.False(ec.VerifyHash(changed, bclSignature), "The BCL's signature verified on the token for a changed digest.");
+        });
+    }
+
     // Wycheproof ecdsa_secp256r1_sha256_p1363_test.json, tcId 169 ("point at infinity during verify") and
     // tcId 208 ("comparison with point at infinity"): (public key, message, r||s). Verification reaches the
     // point at infinity; the signature is invalid, so VerifyData returns false instead of throwing, as the

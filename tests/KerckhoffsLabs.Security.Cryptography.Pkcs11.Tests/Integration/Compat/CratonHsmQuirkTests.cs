@@ -3,10 +3,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 using Xunit.Sdk;
 
@@ -115,25 +113,5 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
         Assert.True(failure is XunitException and not SkipException,
             "Craton HSM no longer lets a copy change CKA_ALLOWED_MECHANISMS: set " +
             "CratonHsmBackendFixture.CratonHsmKeepsAllowedMechanismsOnACopy to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void CbcPadDualDecryptUnpadsEveryPart_QuirkStillPresent()
-    {
-        Exception? failure = Record.Exception(() => DualFunctionTestCases.Assert_DecryptDigest_APartEndingLikePadding_KeepsEveryByte(_backend));
-        Assert.True(failure is XunitException and not SkipException,
-            "Craton HSM no longer unpads every CBC-PAD part of C_DecryptDigestUpdate " +
-            $"(got {failure?.GetType().Name ?? "no failure"}): set " +
-            "CratonHsmBackendFixture.CratonHsmUnpadsOnlyTheLastCbcPadPart to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
-    public void P521WithSha256_QuirkStillPresent()
-    {
-        Exception? ex = Record.Exception(() => ECDsaPkcs11TestCases.Assert_SignVerifyData_CurveHashMatrix_RoundTrips(_backend, "P-521", "SHA256"));
-        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_DATA_LEN_RANGE },
-            "Craton HSM no longer refuses a SHA-256 digest on a P-521 key with CKR_DATA_LEN_RANGE " +
-            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
-            "CratonHsmBackendFixture.CratonHsmSignsP521WithSha256 to true and delete this test.");
     }
 }

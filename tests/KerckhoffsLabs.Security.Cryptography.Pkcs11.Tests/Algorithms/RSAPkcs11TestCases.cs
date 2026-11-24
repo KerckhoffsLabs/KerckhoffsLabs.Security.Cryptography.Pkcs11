@@ -379,7 +379,7 @@ internal static class RSAPkcs11TestCases
     // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires the AllowInsecure policy.
     internal static void Assert_EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
-        backend.RequireMechanisms(CKM.CKM_RSA_PKCS);
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT | CKF_DECRYPT");
         WithRsa(backend, (session, rsa) =>
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("pkcs1 payload");
@@ -831,7 +831,8 @@ internal static class RSAPkcs11TestCases
     // so the default policy allows it; the scheme is deterministic, so the signature equals SignData's.
     internal static void Assert_SignHash_Pkcs1_UnderTheDefaultPolicy_MatchesSignData(IPkcs11Backend backend)
     {
-        backend.RequireMechanisms(CKM.CKM_RSA_PKCS, CKM.CKM_SHA256_RSA_PKCS);
+        backend.RequireMechanism(CKM.CKM_SHA256_RSA_PKCS);
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => f.Sign, "CKF_SIGN");
         WithRsa(backend, (_, rsa) =>
         {
             byte[] data = Encoding.UTF8.GetBytes("pkcs1 over a digest");

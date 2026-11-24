@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -17,10 +18,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// Every case checks both halves against the BCL: the digest is <see cref="SHA256.HashData(byte[])"/> of the
 /// plaintext and the ciphertext is <see cref="Aes"/> CBC with PKCS#7 padding under the same key and IV, so a
 /// token that fed one half the wrong bytes, dropped a partial block, or reset the IV between updates fails.
-/// The buffer lengths include small ones, so the token sees many <c>*Update</c> calls: odd ones on the
-/// encrypting side, whose pieces do not line up with the AES block, and whole blocks on the decrypting side,
-/// since a token may refuse a CBC-PAD ciphertext part that is not a multiple of the block size (NSS does for
-/// <c>C_DecryptUpdate</c>, Craton HSM for <c>C_DecryptDigestUpdate</c> and <c>C_DecryptVerifyUpdate</c>).
+/// The buffer lengths include small ones, so the token sees many <c>*Update</c> calls, and odd ones, whose pieces
+/// do not line up with the AES block. A token may refuse a CBC-PAD ciphertext part that is not a multiple of the
+/// block size (NSS does for <c>C_DecryptUpdate</c>, as Craton HSM did for <c>C_DecryptDigestUpdate</c> and
+/// <c>C_DecryptVerifyUpdate</c> before 0.11.2), so a backend's wrapper chooses the decrypting side's lengths.
 /// Gated by <see cref="IPkcs11Backend.SupportsDualFunctionCrypto"/>.
 /// </summary>
 internal static class DualFunctionTestCases
@@ -110,6 +111,57 @@ internal static class DualFunctionTestCases
 
             Assert.Equal(plaintext, output.ToArray());
             Assert.Equal(SHA256.HashData(plaintext), digest);
+        });
+    }
+
+    /// <summary>
+    /// The <c>C_DecryptVerifyUpdate</c> side of <see cref="Assert_DecryptDigest_APartEndingLikePadding_KeepsEveryByte"/>:
+    /// the first block's plaintext ends in <c>01</c>, the ciphertext goes to the token one block per call, and the
+    /// signature of the whole plaintext verifies only if no part was unpadded.
+    /// </summary>
+    internal static void Assert_DecryptVerify_APartEndingLikePadding_KeepsEveryByte(IPkcs11Backend backend)
+    {
+        RequireDualFunction(backend, CKM.CKM_AES_CBC_PAD, CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA_SHA256);
+
+        byte[] plaintext = [.. Enumerable.Repeat((byte)0xAA, 15), 0x01, .. Enumerable.Repeat((byte)0xBB, 20)];
+        WithAesKey(backend, (session, key, rawKey) =>
+        {
+            var (pub, priv) = TestKeys.GenerateEcP256KeyPair(session);
+            try
+            {
+                byte[] signature = session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), priv, plaintext);
+                bool valid = DecryptVerify(session, pub, key, BclEncrypt(rawKey, plaintext), signature, 16, out byte[] decrypted);
+                Assert.Equal(plaintext, decrypted);
+                Assert.True(valid, "The signature of the plaintext did not verify through C_DecryptVerifyUpdate.");
+            }
+            finally
+            {
+                session.DestroyObject(priv);
+                session.DestroyObject(pub);
+            }
+        });
+    }
+
+    /// <summary>
+    /// A CBC-PAD ciphertext whose last block does not decrypt to PKCS#7 padding (it ends in <c>00</c>) is refused at
+    /// the end of a <c>C_DecryptDigestUpdate</c> run with <c>CKR_ENCRYPTED_DATA_INVALID</c> (PKCS#11 v3.2 §2.10.2,
+    /// §5.2), not decrypted with the bad bytes kept or dropped.
+    /// </summary>
+    internal static void Assert_DecryptDigest_BadPadding_IsEncryptedDataInvalid(IPkcs11Backend backend)
+    {
+        RequireDualFunction(backend, CKM.CKM_SHA256, CKM.CKM_AES_CBC_PAD);
+
+        byte[] plaintext = [.. Enumerable.Repeat((byte)0xCC, 47), 0x00];
+        WithAesKey(backend, (session, key, rawKey) =>
+        {
+            using var aes = Aes.Create();
+            aes.Key = rawKey;
+            using var input = new MemoryStream(aes.EncryptCbc(plaintext, Iv, PaddingMode.None));
+            using var output = new MemoryStream();
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+                session.DecryptDigest(new Mechanism(CKM.CKM_SHA256), CbcPad(), key, input, output, 16));
+            Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, ex.ReturnValue);
         });
     }
 

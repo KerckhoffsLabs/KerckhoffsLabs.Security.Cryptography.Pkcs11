@@ -494,12 +494,13 @@ internal static class TestKeys
 
     /// <summary>
     /// Encodes a NIST P-curve public point as the PKCS#11 CKA_EC_POINT / ECDH peer-point form:
-    /// the uncompressed point (0x04 ‖ X ‖ Y) wrapped in a DER OCTET STRING.
+    /// the uncompressed point (0x04 ‖ X ‖ Y) wrapped in a DER OCTET STRING. A P-521 point is 133 bytes, past the
+    /// 127 a short-form length holds, so its length takes the long form (81 85).
     /// </summary>
     public static byte[] DerEcPoint(byte[] x, byte[] y)
     {
         byte[] raw = [0x04, .. x, .. y];
-        return [0x04, (byte)raw.Length, .. raw];
+        return raw.Length < 0x80 ? [0x04, (byte)raw.Length, .. raw] : [0x04, 0x81, (byte)raw.Length, .. raw];
     }
 
     /// <summary>Imports a NIST P-256 public key from its affine coordinates (verify/derive peer).</summary>

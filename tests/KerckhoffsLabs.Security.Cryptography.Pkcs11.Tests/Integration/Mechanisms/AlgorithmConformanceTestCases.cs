@@ -432,7 +432,8 @@ internal static class AlgorithmConformanceTestCases
     // refused.
     internal static void Assert_RsaPkcs1_Plaintext_IsBoundedByKMinus11(IPkcs11Backend backend)
     {
-        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_PKCS);
+        backend.RequireMechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        backend.RequireMechanismFlags(CKM.CKM_RSA_PKCS, f => f.Encrypt && f.Decrypt, "CKF_ENCRYPT | CKF_DECRYPT");
         WithSession(backend, session =>
         {
             using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);

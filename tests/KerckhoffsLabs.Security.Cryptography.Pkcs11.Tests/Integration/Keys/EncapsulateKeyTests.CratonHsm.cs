@@ -12,7 +12,7 @@ public sealed class EncapsulateKeyTests_CratonHsm(CratonHsmBackendFixture backen
 {
     private readonly CratonHsmBackendFixture _backend = backend;
 
-    // Craton HSM (a PKCS#11 v3.0 module, as of 0.11.1) exports no C_EncapsulateKey/C_DecapsulateKey: its
+    // Craton HSM (a PKCS#11 v3.0 module, as of 0.11.2) exports no C_EncapsulateKey/C_DecapsulateKey: its
     // ML-KEM encapsulation goes through C_DeriveKey (src/pkcs11_abi/functions.rs), and RSA and EC have no
     // encapsulation path at all. CKM_RSA_PKCS_OAEP and CKM_ECDH1_DERIVE are both advertised for ordinary
     // encrypt/derive use, so a live mechanism-list check would not catch this gap.

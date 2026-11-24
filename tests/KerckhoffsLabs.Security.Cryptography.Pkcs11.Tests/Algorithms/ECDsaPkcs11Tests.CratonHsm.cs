@@ -19,12 +19,7 @@ public sealed class ECDsaPkcs11Tests_CratonHsm(CratonHsmBackendFixture f)
     [InlineData("P-521", "SHA256")]
     [InlineData("P-521", "SHA384")]
     [InlineData("P-521", "SHA512")]
-    public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName)
-    {
-        if (curve == "P-521" && hashName == "SHA256" && !CratonHsmBackendFixture.CratonHsmSignsP521WithSha256)
-            Assert.Skip("Craton HSM refuses a SHA-256 digest on a P-521 key with CKR_DATA_LEN_RANGE");
-        ECDsaPkcs11TestCases.Assert_SignVerifyData_CurveHashMatrix_RoundTrips(_backend, curve, hashName);
-    }
+    public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName) => ECDsaPkcs11TestCases.Assert_SignVerifyData_CurveHashMatrix_RoundTrips(_backend, curve, hashName);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [InlineData("P-256")]
@@ -97,6 +92,14 @@ public sealed class ECDsaPkcs11Tests_CratonHsm(CratonHsmBackendFixture f)
     [InlineData("P-384")]
     [InlineData("P-521")]
     public void SignHash_VerifiesUnderBcl(string curve) => ECDsaPkcs11TestCases.Assert_SignHash_VerifiesUnderBcl(_backend, curve);
+
+    // Craton HSM 0.11.2 left-pads a digest shorter than the P-521 field (upstream 444796e); 0.11.1 refused one
+    // under 33 bytes with CKR_DATA_LEN_RANGE.
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [InlineData(20)]
+    [InlineData(28)]
+    [InlineData(32)]
+    public void P521_SignHash_ShortDigest_InteroperatesWithBcl(int digestLength) => ECDsaPkcs11TestCases.Assert_P521_SignHash_ShortDigest_InteroperatesWithBcl(_backend, digestLength);
 
     [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
     [MemberData(nameof(ECDsaPkcs11TestCases.PointAtInfinityVectors), MemberType = typeof(ECDsaPkcs11TestCases))]
