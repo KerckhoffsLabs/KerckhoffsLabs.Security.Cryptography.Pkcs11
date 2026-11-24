@@ -129,6 +129,8 @@ public sealed class StreamFinalLengthTests
         protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => CKR.CKR_OK;
         protected override CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         protected override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => CKR.CKR_OK;
+        protected override CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_OK;
+        protected override CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_OK;
 
         protected override CKR C_DigestFinal(NativeCULong session, NativeBuffer<byte> digest, ref NativeCULong digestLen)
         {

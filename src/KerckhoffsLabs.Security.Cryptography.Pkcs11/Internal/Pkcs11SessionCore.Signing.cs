@@ -444,6 +444,12 @@ internal sealed partial class Pkcs11SessionCore
             operation.End(CKF.CKF_DECRYPT);
 
             outputStream.Write(lastPart, 0, lastPart.Length);
+
+            // PKCS#11 v3.2 §5.13: C_DecryptVerifyUpdate verifies only the plaintext it returns. What a
+            // mechanism held back (the last CBC-PAD block) comes out of C_DecryptFinal, and the application
+            // passes it to C_VerifyUpdate before C_VerifyFinal.
+            if (lastPart.Length > 0)
+                ThrowIfError(_pkcs11Library.C_VerifyUpdate(_sessionId, lastPart), OpVerifyUpdate);
         }
         finally
         {
