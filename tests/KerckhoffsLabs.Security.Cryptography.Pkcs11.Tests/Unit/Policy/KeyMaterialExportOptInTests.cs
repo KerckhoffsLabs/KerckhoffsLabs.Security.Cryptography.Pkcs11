@@ -479,7 +479,8 @@ public sealed class KeyMaterialExportOptInTests
             CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, Salt, Info)),
     };
 
-    [Theory]
+    // The managed token generates ML-KEM keys with the BCL, which macOS lacks.
+    [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     [MemberData(nameof(NotAKem))]
     public void EncapsulateAndDecapsulateSecret_NotAKem_ThrowArgumentException(string name)
     {
@@ -503,7 +504,7 @@ public sealed class KeyMaterialExportOptInTests
         });
     }
 
-    [Fact]
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void EncapsulateAndDecapsulateSecret_EmptyBuffers_ThrowArgumentException() => WithSession(OptIn(KeyMaterialExportKind.KemSharedSecret), session =>
     {
         using var key = GenerateMlKem(session);
