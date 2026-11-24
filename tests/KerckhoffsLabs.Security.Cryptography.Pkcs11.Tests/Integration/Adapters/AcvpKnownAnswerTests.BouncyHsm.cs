@@ -18,15 +18,7 @@ public sealed class AcvpKnownAnswerTests_BouncyHsm(BouncyHsmBackendFixture backe
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(WycheproofMlDsaTestCases.ParameterSets), MemberType = typeof(WycheproofMlDsaTestCases))]
-    // BouncyHsm takes an ML-DSA public key one byte short or long, then answers C_Verify with CKR_GENERAL_ERROR. It
-    // refuses to verify an empty message with CKR_DATA_LEN_RANGE (VerifyState, "Verify empty data"), though FIPS 204
-    // signs one like any other, so the valid signatures over "" fail. A context over 255 bytes never reaches it. Reported as
-    // harrison314/BouncyHsm#155 (key length) and harrison314/BouncyHsm#154 (empty message).
-    public void MlDsa_Verification_Wycheproof(string parameterSet) =>
-        WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet, v =>
-            v.Flags.Contains("IncorrectPublicKeyLength") ? "BouncyHsm imports a public key of the wrong length; C_Verify then answers CKR_GENERAL_ERROR (harrison314/BouncyHsm#155)."
-            : v.Message.Length == 0 && v.Context.Length <= 255 ? "BouncyHsm refuses to verify an empty message (CKR_DATA_LEN_RANGE) (harrison314/BouncyHsm#154)."
-            : null);
+    public void MlDsa_Verification_Wycheproof(string parameterSet) => WycheproofMlDsaTestCases.Assert_MlDsa_Verification_Wycheproof(_backend, parameterSet);
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(AcvpKnownAnswerTestCases.MlDsaPreHashVerificationCases), MemberType = typeof(AcvpKnownAnswerTestCases))]

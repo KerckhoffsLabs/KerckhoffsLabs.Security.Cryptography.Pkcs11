@@ -1,11 +1,11 @@
 # Library Review Backlog
 
-_Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (cryptography, PKCS#11 v3.2 conformance, .NET library design and P/Invoke, QA and release engineering), then re-verified against `main` by staleness passes on 2026-09-15 and 2026-10-27. This file lists open items only: on 2026-10-27 the 88 resolved items were removed to keep it readable, and on 2026-11-21 seven more (BL-014, BL-030, BL-122, BL-125, BL-168, BL-180, BL-184), each checked against the code. Their records, and any reference below to an ID no longer listed here, are in the git history; commit 6ecb5d70 is the last to hold the first 88, and 1ddfe11f the last to hold the seven. BL-020 was removed on 2026-11-24, once resolved. A partly resolved item stays, with a `Remaining scope` line for what is left._
+_Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (cryptography, PKCS#11 v3.2 conformance, .NET library design and P/Invoke, QA and release engineering), then re-verified against `main` by staleness passes on 2026-09-15 and 2026-10-27. This file lists open items only: on 2026-10-27 the 88 resolved items were removed to keep it readable, on 2026-11-21 seven more (BL-014, BL-030, BL-122, BL-125, BL-168, BL-180, BL-184), each checked against the code, and on 2026-11-24 BL-020, once resolved, and BL-183, which the BouncyHsm v2.4.0 bump resolves. Their records, and any reference below to an ID no longer listed here, are in the git history; commit 6ecb5d70 is the last to hold the first 88, 1ddfe11f the last to hold the seven, e1307217 the last to hold BL-020, and 11be420a the last to hold BL-183. A partly resolved item stays, with a `Remaining scope` line for what is left._
 
 ## Summary
 
-- Open items: 86, 25 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 5 (1 partly resolved) | Medium: 42 (16 partly resolved) | Low: 39 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 85, 25 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 5 (1 partly resolved) | Medium: 42 (16 partly resolved) | Low: 38 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **The public surface is narrower than the module's.** There is no capability probe for the v3.0 message API or the v3.2 functions (BL-077), and most of the v3.0 and v3.2 functions bound at the interop layer have no public caller (BL-019, BL-099).
@@ -401,7 +401,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Spec / References:** RFC 5649 §6; RFC 3394 §2.2.2
 
 ### [BL-124] ⚠️ PARTIALLY RESOLVED — ECDH derive is only ever run with `CKD_NULL` and no shared data, so the KDF and `pSharedData` fields never reach a real module
-- **Status:** Partially resolved 2026-10-29 by the algorithm-conformance tests. `AlgorithmConformanceTestCases.Assert_Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData` derives with `CKD_SHA256_KDF`, without and with shared data, and checks the key against the ANSI X9.63 KDF computed in managed code, which is what PKCS#11 specifies for `CKD_SHA*_KDF` (not SP 800-56A's concatenation KDF). It passes on Kryoptic, NSS and opencryptoki. BouncyHsm's wrapper pins a KDF whose counter starts at 0, and FreeHSM's pins `CKR_ARGUMENTS_BAD`; SoftHSM refuses the KDF, so the case skips there. **Remaining scope:** `SoftHsmSupportsEcdh1WithKdf` still has no consumer, and the other `CKD_SHA*_KDF` hashes do not run.
+- **Status:** Partially resolved 2026-10-29 by the algorithm-conformance tests. `AlgorithmConformanceTestCases.Assert_Ecdh_Sha256Kdf_IsX963OverZAndTheSharedData` derives with `CKD_SHA256_KDF`, without and with shared data, and checks the key against the ANSI X9.63 KDF computed in managed code, which is what PKCS#11 specifies for `CKD_SHA*_KDF` (not SP 800-56A's concatenation KDF). It passes on Kryoptic, NSS, opencryptoki and, since its v2.4.0 KDF1 fix, BouncyHsm (whose counter had started at 0). FreeHSM's wrapper pins `CKR_ARGUMENTS_BAD`; SoftHSM refuses the KDF, so the case skips there. **Remaining scope:** `SoftHsmSupportsEcdh1WithKdf` still has no consumer, and the other `CKD_SHA*_KDF` hashes do not run.
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M
@@ -762,7 +762,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** QA C
 
 ### [BL-155] ⚠️ PARTIALLY RESOLVED — Vendored submodules are pinned to untagged upstream commits, with no in-tree record of why and no review gate on bumps
-- **Status:** Partially resolved 2026-10-29 (#211, #128, #242, #243, #261, the FreeHSM v2.5.1, v2.6.0, v2.6.1, v2.7.0 and v2.8.0 bumps, the opencryptoki v3.28.0 bump, the NSS 3.133 and 3.134 bumps, and the Kryoptic v1.5.5 bump). `.github/CODEOWNERS` assigns every path to the maintainer, and the main ruleset requires a code owner's review (#211, 2026-10-19). The `ci.yml` comment described the opencryptoki pin correctly as master after v3.27.0 (#128). NSS, Kryoptic, BouncyHsm, pkcs11-mock, FreeHSM and opencryptoki are pinned to release tags (`NSS_3_134_RTM`, `v1.5.5`, `v2.3.4`, `v2.0.0`, `v2.8.0`, `v3.28.0`; #242, #243, #261 and the FreeHSM, opencryptoki, NSS and Kryoptic bumps).
+- **Status:** Partially resolved 2026-10-29 (#211, #128, #242, #243, #261, the FreeHSM v2.5.1, v2.6.0, v2.6.1, v2.7.0 and v2.8.0 bumps, the opencryptoki v3.28.0 bump, the NSS 3.133 and 3.134 bumps, the Kryoptic v1.5.5 bump, and the BouncyHsm v2.4.0 bump). `.github/CODEOWNERS` assigns every path to the maintainer, and the main ruleset requires a code owner's review (#211, 2026-10-19). The `ci.yml` comment described the opencryptoki pin correctly as master after v3.27.0 (#128). NSS, Kryoptic, BouncyHsm, pkcs11-mock, FreeHSM and opencryptoki are pinned to release tags (`NSS_3_134_RTM`, `v1.5.5`, `v2.4.0`, `v2.0.0`, `v2.8.0`, `v3.28.0`; #242, #243, #261 and the FreeHSM, opencryptoki, NSS, Kryoptic and BouncyHsm bumps). BouncyHsm had sat on `8592a1d1`, an untagged harrison314/BouncyHsm main commit past v2.3.4, since #288; v2.4.0 is a tag again.
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S
@@ -798,13 +798,14 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Corrected 2026-09-19:** the original wording overclaimed "every PRF both support" (SHA-224 is supported by Kryoptic/NSS but has no BCL reference to test against, so it's out of scope by design, not an oversight) and "skip everything via RequireMechanism" (only the cases that touch the token do); both re-verified against source and an actual test run.
 - **Corrected 2026-10-26:** FreeHSM, added as a backend by #259, is a third implementation. Its `CKM_PKCS5_PBKD2` cases cross-check against `Rfc2898DeriveBytes.Pbkdf2` in CI as Kryoptic's and NSS's do. SoftHSM2, opencryptoki, BouncyHsm and Craton HSM do not advertise the mechanism, so their copies skip the cases that reach the token. The `Rfc2898DeriveBytesPkcs11TestCases` class doc still names only Kryoptic and NSS.
 
-### [BL-161] Lift the BouncyHsm empty-digest gate once BouncyHsm digests empty data
+### [BL-161] Lift the BouncyHsm empty-digest-stream gate once BouncyHsm finishes a digest of no data
+- **Status:** Partially resolved 2026-11-24 by the BouncyHsm v2.4.0 bump: a single-part `C_Digest` of empty data now gives the digest of nothing, so `EmptyInputTests_BouncyHsm.Sha256_EmptyInput_MatchesBcl_SessionReusable`, `AlgorithmConformanceTests_BouncyHsm.Digest_OfNothing_KnownAnswer` and the empty rows of `BclDifferentialTests_BouncyHsm.Digest_MatchesBcl` run, and `BouncyHsmAcceptsEmptyDigest` is gone.
 - **Area:** QA
 - **Severity:** Low
 - **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsEmptyDigest`)
-- **Problem:** BouncyHsm v2.3.3 refused zero-length data in `C_Digest`/`C_DigestUpdate`/`C_Verify` (`CKR_ARGUMENTS_BAD`) and `C_Sign` (`CKR_GENERAL_ERROR`). The fix for harrison314/BouncyHsm#115, in the 8a5584ab bump, lets empty data through the client and signs and verifies it, so the EmptyInput HMAC case runs again. A digest of empty data is still refused, and still is at v2.3.4 (#261): `DigestSessionState.Final` answers it with `CKR_DATA_LEN_RANGE`, so the EmptyInput SHA-256 case still skips.
-- **Proposed action:** After a `vendor/bouncyhsm` bump that digests empty data, `BouncyHsmQuirkTests.EmptyDigest_QuirkStillPresent` fails. Then set the flag to true and delete the test.
+- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmFinishesAnEmptyDigestStream`, `EmptyDigestStreamAvailable`); `Integration/Interop/BufferConventionTests.BouncyHsm.cs` (`Digest_EmptyStream_IsTheHashOfNothing`)
+- **Problem:** At v2.4.0, `C_DigestFinal` of a digest that saw no `C_DigestUpdate` still answers `CKR_DATA_LEN_RANGE` (`DigestSessionState`), so a multi-part digest of an empty stream fails where the single-part one succeeds. Not yet reported upstream.
+- **Proposed action:** Report it upstream. After a `vendor/bouncyhsm` bump that finishes it, `BouncyHsmQuirkTests.EmptyDigestStream_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
 
@@ -813,7 +814,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Severity:** Low
 - **Effort:** S
 - **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmAcceptsEmptySignature`, `WrongLengthRsaSignatureRejectionAvailable`); `Integration/Verify/SignatureLengthTests.BouncyHsm.cs` (`Rsa_WrongLengthSignature_ReturnsFalse`)
-- **Problem:** BouncyHsm's native client refuses `ulSignatureLen == 0` in `C_Verify` and `C_VerifyFinal` with `CKR_ARGUMENTS_BAD` (`bouncy-pkcs11.c`), where an empty signature is simply invalid and should get `CKR_SIGNATURE_INVALID` or `CKR_SIGNATURE_LEN_RANGE`. `SignatureLengthTestCases.Assert_Rsa_WrongLengthSignature_ReturnsFalse` includes an empty signature, so `Rsa_WrongLengthSignature_ReturnsFalse` skips on BouncyHsm; the ECDSA and HMAC wrong-length cases still run there. Not yet reported upstream.
+- **Problem:** BouncyHsm's native client refuses `ulSignatureLen == 0` in `C_Verify` and `C_VerifyFinal` with `CKR_ARGUMENTS_BAD` (`bouncy-pkcs11.c`), where an empty signature is simply invalid and should get `CKR_SIGNATURE_INVALID` or `CKR_SIGNATURE_LEN_RANGE`. `SignatureLengthTestCases.Assert_Rsa_WrongLengthSignature_ReturnsFalse` includes an empty signature, so `Rsa_WrongLengthSignature_ReturnsFalse` skips on BouncyHsm; the ECDSA and HMAC wrong-length cases still run there. Still so at v2.4.0. Not yet reported upstream.
 - **Proposed action:** Report it upstream. After a `vendor/bouncyhsm` bump that verifies an empty signature, `BouncyHsmQuirkTests.EmptySignature_QuirkStillPresent` fails. Then set the flag to true and delete the test.
 - **Breaks public API?** No
 - **Raised by:** BouncyHsm backend
@@ -923,6 +924,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Severity:** Low
 - **Effort:** L
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11` (`CKM.CKM_HSS`, `CKM.CKM_HSS_KEY_PAIR_GEN`, `CKM.CKM_XMSS`, `CKM.CKM_XMSSMT` are named only)
+- **Status:** Partly covered 2026-11-24: BouncyHsm v2.4.0 adds `CKM_HSS_KEY_PAIR_GEN` and `CKM_HSS`, and `HssTests_BouncyHsm` (`HssTestCases`) generates 1- and 2-level keys through `ObjectAttribute` templates and signs and verifies through the generic `Pkcs11Key.Sign`/`Verify`: the RFC 8554 signature length, the leaf index and `CKA_HSS_KEYS_REMAINING` advancing per signature, `CKR_KEY_EXHAUSTED` after 2^h signatures, and a sensitive, unextractable private key. The cases admit the two mechanisms on top of Recommended, which does not list them. There is still no state-aware API, and XMSS has no backend.
 - **Problem:** The library has no API for PKCS#11 v3.1's stateful hash-based signatures. wolfPKCS11 implements them (`--enable-lms --enable-xmss`), so it would be the backend to test them on; the wolfPKCS11 test build leaves them off.
 - **Proposed action:** Design the key-state handling (each signature consumes state), then add the API and enable LMS/XMSS in `build/build-wolfpkcs11.sh`.
 - **Breaks public API?** No (additive)
@@ -949,16 +951,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Remaining scope:** The blocking wait is still refused on a module that may not be called concurrently (`SupportsConcurrentAccess` false). The dispatcher could serve it there by polling with `CKF_DONT_BLOCK` at an interval set in `Pkcs11LibraryOptions`, holding the call lock only for each poll, so the same API works on every module.
 - **Breaks public API?** No (additive)
 - **Raised by:** `WaitForSlotEvent` design review (PR #331)
-
-### [BL-183] Lift the five BouncyHsm mechanism-coverage gates once BouncyHsm fixes them
-- **Area:** QA
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/BouncyHsmBackendFixture.cs` (`BouncyHsmRecordsTheHmacKeyGenMechanism`, `BouncyHsmDerivesShakeKeysOfAnyLength`, `BouncyHsmExtractsFromTheBitGiven`, `BouncyHsmRunsCfb1WithAOneBitSegment`, `BouncyHsmTakesSha512THmacKeys`); `Integration/Mechanisms/MechanismCoverageTests.BouncyHsm.cs`; `Integration/Compat/BouncyHsmQuirkTests.cs`
-- **Problem:** `MechanismCoverageTestCases`, which drives every mechanism BouncyHsm lists, found five places where the pinned BouncyHsm (8592a1d1) answers differently from PKCS#11 v3.2. (1) Every HMAC key generator (`CKM_SHA256_KEY_GEN`, `CKM_SHA3_256_KEY_GEN`, `CKM_BLAKE2B_256_KEY_GEN`, `CKM_SHA512_T_KEY_GEN` and the rest) records `CKA_KEY_GEN_MECHANISM` as `CKM_GENERIC_SECRET_KEY_GEN`. (2) `CKM_SHAKE_128_KEY_DERIVATION` and `CKM_SHAKE_256_KEY_DERIVATION` derive no more than 32 and 64 bytes and refuse a longer `CKA_VALUE_LEN` with `CKR_TEMPLATE_INCONSISTENT`. (3) `CKM_EXTRACT_KEY_FROM_KEY` reads `CK_EXTRACT_PARAMS` as a number of bits to keep, not as the bit the derived key starts at. (4) `CKM_AES_CFB1` encrypts with a 128-bit segment. (5) `CKM_SHA512_224_HMAC` and `CKM_SHA512_256_HMAC` refuse the keys their own key generators make, with `CKR_KEY_HANDLE_INVALID`. Each gate's doc comment names the BouncyHsm source line responsible; all five are in BouncyHsm's code, not in BouncyCastle 2.7.0, which it uses (BouncyCastle has no 1-bit CFB, and its SHAKE gives any output length). Reported upstream as harrison314/BouncyHsm#146 (1), #150 (2), #148 (3), #149 (4) and #147 (5).
-- **Proposed action:** After a `vendor/bouncyhsm` bump with a fix, the matching `BouncyHsmQuirkTests.*_QuirkStillPresent` test fails; then set the flag to true and delete the test.
-- **Breaks public API?** No
-- **Raised by:** BouncyHsm backend
 
 ### [BL-185] Lift the NSS and opencryptoki mechanism-coverage gates once they are fixed upstream
 - **Area:** QA

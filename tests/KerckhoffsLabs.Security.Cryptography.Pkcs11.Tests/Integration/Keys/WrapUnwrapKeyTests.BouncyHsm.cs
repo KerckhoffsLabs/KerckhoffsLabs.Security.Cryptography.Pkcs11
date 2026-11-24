@@ -31,10 +31,7 @@ public sealed class WrapUnwrapKeyTests_BouncyHsm(BouncyHsmBackendFixture backend
     public void Unwrap_AppliesSecureDefaults(CKM wrapMechanism)
     {
         _backend.RequireMechanism(wrapMechanism);
-        // BouncyHsm refuses to wrap a key whose CKA_EXTRACTABLE is FALSE with CKR_KEY_NOT_WRAPPABLE
-        // (WrapKeyHandler.CheckExtractable), where PKCS#11 has CKR_KEY_UNEXTRACTABLE. The key still
-        // does not leave the token; pinned, so a fix upstream fails here and the default can take over.
-        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism, CKR.CKR_KEY_NOT_WRAPPABLE);
+        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism);
     }
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -53,10 +50,8 @@ public sealed class WrapUnwrapKeyTests_BouncyHsm(BouncyHsmBackendFixture backend
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void Unwrap_EcPrivateKeyWithoutPublicPoint_Signs() => WrapUnwrapKeyTestCases.Assert_Unwrap_EcPrivateKeyWithoutPublicPoint_Signs(_backend, ecParamsInTemplate: true);
 
-    // BouncyHsm reveals the value of a non-sensitive key even when CKA_EXTRACTABLE is FALSE, where PKCS#11 v3.2 §5.7
-    // withholds the value of an unextractable key; it takes the attribute to govern wrapping only.
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable() => WrapUnwrapKeyTestCases.Assert_KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable(_backend, unextractableValueIsReadable: true);
+    public void KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable() => WrapUnwrapKeyTestCases.Assert_KeyValue_IsReadableOnlyWhenNonSensitiveAndExtractable(_backend);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void AesKeyWrap_KeyOver256Bytes_RoundTrips() => WrapUnwrapKeyTestCases.Assert_AesKeyWrap_KeyOver256Bytes_RoundTrips(_backend);
