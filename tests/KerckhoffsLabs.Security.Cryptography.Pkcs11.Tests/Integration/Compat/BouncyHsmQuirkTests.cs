@@ -9,6 +9,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -27,19 +28,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
 {
     private readonly IPkcs11Backend _backend = backend;
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void EmptyDigest_QuirkStillPresent()
-    {
-        using var session = _backend.OpenSession();
-
-        var ex = Record.Exception(() => session.Digest(new Mechanism(CKM.CKM_SHA256), []));
-
-        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_DATA_LEN_RANGE },
-            "C_Digest of empty data no longer gives CKR_DATA_LEN_RANGE " +
-            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmAcceptsEmptyDigest to true and delete this test.");
-    }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void EmptySignature_QuirkStillPresent()
@@ -95,94 +83,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             "A private session object no longer outlives C_Logout " +
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
             "BouncyHsmBackendFixture.BouncyHsmDestroysPrivateSessionObjectsOnLogout to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void UserLoginOverTheSo_QuirkStillPresent()
-    {
-        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        using var session = slot.OpenSessionCore();
-        var sid = (NativeCULong)session.SessionId;
-        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-        Assert.Equal(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, _backend.SoPin.Span));
-        CKR rv;
-        try { rv = lowLevel.C_Login(sid, CKU.CKU_USER, _backend.UserPin.Span); }
-        finally
-        {
-            lowLevel.C_Logout(sid);
-            lowLevel.C_Logout(sid);
-        }
-
-        Assert.True(rv == CKR.CKR_OK,
-            $"C_Login as the user with the SO logged in no longer answers CKR_OK (got {rv}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmKeepsTheSoAndTheUserApart to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void PrivateObjectAsTheSo_QuirkStillPresent()
-    {
-        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        using var session = slot.OpenSessionCore();
-        var sid = (NativeCULong)session.SessionId;
-        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
-        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
-        using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, $"quirk-so-{Guid.NewGuid():N}");
-        Assert.Equal(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_SO, _backend.SoPin.Span));
-        Exception? ex;
-        try { ex = Record.Exception(() => session.DestroyObject(session.CreateObject([attrClass, attrToken, attrPrivate, attrLabel]))); }
-        finally { lowLevel.C_Logout(sid); }
-
-        Assert.True(ex is null,
-            "The SO can no longer make a private object " +
-            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmRefusesPrivateObjectsToTheSo to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void MinimumPinLength_QuirkStillPresent()
-    {
-        TokenInfo token = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId).GetTokenInfo();
-
-        Assert.True(token.MinPinLen == token.MaxPinLen && token.MinPinLen > (ulong)_backend.UserPin.Length,
-            $"C_GetTokenInfo no longer reports ulMinPinLen as ulMaxPinLen (got [{token.MinPinLen}, {token.MaxPinLen}]): set " +
-            "BouncyHsmBackendFixture.BouncyHsmReportsItsMinimumPinLength to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void ShortMechanismList_QuirkStillPresent()
-    {
-        LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-        Assert.Equal(CKR.CKR_OK, lowLevel.C_GetMechanismList(_backend.SlotId, [], out NativeCULong count));
-        var shortList = new CKM[(int)(ulong)count - 1];
-        CKR rv = lowLevel.C_GetMechanismList(_backend.SlotId, shortList, out NativeCULong reported);
-
-        Assert.True(rv == CKR.CKR_BUFFER_TOO_SMALL && (ulong)reported == (ulong)shortList.Length,
-            $"C_GetMechanismList into a list one short no longer leaves *pulCount as given (got {rv}, {reported} of {count}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmReportsTheMechanismCountOnAShortList to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void SensitivePqcPrivateKey_QuirkStillPresent()
-    {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        CKR rv;
-        ulong length;
-        try
-        {
-            var (publicKey, privateKey) = TestKeys.GenerateMlDsaKeyPair(session, CkpMlDsa.CKP_ML_DSA_44);
-            CK_ATTRIBUTE[] template = [new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_VALUE }];
-            rv = _backend.Library.LowLevelLibrary!.C_GetAttributeValue((NativeCULong)session.SessionId, (NativeCULong)privateKey.ObjectId, template);
-            length = (ulong)template[0].valueLen;
-            session.DestroyObject(privateKey);
-            session.DestroyObject(publicKey);
-        }
-        finally { session.SendLogout(); }
-
-        Assert.True(rv == CKR.CKR_OK && length != CK.CK_UNAVAILABLE_INFORMATION,
-            $"A sensitive ML-DSA private key no longer reveals the length of its CKA_VALUE (got {rv}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmHidesSensitivePqcPrivateKeys to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -257,136 +157,88 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void CopyUniqueId_QuirkStillPresent()
+    public void KeyMaterialChange_QuirkStillPresent()
+    {
+        foreach (string component in (string[])["EC CKA_EC_POINT", "RSA CKA_PUBLIC_EXPONENT"])
+        {
+            Exception? failure = Record.Exception(() => ObjectConformanceTestCases.Assert_KeyComponent_IsReadOnly(_backend, component));
+            Assert.True(failure is XunitException and not SkipException,
+                $"C_SetAttributeValue no longer changes a public key's {component} ({failure?.Message ?? "the case passes"}): set " +
+                "BouncyHsmBackendFixture.BouncyHsmFixesKeyMaterial to true and delete this test.");
+        }
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void ModifiableFlagChange_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => ObjectConformanceTestCases.Assert_SetAttributeValue_ReadOnlyKeyAttribute_IsRefused(_backend, CKA.CKA_MODIFIABLE));
+        Assert.True(failure is XunitException and not SkipException,
+            $"C_SetAttributeValue no longer changes CKA_MODIFIABLE ({failure?.Message ?? "the case passes"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmFixesTheModifiableFlag to true and delete this test.");
+    }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void UniqueIdInACopyTemplate_QuirkStillPresent()
     {
         using var session = TestKeys.OpenLoggedInSession(_backend);
-        byte[] original, copied;
+        using var attrUniqueId = new ObjectAttribute(CKA.CKA_UNIQUE_ID, "kl-chosen-id");
+        Exception? ex;
         try
         {
             ObjectHandle data = CreateDataObject(session);
-            ObjectHandle copy = session.CopyObject(data, []);
-            using (var read = session.GetAttributeValue(data, [CKA.CKA_UNIQUE_ID]))
-                original = read[0].GetValueAsByteArray();
-            using (var read = session.GetAttributeValue(copy, [CKA.CKA_UNIQUE_ID]))
-                copied = read[0].GetValueAsByteArray();
-            session.DestroyObject(copy);
+            ex = Record.Exception(() => session.DestroyObject(session.CopyObject(data, [attrUniqueId])));
             session.DestroyObject(data);
         }
         finally { session.SendLogout(); }
 
-        Assert.True(original.AsSpan().SequenceEqual(copied),
-            "A copy no longer has the original's CKA_UNIQUE_ID: set " +
-            "BouncyHsmBackendFixture.BouncyHsmGivesACopyItsOwnUniqueId to true and delete this test.");
+        Assert.True(ex is null,
+            "C_CopyObject with a CKA_UNIQUE_ID in its template is now refused " +
+            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesAUniqueIdInACopyTemplate to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void KeyMaterialChange_QuirkStillPresent()
+    public void DerivedNeverExtractable_QuirkStillPresent()
     {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
-        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, new byte[32]);
-        byte[] replacement = [.. Enumerable.Repeat((byte)0x07, 32)];
-        using var attrReplacement = new ObjectAttribute(CKA.CKA_VALUE, replacement);
-        Exception? ex;
-        byte[] after;
-        try
-        {
-            ObjectHandle key = session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrValue]);
-            ex = Record.Exception(() => session.SetAttributeValue(key, [attrReplacement]));
-            using (var read = session.GetAttributeValue(key, [CKA.CKA_VALUE]))
-                after = read[0].GetValueAsByteArray();
-            session.DestroyObject(key);
-        }
-        finally { session.SendLogout(); }
-
-        Assert.True(ex is null && after.AsSpan().SequenceEqual(replacement),
-            "C_SetAttributeValue no longer changes an AES key's CKA_VALUE " +
-            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "value unchanged"}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmFixesKeyMaterial to true and delete this test.");
+        Exception? failure = Record.Exception(() => KeyProvenanceTestCases.Assert_DerivedKey_TakesItsHistoryFromTheBase(_backend, "HKDF"));
+        Assert.True(failure is XunitException and not SkipException && failure.Message.Contains("CKA_NEVER_EXTRACTABLE is False", StringComparison.Ordinal),
+            $"An unextractable HKDF key from a never-extractable base no longer reports CKA_NEVER_EXTRACTABLE FALSE ({failure?.Message ?? "the case passes"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmSetsADerivedKeysNeverExtractable to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void PrivateFlagChange_QuirkStillPresent()
+    public void EmptyDigestStream_QuirkStillPresent()
     {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        using var attrPrivate = new ObjectAttribute(CKA.CKA_PRIVATE, true);
-        Exception? ex;
-        bool after;
-        try
-        {
-            ObjectHandle data = CreateDataObject(session, isPrivate: false);
-            ex = Record.Exception(() => session.SetAttributeValue(data, [attrPrivate]));
-            using (var read = session.GetAttributeValue(data, [CKA.CKA_PRIVATE]))
-                after = read[0].GetValueAsBool();
-            session.DestroyObject(data);
-        }
-        finally { session.SendLogout(); }
+        Exception? ex = Record.Exception(() => BufferConventionTestCases.Assert_Digest_EmptyStream_IsTheHashOfNothing(_backend));
 
-        Assert.True(ex is null && after,
-            "C_SetAttributeValue no longer makes a public object private " +
-            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "flag unchanged"}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmFixesThePrivateAndModifiableFlags to true and delete this test.");
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_DATA_LEN_RANGE },
+            "C_DigestFinal of an empty stream no longer gives CKR_DATA_LEN_RANGE " +
+            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmFinishesAnEmptyDigestStream to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void MalformedAttributeValue_QuirkStillPresent()
+    public void NewPinOutsideTheLengthRange_QuirkStillPresent()
     {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
+        TokenInfo token = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId).GetTokenInfo();
+        byte[] shortPin = [.. Enumerable.Repeat((byte)'7', (int)token.MinPinLen - 1)];
+        Pkcs11Slot slot = _backend.Library.GetSlotList().First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
+        using var session = slot.OpenSessionCore();
+        var sid = (NativeCULong)session.SessionId;
         LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
-        IntPtr buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(16);
+        Assert.Equal(CKR.CKR_OK, lowLevel.C_Login(sid, CKU.CKU_USER, _backend.UserPin.Span));
         CKR rv;
         try
         {
-            System.Runtime.InteropServices.Marshal.Copy(new byte[16], 0, buffer, 16);
-            // A CK_OBJECT_CLASS of zero (CKO_DATA) in the first half, a 4-byte CKA_TOKEN of zeros in the second.
-            CK_ATTRIBUTE[] template =
-            [
-                new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_CLASS, value = buffer, valueLen = (NativeCULong)(ulong)System.Runtime.CompilerServices.Unsafe.SizeOf<NativeCULong>() },
-                new CK_ATTRIBUTE { type = (NativeCULong)(ulong)CKA.CKA_TOKEN, value = buffer + 8, valueLen = (NativeCULong)4UL },
-            ];
-            rv = lowLevel.C_CreateObject((NativeCULong)session.SessionId, template, out NativeCULong created);
+            rv = lowLevel.C_SetPIN(sid, _backend.UserPin.Span, shortPin);
             if (rv == CKR.CKR_OK)
-                lowLevel.C_DestroyObject((NativeCULong)session.SessionId, created);
+                Assert.Equal(CKR.CKR_OK, lowLevel.C_SetPIN(sid, shortPin, _backend.UserPin.Span));
         }
-        finally
-        {
-            System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
-            session.SendLogout();
-        }
+        finally { lowLevel.C_Logout(sid); }
 
-        Assert.True(rv == CKR.CKR_GENERAL_ERROR,
-            $"C_CreateObject with a 4-byte CKA_TOKEN no longer answers CKR_GENERAL_ERROR (got {rv}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmRefusesMalformedAttributeValues to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void CopyableUndone_QuirkStillPresent()
-    {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
-        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var attrUncopyable = new ObjectAttribute(CKA.CKA_COPYABLE, false);
-        using var attrCopyable = new ObjectAttribute(CKA.CKA_COPYABLE, true);
-        Exception? ex;
-        bool after;
-        try
-        {
-            ObjectHandle data = session.CreateObject([attrClass, attrToken, attrUncopyable]);
-            ex = Record.Exception(() => session.SetAttributeValue(data, [attrCopyable]));
-            using (var read = session.GetAttributeValue(data, [CKA.CKA_COPYABLE]))
-                after = read[0].GetValueAsBool();
-            session.DestroyObject(data);
-        }
-        finally { session.SendLogout(); }
-
-        Assert.True(ex is null && after,
-            "C_SetAttributeValue no longer sets CKA_COPYABLE back to TRUE " +
-            $"({(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "flag unchanged"}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmKeepsCkaCopyableFalse to true and delete this test.");
+        Assert.True(rv == CKR.CKR_OK,
+            $"C_SetPIN to a {shortPin.Length}-byte PIN (ulMinPinLen {token.MinPinLen}) no longer answers CKR_OK (got {rv}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmRefusesANewPinOutsideTheLengthRange to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -415,32 +267,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
         Assert.True(rv == CKR.CKR_KEY_HANDLE_INVALID,
             $"C_SignRecoverInit with an RSA public key no longer answers CKR_KEY_HANDLE_INVALID (got {rv}): set " +
             "BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void NonKeyObjectAsAKey_QuirkStillPresent()
-    {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
-        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, new byte[32]);
-        ObjectHandle data = session.CreateObject([attrClass, attrToken, attrValue]);
-        CKR rv;
-        try
-        {
-            using var scope = new MechanismParameterScope();
-            CK_MECHANISM mech = new Mechanism(CKM.CKM_SHA256_HMAC).Marshal(scope, out _);
-            rv = _backend.Library.LowLevelLibrary!.C_SignInit((NativeCULong)session.SessionId, in mech, (NativeCULong)data.ObjectId);
-        }
-        finally
-        {
-            session.DestroyObject(data);
-            TestKeys.LogoutIfRequired(_backend, session);
-        }
-
-        Assert.True(rv == CKR.CKR_OBJECT_HANDLE_INVALID,
-            $"C_SignInit(CKM_SHA256_HMAC) with a data object no longer answers CKR_OBJECT_HANDLE_INVALID (got {rv}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmRefusesANonKeyObjectAsAKey to true and delete this test.");
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
@@ -489,7 +315,7 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
             using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
             using var enc = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-            ex = Record.Exception(() => session.DestroyObject(session.UnwrapKey(oaep, priv, wrapped[..^1], [c, t, tok, enc])));
+            ex = Record.Exception(() => session.DestroyObject(session.UnwrapKey(oaep, priv, [.. wrapped, 0x00], [c, t, tok, enc])));
         }
         finally
         {
@@ -498,8 +324,8 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             TestKeys.LogoutIfRequired(_backend, session);
         }
 
-        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_GENERAL_ERROR },
-            $"C_UnwrapKey(CKM_RSA_PKCS_OAEP) of a 255-byte blob under a 2048-bit key no longer answers CKR_GENERAL_ERROR (got {ex?.Message ?? "no error"}): set " +
+        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_WRAPPED_KEY_INVALID },
+            $"C_UnwrapKey(CKM_RSA_PKCS_OAEP) of a 257-byte blob under a 2048-bit key no longer answers CKR_WRAPPED_KEY_INVALID (got {ex?.Message ?? "no error"}): set " +
             "BouncyHsmBackendFixture.BouncyHsmRefusesAnOaepBlobByItsLength to true and delete this test.");
     }
 
@@ -686,54 +512,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     }
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void HkdfOutputAboveTheRfcLimit_QuirkStillPresent()
-    {
-        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
-        var (rv, _) = HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 255 x 32 + 1");
-        var (narrowed, length) = HkdfTestCases.DeriveHkdfWithFault(_backend, "CKA_VALUE_LEN 2^32 + 1");
-
-        Assert.True(rv == CKR.CKR_GENERAL_ERROR && narrowed == CKR.CKR_OK && length == 1,
-            $"C_DeriveKey(CKM_HKDF_DERIVE) past RFC 5869's limit no longer answers CKR_GENERAL_ERROR, or 2^32 + 1 a 1-byte key (got {rv}; {narrowed}, {length}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmRefusesAnHkdfOutputAboveTheRfcLimit to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void HkdfSaltKeyOfTheWrongType_QuirkStillPresent()
-    {
-        var (rv, _) = HkdfTestCases.DeriveHkdfWithFault(_backend, "a salt key that is an EC public key");
-
-        Assert.True(rv == CKR.CKR_OBJECT_HANDLE_INVALID,
-            $"C_DeriveKey(CKM_HKDF_DERIVE) with an EC public key as the salt key no longer answers CKR_OBJECT_HANDLE_INVALID (got {rv}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmReportsAnHkdfSaltKeyOfTheWrongTypeAsInconsistent to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void KeyLengthAttributeAbove32Bits_QuirkStillPresent()
-    {
-        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
-        var (secretRv, secretLength) = Mechanisms.MechanismParameterTestCases.GenerateGenericSecret(_backend, (1UL << 32) + 16);
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        CKR rv;
-        int modulusBytes = 0;
-        try
-        {
-            rv = Keys.GenerateRsaKeyPairTestCases.GenerateRawRsa(_backend, session, (1UL << 32) + 2048, [0x01, 0x00, 0x01], out ObjectHandle pub, out ObjectHandle priv);
-            if (rv == CKR.CKR_OK)
-            {
-                using (var read = session.GetAttributeValue(pub, [CKA.CKA_MODULUS]))
-                    modulusBytes = read[0].GetValueAsByteArray().Length;
-                session.DestroyObject(priv);
-                session.DestroyObject(pub);
-            }
-        }
-        finally { TestKeys.LogoutIfRequired(_backend, session); }
-
-        Assert.True(rv == CKR.CKR_OK && modulusBytes == 256 && secretRv == CKR.CKR_OK && secretLength == 16,
-            $"CKA_MODULUS_BITS 2^32 + 2048 no longer makes a 2048-bit key ({rv}, {modulusBytes} bytes), or CKA_VALUE_LEN 2^32 + 16 a 16-byte " +
-            $"generic secret ({secretRv}, {secretLength}): set BouncyHsmBackendFixture.BouncyHsmRefusesAKeyLengthAttributeAbove32Bits to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void DerivedAesKeyOfAnInvalidLength_QuirkStillPresent()
     {
         CKR rv = Mechanisms.AlgorithmConformanceTestCases.DeriveEcdhAesKey(_backend, 13);
@@ -767,9 +545,9 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void BaseKeyProtection_QuirkStillPresent()
     {
-        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, "XOR_BASE_AND_DATA; sensitive and unextractable"));
+        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, "CONCATENATE_BASE_AND_DATA; sensitive and unextractable"));
         Assert.True(failure is XunitException and not SkipException,
-            "BouncyHsm now gives a key derived from a protected key the base key's protection (harrison314/BouncyHsm#141): set " +
+            "BouncyHsm now gives a key derived from a protected key and data the base key's protection (harrison314/BouncyHsm#141): set " +
             "BouncyHsmBackendFixture.BouncyHsmKeepsABaseKeysProtection to true and delete this test.");
     }
 
@@ -781,146 +559,6 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             "BouncyHsm no longer lets a copy change CKA_ALLOWED_MECHANISMS: set " +
             "BouncyHsmBackendFixture.BouncyHsmKeepsAllowedMechanismsOnACopy to true and delete this test.");
     }
-
-    // The mechanism-coverage quirks below drive mechanisms outside the default policy on purpose, under a scoped
-    // AllowInsecure lease; the compile-time policy analyzer flags them, so it is off for these tests only.
-#pragma warning disable KLPKCS11008, KLPKCS11009
-    // Opens a logged-in session under an AllowInsecure lease for the mechanism-coverage quirks below, runs body,
-    // and logs out.
-    private void WithInsecureSession(Action<Pkcs11SessionCore> body)
-    {
-        using var session = TestKeys.OpenLoggedInSession(_backend);
-        try
-        {
-            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
-            body(session);
-        }
-        finally { TestKeys.LogoutIfRequired(_backend, session); }
-    }
-
-    // A generic secret derived from a 4-byte base key with the mechanism given, compared through an HMAC-SHA-256
-    // under it with each candidate value; returns the candidate it matches, or null.
-    private byte[]? DerivedFrom(byte[] baseValue, Mechanism mechanism, ulong length, params byte[][] candidates)
-    {
-        byte[]? match = null;
-        WithInsecureSession(session =>
-        {
-            using var baseClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var baseType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
-            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var derive = new ObjectAttribute(CKA.CKA_DERIVE, true);
-            using var value = new ObjectAttribute(CKA.CKA_VALUE, baseValue);
-            ObjectHandle baseKey = session.CreateObject([baseClass, baseType, token, derive, value]);
-            try
-            {
-                using var len = new ObjectAttribute(CKA.CKA_VALUE_LEN, length);
-                using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
-                ObjectHandle derived = session.DeriveKey(mechanism, baseKey, [baseClass, baseType, token, len, sign]);
-                try
-                {
-                    byte[] mac = session.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), derived, "probe"u8);
-                    match = candidates.FirstOrDefault(c => System.Security.Cryptography.HMACSHA256.HashData(c, "probe"u8).AsSpan().SequenceEqual(mac));
-                }
-                finally { session.DestroyObject(derived); }
-            }
-            finally { session.DestroyObject(baseKey); }
-        });
-        return match;
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void HmacKeyGenMechanism_QuirkStillPresent()
-    {
-        ulong recorded = 0;
-        WithInsecureSession(session =>
-        {
-            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
-            using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
-            ObjectHandle key = session.GenerateKey(new Mechanism(CKM.CKM_SHA256_KEY_GEN), [keyClass, token, length, sign]);
-            try
-            {
-                using var read = session.GetAttributeValue(key, [CKA.CKA_KEY_GEN_MECHANISM]);
-                recorded = read[0].GetValueAsUlong();
-            }
-            finally { session.DestroyObject(key); }
-        });
-
-        Assert.True(recorded == (ulong)CKM.CKM_GENERIC_SECRET_KEY_GEN,
-            $"A CKM_SHA256_KEY_GEN key no longer records CKM_GENERIC_SECRET_KEY_GEN as its CKA_KEY_GEN_MECHANISM (got 0x{recorded:X}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmRecordsTheHmacKeyGenMechanism to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void ShakeDerivationLength_QuirkStillPresent()
-    {
-        var ex = Record.Exception(() => DerivedFrom([1, 2, 3, 4], new Mechanism(CKM.CKM_SHAKE_128_KEY_DERIVATION), 64));
-
-        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_TEMPLATE_INCONSISTENT },
-            "CKM_SHAKE_128_KEY_DERIVATION of a 64-byte key no longer gives CKR_TEMPLATE_INCONSISTENT " +
-            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmDerivesShakeKeysOfAnyLength to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void ExtractKeyFromKey_QuirkStillPresent()
-    {
-        // From bit 16 of 0x329F84A9, two bytes are 0x84A9; BouncyHsm keeps the first 16 bits, 0x329F.
-        byte[] bit16 = new byte[UnmanagedMemory.NativeULongSize];
-        bit16[0] = 16; // little-endian CK_ULONG
-        byte[]? got = DerivedFrom([0x32, 0x9F, 0x84, 0xA9], new Mechanism(CKM.CKM_EXTRACT_KEY_FROM_KEY, bit16), 2, [0x32, 0x9F], [0x84, 0xA9]);
-
-        Assert.True(got is [0x32, 0x9F],
-            $"CKM_EXTRACT_KEY_FROM_KEY from bit 16 no longer keeps the first 16 bits (got {(got is null ? "neither" : Convert.ToHexString(got))}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmExtractsFromTheBitGiven to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void AesCfb1_QuirkStillPresent()
-    {
-        byte[] key = [.. Enumerable.Range(0, 16).Select(i => (byte)i)];
-        byte[] iv = [.. Enumerable.Range(0, 16).Select(i => (byte)(0xF0 + i))];
-        byte[] plaintext = "the quick brown fox"u8.ToArray();
-        byte[] ciphertext = [];
-        WithInsecureSession(session =>
-        {
-            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var encrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-            using var value = new ObjectAttribute(CKA.CKA_VALUE, key);
-            ObjectHandle handle = session.CreateObject([keyClass, keyType, token, encrypt, value]);
-            try { ciphertext = session.Encrypt(new Mechanism(CKM.CKM_AES_CFB1, iv), handle, plaintext); }
-            finally { session.DestroyObject(handle); }
-        });
-
-        Assert.True(ciphertext.AsSpan().SequenceEqual(Mechanisms.MechanismCoverageTestCases.ReferenceCfb(key, iv, plaintext, 128)),
-            "CKM_AES_CFB1 no longer encrypts as CFB with a 128-bit segment: set " +
-            "BouncyHsmBackendFixture.BouncyHsmRunsCfb1WithAOneBitSegment to true and delete this test.");
-    }
-
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
-    public void Sha512THmacKeyType_QuirkStillPresent()
-    {
-        Exception? ex = null;
-        WithInsecureSession(session =>
-        {
-            using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var token = new ObjectAttribute(CKA.CKA_TOKEN, false);
-            using var length = new ObjectAttribute(CKA.CKA_VALUE_LEN, 28UL);
-            using var sign = new ObjectAttribute(CKA.CKA_SIGN, true);
-            ObjectHandle key = session.GenerateKey(new Mechanism(CKM.CKM_SHA512_224_KEY_GEN), [keyClass, token, length, sign]);
-            try { ex = Record.Exception(() => session.Sign(new Mechanism(CKM.CKM_SHA512_224_HMAC), key, "probe"u8)); }
-            finally { session.DestroyObject(key); }
-        });
-
-        Assert.True(ex is Pkcs11Exception { ReturnValue: CKR.CKR_KEY_HANDLE_INVALID },
-            "CKM_SHA512_224_HMAC under a CKM_SHA512_224_KEY_GEN key no longer gives CKR_KEY_HANDLE_INVALID " +
-            $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): set " +
-            "BouncyHsmBackendFixture.BouncyHsmTakesSha512THmacKeys to true and delete this test.");
-    }
-#pragma warning restore KLPKCS11008, KLPKCS11009
 
     // The harrison314/BouncyHsm#145 canary. On the shared token, which is not a qualified-area one (so it needs no
     // QualifiedAreaToken): the case puts CKA_ALWAYS_AUTHENTICATE in the template. A skip from inside the case (the

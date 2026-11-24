@@ -8,7 +8,12 @@ public sealed class BaseKeyProtectionTests_BouncyHsm(BouncyHsmBackendFixture bac
 {
     private readonly BouncyHsmBackendFixture _backend = backend;
 
-    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BaseKeyProtectionAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "BouncyHsm gives the derived key the template's protection, not the base key's (harrison314/BouncyHsm#141)")]
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(BaseKeyProtectionTestCases.Derivations), MemberType = typeof(BaseKeyProtectionTestCases))]
-    public void KeyMadeFromAProtectedKey_KeepsItsProtection(string derivation) => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, derivation);
+    public void KeyMadeFromAProtectedKey_KeepsItsProtection(string derivation)
+    {
+        if (!BouncyHsmBackendFixture.BaseKeyProtectionIsKept(derivation))
+            Assert.Skip("BouncyHsm gives a key derived from data and a key the template's protection, not the base key's (harrison314/BouncyHsm#141)");
+        BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, derivation);
+    }
 }
