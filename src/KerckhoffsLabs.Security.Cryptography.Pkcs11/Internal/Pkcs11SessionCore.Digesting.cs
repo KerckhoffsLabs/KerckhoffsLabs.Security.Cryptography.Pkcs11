@@ -276,7 +276,8 @@ internal sealed partial class Pkcs11SessionCore
                 Final: (Span<byte> buffer, bool lengthOnly, out NativeCULong length)
                     => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, lengthOnly, out length),
                 FinalOperation: OpEncryptFinal,
-                CancelFlag: CKF.CKF_ENCRYPT),
+                CancelFlag: CKF.CKF_ENCRYPT,
+                DigestsTheFinalPart: false),
             "DigestEncrypt");
     }
 
@@ -399,7 +400,8 @@ internal sealed partial class Pkcs11SessionCore
                 Final: (Span<byte> buffer, bool lengthOnly, out NativeCULong length)
                     => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, lengthOnly, out length),
                 FinalOperation: OpDecryptFinal,
-                CancelFlag: CKF.CKF_DECRYPT),
+                CancelFlag: CKF.CKF_DECRYPT,
+                DigestsTheFinalPart: true),
             "DecryptDigest");
     }
 }

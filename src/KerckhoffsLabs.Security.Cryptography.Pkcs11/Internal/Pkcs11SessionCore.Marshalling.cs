@@ -353,13 +353,15 @@ internal sealed partial class Pkcs11SessionCore
     /// The non-digest half of a combined digest-and-transform operation: the three native calls that
     /// differ between <see cref="DigestEncrypt(Mechanism, Mechanism, ObjectHandle, Stream, Stream, int)"/>
     /// and <see cref="DecryptDigest(Mechanism, Mechanism, ObjectHandle, Stream, Stream, int)"/>, plus
-    /// the <c>CKF_*</c> bit naming that half when an unwind has to cancel it.
+    /// the <c>CKF_*</c> bit naming that half when an unwind has to cancel it. <c>DigestsTheFinalPart</c> is set
+    /// when the digest is over the transform's output (a decryption): the part the final returns never went
+    /// through a <c>C_*Update</c>, so the digest is fed it with <c>C_DigestUpdate</c>.
     /// </summary>
     private sealed record CombinedTransform(
         TransformInit Init, string InitOperation,
         StreamingUpdate Update, string UpdateOperation,
         LengthProbedCall Final, string FinalOperation,
-        ulong CancelFlag);
+        ulong CancelFlag, bool DigestsTheFinalPart);
 
     /// <summary>
     /// Runs a digest interleaved with a transform over a stream — <c>C_DigestEncryptUpdate</c> and
@@ -407,7 +409,15 @@ internal sealed partial class Pkcs11SessionCore
             operation.End(transform.CancelFlag);
 
             if (lastPart.Length > 0)
+            {
                 outputStream.Write(lastPart, 0, lastPart.Length);
+
+                // PKCS#11 v3.2 §5.13: C_DecryptDigestUpdate digests only the plaintext it returns. What a
+                // mechanism held back (the last CBC-PAD block) comes out of C_DecryptFinal, and the
+                // application digests it with C_DigestUpdate before C_DigestFinal.
+                if (transform.DigestsTheFinalPart)
+                    ThrowIfError(_pkcs11Library.C_DigestUpdate(_sessionId, lastPart), OpDigestUpdate);
+            }
         }
         finally
         {
