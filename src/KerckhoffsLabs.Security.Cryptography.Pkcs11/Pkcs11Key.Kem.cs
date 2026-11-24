@@ -47,7 +47,7 @@ public sealed partial class Pkcs11Key
         try
         {
             using var use = Use();
-            RequireKemSecretArguments(mechanism, ciphertext.Length, sharedSecret.Length, nameof(ciphertext));
+            RequireKemSecretArguments(mechanism, ciphertext, sharedSecret);
             int ciphertextLength = ciphertext.Length;
 
             // Encapsulation uses no private key, so the read-back judges none.
@@ -120,7 +120,7 @@ public sealed partial class Pkcs11Key
         try
         {
             using var use = Use();
-            RequireKemSecretArguments(mechanism, ciphertext.Length, sharedSecret.Length, nameof(ciphertext));
+            RequireKemSecretArguments(mechanism, ciphertext, sharedSecret);
 
             using SecretReadBack readBack = _session.BeginReadBack(KeyMaterialExportKind.KemSharedSecret, this);
             Pkcs11Library library = _session.Library;
@@ -184,17 +184,17 @@ public sealed partial class Pkcs11Key
     }
 
     // EncapsulateSecret's and DecapsulateSecret's allow-list: the read-back is only ever a KEM's shared secret.
-    private static void RequireKemSecretArguments(Mechanism mechanism, int ciphertextLength, int sharedSecretLength, string ciphertextName)
+    private static void RequireKemSecretArguments(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> sharedSecret)
     {
         ArgumentNullException.ThrowIfNull(mechanism);
         if (mechanism.Type != CKM.CKM_ML_KEM || mechanism.Parameters is not null)
             throw new ArgumentException(
                 $"Pkcs11Key.EncapsulateSecret and DecapsulateSecret take CKM_ML_KEM without parameters; got {mechanism.Type}.",
                 nameof(mechanism));
-        if (ciphertextLength == 0)
-            throw new ArgumentException("The ciphertext is empty.", ciphertextName);
-        if (sharedSecretLength == 0)
-            throw new ArgumentException("The shared-secret buffer is empty.", "sharedSecret");
+        if (ciphertext.IsEmpty)
+            throw new ArgumentException("The ciphertext is empty.", nameof(ciphertext));
+        if (sharedSecret.IsEmpty)
+            throw new ArgumentException("The shared-secret buffer is empty.", nameof(sharedSecret));
     }
 
     // How a KEM shared-secret read-back fails. These are the library's findings, not codes the module returned, so
