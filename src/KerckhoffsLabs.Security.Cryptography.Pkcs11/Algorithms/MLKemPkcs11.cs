@@ -242,15 +242,17 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 
     // How the shared-secret read-back fails: a token that would not expose the value, or a value of the
     // wrong length (which must not leave a partially-filled shared secret), and a destroy that failed
-    // after a good read, which would leave an extractable copy of the secret on the token.
+    // after a good read, which would leave an extractable copy of the secret on the token. These are the
+    // adapter's findings, not codes the module returned, so they are CryptographicExceptions (what code
+    // written against MLKem catches); the destroy's own Pkcs11Exception is the inner exception.
     private static readonly ReadBackFailures SharedSecretFailures = new(
-        () => Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-            "MLKemPkcs11 (shared-secret CKA_VALUE unreadable; token rejected the extractable template)"),
-        (actual, expected) => Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+        () => new CryptographicException(
+            "MLKemPkcs11: shared-secret CKA_VALUE unreadable; the token rejected the extractable template."),
+        (actual, expected) => new CryptographicException(
             $"Token returned {actual}-byte shared secret; expected {expected} bytes."),
-        ex => Pkcs11Exception.Create(ex.ReturnValue,
+        ex => new CryptographicException(
             "MLKemPkcs11: C_DestroyObject failed for the extracted shared-secret object — an " +
-            "extractable copy of the shared secret may remain on-token and must be destroyed manually"));
+            "extractable copy of the shared secret may remain on-token and must be destroyed manually.", ex));
 
     // Copies the read-back value into the caller's span and zeroes the managed copy.
     private static void CopyOut(byte[] value, Span<byte> destination)
@@ -268,7 +270,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     private static void RequireLength(byte[] source, int expectedLength)
     {
         if (source.Length != expectedLength)
-            throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+            throw new CryptographicException(
                 $"Token returned {source.Length}-byte buffer; expected {expectedLength} bytes for this parameter set.");
     }
 }

@@ -27,23 +27,11 @@ public sealed class AlgorithmsPublicSurfaceTests
         "KeyMaterial.SecretReadBack.Read",
         "Pkcs11Session.BeginReadBack",
 
-        // Key operations the public API does not offer.
-        "Mechanism.get_Parameters",
-        "Pkcs11Key.ReadEcCurve",
-        "Pkcs11Key.SignPkcs1Digest",
-        "Pkcs11Key.SupportsMechanism",
-        "Pkcs11Key.VerifyPkcs1Digest",
-
         // A module quirk MLKemPkcs11 detects and records on the library.
         "Pkcs11Library.get_MlKemDecapsulateOmitsValueLen",
         "Pkcs11Library.set_MlKemDecapsulateOmitsValueLen",
 
         // Shared helpers.
-        "Exceptions.Pkcs11Exception.Create",
-        "KeyMaterial.PostQuantumParameterSets",
-        "KeyMaterial.PostQuantumParameterSets.AlgorithmOf",
-        "KeyMaterial.PostQuantumParameterSets.Describe",
-        "KeyMaterial.PostQuantumParameterSets.KeyTypeOf",
         "SecurePassword..ctor",
     ];
 

@@ -218,11 +218,12 @@ public sealed class SlhDsaPkcs11Tests_Managed
     // === A token signature of the wrong length ===========================
 
     // A signature of another length than the parameter set's is the token's fault: it is refused rather
-    // than truncated or padded into the caller's buffer.
+    // than truncated or padded into the caller's buffer. It is the adapter's finding, not a code the module
+    // returned, so it is a plain CryptographicException rather than a Pkcs11Exception.
     [Theory(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     [InlineData(-1)]
     [InlineData(1)]
-    public void SignData_TokenSignatureOfTheWrongLength_ThrowsPkcs11Exception(int lengthDelta)
+    public void SignData_TokenSignatureOfTheWrongLength_ThrowsCryptographicException(int lengthDelta)
     {
         var token = new ManagedSoftToken
         {
@@ -237,8 +238,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
         using var slhdsa = new SlhDsaPkcs11(key);
         int expected = SlhDsaAlgorithm.SlhDsaSha2_128f.SignatureSizeInBytes;
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => slhdsa.SignData([1, 2, 3]));
-        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+        var ex = Assert.Throws<CryptographicException>(() => slhdsa.SignData([1, 2, 3]));
         Assert.Contains($"{expected + lengthDelta}-byte", ex.Message, StringComparison.Ordinal);
     }
 

@@ -210,7 +210,7 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)
     {
         if (source.Length != expectedLength)
-            throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+            throw new CryptographicException(
                 $"Token returned {source.Length}-byte buffer; expected {expectedLength} bytes for this parameter set.");
         source.CopyTo(destination);
     }

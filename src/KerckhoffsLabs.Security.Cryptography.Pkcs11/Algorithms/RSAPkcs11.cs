@@ -480,7 +480,7 @@ public sealed class RSAPkcs11 : RSA
     // hash, its MGF1, and a salt of the hash's length, as the BCL's Pss uses.
     private static Mechanism PssDigestMechanism(HashAlgorithmName hashAlgorithm, RSASignaturePadding padding)
         => padding.Mode == RSASignaturePaddingMode.Pss
-            ? new Mechanism(CKM.CKM_RSA_PKCS_PSS, Pkcs11MechanismMap.RsaPssSign(hashAlgorithm, saltLength: -1).Parameters!)
+            ? Pkcs11MechanismMap.RsaPssOverDigest(hashAlgorithm)
             : throw new NotSupportedException($"Unsupported RSA signature padding: {padding}.");
 
     private static Mechanism EncryptMechanismFor(RSAEncryptionPadding padding)

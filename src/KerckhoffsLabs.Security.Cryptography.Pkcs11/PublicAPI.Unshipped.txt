@@ -2369,3 +2369,11 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Curve.get 
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Curve.init -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Operation.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoOperation?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.KeyStrengthRequest.Operation.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.ReadEcCurve() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.SignPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, System.ReadOnlySpan<byte> digest) -> byte[]!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.SupportsMechanism(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKM mechanism, ulong requiredFlags) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.VerifyPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, System.ReadOnlySpan<byte> digest, System.ReadOnlySpan<byte> signature) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.AlgorithmOf<TAlgorithm>(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK keyType, ulong parameterSet) -> TAlgorithm?
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK keyType, ulong parameterSet) -> (string! Oid, int PublicKeyLength)?
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.KeyTypeOf(string? oid) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK?

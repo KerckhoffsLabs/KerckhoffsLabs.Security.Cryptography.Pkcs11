@@ -68,6 +68,23 @@ public static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism RsaPssSign(HashAlgorithmName hash, int saltLength)
     {
+        (CKM combined, CkmRsaPkcsPssParams parameters) = RsaPss(hash, saltLength);
+        return new Mechanism(combined, parameters);
+    }
+
+    /// <summary>
+    /// <c>CKM_RSA_PKCS_PSS</c> over a digest the caller computed, with the parameters
+    /// <see cref="RsaPssSign"/> gives the combined mechanism for <paramref name="hash"/> and a salt of the hash's
+    /// length (as the BCL's <see cref="RSASignaturePadding.Pss"/> uses).
+    /// </summary>
+    /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
+    internal static Mechanism RsaPssOverDigest(HashAlgorithmName hash)
+        => new(CKM.CKM_RSA_PKCS_PSS, RsaPss(hash, saltLength: -1).Parameters);
+
+    // The combined RSA-PSS mechanism for hash, and its parameters: the hash, its MGF1, and the salt length
+    // (the hash's output length when saltLength is negative).
+    private static (CKM Combined, CkmRsaPkcsPssParams Parameters) RsaPss(HashAlgorithmName hash, int saltLength)
+    {
         var (ckm, innerHash, mgf, defaultSalt) = hash.Name switch
         {
             Sha1 => (CKM.CKM_SHA1_RSA_PKCS_PSS, CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1, 20),
@@ -81,7 +98,7 @@ public static class Pkcs11MechanismMap
             _ => throw new NotSupportedException(
                 $"RSA-PSS does not support hash {hash.Name}."),
         };
-        return new Mechanism(ckm, new CkmRsaPkcsPssParams(innerHash, mgf, saltLength < 0 ? defaultSalt : saltLength));
+        return (ckm, new CkmRsaPkcsPssParams(innerHash, mgf, saltLength < 0 ? defaultSalt : saltLength));
     }
 
     /// <summary>
