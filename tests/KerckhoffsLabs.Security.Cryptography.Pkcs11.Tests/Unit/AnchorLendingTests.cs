@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes.Modules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Policies;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -547,6 +548,97 @@ public sealed class AnchorLendingTests : IDisposable
         using Pkcs11Key ordinary = next.OpenKey(SigningKey);
 
         Assert.Equal(LoginTokenModule.SignatureLength, ordinary.Sign(Ecdsa, "data"u8).Length);
+    }
+
+    // ---- Returning the anchor: what the borrower leaves behind ----------------------------------------------------
+
+    // A sign that failed partway on a module without C_SessionCancel stays active on the anchor: the lent session's
+    // return says so in the log, and the next borrower is told why its sign cannot start.
+    [Fact]
+    public void LentSession_OperationTheModuleCannotCancel_ReturnWarnsItIsCarried_NextBorrowerIsTold()
+    {
+        _module.SupportsSessionCancel = false;
+        var logger = new CapturingLogger();
+        using Pkcs11Library logged = _module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(logger) });
+        using Pkcs11Login login = Assert.Single(logged.GetSlotList()).Login(TokenUser.User, _pin);
+        ulong anchor = AnchorId;
+        using (Pkcs11Session session = login.OpenSession())
+        using (Pkcs11Key key = session.OpenKey(SigningKey))
+        {
+            AssertLent(session, anchor);
+            _module.FailNext("C_Sign", CKR.CKR_DEVICE_ERROR);
+            Assert.Equal(CKR.CKR_DEVICE_ERROR, Assert.ThrowsAny<Pkcs11Exception>(() => key.Sign(Ecdsa, "data"u8)).ReturnValue);
+            Assert.True(_module.HasActiveOperation(anchor));
+        }
+
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning
+            && entry.Message.Contains($"Session({anchor}): returning the lent session with operations", StringComparison.Ordinal));
+
+        using Pkcs11Session next = login.OpenSession();
+        using Pkcs11Key again = next.OpenKey(SigningKey);
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => again.Sign(Ecdsa, "data"u8));
+        Assert.Equal(CKR.CKR_OPERATION_ACTIVE, ex.ReturnValue);
+        Assert.Contains("lent because the token allows no other", ex.Message, StringComparison.Ordinal);
+    }
+
+    // A session object the lent session made that the module will not destroy on its return stays until the anchor
+    // closes: the return logs it, and goes on.
+    [Fact]
+    public void LentSession_SessionObjectTheModuleWillNotDestroy_ReturnWarns_AndGoesOn()
+    {
+        var logger = new CapturingLogger();
+        using Pkcs11Library logged = _module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(logger) });
+        using Pkcs11Login login = Assert.Single(logged.GetSlotList()).Login(TokenUser.User, _pin);
+        using ObjectTemplate template = ObjectTemplate.ForData().Label("session").Build();
+        ulong anchor = AnchorId;
+        ulong handle;
+        using (Pkcs11Session session = login.OpenSession())
+        {
+            using Pkcs11Object created = session.CreateObject(template);
+            handle = created.Handle.ObjectId;
+            _module.FailNext("C_DestroyObject", CKR.CKR_DEVICE_ERROR);
+        }
+
+        Assert.Single(_module.DestroyObjectCalls, h => h == handle);
+        Assert.True(_module.HasObject(handle));
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning
+            && entry.Message.Contains($"session object {handle} returned CKR_DEVICE_ERROR", StringComparison.Ordinal));
+        Assert.Null(Record.Loan);
+        using Pkcs11Session next = login.OpenSession(); // returned all the same
+        AssertLent(next, anchor);
+    }
+
+    // Only the login's own session can be lent: a lent session's core, given as the anchor, is refused.
+    [Fact]
+    public void Borrow_FromALentSession_IsRefused()
+    {
+        using Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        using Pkcs11Session lent = login.OpenSession();
+        var loan = new AnchorLoan(lent.Core, _library, Record.Generation, lent.Core.SessionId);
+
+        var ex = Assert.Throws<ArgumentException>(() => Pkcs11SessionCore.Borrow(lent.Core, loan, loggerFactory: null, policy: null));
+
+        Assert.Equal("anchor", ex.ParamName);
+        Assert.Same(lent.Core, Assert.IsType<AnchorLoan>(Record.Loan).Borrower);
+    }
+
+    // An anchor closed by the login's end (between reading it out of the record and building the borrower, in TryLend)
+    // cannot be lent: the borrower is refused as the ended login's, and TryLend turns that into the login ended.
+    [Fact]
+    public void Borrow_OfAnAnchorTheLoginEndedClosed_ThrowsDisposed()
+    {
+        Pkcs11Login login = Slot.Login(TokenUser.User, _pin);
+        Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(Record.Anchor);
+        long generation = Record.Generation;
+        ulong sessionId = anchor.SessionId;
+        login.Dispose();
+        Assert.False(Record.IsLoggedIn);
+        var loan = new AnchorLoan(anchor, _library, generation, sessionId);
+
+        var ex = Assert.Throws<ObjectDisposedException>(() => Pkcs11SessionCore.Borrow(anchor, loan, loggerFactory: null, policy: null));
+
+        Assert.Equal(nameof(Pkcs11Login), ex.ObjectName);
+        Assert.Contains("login has ended", ex.Message, StringComparison.Ordinal);
     }
 
     // ---- Concurrency on the lent anchor --------------------------------------------------------------------------

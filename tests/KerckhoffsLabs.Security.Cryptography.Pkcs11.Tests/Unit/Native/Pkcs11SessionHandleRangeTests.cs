@@ -21,9 +21,15 @@ public sealed class Pkcs11SessionHandleRangeTests
     private sealed class ClosingLibrary : SessionTestModule
     {
         public NativeCULong? Closed;
+        public int Finalized;
         protected override CKR C_CloseSession(NativeCULong session)
         {
             Closed = session;
+            return CKR.CKR_OK;
+        }
+        protected override CKR C_Finalize(IntPtr pReserved)
+        {
+            Finalized++;
             return CKR.CKR_OK;
         }
     }
@@ -74,5 +80,36 @@ public sealed class Pkcs11SessionHandleRangeTests
         handle.Dispose();
 
         Assert.Null(library.Closed);
+    }
+
+    [Fact]
+    public void Handle_ReportsTheSessionItWasOpenedAs()
+    {
+        using var library = new ClosingLibrary();
+        using var handle = new Pkcs11SessionHandle(library.LowLevel, (NativeCULong)5UL, slotId: (NativeCULong)3UL,
+            isReadWrite: true, isAnchor: true);
+
+        Assert.Equal((3UL, true, true), ((ulong)handle.SlotId, handle.IsReadWrite, handle.IsAnchor));
+    }
+
+    // The release may run on the finalizer thread, where an exception ends the process: a released callback
+    // that throws is dropped, and the session is still closed and its use of the module still given back, so
+    // the module is finalized when the library goes.
+    [Fact]
+    public void ReleasedCallbackThatThrows_IsContained_AndTheModuleIsStillFinalized()
+    {
+        using var library = new ClosingLibrary();
+        Pkcs11Library loaded = library.Library;
+        int released = 0;
+        var handle = new Pkcs11SessionHandle(loaded.LowLevelLibrary!, (NativeCULong)9UL,
+            released: () => { released++; throw new InvalidOperationException("from the callback"); });
+
+        handle.Dispose();
+        Assert.Equal(1, released);
+        Assert.Equal(9UL, (ulong?)library.Closed);
+        Assert.Equal(0, loaded.LowLevelLibrary!.Module.TrackedSessionCount);
+
+        loaded.Dispose();
+        Assert.Equal(1, library.Finalized);
     }
 }

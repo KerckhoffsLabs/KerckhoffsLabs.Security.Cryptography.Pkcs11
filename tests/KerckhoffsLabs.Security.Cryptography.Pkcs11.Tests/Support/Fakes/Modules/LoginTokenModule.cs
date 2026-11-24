@@ -254,8 +254,8 @@ internal sealed class LoginTokenModule : FakeModule
     private readonly Dictionary<string, Queue<CKR>> _failNext = [];
 
     /// <summary>
-    /// Makes the next call of <paramref name="function"/> (<c>"C_OpenSession"</c>, <c>"C_Login"</c>, <c>"C_Logout"</c>
-    /// or <c>"C_GetSessionInfo"</c>) answer <paramref name="rv"/> and do nothing else; queued, one call each.
+    /// Makes the next call of <paramref name="function"/> (<c>"C_OpenSession"</c>, <c>"C_Login"</c>, <c>"C_Logout"</c>,
+    /// <c>"C_GetSessionInfo"</c>, <c>"C_Sign"</c> or <c>"C_DestroyObject"</c>) answer <paramref name="rv"/> and do nothing else; queued, one call each.
     /// </summary>
     public void FailNext(string function, CKR rv)
     {
@@ -421,6 +421,16 @@ internal sealed class LoginTokenModule : FakeModule
     {
         get { lock (_lock) return [.. _sessions]; }
     }
+
+    /// <summary>
+    /// Whether <c>C_Initialize</c> answers <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c>, as when another component of the
+    /// process initialized the module: a load then owes no <c>C_Finalize</c>, and the module's state (its login
+    /// included) outlives it.
+    /// </summary>
+    public bool InitializedElsewhere { get; set; }
+
+    protected override CKR C_Initialize(IntPtr pInitArgs)
+        => InitializedElsewhere ? CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED : CKR.CKR_OK;
 
     protected override CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count)
     {
@@ -1030,6 +1040,8 @@ internal sealed class LoginTokenModule : FakeModule
             _destroyObjectCalls.Add((ulong)objectId);
             if (_failing.TryGetValue((ulong)session, out CKR failure))
                 return failure;
+            if (FailsNextLocked("C_DestroyObject", out CKR next))
+                return next;
             if (!IsOpen(session))
                 return CKR.CKR_SESSION_HANDLE_INVALID;
             if (!IsVisible((ulong)objectId))

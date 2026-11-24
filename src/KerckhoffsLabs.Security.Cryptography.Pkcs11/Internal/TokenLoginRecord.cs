@@ -293,6 +293,20 @@ internal sealed partial class TokenLoginRecord
     internal Action? WhileHoldingTransition { get; set; }
 
     /// <summary>
+    /// Runs on the thread that holds the transition semaphore, once it has run its hand-offs and before it releases the
+    /// semaphore. A test seam, as <see cref="WhileHoldingTransition"/>: it lets a test post a hand-off in the window a
+    /// release must still look at.
+    /// </summary>
+    internal Action? BeforeReleasingTransition { get; set; }
+
+    /// <summary>
+    /// Runs on a thread that found the transition semaphore taken and handed its action to the holder, before it looks
+    /// at the semaphore again. A test seam, as <see cref="WhileHoldingTransition"/>: it lets a test have the holder
+    /// release in between.
+    /// </summary>
+    internal Action? AfterPostingHandOff { get; set; }
+
+    /// <summary>
     /// Runs on a first login's thread when it is about to wait for the operations in flight on the token's sessions
     /// (outside the transition semaphore). A test seam, as <see cref="WhileHoldingTransition"/>.
     /// </summary>

@@ -22,6 +22,9 @@ public sealed class TokenLoginRecordTests : IDisposable
     private readonly Pkcs11Library _library;
     private readonly SecurePin _pin;
 
+    // Sessions a helper opened for a test, disposed with it.
+    private readonly List<Pkcs11Session> _keepOpen = [];
+
     public TokenLoginRecordTests()
     {
         _library = _module.Load();
@@ -32,6 +35,8 @@ public sealed class TokenLoginRecordTests : IDisposable
 
     public void Dispose()
     {
+        foreach (Pkcs11Session session in _keepOpen)
+            session.Dispose();
         _pin.Dispose();
         _library.Dispose();
         _module.Dispose();
@@ -1140,6 +1145,215 @@ public sealed class TokenLoginRecordTests : IDisposable
         foreach (LoginHold? hold in holds)
             hold!.Dispose();
         Assert.Equal(1, _module.LogoutCalls);
+    }
+
+    // The transition semaphore is not reentrant: a login made from the thread that holds it (code the library calls
+    // while logging in, a logger, say) would wait for itself forever, so it is refused at once, and the login that
+    // holds the semaphore goes on.
+    [Fact]
+    public void Login_FromTheThreadHoldingTheTransition_IsRefused_TheOuterLoginGoesOn()
+    {
+        TokenLoginRecord record = Record;
+        Exception? reentrant = null;
+        record.WhileHoldingTransition = () =>
+        {
+            record.WhileHoldingTransition = null;
+            reentrant = Xunit.Record.Exception(() =>
+            {
+                using LoginHold unexpected = record.Login(_library, TokenUser.User, _pin, username: null);
+            });
+        };
+
+        using LoginHold hold = record.Login(_library, TokenUser.User, _pin, username: null);
+
+        var refused = Assert.IsType<InvalidOperationException>(reentrant);
+        Assert.Contains("already being made on this thread", refused.Message, StringComparison.Ordinal);
+        Assert.True(hold.IsActive);
+        Assert.Equal(1, _module.LoginCalls);
+    }
+
+    // An operation in flight on the token's sessions is tallied by the epoch it began in until it ends, counted on the
+    // gate or not: what a first login waits for.
+    [Fact]
+    public void OperationsInFlight_CountsEachOperationUntilItEnds()
+    {
+        TokenLoginRecord record = Record;
+        Assert.Equal(0, record.OperationsInFlight);
+
+        using (record.EnterOperation())
+        {
+            Assert.Equal(1, record.OperationsInFlight);
+            using (record.EnterOperation())
+                Assert.Equal(2, record.OperationsInFlight);
+            Assert.Equal(1, record.OperationsInFlight);
+        }
+
+        Assert.Equal(0, record.OperationsInFlight);
+    }
+
+    // A logout handed to the login holding the transition can land after that login ran its hand-offs and before it
+    // releases the semaphore: the release looks again, takes the semaphore back, and runs it, so it is not lost.
+    [Fact]
+    public void HandOffPostedAsTheHolderReleases_TheHolderTakesTheTransitionBack_AndRunsIt()
+    {
+        TimeSpan bounded = TimeSpan.FromSeconds(5);
+        CancellationToken cancel = TestContext.Current.CancellationToken;
+        TokenLoginRecord record = Record;
+        (BackgroundWork operation, ManualResetEventSlim end, ManualResetEventSlim ended) = LeftBehindLogoutDueOnAnOperationsEnd(bounded, cancel);
+        using (end)
+        using (ended)
+        {
+            int loginThread = 0;
+            int retakenBy = 0;
+            record.WhileHoldingTransition = () =>
+            {
+                loginThread = Environment.CurrentManagedThreadId;
+                record.WhileHoldingTransition = null;
+            };
+            // The operation ends now: its logout finds the semaphore taken, and is handed to this thread.
+            record.BeforeReleasingTransition = () =>
+            {
+                record.BeforeReleasingTransition = null;
+                end.Set();
+                Assert.True(ended.Wait(bounded, cancel));
+                record.WhileHoldingTransition = () =>
+                {
+                    record.WhileHoldingTransition = null;
+                    retakenBy = Environment.CurrentManagedThreadId;
+                };
+            };
+
+            using LoginHold fresh = record.Login(_library, TokenUser.User, _pin, username: null);
+
+            Assert.True(operation.Join(bounded));
+            Assert.Null(operation.Failure);
+            Assert.NotEqual(0, loginThread);
+            Assert.Equal(loginThread, retakenBy);
+            Assert.True(fresh.IsActive);
+            Assert.False(record.MayStillBeLoggedIn);
+            Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        }
+    }
+
+    // A thread that found the semaphore taken hands its logout over, then looks again: when the holder released in
+    // between, after running that logout, it takes the semaphore itself so nothing handed over is left waiting.
+    [Fact]
+    public void HolderReleasesRightAfterAHandOff_ThePostingThreadTakesTheTransition()
+    {
+        TimeSpan bounded = TimeSpan.FromSeconds(5);
+        CancellationToken cancel = TestContext.Current.CancellationToken;
+        TokenLoginRecord record = Record;
+        (BackgroundWork operation, ManualResetEventSlim end, ManualResetEventSlim ended) = LeftBehindLogoutDueOnAnOperationsEnd(bounded, cancel);
+        using (end)
+        using (ended)
+        using (var holding = new ManualResetEventSlim())
+        using (var release = new ManualResetEventSlim())
+        {
+            record.WhileHoldingTransition = () =>
+            {
+                record.WhileHoldingTransition = null;
+                holding.Set();
+                release.Wait(TimeSpan.FromSeconds(30), cancel);
+            };
+            LoginHold? fresh = null;
+            BackgroundWork login = BackgroundWork.Run(() => fresh = record.Login(_library, TokenUser.User, _pin, username: null));
+            Assert.True(holding.Wait(bounded, cancel));
+
+            int operationThread = 0;
+            int takenBy = 0;
+            // The operation's thread has handed its logout over: the login now releases, and has finished, before that
+            // thread looks at the semaphore again.
+            record.AfterPostingHandOff = () =>
+            {
+                record.AfterPostingHandOff = null;
+                operationThread = Environment.CurrentManagedThreadId;
+                release.Set();
+                Assert.True(login.Join(bounded));
+                record.WhileHoldingTransition = () =>
+                {
+                    record.WhileHoldingTransition = null;
+                    takenBy = Environment.CurrentManagedThreadId;
+                };
+            };
+            end.Set();
+
+            Assert.True(ended.Wait(bounded, cancel));
+            Assert.True(operation.Join(bounded));
+            Assert.Null(operation.Failure);
+            Assert.Null(login.Failure);
+            Assert.NotEqual(0, operationThread);
+            Assert.Equal(operationThread, takenBy);
+            using LoginHold hold = Assert.IsType<LoginHold>(fresh);
+            Assert.True(hold.IsActive);
+            Assert.False(record.MayStillBeLoggedIn);
+            Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        }
+    }
+
+    // A login left on the token, with an operation in flight whose end is to log it out: the anchor is lost with
+    // another session keeping the login, and the last holder goes. The operation runs on a thread of its own (a lease
+    // is given back on the thread that took it), and ends once End is set.
+    private (BackgroundWork Operation, ManualResetEventSlim End, ManualResetEventSlim Ended) LeftBehindLogoutDueOnAnOperationsEnd(
+        TimeSpan bounded, CancellationToken cancel)
+    {
+        _keepOpen.Add(Assert.Single(_library.GetSlotList()).OpenSession(SessionAccess.ReadOnly));
+        LoginHold first = Record.Login(_library, TokenUser.User, _pin, username: null);
+        Pkcs11SessionCore anchor = Assert.IsType<Pkcs11SessionCore>(Record.Anchor);
+        using var entered = new ManualResetEventSlim();
+        var end = new ManualResetEventSlim();
+        var ended = new ManualResetEventSlim();
+        BackgroundWork operation = BackgroundWork.Run(() =>
+        {
+            IDisposable lease = Record.EnterOperation();
+            entered.Set();
+            end.Wait(TimeSpan.FromSeconds(30), cancel);
+            lease.Dispose();
+            ended.Set();
+        });
+        Assert.True(entered.Wait(bounded, cancel));
+        Record.AnchorLost(anchor, CKR.CKR_SESSION_HANDLE_INVALID);
+        first.Dispose();
+        Assert.True(Record.MayStillBeLoggedIn);
+        return (operation, end, ended);
+    }
+
+    // A load that did not initialize the module (another component of the process did) owes no C_Finalize, so the
+    // module's state outlives it. A login its record left on the token is carried to the next load's record, which logs
+    // it out and logs in again when the module answers the user is logged in, rather than refusing it as foreign.
+    [Fact]
+    public void LeftBehindLogin_ModuleInitializedElsewhere_CarriedToTheNextLoad_WhichLogsItOutAndLogsIn()
+    {
+        _library.Dispose(); // the class's load initialized the module, and finalizes it
+        _module.InitializedElsewhere = true;
+        TokenLoginRecord first;
+        using (Pkcs11Library earlier = _module.Load())
+        {
+            // A session the library does not track, as another component's would be: it keeps the module logged in.
+            Assert.Equal(CKR.CKR_OK, earlier.LowLevelLibrary!.C_OpenSession(Slot, (NativeCULong)CKF.CKF_SERIAL_SESSION, out _));
+            first = TokenLoginRegistry.Of(earlier.LowLevelLibrary.Module).For(Slot);
+            LoginHold hold = first.Login(earlier, TokenUser.User, _pin, username: null);
+            Assert.Null(first.LeftBehindUser); // a login held is never carried
+            _module.FailNext("C_Logout", CKR.CKR_DEVICE_ERROR);
+            _module.FailNext("C_OpenSession", CKR.CKR_SESSION_COUNT);
+            hold.Dispose();
+
+            Assert.Equal(Slot, first.SlotId);
+            Assert.Equal(TokenUser.User, first.LeftBehindUser);
+        }
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+
+        using Pkcs11Library next = _module.Load();
+        TokenLoginRecord carried = TokenLoginRegistry.Of(next.LowLevelLibrary!.Module).For(Slot);
+        Assert.NotSame(first, carried);
+        Assert.True(carried.MayStillBeLoggedIn);
+
+        using LoginHold again = carried.Login(next, TokenUser.User, _pin, username: null);
+
+        Assert.True(again.IsActive);
+        Assert.False(carried.MayStillBeLoggedIn);
+        Assert.Null(carried.LeftBehindUser);
+        Assert.Equal(CKU.CKU_USER, _module.LoggedIn);
+        Assert.Equal(2, _module.LogoutCalls); // the failed one, then the carried login's
     }
 
     [Fact]
