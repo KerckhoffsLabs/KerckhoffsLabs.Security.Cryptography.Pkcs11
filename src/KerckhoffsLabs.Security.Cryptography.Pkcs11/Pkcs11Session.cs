@@ -1083,6 +1083,60 @@ public sealed partial class Pkcs11Session : IDisposable
     }
 
     /// <summary>
+    /// Runs an on-token password-based KDF and returns <paramref name="length"/> bytes of its output: the PKCS#11
+    /// counterpart of <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{byte}, ReadOnlySpan{byte}, int, HashAlgorithmName, int)"/>.
+    /// Reading the output off the token is an export of <see cref="KeyMaterialExportKind.KdfOutput"/>, so the
+    /// session's policy must allow it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Prefer <see cref="GenerateKey(Mechanism, ObjectTemplate)"/> where the output is a key: it stays on the token,
+    /// sensitive and non-extractable. Use this where the output must leave the token.
+    /// </para>
+    /// <para>
+    /// Only <see cref="CKM.CKM_PKCS5_PBKD2"/> with <see cref="CkmPkcs5Pbkd2Params"/> is accepted: anything else, a
+    /// key-generation mechanism above all, is refused before the policy or the token is consulted, so the
+    /// <see cref="KeyMaterialExportKind.KdfOutput"/> opt-in never reads a freshly generated key off the token.
+    /// A password-based KDF has no base key, so the opt-in's <see cref="KdfBaseKeyScope"/> has none to judge.
+    /// </para>
+    /// <para>
+    /// The output is generated into an extractable, non-sensitive session generic secret, read and destroyed. The
+    /// caller owns the returned array and should zero it
+    /// (<see cref="CryptographicOperations.ZeroMemory(Span{byte})"/>) once done.
+    /// </para>
+    /// </remarks>
+    /// <param name="mechanism">The KDF and its parameters.</param>
+    /// <param name="length">The number of bytes to derive.</param>
+    /// <returns>The KDF output.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="mechanism"/> is not <see cref="CKM.CKM_PKCS5_PBKD2"/> with <see cref="CkmPkcs5Pbkd2Params"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="length"/> is zero or negative.</exception>
+    /// <exception cref="CryptoPolicyViolationException">
+    /// Thrown unless the session's <see cref="Policy"/> permits reading KDF output off the token
+    /// (<see cref="KeyMaterialExportKind.KdfOutput"/>) and the mechanism and its PRF.
+    /// </exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GenerateKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the token does not expose the generated value.</exception>
+    /// <exception cref="CryptographicException">Thrown if the token returns output of a length other than <paramref name="length"/>.</exception>
+    public byte[] GenerateBytes(Mechanism mechanism, int length)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
+        if (mechanism.Type != CKM.CKM_PKCS5_PBKD2 || mechanism.Parameters is not CkmPkcs5Pbkd2Params)
+            throw new ArgumentException(
+                $"Pkcs11Session.GenerateBytes takes CKM_PKCS5_PBKD2 with CkmPkcs5Pbkd2Params; got {mechanism.Type}.",
+                nameof(mechanism));
+
+        // The export check comes first: it is what a policy that allows extractable templates but not
+        // plaintext KDF output (a FIPS-style policy) relies on.
+        using SecretReadBack readBack = BeginReadBack(KeyMaterialExportKind.KdfOutput);
+        using ObjectTemplate template = SecretReadBack.ExtractableSecretTemplate(length);
+        return readBack.Read(() => GenerateKey(mechanism, template), length, ReadBackFailures.KdfOutput);
+    }
+
+    /// <summary>
     /// Generates a new asymmetric key pair using <c>C_GenerateKeyPair</c> and returns
     /// it as a single <see cref="Pkcs11Key"/> carrying both handles.
     /// </summary>

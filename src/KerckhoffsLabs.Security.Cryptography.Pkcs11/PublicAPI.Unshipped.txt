@@ -2378,3 +2378,7 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParame
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK keyType, ulong parameterSet) -> (string! Oid, int PublicKeyLength)?
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.KeyTypeOf(string? oid) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.InterfaceInfo.Version.get -> System.Version?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.DecapsulateSecret(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> ciphertext, System.Span<byte> sharedSecret) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.EncapsulateSecret(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.Span<byte> ciphertext, System.Span<byte> sharedSecret) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Session.GenerateBytes(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, int length) -> byte[]!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurePassword.SecurePassword(System.ReadOnlySpan<char> password, System.Text.Encoding! encoding) -> void

@@ -65,6 +65,13 @@ public sealed class KeyMaterialExportOptInTests
         body(session);
     }
 
+    private static int SecretKeyCount(Pkcs11Session session)
+    {
+        using var filter = ObjectTemplate.Empty().Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_SECRET_KEY).Build();
+        using var keys = session.FindKeys(filter);
+        return keys.Count;
+    }
+
     private static Pkcs11Key ImportIkm(Pkcs11Session session)
     {
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Value(Ikm).Derive().Build();
@@ -404,6 +411,131 @@ public sealed class KeyMaterialExportOptInTests
             Assert.Throws<ArgumentException>(() => alice.DeriveBytes(mechanism, 32));
         });
     }
+
+    // GenerateBytes is the password-KDF read-back: a key-generation mechanism handed to it must never come back as
+    // a fresh key's value. It is refused as the caller's argument, before the policy sees anything.
+    public static TheoryData<string> NotAPasswordKdf => [.. NotAPasswordKdfMechanisms.Keys];
+
+    private static readonly Dictionary<string, Func<Mechanism>> NotAPasswordKdfMechanisms = new()
+    {
+        ["AES key generation"] = () => new Mechanism(CKM.CKM_AES_KEY_GEN),
+        ["generic secret generation"] = () => new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN),
+        ["PBKDF2 with no parameters"] = () => new Mechanism(CKM.CKM_PKCS5_PBKD2),
+        ["PBKDF2 with HKDF parameters"] = () => new Mechanism(CKM.CKM_PKCS5_PBKD2,
+            CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, Salt, Info)),
+    };
+
+    [Theory]
+    [MemberData(nameof(NotAPasswordKdf))]
+    public void GenerateBytes_NotAPasswordKdf_ThrowsArgumentException(string name)
+    {
+        var policy = new RecordingPolicy();
+        WithSession(policy, session =>
+        {
+            Mechanism mechanism = NotAPasswordKdfMechanisms[name]();
+            policy.Seen.Clear();
+
+            var e = Assert.Throws<ArgumentException>(() => session.GenerateBytes(mechanism, 32));
+
+            Assert.Equal("mechanism", e.ParamName);
+            Assert.Empty(policy.Seen);
+        });
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void GenerateBytes_NonPositiveLength_ThrowsArgumentOutOfRangeException(int length) =>
+        WithSession(OptIn(KeyMaterialExportKind.KdfOutput), session =>
+        {
+            using var password = new SecurePassword("password"u8);
+            var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2,
+                new CkmPkcs5Pbkd2Params(Salt, 1000, CKP.CKP_PKCS5_PBKD2_HMAC_SHA256, password));
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateBytes(mechanism, length));
+        });
+
+    // The managed token has no CKM_PKCS5_PBKD2; the output itself is checked against the BCL by the
+    // Rfc2898DeriveBytesPkcs11 backend tests, which derive through GenerateBytes.
+    [Fact]
+    public void GenerateBytes_WithoutTheKdfOutputOptIn_Throws() => WithSession(CryptoPolicy.Recommended, session =>
+    {
+        using var password = new SecurePassword("password"u8);
+        var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2,
+            new CkmPkcs5Pbkd2Params(Salt, 1000, CKP.CKP_PKCS5_PBKD2_HMAC_SHA256, password));
+
+        Assert.Throws<CryptoPolicyViolationException>(() => session.GenerateBytes(mechanism, 32));
+        Assert.Equal(0, SecretKeyCount(session));
+    });
+
+    // EncapsulateSecret and DecapsulateSecret read only a KEM's shared secret back.
+    public static TheoryData<string> NotAKem => [.. NotAKemMechanisms.Keys];
+
+    private static readonly Dictionary<string, Func<Mechanism>> NotAKemMechanisms = new()
+    {
+        ["ECDH"] = () => new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_NULL, PeerPoint())),
+        ["AES key generation"] = () => new Mechanism(CKM.CKM_AES_KEY_GEN),
+        ["ML-KEM with parameters"] = () => new Mechanism(CKM.CKM_ML_KEM,
+            CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256, Salt, Info)),
+    };
+
+    [Theory]
+    [MemberData(nameof(NotAKem))]
+    public void EncapsulateAndDecapsulateSecret_NotAKem_ThrowArgumentException(string name)
+    {
+        var policy = new RecordingPolicy();
+        WithSession(policy, session =>
+        {
+            using var key = GenerateMlKem(session);
+            Mechanism mechanism = NotAKemMechanisms[name]();
+            byte[] sharedSecret = [.. Enumerable.Repeat((byte)0xA5, 32)];
+            policy.Seen.Clear();
+
+            var encapsulate = Assert.Throws<ArgumentException>(() =>
+                key.EncapsulateSecret(mechanism, new byte[MLKemAlgorithm.MLKem768.CiphertextSizeInBytes], sharedSecret));
+            var decapsulate = Assert.Throws<ArgumentException>(() =>
+                key.DecapsulateSecret(mechanism, new byte[MLKemAlgorithm.MLKem768.CiphertextSizeInBytes], sharedSecret));
+
+            Assert.Equal("mechanism", encapsulate.ParamName);
+            Assert.Equal("mechanism", decapsulate.ParamName);
+            Assert.Empty(policy.Seen);
+            Assert.All(sharedSecret, b => Assert.Equal(0, b));
+        });
+    }
+
+    [Fact]
+    public void EncapsulateAndDecapsulateSecret_EmptyBuffers_ThrowArgumentException() => WithSession(OptIn(KeyMaterialExportKind.KemSharedSecret), session =>
+    {
+        using var key = GenerateMlKem(session);
+        var mlKem = new Mechanism(CKM.CKM_ML_KEM);
+        byte[] ciphertext = new byte[MLKemAlgorithm.MLKem768.CiphertextSizeInBytes];
+
+        Assert.Equal("ciphertext", Assert.Throws<ArgumentException>(() => key.EncapsulateSecret(mlKem, [], new byte[32])).ParamName);
+        Assert.Equal("sharedSecret", Assert.Throws<ArgumentException>(() => key.EncapsulateSecret(mlKem, ciphertext, [])).ParamName);
+        Assert.Equal("ciphertext", Assert.Throws<ArgumentException>(() => key.DecapsulateSecret(mlKem, [], new byte[32])).ParamName);
+        Assert.Equal("sharedSecret", Assert.Throws<ArgumentException>(() => key.DecapsulateSecret(mlKem, ciphertext, [])).ParamName);
+    });
+
+    [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
+    public void EncapsulateSecret_ThenDecapsulateSecret_AgreeWithTheBcl() => WithSession(OptIn(KeyMaterialExportKind.KemSharedSecret), session =>
+    {
+        using var key = GenerateMlKem(session);
+        var mlKem = new Mechanism(CKM.CKM_ML_KEM);
+        using var sender = MLKem.ImportEncapsulationKey(MLKemAlgorithm.MLKem768, key.Export(Pkcs11KeyBlobFormat.RawPublicKey));
+        sender.Encapsulate(out byte[] bclCiphertext, out byte[] bclSecret);
+
+        byte[] ciphertext = new byte[MLKemAlgorithm.MLKem768.CiphertextSizeInBytes];
+        byte[] encapsulated = new byte[32];
+        key.EncapsulateSecret(mlKem, ciphertext, encapsulated);
+        byte[] decapsulated = new byte[32];
+        key.DecapsulateSecret(mlKem, ciphertext, decapsulated);
+        byte[] fromBcl = new byte[32];
+        key.DecapsulateSecret(mlKem, bclCiphertext, fromBcl);
+
+        Assert.Equal(encapsulated, decapsulated);
+        Assert.Equal(bclSecret, fromBcl);
+        Assert.Equal(0, SecretKeyCount(session));
+    });
 
     public static TheoryData<string> NotAKdfOutput => [.. NotAKdfOutputMechanisms.Keys];
 

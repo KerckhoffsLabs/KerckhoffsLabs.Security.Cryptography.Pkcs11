@@ -52,6 +52,24 @@ public sealed class SecurePasswordTests
     }
 
     [Fact]
+    public void Constructor_WithEncoding_EncodesWithIt()
+    {
+        using var password = new SecurePassword("pässwörd".AsSpan(), Encoding.Latin1);
+
+        Assert.Equal(Encoding.Latin1.GetBytes("pässwörd"), password.Password.ToArray());
+    }
+
+    // A throwing encoding refuses an unpaired surrogate while counting, before the pinned buffer exists.
+    [Fact]
+    public void Constructor_WithThrowingEncoding_RefusesAnUnpairedSurrogate() =>
+        Assert.Throws<EncoderFallbackException>(() =>
+            new SecurePassword("1\uD8002".AsSpan(), new UTF8Encoding(false, throwOnInvalidBytes: true)));
+
+    [Fact]
+    public void Constructor_RejectsNullEncoding() =>
+        Assert.Throws<ArgumentNullException>(() => new SecurePassword("x".AsSpan(), null!));
+
+    [Fact]
     public void Constructor_RejectsNullString() =>
         Assert.Throws<ArgumentNullException>(() => new SecurePassword((string)null!));
 
