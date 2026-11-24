@@ -13,9 +13,22 @@ public sealed record InterfaceInfo
     /// <summary>Flags describing the interface.</summary>
     public InterfaceFlags InterfaceFlags { get; }
 
-    internal InterfaceInfo(string name, ulong flags)
+    /// <summary>
+    /// The version in the <c>CK_VERSION</c> header of the interface's function list: what tells a module's
+    /// v2.40, v3.0 and v3.2 <c>"PKCS 11"</c> interfaces apart. <see langword="null"/> when the module hands back
+    /// no function list.
+    /// </summary>
+    /// <remarks>
+    /// Major and minor only, verbatim from the header, as <see cref="LibraryInfo.CryptokiVersion"/>: v3.2 is
+    /// <c>(3, 2)</c> and v2.40 is <c>(2, 40)</c>. A vendor interface's table need not follow the standard layout
+    /// past this header; its version is the vendor's.
+    /// </remarks>
+    public Version? Version { get; }
+
+    internal InterfaceInfo(string name, ulong flags, Version? version = null)
     {
         Name = name;
         InterfaceFlags = new InterfaceFlags(flags);
+        Version = version;
     }
 }

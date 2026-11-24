@@ -1,11 +1,11 @@
 # Library Review Backlog
 
-_Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (cryptography, PKCS#11 v3.2 conformance, .NET library design and P/Invoke, QA and release engineering), then re-verified against `main` by staleness passes on 2026-09-15 and 2026-10-27. This file lists open items only: on 2026-10-27 the 88 resolved items were removed to keep it readable, and on 2026-11-21 seven more (BL-014, BL-030, BL-122, BL-125, BL-168, BL-180, BL-184), each checked against the code. Their records, and any reference below to an ID no longer listed here, are in the git history; commit 6ecb5d70 is the last to hold the first 88, and 1ddfe11f the last to hold the seven. A partly resolved item stays, with a `Remaining scope` line for what is left._
+_Generated 2026-07-09 and extended 2026-08-11 by two multi-specialist reviews (cryptography, PKCS#11 v3.2 conformance, .NET library design and P/Invoke, QA and release engineering), then re-verified against `main` by staleness passes on 2026-09-15 and 2026-10-27. This file lists open items only: on 2026-10-27 the 88 resolved items were removed to keep it readable, and on 2026-11-21 seven more (BL-014, BL-030, BL-122, BL-125, BL-168, BL-180, BL-184), each checked against the code. Their records, and any reference below to an ID no longer listed here, are in the git history; commit 6ecb5d70 is the last to hold the first 88, and 1ddfe11f the last to hold the seven. BL-020 was removed on 2026-11-24, once resolved. A partly resolved item stays, with a `Remaining scope` line for what is left._
 
 ## Summary
 
-- Open items: 87, 25 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
-- Critical: 0 | High: 5 (1 partly resolved) | Medium: 43 (16 partly resolved) | Low: 39 (8 partly resolved; includes the Info entry BL-158)
+- Open items: 86, 25 of them partly resolved. Item IDs keep their numbering, so gaps are resolved items.
+- Critical: 0 | High: 5 (1 partly resolved) | Medium: 42 (16 partly resolved) | Low: 39 (8 partly resolved; includes the Info entry BL-158)
 - Headline risks:
   - **The advertised streaming surface does not exist.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer: `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099).
   - **The public surface is narrower than the module's.** There is no capability probe for the v3.0 message API or the v3.2 functions (BL-077), and most of the v3.0 and v3.2 functions bound at the interop layer have no public caller (BL-019, BL-099).
@@ -104,16 +104,6 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist A
 - **Spec / References:** PKCS#11 v3.2 §5.16, §5.17, §5.20
-
-### [BL-020] `InterfaceInfo` omits the interface version, defeating the point of interface enumeration
-- **Area:** PKCS#11 Conformance
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/InterfaceInfo.cs:8-14` (`Name` and `InterfaceFlags` only); producers `Pkcs11Library.cs:417-441` (`GetInterfaces`) and `:458-472` (`GetInterface`)
-- **Problem:** `GetInterfaces()` returns only `Name` + flags. The interface's cryptoki version sits in the `CK_VERSION` header of the function list the descriptor points to, but is never surfaced — a consumer cannot tell a token's 2.40 / 3.0 / 3.2 "PKCS 11" interfaces apart.
-- **Proposed action:** Read the `CK_VERSION` from `CK_INTERFACE.FunctionList` and add a `Version` property. Additive.
-- **Breaks public API?** No
-- **Raised by:** PKCS#11 Specialist A
 
 ### [BL-022] net10.0-only targeting is a major reach cut with no documented rationale
 - **Area:** .NET API Design

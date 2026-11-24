@@ -24,5 +24,6 @@ public sealed class GetInterfaceTests_Mock(MockBackendFixture f)
     {
         var info = _backend.Library.GetInterface("PKCS 11");
         Assert.Equal("PKCS 11", info.Name);
+        Assert.Contains(info.Version, (Version?[])[new Version(2, 40), new Version(3, 1)]);
     }
 }

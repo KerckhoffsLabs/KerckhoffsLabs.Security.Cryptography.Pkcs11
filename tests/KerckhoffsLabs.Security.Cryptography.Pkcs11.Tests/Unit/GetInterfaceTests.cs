@@ -25,7 +25,10 @@ public sealed class GetInterfaceTests
         public bool NameWasNull;
         public ulong Flags = 1; // CKF_INTERFACE_FORK_SAFE
         public string ReturnName = "PKCS 11";
+        // The CK_VERSION header of the function list handed back, or null for no function list.
+        public (byte Major, byte Minor)? ListVersion = (3, 2);
         private IntPtr _namePtr;
+        private IntPtr _listPtr;
 
         protected override CKR C_GetInterface(byte[]? interfaceName, NativeCULong flags, ref CK_INTERFACE iface)
         {
@@ -36,6 +39,16 @@ public sealed class GetInterfaceTests
             _namePtr = Marshal.StringToCoTaskMemUTF8(ReturnName);
             iface.InterfaceName = _namePtr;
             iface.Flags = (NativeCULong)Flags;
+
+            Marshal.FreeCoTaskMem(_listPtr);
+            _listPtr = IntPtr.Zero;
+            if (ListVersion is var (major, minor))
+            {
+                _listPtr = Marshal.AllocCoTaskMem(2);
+                Marshal.WriteByte(_listPtr, 0, major);
+                Marshal.WriteByte(_listPtr, 1, minor);
+            }
+            iface.FunctionList = _listPtr;
             return CKR.CKR_OK;
         }
 
@@ -43,6 +56,8 @@ public sealed class GetInterfaceTests
         {
             Marshal.FreeCoTaskMem(_namePtr);
             _namePtr = IntPtr.Zero;
+            Marshal.FreeCoTaskMem(_listPtr);
+            _listPtr = IntPtr.Zero;
         }
     }
 
@@ -70,6 +85,31 @@ public sealed class GetInterfaceTests
 
         Assert.True(fake.NameWasNull);
         Assert.Equal("Vendor X", info.Name);
+    }
+
+    // The function list's CK_VERSION header, verbatim: v2.40 is (2, 40), not (2, 4).
+    [Theory]
+    [InlineData(3, 2)]
+    [InlineData(3, 0)]
+    [InlineData(2, 40)]
+    public void GetInterface_ReadsTheFunctionListVersion(byte major, byte minor)
+    {
+        using var fake = new InterfaceModule { ListVersion = (major, minor) };
+        using var lib = fake.Load();
+
+        Assert.Equal(new Version(major, minor), lib.GetInterface().Version);
+    }
+
+    [Fact]
+    public void GetInterface_NoFunctionList_HasNoVersion()
+    {
+        using var fake = new InterfaceModule { ListVersion = null };
+        using var lib = fake.Load();
+
+        InterfaceInfo info = lib.GetInterface();
+
+        Assert.Null(info.Version);
+        Assert.Equal("PKCS 11", info.Name);
     }
 
     [Fact]
