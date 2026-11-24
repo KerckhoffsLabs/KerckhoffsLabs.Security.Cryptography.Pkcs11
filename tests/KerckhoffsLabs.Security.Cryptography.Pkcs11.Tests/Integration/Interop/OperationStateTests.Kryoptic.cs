@@ -51,11 +51,7 @@ public sealed class OperationStateTests_Kryoptic(KryopticBackendFixture backend)
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationStateTestCases.PartialBlockDecryptions), MemberType = typeof(OperationStateTestCases))]
-    public void PartialBlock_Decrypt_IsEncryptedDataLenRange(CKM mechanism, int length)
-    {
-        // Kryoptic answers a partial ciphertext block with CKR_DATA_LEN_RANGE.
-        OperationStateTestCases.Assert_PartialBlock_Decrypt_IsEncryptedDataLenRange(_backend, mechanism, length, CKR.CKR_DATA_LEN_RANGE);
-    }
+    public void PartialBlock_Decrypt_IsEncryptedDataLenRange(CKM mechanism, int length) => OperationStateTestCases.Assert_PartialBlock_Decrypt_IsEncryptedDataLenRange(_backend, mechanism, length);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void LegacyParallelFunctions_AreNotParallel() => OperationStateTestCases.Assert_LegacyParallelFunctions_AreNotParallel(_backend);
@@ -82,10 +78,5 @@ public sealed class OperationStateTests_Kryoptic(KryopticBackendFixture backend)
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(OperationStateTestCases.ShortCiphertexts), MemberType = typeof(OperationStateTestCases))]
-    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext)
-    {
-        if (ciphertext.EndsWith(", 8 bytes", StringComparison.Ordinal) && !KryopticBackendFixture.KryopticRefusesAOneSemiblockKeyWrapCiphertext)
-            Assert.Skip("Kryoptic answers a one-semiblock key wrap ciphertext with CKR_DEVICE_ERROR");
-        OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
-    }
+    public void ShortCiphertext_Decrypt_IsRefused(string ciphertext) => OperationStateTestCases.Assert_ShortCiphertext_Decrypt_IsRefused(_backend, ciphertext);
 }

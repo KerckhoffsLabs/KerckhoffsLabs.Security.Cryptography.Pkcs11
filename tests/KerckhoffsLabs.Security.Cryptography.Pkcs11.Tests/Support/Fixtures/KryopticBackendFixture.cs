@@ -49,11 +49,11 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     // list already tells the truth.
 
     /// <inheritdoc/>
-    // Kryoptic reports a failed AES-CCM tag check through C_DecryptMessage as CKR_DEVICE_ERROR, a code
-    // the AEAD adapters deliberately do not map; pin it so the tests prove it stays a Pkcs11Exception.
-    // AES-GCM and ChaCha20-Poly1305 report a mapped code, which is left unpinned.
+    // Since v1.5.5 (latchset/kryoptic d01ea71) Kryoptic reports a failed AES-CCM or AES-GCM tag check as
+    // CKR_AEAD_DECRYPT_FAILED; AES-CCM answered CKR_DEVICE_ERROR before. ChaCha20-Poly1305 reports another
+    // tag-failure code, which is left unpinned.
     public CKR? AeadAuthFailureCode(CKM mechanism) =>
-        mechanism == CKM.CKM_AES_CCM ? CKR.CKR_DEVICE_ERROR : null;
+        mechanism is CKM.CKM_AES_CCM or CKM.CKM_AES_GCM ? CKR.CKR_AEAD_DECRYPT_FAILED : null;
 
     /// <summary>True if the token supports <see cref="CKM.CKM_CHACHA20_POLY1305"/>. Added upstream
     /// alongside <c>CKM_CHACHA20</c> — before that, Kryoptic had no ChaCha20 support of any kind and
@@ -81,27 +81,6 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the private-object cases (nobody, or the SO, logged in): see <see cref="KryopticRefusesPrivateObjectsWithoutALogin"/>.</summary>
     public static bool PrivateObjectLoginCheckAvailable => KryopticAvailable && KryopticRefusesPrivateObjectsWithoutALogin;
-
-    /// <summary>
-    /// False while <c>CKM_CONCATENATE_BASE_AND_DATA</c>, <c>CKM_CONCATENATE_DATA_AND_BASE</c>, <c>CKM_XOR_BASE_AND_DATA</c>
-    /// and <c>CKM_EXTRACT_KEY_FROM_KEY</c> give the derived key the template's <c>CKA_SENSITIVE</c> and
-    /// <c>CKA_EXTRACTABLE</c>, not the base key's (<c>derive</c> in <c>src/native/simplekdf.rs</c>): a sensitive or
-    /// unextractable key can be read through a key derived from it. <c>CKM_CONCATENATE_BASE_AND_KEY</c> is right.
-    /// PKCS#11 v3.2 §6.43. Reported upstream as latchset/kryoptic#577 (the extraction confirmed here).
-    /// </summary>
-    public const bool KryopticKeepsABaseKeysProtection = false;
-
-    /// <summary>Gate for the byte-operation derivations other than <c>CKM_CONCATENATE_BASE_AND_KEY</c>: see <see cref="KryopticKeepsABaseKeysProtection"/>.</summary>
-    public static bool BaseKeyProtectionAvailable => KryopticAvailable && KryopticKeepsABaseKeysProtection;
-
-    /// <summary>
-    /// False while <c>C_CopyObject</c> changes <c>CKA_ALLOWED_MECHANISMS</c>, wider or narrower, with <c>CKR_OK</c>.
-    /// PKCS#11 v3.2 §4.1.3: <c>CKA_ALLOWED_MECHANISMS</c> has no footnote 8, so a copy cannot change it. Fixed upstream by latchset/kryoptic#552, which marks it unchangeable, after the pinned commit.
-    /// </summary>
-    public const bool KryopticKeepsAllowedMechanismsOnACopy = false;
-
-    /// <summary>Gate for the copy cases that change <c>CKA_ALLOWED_MECHANISMS</c>: see <see cref="KryopticKeepsAllowedMechanismsOnACopy"/>.</summary>
-    public static bool AllowedMechanismsCopyAvailable => KryopticAvailable && KryopticKeepsAllowedMechanismsOnACopy;
 
     /// <summary>
     /// False while <c>C_EncryptInit</c> with the handle of a private token key after <c>C_Logout</c> answers
@@ -140,14 +119,6 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     public const bool KryopticRefusesAUniqueIdWithReadOnly = false;
 
     /// <summary>
-    /// False while a secret key's <c>CKA_VALUE</c> can be changed: <c>C_SetAttributeValue</c> of a new
-    /// <c>CKA_VALUE</c> on a non-sensitive AES key, and <c>C_CopyObject</c> with one in the template, answer
-    /// <c>CKR_OK</c> and the key takes the new value. PKCS#11 v3.2 §6.7 (no footnote 8 on <c>CKA_VALUE</c>),
-    /// §4.1.2 and §4.1.3: <c>CKR_ATTRIBUTE_READ_ONLY</c>. RSA and EC public key material is refused.
-    /// </summary>
-    public const bool KryopticFixesASecretKeysValue = false;
-
-    /// <summary>
     /// False while <c>CKA_ALWAYS_SENSITIVE</c> and <c>CKA_NEVER_EXTRACTABLE</c> in a template are not refused with
     /// <c>CKR_ATTRIBUTE_READ_ONLY</c>: <c>C_GenerateKey</c> takes either (with the opposite of what it would
     /// record) and <c>C_CreateObject</c> answers <c>CKR_ATTRIBUTE_TYPE_INVALID</c>. PKCS#11 v3.2 §4.11 footnotes
@@ -160,23 +131,6 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the provenance-in-a-template case: see <see cref="KryopticRefusesProvenanceAttributesInATemplate"/>.</summary>
     public static bool ProvenanceTemplateRefusalAvailable => KryopticAvailable && KryopticRefusesProvenanceAttributesInATemplate;
-
-    /// <summary>
-    /// False while an attribute with a NULL <c>pValue</c> and a non-zero <c>ulValueLen</c> is not refused:
-    /// <c>C_CreateObject</c> with <c>CKA_TOKEN</c> given as <c>{NULL, 1}</c> crashes the process (SIGSEGV), and
-    /// with <c>CKA_VALUE</c> given as <c>{NULL, 16}</c> makes a data object with an empty value and answers
-    /// <c>CKR_OK</c>. PKCS#11 v3.2 §4.1.1 point 2 (<c>CKR_ATTRIBUTE_VALUE_INVALID</c>), or
-    /// <c>CKR_ARGUMENTS_BAD</c>. No tripwire: reproducing the crash would take the test host down.
-    /// </summary>
-    public const bool KryopticRefusesANullAttributeValue = false;
-
-    /// <summary>
-    /// False while <c>CKM_ECDH1_DERIVE</c> gives the derived key <c>CKA_ALWAYS_SENSITIVE = TRUE</c> from a base
-    /// key whose <c>CKA_ALWAYS_SENSITIVE</c> is FALSE (an EC private key imported sensitive with
-    /// <c>C_CreateObject</c>). PKCS#11 v3.2 §6.3.17: "If the base key has its CKA_ALWAYS_SENSITIVE attribute set to
-    /// CK_FALSE, then the derived key will as well." <c>CKM_HKDF_DERIVE</c> follows the rule.
-    /// </summary>
-    public const bool KryopticDerivesAnEcdhKeysHistoryFromTheBase = false;
 
     /// <summary>
     /// False while an HMAC key whose <c>CKA_SIGN</c> (<c>CKA_VERIFY</c>) is FALSE is refused by
@@ -209,35 +163,9 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     public const bool KryopticReportsAnHkdfBaseKeyOfTheWrongTypeAsInconsistent = false;
 
     /// <summary>
-    /// False while a <c>CKM_AES_CBC_PAD</c> <c>C_DecryptFinal</c> into a buffer too small for the last part answers
-    /// <c>CKR_ENCRYPTED_DATA_INVALID</c> and ends the operation: <c>decrypt_final</c> in <c>src/ossl/aes.rs</c>
-    /// hands the caller's buffer to OpenSSL's final, whose failure it reports as bad data. PKCS#11 v3.2 §5.2:
-    /// <c>CKR_BUFFER_TOO_SMALL</c> with the length needed, and the operation kept for the retry.
-    /// </summary>
-    public const bool KryopticKeepsACbcPadDecryptFinalOnAShortBuffer = false;
-
-    /// <summary>
-    /// False while <c>C_UnwrapKey(CKM_AES_KEY_WRAP)</c> refuses a blob that fails RFC 3394's integrity check, or one
-    /// of 8 bytes, with <c>CKR_DEVICE_ERROR</c>, and one of 20 bytes (not a whole number of semiblocks) with
-    /// <c>CKR_DATA_LEN_RANGE</c>. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_INVALID</c> for the first,
-    /// <c>CKR_WRAPPED_KEY_LEN_RANGE</c> for a blob invalid by its length alone.
-    /// </summary>
-    public const bool KryopticReportsATamperedKeyWrapBlobAsInvalid = false;
-
-    /// <summary>Gate for the tampered AES key wrap case: see <see cref="KryopticReportsATamperedKeyWrapBlobAsInvalid"/>.</summary>
-    public static bool TamperedKeyWrapRefusalAvailable => KryopticAvailable && KryopticReportsATamperedKeyWrapBlobAsInvalid;
-
-    /// <summary>
-    /// False while a <c>C_Decrypt</c> with <c>CKM_AES_KEY_WRAP</c> or <c>CKM_AES_KEY_WRAP_KWP</c> of 8 bytes (one
-    /// semiblock) answers its length query with <c>CKR_OK</c> and then the call with <c>CKR_DEVICE_ERROR</c>. PKCS#11
-    /// v3.2 §5.10.2: a ciphertext of an inappropriate length is <c>CKR_ENCRYPTED_DATA_LEN_RANGE</c> or
-    /// <c>CKR_ENCRYPTED_DATA_INVALID</c>. 20 bytes is refused as it should be.
-    /// </summary>
-    public const bool KryopticRefusesAOneSemiblockKeyWrapCiphertext = false;
-
-    /// <summary>
     /// False while <c>C_UnwrapKey(CKM_RSA_PKCS_OAEP)</c> of a blob one byte short of the modulus answers
-    /// <c>CKR_DEVICE_ERROR</c>. PKCS#11 v3.2 §5.1.6 and §5.18.4: <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
+    /// <c>CKR_ENCRYPTED_DATA_INVALID</c> (<c>CKR_DEVICE_ERROR</c> before v1.5.5). PKCS#11 v3.2 §5.1.6 and §5.18.4:
+    /// <c>CKR_WRAPPED_KEY_LEN_RANGE</c>.
     /// </summary>
     public const bool KryopticRefusesAnOaepBlobByItsLength = false;
 
@@ -253,22 +181,6 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for the private-key <c>C_DigestKey</c> case: see <see cref="KryopticReportsAPrivateKeyAsIndigestible"/>.</summary>
     public static bool PrivateKeyDigestRefusalAvailable => KryopticAvailable && KryopticReportsAPrivateKeyAsIndigestible;
-
-    /// <summary>
-    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit</c> with <c>CKM_AES_GCM</c> or <c>CKM_AES_CCM</c> and a NULL
-    /// <c>pAAD</c> behind a non-zero <c>ulAADLen</c> answers <c>CKR_OK</c> and runs with no AAD: <c>bytes_to_vec</c>
-    /// (<c>src/pkcs11/mod.rs</c>) makes an empty vector of a NULL pointer, in <c>src/ossl/aes.rs</c>. Confirmed by a
-    /// probe whose ciphertext and tag were the BCL's with empty AAD. PKCS#11 v3.2 §6.13.2, §6.13.4: <c>pAAD</c> may be
-    /// NULL only when <c>ulAADLen</c> is 0; §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>).
-    /// </summary>
-    public const bool KryopticRefusesANullAadPointer = false;
-
-    /// <summary>
-    /// False while <c>C_EncryptInit</c> or <c>C_DecryptInit(CKM_AES_CCM)</c> with a NULL <c>pNonce</c> behind
-    /// <c>ulNonceLen</c> 12 answers <c>CKR_DEVICE_ERROR</c>: the NULL pointer becomes an empty nonce, which OpenSSL
-    /// refuses. PKCS#11 v3.2 §6.13.7 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c> (or <c>CKR_ARGUMENTS_BAD</c>).
-    /// </summary>
-    public const bool KryopticRefusesANullCcmNonceAsInvalid = false;
 
     /// <summary>
     /// False while <c>C_Encrypt(CKM_AES_CTR)</c> of three blocks under <c>ulCounterBits</c> 2, the counter bits starting
@@ -301,35 +213,12 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     public static bool NullOaepLabelRefusalAvailable => KryopticAvailable && KryopticRefusesANullOaepLabel;
 
     /// <summary>
-    /// False while <c>C_DeriveKey(CKM_ECDH1_DERIVE)</c> with a peer value that is a DER OCTET STRING whose length byte
-    /// promises 65 bytes and has 40 answers <c>CKR_DEVICE_ERROR</c>; a 1 KiB peer value is refused as it should be.
-    /// PKCS#11 v3.2 §6.3.16 and §5.1.6: <c>CKR_MECHANISM_PARAM_INVALID</c>.
-    /// </summary>
-    public const bool KryopticRefusesAMalformedEcdhPeerAsInvalid = false;
-
-    /// <summary>
     /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with SHA-256 and <c>CKA_VALUE_LEN</c> 8161 (255 x 32 + 1, past
     /// RFC 5869's limit) answers <c>CKR_DEVICE_ERROR</c>; 2^32 + 1 and a salt key that is no secret key are refused as
     /// they should be. PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
     /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>.
     /// </summary>
     public const bool KryopticRefusesAnHkdfOutputAboveTheRfcLimit = false;
-
-    /// <summary>
-    /// False while <c>C_GenerateKeyPair(CKM_EC_KEY_PAIR_GEN)</c> with a <c>CKA_EC_PARAMS</c> OID that names no curve (the
-    /// P-256 OID with an arc added or its last arc dropped) answers <c>CKR_GENERAL_ERROR</c>. PKCS#11 v3.2 §5.1.6:
-    /// <c>CKR_CURVE_NOT_SUPPORTED</c> or <c>CKR_DOMAIN_PARAMS_INVALID</c> (or <c>CKR_ATTRIBUTE_VALUE_INVALID</c>, §4.1).
-    /// </summary>
-    public const bool KryopticRefusesAnOidThatIsNoCurveAsNotSupported = false;
-
-    /// <summary>
-    /// False while <c>C_GenerateKey(CKM_GENERIC_SECRET_KEY_GEN)</c> with <c>CKA_VALUE_LEN</c> 2^32 + 16 sets out to make
-    /// the 4 GiB key: the test host grew past 4 GiB of resident memory and the kernel's OOM killer ended it (confirmed
-    /// by running the row alone and in the kernel log). It reports ulMinKeySize and ulMaxKeySize 0, so the case's
-    /// range rows skip. PKCS#11 v3.2 §6.8.3: a length past the reported range is <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
-    /// <c>CKR_TEMPLATE_INCONSISTENT</c> or <c>CKR_KEY_SIZE_RANGE</c>, which a module can answer before allocating.
-    /// </summary>
-    public const bool KryopticBoundsAGenericSecretLength = false;
 
     public KryopticBackendFixture()
     {

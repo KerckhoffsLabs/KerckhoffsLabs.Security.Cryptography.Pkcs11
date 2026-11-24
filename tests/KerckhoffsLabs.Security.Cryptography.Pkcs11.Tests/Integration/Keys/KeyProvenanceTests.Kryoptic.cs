@@ -25,12 +25,7 @@ public sealed class KeyProvenanceTests_Kryoptic(KryopticBackendFixture backend)
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(KeyProvenanceTestCases.DerivationMechanisms), MemberType = typeof(KeyProvenanceTestCases))]
-    public void DerivedKey_TakesItsHistoryFromTheBase(string derivation)
-    {
-        if (derivation == "ECDH" && !KryopticBackendFixture.KryopticDerivesAnEcdhKeysHistoryFromTheBase)
-            Assert.Skip("Kryoptic makes a key derived with ECDH from an imported base CKA_ALWAYS_SENSITIVE");
-        KeyProvenanceTestCases.Assert_DerivedKey_TakesItsHistoryFromTheBase(_backend, derivation);
-    }
+    public void DerivedKey_TakesItsHistoryFromTheBase(string derivation) => KeyProvenanceTestCases.Assert_DerivedKey_TakesItsHistoryFromTheBase(_backend, derivation);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void KeyProtectedAfterItsCreation_HasNoProtectedHistory() => KeyProvenanceTestCases.Assert_KeyProtectedAfterItsCreation_HasNoProtectedHistory(_backend);

@@ -10,14 +10,7 @@ public sealed class MechanismParameterTests_Kryoptic(KryopticBackendFixture back
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.AeadParameterFaults), MemberType = typeof(MechanismParameterTestCases))]
-    public void AeadParameter_OutOfRange_IsMechanismParamInvalid(string fault)
-    {
-        if (fault is "GCM pAAD NULL" or "CCM pAAD NULL" && !KryopticBackendFixture.KryopticRefusesANullAadPointer)
-            Assert.Skip("Kryoptic takes a NULL pAAD behind a length as no AAD");
-        if (fault == "CCM pNonce NULL" && !KryopticBackendFixture.KryopticRefusesANullCcmNonceAsInvalid)
-            Assert.Skip("Kryoptic refuses a NULL CCM pNonce with CKR_DEVICE_ERROR");
-        MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
-    }
+    public void AeadParameter_OutOfRange_IsMechanismParamInvalid(string fault) => MechanismParameterTestCases.Assert_AeadParameter_OutOfRange_IsMechanismParamInvalid(_backend, fault);
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.AesCtrCounterBitsOutOfRange), MemberType = typeof(MechanismParameterTestCases))]
@@ -32,10 +25,5 @@ public sealed class MechanismParameterTests_Kryoptic(KryopticBackendFixture back
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(MechanismParameterTestCases.GenericSecretLengths), MemberType = typeof(MechanismParameterTestCases))]
-    public void GenericSecretKeyGen_LengthIsBoundedInBits(string row)
-    {
-        if (row == "2^32 + 16" && !KryopticBackendFixture.KryopticBoundsAGenericSecretLength)
-            Assert.Skip("Kryoptic sets out to make a 4 GiB generic secret, and the test host is killed for its memory");
-        MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
-    }
+    public void GenericSecretKeyGen_LengthIsBoundedInBits(string row) => MechanismParameterTestCases.Assert_GenericSecretKeyGen_LengthIsBoundedInBits(_backend, row);
 }

@@ -35,4 +35,8 @@ public sealed class EncapsulateKeyTests_Kryoptic(KryopticBackendFixture backend)
     [MemberData(nameof(EncapsulateKeyTestCases.MlKemParameterSets), MemberType = typeof(EncapsulateKeyTestCases))]
     public void MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(CkpMlKem parameterSet) =>
         EncapsulateKeyTestCases.Assert_MlKem_EncapsulateDecapsulate_ToNonExtractableAesKey(_backend, parameterSet);
+
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [MemberData(nameof(EncapsulateKeyTestCases.MlKemMalformedInputs), MemberType = typeof(EncapsulateKeyTestCases))]
+    public void MlKem_MalformedInput_IsRefused(string malformed) => EncapsulateKeyTestCases.Assert_MlKem_MalformedInput_IsRefused(_backend, malformed);
 }

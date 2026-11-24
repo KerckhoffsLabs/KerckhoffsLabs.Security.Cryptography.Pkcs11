@@ -229,6 +229,58 @@ internal static class EncapsulateKeyTestCases
         }
     }
 
+    public static TheoryData<string> MlKemMalformedInputs =>
+        ["encapsulate with a parameter", "decapsulate with a parameter", "a ciphertext 1 byte short", "a ciphertext 1 byte long"];
+
+    // CKM_ML_KEM has no parameter (PKCS#11 v3.2 §6.68.5), so one given to C_EncapsulateKey or C_DecapsulateKey is
+    // CKR_MECHANISM_PARAM_INVALID (§5.1.6); a ciphertext that is not the parameter set's length is
+    // CKR_WRAPPED_KEY_LEN_RANGE, which §5.18.9 lists for C_DecapsulateKey. ML-KEM-768. Kryoptic before v1.5.5 took
+    // the parameter (latchset/kryoptic#571) and answered the ciphertext with CKR_DEVICE_ERROR.
+    internal static void Assert_MlKem_MalformedInput_IsRefused(IPkcs11Backend backend, string malformed)
+    {
+        backend.RequireMlKemParameterSet(MLKemAlgorithm.MLKem768.EncapsulationKeySizeInBytes);
+        using var session = OpenSession(backend);
+
+        string label = $"encap-malformed-{Guid.NewGuid():N}";
+        byte[] id = TestKeys.IdFor(label);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
+            .Label(label).Id(id)
+            .Attribute(CKA.CKA_ENCAPSULATE, true)
+            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
+            .Label(label).Id(id)
+            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
+
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        try
+        {
+            var plain = new Mechanism(CKM.CKM_ML_KEM);
+            var withParameter = new Mechanism(CKM.CKM_ML_KEM, [0x01, 0x02, 0x03, 0x04]);
+            int length = MLKemAlgorithm.MLKem768.CiphertextSizeInBytes;
+            using var template = AesSharedKeyTemplate(32, valueLen: true);
+
+            var (expected, call) = malformed switch
+            {
+                "encapsulate with a parameter" => (CKR.CKR_MECHANISM_PARAM_INVALID,
+                    (Action)(() => key.EncapsulateKey(withParameter, template, length).Dispose())),
+                "decapsulate with a parameter" => (CKR.CKR_MECHANISM_PARAM_INVALID,
+                    () => DecapsulateAesKey(key, withParameter, new byte[length], 32).Dispose()),
+                "a ciphertext 1 byte short" => (CKR.CKR_WRAPPED_KEY_LEN_RANGE,
+                    () => DecapsulateAesKey(key, plain, new byte[length - 1], 32).Dispose()),
+                "a ciphertext 1 byte long" => (CKR.CKR_WRAPPED_KEY_LEN_RANGE,
+                    () => DecapsulateAesKey(key, plain, new byte[length + 1], 32).Dispose()),
+                _ => throw new ArgumentOutOfRangeException(nameof(malformed), malformed, null),
+            };
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(call);
+            Assert.Equal(expected, ex.ReturnValue);
+        }
+        finally
+        {
+            key.Destroy();
+        }
+    }
+
     private static void AssertNoProtectedHistory(Pkcs11Key sharedKey, string side)
     {
         using var attrs = sharedKey.GetAttributeValue(
