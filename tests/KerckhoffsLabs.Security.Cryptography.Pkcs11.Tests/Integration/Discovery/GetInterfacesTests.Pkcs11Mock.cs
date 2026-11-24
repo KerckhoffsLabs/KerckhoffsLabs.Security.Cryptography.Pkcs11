@@ -22,5 +22,7 @@ public sealed class GetInterfacesTests_Mock(MockBackendFixture f)
         // The mock advertises flags = 0 on both interfaces.
         Assert.All(interfaces, i => Assert.False(i.InterfaceFlags.ForkSafe));
         Assert.All(interfaces, i => Assert.Equal(0UL, i.InterfaceFlags.Flags));
+        // Only the function lists' CK_VERSION headers tell the two apart.
+        Assert.Equal([new Version(2, 40), new Version(3, 1)], interfaces.Select(i => i.Version).Order());
     }
 }

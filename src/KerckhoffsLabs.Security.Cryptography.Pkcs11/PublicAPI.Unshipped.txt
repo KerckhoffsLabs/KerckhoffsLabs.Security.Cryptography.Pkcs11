@@ -2377,3 +2377,4 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.VerifyPkcs1Digest(System.S
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.AlgorithmOf<TAlgorithm>(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK keyType, ulong parameterSet) -> TAlgorithm?
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.Describe(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK keyType, ulong parameterSet) -> (string! Oid, int PublicKeyLength)?
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial.PostQuantumParameterSets.KeyTypeOf(string? oid) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.InterfaceInfo.Version.get -> System.Version?

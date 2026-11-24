@@ -490,14 +490,22 @@ public sealed class Pkcs11Library : IDisposable
         int n = ReportedLength.Written(count, raw.Length, Pkcs11Operations.OpGetInterfaceList);
         List<InterfaceInfo> list = new(n);
         for (int i = 0; i < n; i++)
-        {
-            string name = raw[i].InterfaceName != IntPtr.Zero
-                ? Marshal.PtrToStringUTF8(raw[i].InterfaceName) ?? string.Empty
-                : string.Empty;
-            list.Add(new InterfaceInfo(name, (ulong)raw[i].Flags));
-        }
+            list.Add(Describe(raw[i]));
 
         return list;
+    }
+
+    // The descriptor's name and flags, and the CK_VERSION every function list starts with (
+    // CK_FUNCTION_LIST and CK_FUNCTION_LIST_3_x share that first member, and so do vendor tables by convention).
+    private static InterfaceInfo Describe(CK_INTERFACE iface)
+    {
+        string name = iface.InterfaceName != IntPtr.Zero
+            ? Marshal.PtrToStringUTF8(iface.InterfaceName) ?? string.Empty
+            : string.Empty;
+        Version? version = iface.FunctionList != IntPtr.Zero
+            ? UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList).ToVersion()
+            : null;
+        return new InterfaceInfo(name, (ulong)iface.Flags, version);
     }
 
     /// <summary>
@@ -522,10 +530,7 @@ public sealed class Pkcs11Library : IDisposable
         CKR rv = LowLevel.C_GetInterface(nameBytes, new NativeCULong(0), out CK_INTERFACE iface);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetInterface);
 
-        string name = iface.InterfaceName != IntPtr.Zero
-            ? Marshal.PtrToStringUTF8(iface.InterfaceName) ?? string.Empty
-            : string.Empty;
-        return new InterfaceInfo(name, (ulong)iface.Flags);
+        return Describe(iface);
     }
 
     /// <summary>
