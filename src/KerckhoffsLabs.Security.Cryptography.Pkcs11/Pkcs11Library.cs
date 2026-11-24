@@ -101,7 +101,7 @@ public sealed class Pkcs11Library : IDisposable
     /// Cached per-token quirk for ML-KEM decapsulation: whether the shared-secret template must
     /// omit <c>CKA_VALUE_LEN</c>. Tokens disagree on the unwrap-created key — SoftHSM rejects
     /// <c>CKA_VALUE_LEN</c> as read-only, opencryptoki requires it — and PKCS#11 offers no way to
-    /// query this, so it is learned the first time <see cref="Algorithms.MLKemPkcs11"/> decapsulates
+    /// query this, so it is learned the first time <see cref="Pkcs11Key.DecapsulateSecret"/> decapsulates
     /// against this token and reused thereafter. <see langword="null"/> until probed; constant for a given module.
     /// </summary>
     internal bool? MlKemDecapsulateOmitsValueLen { get; set; }

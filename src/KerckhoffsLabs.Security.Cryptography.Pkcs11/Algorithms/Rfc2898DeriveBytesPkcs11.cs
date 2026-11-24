@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
@@ -408,21 +407,9 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         return Pbkdf2Key(session, secure, salt, iterations, hashAlgorithm, template);
     }
 
+    // The core reads the output back under the KdfOutput export rule.
     private static byte[] DeriveExtractable(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, int length)
-    {
-        // The export check comes first: it is what a policy that allows extractable templates but not
-        // plaintext KDF output (a FIPS-style policy) relies on.
-        using SecretReadBack readBack = session.BeginReadBack(KeyMaterialExportKind.KdfOutput);
-        var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf));
-        // A session-scoped, extractable, non-sensitive generic secret, so its CKA_VALUE can be read back. Built from
-        // the public template API: what SecretReadBack.ExtractableSecretTemplate builds for the core's read-backs.
-        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .ValueLen(length)
-            .Extractable()
-            .Sensitive(false)
-            .Build();
-        return readBack.Read(() => session.GenerateKey(mechanism, template), length, ReadBackFailures.KdfOutput);
-    }
+        => session.GenerateBytes(new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), length);
 
     private static void DeriveInto(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, Span<byte> destination)
     {

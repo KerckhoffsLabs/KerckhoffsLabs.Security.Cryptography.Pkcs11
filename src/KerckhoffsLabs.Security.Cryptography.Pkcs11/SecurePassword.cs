@@ -48,10 +48,20 @@ public sealed class SecurePassword : IDisposable
     {
     }
 
-    // Encodes with encoding, whose fallback decides what an unpaired surrogate becomes: a throwing
-    // encoding throws while counting, before the buffer exists.
-    internal SecurePassword(ReadOnlySpan<char> password, Encoding encoding)
+    /// <summary>Initializes a new <see cref="SecurePassword"/> from characters, encoded with <paramref name="encoding"/>.</summary>
+    /// <remarks>
+    /// The encoding's fallback decides what a character it cannot encode becomes. Pass
+    /// <c>new UTF8Encoding(false, throwOnInvalidBytes: true)</c> to refuse an unpaired surrogate instead of encoding it
+    /// as U+FFFD: it throws while the length is counted, before the pinned buffer exists, so nothing is left to zero.
+    /// The characters are encoded straight into the pinned buffer; zero your own character buffer once this returns.
+    /// </remarks>
+    /// <param name="password">The password characters. May be empty.</param>
+    /// <param name="encoding">The encoding the token should see the password in.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="encoding"/> is <see langword="null"/>.</exception>
+    /// <exception cref="EncoderFallbackException">Thrown if <paramref name="encoding"/> throws on a character it cannot encode.</exception>
+    public SecurePassword(ReadOnlySpan<char> password, Encoding encoding)
     {
+        ArgumentNullException.ThrowIfNull(encoding);
         _buffer = GC.AllocateArray<byte>(encoding.GetByteCount(password), pinned: true);
         encoding.GetBytes(password, _buffer);
     }
