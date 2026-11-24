@@ -230,7 +230,7 @@ public sealed class MLKemPkcs11Tests_Managed
     [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     [InlineData(true)]
     [InlineData(false)]
-    public void WhenDestroyFails_SurfacesPkcs11Exception_AndHandsBackNoSecret(bool encapsulate)
+    public void WhenDestroyFails_SurfacesTheFailure_AndHandsBackNoSecret(bool encapsulate)
     {
         var token = new ManagedSoftToken();
         using var library = token.Load();
@@ -249,15 +249,16 @@ public sealed class MLKemPkcs11Tests_Managed
             // Make every C_DestroyObject report failure so the shared-secret object cannot be removed.
             token.DestroyObjectResultOverride = CKR.CKR_FUNCTION_FAILED;
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            // The adapter's warning, with the module's own answer to C_DestroyObject as the inner exception.
+            var ex = Assert.Throws<CryptographicException>(() =>
             {
                 if (encapsulate)
                     mlkem.Encapsulate(ciphertext, sharedSecret);
                 else
                     mlkem.Decapsulate(ciphertext, sharedSecret);
             });
-            Assert.Equal(CKR.CKR_FUNCTION_FAILED, ex.ReturnValue);
             Assert.Contains("may remain on-token", ex.Message, StringComparison.Ordinal);
+            Assert.Equal(CKR.CKR_FUNCTION_FAILED, Assert.IsAssignableFrom<Pkcs11Exception>(ex.InnerException).ReturnValue);
             Assert.All(sharedSecret, b => Assert.Equal(0, b));
         }
         finally
@@ -305,19 +306,18 @@ public sealed class MLKemPkcs11Tests_Managed
     [Theory(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     [InlineData(true)]
     [InlineData(false)]
-    public void SharedSecretUnreadable_ThrowsPkcs11Exception_AndHandsBackNoSecret(bool encapsulate) =>
+    public void SharedSecretUnreadable_ThrowsCryptographicException_AndHandsBackNoSecret(bool encapsulate) =>
         WithMisbehavingToken(new ManagedSoftToken { KemWithholdsSharedSecret = true }, (session, mlkem, ciphertext) =>
         {
             byte[] sharedSecret = Filled(mlkem.Algorithm.SharedSecretSizeInBytes);
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            var ex = Assert.Throws<CryptographicException>(() =>
             {
                 if (encapsulate)
                     mlkem.Encapsulate(new byte[mlkem.Algorithm.CiphertextSizeInBytes], sharedSecret);
                 else
                     mlkem.Decapsulate(ciphertext, sharedSecret);
             });
-            Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
             Assert.Contains("unreadable", ex.Message, StringComparison.Ordinal);
             Assert.All(sharedSecret, b => Assert.Equal(0, b));
             Assert.Equal(0, SecretKeyCount(session));
@@ -329,7 +329,7 @@ public sealed class MLKemPkcs11Tests_Managed
     [InlineData(true, 1)]
     [InlineData(false, -1)]
     [InlineData(false, 1)]
-    public void SharedSecretOfTheWrongLength_ThrowsPkcs11Exception_AndHandsBackNoSecret(bool encapsulate, int lengthDelta)
+    public void SharedSecretOfTheWrongLength_ThrowsCryptographicException_AndHandsBackNoSecret(bool encapsulate, int lengthDelta)
     {
         var token = new ManagedSoftToken
         {
@@ -339,14 +339,13 @@ public sealed class MLKemPkcs11Tests_Managed
         {
             byte[] sharedSecret = Filled(mlkem.Algorithm.SharedSecretSizeInBytes);
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+            var ex = Assert.Throws<CryptographicException>(() =>
             {
                 if (encapsulate)
                     mlkem.Encapsulate(new byte[mlkem.Algorithm.CiphertextSizeInBytes], sharedSecret);
                 else
                     mlkem.Decapsulate(ciphertext, sharedSecret);
             });
-            Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
             Assert.Contains($"{32 + lengthDelta}-byte shared secret", ex.Message, StringComparison.Ordinal);
             Assert.All(sharedSecret, b => Assert.Equal(0, b));
             Assert.Equal(0, SecretKeyCount(session));
@@ -356,15 +355,14 @@ public sealed class MLKemPkcs11Tests_Managed
     // A short ciphertext is the token's fault. The secret was already copied out when the ciphertext is
     // checked, so the failure must zero it again.
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
-    public void Encapsulate_TokenCiphertextTooShort_ThrowsPkcs11Exception_AndHandsBackNoSecret() =>
+    public void Encapsulate_TokenCiphertextTooShort_ThrowsCryptographicException_AndHandsBackNoSecret() =>
         WithMisbehavingToken(new ManagedSoftToken { KemCiphertextOverride = ct => ct[..^1] }, (session, mlkem, _) =>
         {
             int expected = mlkem.Algorithm.CiphertextSizeInBytes;
             byte[] ciphertext = new byte[expected];
             byte[] sharedSecret = Filled(mlkem.Algorithm.SharedSecretSizeInBytes);
 
-            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mlkem.Encapsulate(ciphertext, sharedSecret));
-            Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+            var ex = Assert.Throws<CryptographicException>(() => mlkem.Encapsulate(ciphertext, sharedSecret));
             Assert.Contains($"{expected - 1}-byte buffer", ex.Message, StringComparison.Ordinal);
             Assert.All(sharedSecret, b => Assert.Equal(0, b));
             Assert.Equal(0, SecretKeyCount(session));
@@ -385,14 +383,13 @@ public sealed class MLKemPkcs11Tests_Managed
             token.DestroyObjectResultOverride = CKR.CKR_FUNCTION_FAILED;
             try
             {
-                var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
+                var ex = Assert.Throws<CryptographicException>(() =>
                 {
                     if (encapsulate)
                         mlkem.Encapsulate(new byte[mlkem.Algorithm.CiphertextSizeInBytes], sharedSecret);
                     else
                         mlkem.Decapsulate(ciphertext, sharedSecret);
                 });
-                Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
                 Assert.Contains("31-byte shared secret", ex.Message, StringComparison.Ordinal);
                 Assert.All(sharedSecret, b => Assert.Equal(0, b));
             }

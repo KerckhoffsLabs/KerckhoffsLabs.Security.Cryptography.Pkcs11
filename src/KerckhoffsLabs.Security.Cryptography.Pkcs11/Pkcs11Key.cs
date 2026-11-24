@@ -284,7 +284,8 @@ public sealed partial class Pkcs11Key : IDisposable
     /// named-curve OID, or names a curve the catalog doesn't list. Not cached.
     /// </summary>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
-    internal Pkcs11CurveInfo? ReadEcCurve()
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    public Pkcs11CurveInfo? ReadEcCurve()
     {
         using var attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
         if (attrs[0].CannotBeRead)
@@ -341,7 +342,20 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <see cref="SupportsMechanism(CKM)"/>, and the token's C_GetMechanismInfo flags for the mechanism
     /// include every <c>CKF_*</c> operation in <paramref name="requiredFlags"/> when it reports them.
     /// </summary>
-    internal bool SupportsMechanism(CKM mechanism, ulong requiredFlags) => _session.Core.SupportsMechanism(mechanism, requiredFlags);
+    /// <remarks>
+    /// A token can list a mechanism for some operations only: <c>CKM_AES_KEY_WRAP_KWP</c> for <c>C_WrapKey</c>
+    /// but not <c>C_Encrypt</c>, for example. When <c>C_GetMechanismInfo</c> fails, the flags are unknown and
+    /// the listing alone decides, as for <see cref="SupportsMechanism(CKM)"/>. Answers are cached per mechanism
+    /// on the session.
+    /// </remarks>
+    /// <param name="mechanism">The mechanism.</param>
+    /// <param name="requiredFlags">The <see cref="CKF"/> operation flags the mechanism must allow, such as
+    /// <see cref="CKF.CKF_ENCRYPT"/> or <see cref="CKF.CKF_DIGEST"/>, combined with <c>|</c>.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if another thread is currently inside an operation on the underlying session.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the underlying session has been disposed.</exception>
+    public bool SupportsMechanism(CKM mechanism, ulong requiredFlags) => _session.Core.SupportsMechanism(mechanism, requiredFlags);
 
     /// <summary>
     /// Reads the requested attribute values from this key. Uses the public-key handle for
@@ -853,10 +867,27 @@ public sealed partial class Pkcs11Key : IDisposable
     }
 
     /// <summary>
-    /// Signs a digest the caller computed with RSASSA-PKCS1-v1_5, judged by the session's policy as the
-    /// combined mechanism for <paramref name="hash"/>; see <see cref="Pkcs11SessionCore.SignPkcs1Digest"/>.
+    /// Signs a digest the caller computed with RSASSA-PKCS1-v1_5 (RFC 8017 §8.2): raw <c>CKM_RSA_PKCS</c> over
+    /// the DigestInfo for <paramref name="hash"/>, judged by the session's policy as the combined mechanism
+    /// (<c>CKM_SHA256_RSA_PKCS</c> for SHA-256, and so on).
     /// </summary>
-    internal byte[] SignPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest)
+    /// <remarks>
+    /// Raw <c>CKM_RSA_PKCS</c> signs any input, so <see cref="Sign"/> leaves it to the policy alone. Here the
+    /// input is always a DigestInfo of the named hash, so the operation is the PKCS#1 v1.5 signature scheme and
+    /// is judged as such. Prefer RSA-PSS (<c>CKM_RSA_PKCS_PSS</c> through <see cref="Sign"/>) for new signatures.
+    /// </remarks>
+    /// <param name="hash">The hash that produced <paramref name="digest"/>: SHA-1, SHA-224, SHA-256, SHA-384,
+    /// SHA-512, SHA3-256, SHA3-384 or SHA3-512.</param>
+    /// <param name="digest">The digest to sign.</param>
+    /// <returns>The signature.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="hash"/> is none of the hashes above.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException"><paramref name="digest"/> is not the length of a <paramref name="hash"/> digest.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's <see cref="Pkcs11Session.Policy"/> refuses the combined mechanism.</exception>
+    /// <exception cref="InvalidOperationException">As for <see cref="Sign"/>: a <c>CKA_ALWAYS_AUTHENTICATE</c> key whose
+    /// context login cannot be made.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Sign</c> call.</exception>
+    public byte[] SignPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest)
     {
         using ContextLogin? context = PrepareContextLogin();
         using var use = Use();
@@ -873,7 +904,16 @@ public sealed partial class Pkcs11Key : IDisposable
     /// on the combined mechanism for <paramref name="hash"/>. Uses the public handle when present, otherwise
     /// the synthesized public parameters, as <see cref="Verify"/> does.
     /// </summary>
-    internal bool VerifyPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest, ReadOnlySpan<byte> signature)
+    /// <param name="hash">The hash that produced <paramref name="digest"/>, as for <see cref="SignPkcs1Digest"/>.</param>
+    /// <param name="digest">The digest the signature covers.</param>
+    /// <param name="signature">The signature to verify.</param>
+    /// <returns><see langword="true"/> if the signature is valid, <see langword="false"/> if not.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="hash"/> is not one <see cref="SignPkcs1Digest"/> accepts.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException"><paramref name="digest"/> is not the length of a <paramref name="hash"/> digest.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's <see cref="Pkcs11Session.Policy"/> refuses the combined mechanism.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
+    public bool VerifyPkcs1Digest(System.Security.Cryptography.HashAlgorithmName hash, ReadOnlySpan<byte> digest, ReadOnlySpan<byte> signature)
     {
         using var use = Use();
 

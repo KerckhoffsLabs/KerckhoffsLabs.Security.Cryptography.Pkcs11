@@ -9,14 +9,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.KeyMaterial;
 
 /// <summary>
 /// Per parameter set of the FIPS 203/204/205 key types: the <c>SubjectPublicKeyInfo</c> algorithm OID
-/// (<see cref="Oids.PostQuantum"/>, with absent parameters), the BCL algorithm, and the public-key length.
+/// (the NIST CSOR OID, with absent parameters), the BCL algorithm, and the public-key length.
 /// </summary>
 /// <remarks>
 /// The lengths come from the BCL's descriptors (<see cref="MLDsaAlgorithm.PublicKeySizeInBytes"/>,
 /// <see cref="SlhDsaAlgorithm.PublicKeySizeInBytes"/>, <see cref="MLKemAlgorithm.EncapsulationKeySizeInBytes"/>),
 /// which are static and available whether or not the platform implements the algorithm.
 /// </remarks>
-internal static class PostQuantumParameterSets
+public static class PostQuantumParameterSets
 {
     private sealed record ParameterSet(CKK KeyType, ulong Value, string Oid, object Algorithm, int PublicKeyLength);
 
@@ -43,16 +43,16 @@ internal static class PostQuantumParameterSets
     ];
 
     /// <summary>The OID and public-key length for <paramref name="parameterSet"/> of <paramref name="keyType"/>, or <see langword="null"/> when unrecognized.</summary>
-    internal static (string Oid, int PublicKeyLength)? Describe(CKK keyType, ulong parameterSet)
+    public static (string Oid, int PublicKeyLength)? Describe(CKK keyType, ulong parameterSet)
         => Find(keyType, parameterSet) is { } set ? (set.Oid, set.PublicKeyLength) : null;
 
     /// <summary>The BCL algorithm for <paramref name="parameterSet"/> of <paramref name="keyType"/>, or <see langword="null"/> when unrecognized.</summary>
     /// <typeparam name="TAlgorithm"><see cref="MLDsaAlgorithm"/>, <see cref="SlhDsaAlgorithm"/> or <see cref="MLKemAlgorithm"/>, matching <paramref name="keyType"/>.</typeparam>
-    internal static TAlgorithm? AlgorithmOf<TAlgorithm>(CKK keyType, ulong parameterSet) where TAlgorithm : class
+    public static TAlgorithm? AlgorithmOf<TAlgorithm>(CKK keyType, ulong parameterSet) where TAlgorithm : class
         => Find(keyType, parameterSet)?.Algorithm as TAlgorithm;
 
     /// <summary>The key type whose parameter sets include the <c>SubjectPublicKeyInfo</c> algorithm <paramref name="oid"/>, or <see langword="null"/> when it is none of them.</summary>
-    internal static CKK? KeyTypeOf(string? oid)
+    public static CKK? KeyTypeOf(string? oid)
         => Array.Find(All, set => set.Oid == oid)?.KeyType;
 
     private static ParameterSet? Find(CKK keyType, ulong parameterSet)

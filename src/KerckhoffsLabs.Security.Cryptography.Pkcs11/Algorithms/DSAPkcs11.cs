@@ -197,12 +197,11 @@ public sealed class DSAPkcs11 : DSA
     }
 
     // q's length in bytes as ExportParameters(false) reports it, from the public-key object: a key without
-    // one throws CKR_OBJECT_HANDLE_INVALID, as Pkcs11Key.Verify does, since DSA has no managed fallback.
+    // one throws CKR_OBJECT_HANDLE_INVALID, as Pkcs11Key.Verify does, since DSA has no managed fallback. A q
+    // that is empty or zero never gets here: Pkcs11Key.Export refuses it with CKR_ATTRIBUTE_VALUE_INVALID.
     private int ReadSubprimeLength()
     {
         byte[] q = ExportParameters(includePrivateParameters: false).Q!;
-        if (q is [] or [0])
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID, "DSAPkcs11 (q is zero)");
         Volatile.Write(ref _subprimeLength, q.Length);
         return q.Length;
     }
