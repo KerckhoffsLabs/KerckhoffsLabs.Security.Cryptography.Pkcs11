@@ -25,15 +25,26 @@ public sealed class EcSubjectPublicKeyInfoTests
         Assert.Equal(expected.Q.Y, parsed.Q.Y);
     }
 
-    // Explicit domain parameters put a SEQUENCE where the curve's OID is read.
+    // Explicit domain parameters put a SEQUENCE where the curve's OID is read. Written by hand: macOS's ECDsa
+    // exports named curves only (PlatformNotSupportedException), and only the parameters' tag matters here.
     [Fact]
     public void ExplicitCurveSpki_ThrowsCryptographicException()
     {
-        using var named = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var ecdsa = ECDsa.Create();
-        ecdsa.ImportParameters(named.ExportExplicitParameters(false));
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        ECPoint q = ecdsa.ExportParameters(false).Q;
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            using (writer.PushSequence())
+            {
+                writer.WriteObjectIdentifier("1.2.840.10045.2.1");    // id-ecPublicKey
+                using (writer.PushSequence())                       // SpecifiedECDomain, abridged
+                    writer.WriteInteger(1);
+            }
+            writer.WriteBitString([0x04, .. q.X!, .. q.Y!]);
+        }
 
-        AssertMalformed(ecdsa.ExportSubjectPublicKeyInfo());
+        AssertMalformed(writer.Encode());
     }
 
     [Fact]

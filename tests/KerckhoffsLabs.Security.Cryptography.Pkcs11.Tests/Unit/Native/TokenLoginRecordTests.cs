@@ -1158,14 +1158,10 @@ public sealed class TokenLoginRecordTests : IDisposable
         record.WhileHoldingTransition = () =>
         {
             record.WhileHoldingTransition = null;
-            try
+            reentrant = Xunit.Record.Exception(() =>
             {
                 using LoginHold unexpected = record.Login(_library, TokenUser.User, _pin, username: null);
-            }
-            catch (Exception ex)
-            {
-                reentrant = ex;
-            }
+            });
         };
 
         using LoginHold hold = record.Login(_library, TokenUser.User, _pin, username: null);
