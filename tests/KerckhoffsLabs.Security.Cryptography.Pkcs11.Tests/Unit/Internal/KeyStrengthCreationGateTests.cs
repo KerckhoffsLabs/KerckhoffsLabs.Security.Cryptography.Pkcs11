@@ -697,6 +697,176 @@ public sealed class KeyStrengthCreationGateTests : IDisposable
         Assert.Equal(0, fake.GenerateKeyCalls);
     }
 
+    // A stated length that is no CK_ULONG length: CK_UNAVAILABLE_INFORMATION, or one past int. Either is refused as
+    // unreported before the token, never judged as a huge key.
+    [Theory]
+    [InlineData(ulong.MaxValue)]
+    [InlineData((ulong)int.MaxValue + 1)]
+    public void GenerateAes_TemplateWithAnUnusableLength_IsRefusedAsUnreported_BeforeTheToken(ulong valueLen)
+    {
+        if (valueLen == ulong.MaxValue)
+            valueLen = CK.CK_UNAVAILABLE_INFORMATION;
+        using var fake = new CreationFake();
+        using var session = fake.CreateSession(policy: StrongKeysOnly());
+        using var len = new ObjectAttribute(CKA.CKA_VALUE_LEN, valueLen);
+
+        KeyStrengthRequest request = RefusedRequest(() => session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [len]));
+
+        Assert.Equal(KeyStrengthSource.Template, request.Source);
+        Assert.Equal(CKK.CKK_AES, request.KeyType);
+        Assert.Null(request.ValueLengthBytes);
+        Assert.Equal(0, fake.GenerateKeyCalls);
+    }
+
+    // An imported value the caller's own template marks unreadable (the -1 length) states no size: refused as
+    // unreported before the token, not judged as a zero-byte key.
+    [Fact]
+    public void CreateObject_UnreadableValue_IsRefusedAsUnreported_BeforeTheToken()
+    {
+        using var fake = new CreationFake();
+        using var session = fake.CreateSession(policy: StrongKeysOnly());
+        using var keyClass = new ObjectAttribute(CKA.CKA_CLASS, (ulong)CKO.CKO_SECRET_KEY);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, (ulong)CKK.CKK_AES);
+        using var value = new ObjectAttribute(new CK_ATTRIBUTE
+        {
+            type = (NativeCULong)(ulong)CKA.CKA_VALUE,
+            value = IntPtr.Zero,
+            valueLen = NativeCULong.MaxValue,
+        });
+
+        KeyStrengthRequest request = RefusedRequest(() => session.CreateObject([keyClass, keyType, value]));
+
+        Assert.Equal(KeyStrengthSource.Template, request.Source);
+        Assert.Equal(CKK.CKK_AES, request.KeyType);
+        Assert.Null(request.ValueLengthBytes);
+        Assert.Equal(0, fake.CreateObjectCalls);
+    }
+
+    // A CKA_CLASS that is not a CK_ULONG says nothing about the object: it is treated as a key, so its stated size is
+    // judged rather than waved through as a non-key object.
+    [Fact]
+    public void CreateObject_ClassThatIsNotACkUlong_IsJudgedAsAKey()
+    {
+        using var fake = new CreationFake();
+        using var session = fake.CreateSession(policy: StrongKeysOnly());
+        using var oddClass = new ObjectAttribute(CKA.CKA_CLASS, [0x04]);
+        using var keyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, (ulong)CKK.CKK_AES);
+        using var value = new ObjectAttribute(CKA.CKA_VALUE, new byte[16]);
+
+        KeyStrengthRequest request = RefusedRequest(() => session.CreateObject([oddClass, keyType, value]));
+
+        Assert.Equal(KeyStrengthSource.Template, request.Source);
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal(0, fake.CreateObjectCalls);
+    }
+
+    /// <summary>
+    /// Allows every mechanism (Recommended refuses the stateful-hash key-pair mechanisms before any key is judged),
+    /// inspects keys, and refuses every one.
+    /// </summary>
+    private sealed class RefusesEveryKey : ICryptoPolicy
+    {
+        public string Name => "RefusesEveryKey";
+        public bool AllowsOverride => true;
+        public bool InspectsKeys => true;
+
+        public PolicyDecision Evaluate(PolicyRequest request)
+            => request is KeyStrengthRequest ? PolicyDecision.Deny("Too weak.") : PolicyDecision.Allow;
+    }
+
+    // CKM_HSS_KEY_PAIR_GEN makes an HSS pair: a template that states CKA_HSS_LEVELS but no key type is judged as HSS.
+    [Fact]
+    public void HssKeyPair_TemplateWithLevelsAndNoKeyType_TakesTheTypeFromTheMechanism()
+    {
+        using var fake = new CreationFake();
+        using var session = fake.CreateSession(policy: new RefusesEveryKey());
+        using var levels = new ObjectAttribute(CKA.CKA_HSS_LEVELS, 2UL);
+
+        KeyStrengthRequest request = RefusedRequest(() => session.GenerateKeyPair(
+            new Mechanism(CKM.CKM_HSS_KEY_PAIR_GEN), [], [levels], out _, out _));
+
+        Assert.Equal(KeyStrengthSource.Template, request.Source);
+        Assert.Equal(CKK.CKK_HSS, request.KeyType);
+        Assert.Equal(2UL, request.HssLevels);
+        Assert.Equal(0, fake.GenerateKeyPairCalls);
+    }
+
+    // An XMSS key is described by its type alone: no template attribute states its size, so nothing is judged before
+    // the token, and the pair the token made is judged, and destroyed, afterwards.
+    [Fact]
+    public void XmssKeyPair_IsJudgedAfterCreation_AndBothHalvesDestroyed()
+    {
+        using var fake = new CreationFake();
+        fake.Keys[CreatedPublic] = new() { [CKA.CKA_KEY_TYPE] = (ulong)CKK.CKK_XMSS };
+        fake.Keys[CreatedPrivate] = new() { [CKA.CKA_KEY_TYPE] = (ulong)CKK.CKK_XMSS };
+        using var session = fake.CreateSession(policy: new RefusesEveryKey());
+        using var parameterSet = new ObjectAttribute(CKA.CKA_PARAMETER_SET, 1UL);
+
+        KeyStrengthRequest request = RefusedRequest(() => session.GenerateKeyPair(
+            new Mechanism(CKM.CKM_XMSS_KEY_PAIR_GEN), [parameterSet], [], out _, out _));
+
+        Assert.Equal(KeyStrengthSource.CreatedKey, request.Source);
+        Assert.Equal(CKK.CKK_XMSS, request.KeyType);
+        Assert.Equal(1, fake.GenerateKeyPairCalls);
+        Assert.Equal([CreatedPublic, CreatedPrivate], fake.Destroyed);
+    }
+
+    // A refused main key takes the written siblings with it; a slot the token left at CK_INVALID_HANDLE names no
+    // object and is not destroyed.
+    [Fact]
+    public void Sp800108_RefusedMainKey_DestroysTheWrittenSiblings_AndSkipsTheUnwrittenSlot()
+    {
+        using CreationFake fake = Sp800108Fake(siblingBLength: 32);
+        fake.SiblingHandles = [CK.CK_INVALID_HANDLE, SiblingB];
+        fake.SetAes(Created, 16);
+        using var session = fake.CreateSession(policy: Only32Bytes());
+        CkmSp800108KdfParams kdf = Sp800108(AesTemplate(), AesTemplate());
+
+        KeyStrengthRequest request = RefusedRequest(
+            () => session.DeriveKey(new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdf), StrongAes, AesTemplate()));
+
+        Assert.Equal(KeyStrengthSource.CreatedKey, request.Source);
+        Assert.Equal(16, request.ValueLengthBytes);
+        Assert.Equal([Created, SiblingB], fake.Destroyed);
+    }
+
+    /// <summary>
+    /// Inspects keys and refuses every created one, after finalizing the library under the session, as a policy or a
+    /// logger running on another thread could.
+    /// </summary>
+    private sealed class FinalizesThenRefuses(LowLevelPkcs11Library library) : ICryptoPolicy
+    {
+        public string Name => "FinalizesThenRefuses";
+        public bool AllowsOverride => true;
+        public bool InspectsKeys => true;
+
+        public PolicyDecision Evaluate(PolicyRequest request)
+        {
+            if (request is not KeyStrengthRequest { Source: KeyStrengthSource.CreatedKey })
+                return PolicyDecision.Allow;
+            library.Dispose();
+            return PolicyDecision.Deny("Refused.");
+        }
+    }
+
+    // The library finalized under the session cannot destroy the refused key: the refusal is still what is thrown, and
+    // it says the key remains on the token, with the code a finalized library answers.
+    [Fact]
+    public void CreatedKeyRefused_AfterTheLibraryIsFinalized_ReportsTheKeyLeftOnTheToken()
+    {
+        using var fake = new CreationFake();
+        fake.SetAes(Created, 16);
+        Pkcs11SessionCore session = fake.CreateSession(policy: new FinalizesThenRefuses(fake.LowLevel));
+
+        CryptoPolicyViolationException ex = Refusal(() => GenerateAes(session));
+
+        Assert.Equal(KeyStrengthSource.CreatedKey, Assert.IsType<KeyStrengthRequest>(ex.Request).Source);
+        Assert.StartsWith("Refused.", ex.Reason, StringComparison.Ordinal);
+        Assert.Contains("handle 42", ex.Reason, StringComparison.Ordinal);
+        Assert.Contains(nameof(CKR.CKR_CRYPTOKI_NOT_INITIALIZED), ex.Reason, StringComparison.Ordinal);
+        Assert.Empty(fake.Destroyed);
+    }
+
     // A device error while reading back a created key is the token's error, and the key is still destroyed (F6).
     [Fact]
     public void CreatedKeyReadFails_WithDeviceError_Propagates_AndDestroysTheKey()

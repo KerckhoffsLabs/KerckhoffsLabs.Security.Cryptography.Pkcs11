@@ -42,6 +42,7 @@ internal sealed partial class TokenLoginRecord
             try
             {
                 RunHandOffs();
+                BeforeReleasingTransition?.Invoke();
             }
             finally
             {
@@ -121,6 +122,7 @@ internal sealed partial class TokenLoginRecord
         {
             lock (_lock)
                 _handOffs.Add(action);
+            AfterPostingHandOff?.Invoke();
             // The holder may have run its hand-offs and released since: take the semaphore now, if free, to run them.
             if (Volatile.Read(ref _transitionOwner) == Environment.CurrentManagedThreadId || !_transition.Wait(0))
                 return;

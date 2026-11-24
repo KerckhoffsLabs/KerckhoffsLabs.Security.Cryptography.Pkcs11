@@ -15,8 +15,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 internal static class EcSubjectPublicKeyInfo
 {
     internal static ECParameters ToECParameters(Pkcs11Key key)
+        => FromSubjectPublicKeyInfo(key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo));
+
+    // The parse on its own, so the tests can hand it an encoding Pkcs11Key.Export never writes.
+    internal static ECParameters FromSubjectPublicKeyInfo(byte[] spki)
     {
-        byte[] spki = key.Export(Pkcs11KeyBlobFormat.SubjectPublicKeyInfo);
         try
         {
             var outer = new AsnReader(spki, AsnEncodingRules.DER);

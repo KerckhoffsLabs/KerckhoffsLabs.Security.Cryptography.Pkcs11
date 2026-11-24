@@ -68,6 +68,20 @@ public sealed class AesPkcs11_Managed
         Assert.Equal("key", ex.ParamName);
     }
 
+    // A token whose C_GetAttributeValue(CKA_VALUE_LEN) fails outright, rather than answering the length or
+    // CKR_ATTRIBUTE_SENSITIVE: the adapter is still built, and keeps the Aes base class's size and range,
+    // since it learned nothing about the key.
+    [Fact]
+    public void Ctor_TokenFailsToReadValueLen_KeepsTheAesDefaults()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_AES, _ => (CKR.CKR_DEVICE_ERROR, null));
+        using var aes = new AesPkcs11(key);
+
+        Assert.Equal(256, aes.KeySize);
+        KeySizes legal = Assert.Single(aes.LegalKeySizes);
+        Assert.Equal((128, 256, 64), (legal.MinSize, legal.MaxSize, legal.SkipSize));
+    }
+
     // === CBC: gated, and the token's output must match the BCL once unlocked ==============
 
     [Fact]
