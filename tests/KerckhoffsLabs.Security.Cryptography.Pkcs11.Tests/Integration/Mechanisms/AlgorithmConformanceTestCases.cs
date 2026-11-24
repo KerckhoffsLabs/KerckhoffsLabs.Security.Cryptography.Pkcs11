@@ -908,7 +908,9 @@ internal static class AlgorithmConformanceTestCases
     // CK_ECDH1_DERIVE_PARAMS for CKM_ECDH1_DERIVE on P-256 (PKCS#11 v3.2 §6.3.16): with CKD_NULL, "pSharedData must
     // be NULL and ulSharedDataLen must be zero"; pPublicData is the peer's point, raw or DER-encoded, so 1 KiB (a raw
     // point padded with zeros) is none, and neither is a DER OCTET STRING whose length byte promises 65 bytes and
-    // has 40 (04 41 and 40 bytes). C_DeriveKey refuses each with CKR_MECHANISM_PARAM_INVALID (§5.1.6). A raw secret
+    // has 40 (04 41 and 40 bytes). C_DeriveKey refuses each with CKR_MECHANISM_PARAM_INVALID (§5.1.6), or, for the
+    // two peer values, with CKR_PUBLIC_KEY_INVALID, which §5.1.6 lets C_DeriveKey return "in preference to
+    // CKR_MECHANISM_PARAM_INVALID" when the other party's public key is invalid (Kryoptic since v1.5.5). A raw secret
     // is 32 bytes on P-256 and the mechanism can only truncate it (§6.3.17), so CKA_VALUE_LEN 33 for a generic
     // secret is an attribute it cannot meet: CKR_ATTRIBUTE_VALUE_INVALID or CKR_TEMPLATE_INCONSISTENT (§4.1,
     // §5.1.6), or CKR_KEY_SIZE_RANGE, which C_DeriveKey lists (§5.18.5). None makes a key, and the same session then
@@ -928,7 +930,9 @@ internal static class AlgorithmConformanceTestCases
                 CKR rv = RawDerive(lowLevel, session, EcdhWithFault(buffers, fault, out ulong valueLen), priv, valueLen, label, out _);
                 CKR[] allowed = fault == "CKA_VALUE_LEN 33"
                     ? [CKR.CKR_ATTRIBUTE_VALUE_INVALID, CKR.CKR_TEMPLATE_INCONSISTENT, CKR.CKR_KEY_SIZE_RANGE]
-                    : [CKR.CKR_MECHANISM_PARAM_INVALID];
+                    : fault is "a 1 KiB peer value" or "a DER length that lies"
+                        ? [CKR.CKR_MECHANISM_PARAM_INVALID, CKR.CKR_PUBLIC_KEY_INVALID]
+                        : [CKR.CKR_MECHANISM_PARAM_INVALID];
                 Assert.True(allowed.Contains(rv), $"C_DeriveKey(CKM_ECDH1_DERIVE) with {fault} returned {rv}.");
                 using (var labelAttribute = new ObjectAttribute(CKA.CKA_LABEL, label))
                     Assert.Empty(session.FindAllObjects([labelAttribute]));

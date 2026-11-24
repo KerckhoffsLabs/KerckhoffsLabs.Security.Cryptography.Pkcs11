@@ -186,6 +186,62 @@ internal static class KnownAnswerTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
+    // The same RFC 8439 §2.8.2 vector, encrypted and decrypted in pieces through C_EncryptUpdate /
+    // C_DecryptUpdate, as Assert_AesGcm_Multipart_Kat does for AES-GCM. Decryption holds back the last 16
+    // bytes as the possible tag; two or more pieces longer than the tag are the hard case (Kryoptic before
+    // v1.5.5 dropped the front of each, latchset/kryoptic 5b3c81c). An empty plaintext goes straight from
+    // C_EncryptInit to C_EncryptFinal, whose output is the tag over the AAD alone (refused by Kryoptic before
+    // v1.5.5 with CKR_OPERATION_NOT_INITIALIZED, 4aa6c2b); it is checked against the BCL.
+    internal static void Assert_ChaCha20Poly1305_Multipart_Kat(IPkcs11Backend backend)
+    {
+        byte[] key = H("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f");
+        byte[] nonce = H("070000004041424344454647");
+        byte[] aad = H("50515253c0c1c2c3c4c5c6c7");
+        byte[] pt = Encoding.ASCII.GetBytes(
+            "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.");
+        byte[] expected = H(
+            "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b6" +
+            "7ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116" +
+            "1ae10b594f09e26a7e902ecbd0600691");
+
+        backend.RequireMechanism(CKM.CKM_CHACHA20_POLY1305);
+        using var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            ObjectHandle k = TestKeys.CreateChaCha20Key(session, key);
+            try
+            {
+                foreach (int chunk in (int[])[16, 17, 20, 32, 64])
+                {
+                    using var ctOut = new MemoryStream();
+                    using (var ptIn = new MemoryStream(pt))
+                        session.Encrypt(Mech(), k, ptIn, ctOut, chunk);
+                    Assert.True(Convert.ToHexString(expected) == Convert.ToHexString(ctOut.ToArray()),
+                        $"encrypting in {chunk}-byte pieces");
+
+                    using var ptOut = new MemoryStream();
+                    using (var ctIn = new MemoryStream(expected))
+                        session.Decrypt(Mech(), k, ctIn, ptOut, chunk);
+                    Assert.True(Convert.ToHexString(pt) == Convert.ToHexString(ptOut.ToArray()),
+                        $"decrypting in {chunk}-byte pieces");
+                }
+
+                byte[] emptyTag = new byte[16];
+                using (var bcl = new System.Security.Cryptography.ChaCha20Poly1305(key))
+                    bcl.Encrypt(nonce, ReadOnlySpan<byte>.Empty, Span<byte>.Empty, emptyTag, aad);
+                using var tagOut = new MemoryStream();
+                using (var nothing = new MemoryStream())
+                    session.Encrypt(Mech(), k, nothing, tagOut, 64);
+                Assert.True(Convert.ToHexString(emptyTag) == Convert.ToHexString(tagOut.ToArray()),
+                    "encrypting an empty stream (C_EncryptInit then C_EncryptFinal)");
+            }
+            finally { session.DestroyObject(k); }
+        }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
+
+        Mechanism Mech() => new(CKM.CKM_CHACHA20_POLY1305, new CkmSalsa20ChaCha20Poly1305Params(nonce, aad));
+    }
+
     // HMAC-SHA384, RFC 4231 test case 6 (131-byte key, larger than the block size).
     internal static void Assert_HmacSha384_Kat(IPkcs11Backend backend)
     {

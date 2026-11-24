@@ -11,20 +11,15 @@ public sealed class BufferConventionTests_Kryoptic(KryopticBackendFixture backen
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(BufferConventionTestCases.MultipartFinals), MemberType = typeof(BufferConventionTestCases))]
-    public void MultipartFinal_BufferTooSmall_KeepsTheOperation(string operation)
-    {
-        if (operation == "AES-CBC-PAD decrypt" && !KryopticBackendFixture.KryopticKeepsACbcPadDecryptFinalOnAShortBuffer)
-            Assert.Skip("Kryoptic answers a CBC-PAD C_DecryptFinal into a buffer too small with CKR_ENCRYPTED_DATA_INVALID");
-        BufferConventionTestCases.Assert_MultipartFinal_BufferTooSmall_KeepsTheOperation(_backend, operation);
-    }
+    public void MultipartFinal_BufferTooSmall_KeepsTheOperation(string operation) => BufferConventionTestCases.Assert_MultipartFinal_BufferTooSmall_KeepsTheOperation(_backend, operation);
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(BufferConventionTestCases.EmptyEncryptions), MemberType = typeof(BufferConventionTestCases))]
     public void EncryptFinal_WithNoUpdate_IsTheEmptyMessage(string mode)
     {
-        // Kryoptic's C_EncryptFinal length query, with no update before it, ends the operation; for AES-GCM
-        // that loses the tag of the empty message.
-        BufferConventionTestCases.Assert_EncryptFinal_WithNoUpdate_IsTheEmptyMessage(_backend, mode, lengthQueryEndsIt: true);
+        // Kryoptic's AES-CBC C_EncryptFinal length query, with no update before it, ends the operation. AES-GCM
+        // keeps it since v1.5.5 (latchset/kryoptic c4ac486) and gives the tag of the empty message.
+        BufferConventionTestCases.Assert_EncryptFinal_WithNoUpdate_IsTheEmptyMessage(_backend, mode, lengthQueryEndsIt: mode == "AES-CBC");
     }
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]

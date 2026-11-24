@@ -69,7 +69,8 @@ fi
 # linked dynamically against system libcrypto) are kept; "pqc" is added on top for ML-KEM, ML-DSA,
 # and SLH-DSA. Together this closes the AES-CCM and SLH-DSA real-backend coverage gap
 # (verified against C_GetMechanismList: CKM_AES_CCM and CKM_SLH_DSA are both advertised).
-# Kryoptic 1.5.2 has no ChaCha20 support at all, so ChaCha20-Poly1305 coverage remains NSS-only.
+# Kryoptic also implements CKM_CHACHA20 and CKM_CHACHA20_POLY1305 (in "standard"), a second real
+# backend for them alongside NSS.
 # Note: cdylib/Cargo.toml
 # does not re-expose "dynamic" as a selectable feature of the `kryoptic` package itself (only of
 # its kryoptic-lib/ossl/ossl-sys dependencies) — it only reaches the build via `default`, so

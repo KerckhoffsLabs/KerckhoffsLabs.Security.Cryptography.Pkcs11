@@ -35,6 +35,9 @@ public sealed class KnownAnswerTests_Kryoptic(KryopticBackendFixture backend)
     [Fact(SkipUnless = nameof(KryopticAvailableWithChaCha20Poly1305), Skip = "Requires " + nameof(KryopticAvailableWithChaCha20Poly1305))]
     public void ChaCha20Poly1305_Kat() => KnownAnswerTestCases.Assert_ChaCha20Poly1305_Kat(_backend);
 
+    [Fact(SkipUnless = nameof(KryopticAvailableWithChaCha20Poly1305), Skip = "Requires " + nameof(KryopticAvailableWithChaCha20Poly1305))]
+    public void ChaCha20Poly1305_Multipart_Kat() => KnownAnswerTestCases.Assert_ChaCha20Poly1305_Multipart_Kat(_backend);
+
     [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void HmacSha384_Kat() => KnownAnswerTestCases.Assert_HmacSha384_Kat(_backend);
 

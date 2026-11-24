@@ -10,10 +10,5 @@ public sealed class BaseKeyProtectionTests_Kryoptic(KryopticBackendFixture backe
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(BaseKeyProtectionTestCases.Derivations), MemberType = typeof(BaseKeyProtectionTestCases))]
-    public void KeyMadeFromAProtectedKey_KeepsItsProtection(string derivation)
-    {
-        if (!derivation.StartsWith("CONCATENATE_BASE_AND_KEY", StringComparison.Ordinal) && !KryopticBackendFixture.BaseKeyProtectionAvailable)
-            Assert.Skip("Kryoptic gives the derived key the template's protection, not the base key's (latchset/kryoptic#577).");
-        BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, derivation);
-    }
+    public void KeyMadeFromAProtectedKey_KeepsItsProtection(string derivation) => BaseKeyProtectionTestCases.Assert_KeyMadeFromAProtectedKey_KeepsItsProtection(_backend, derivation);
 }

@@ -31,10 +31,9 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ed25519_MixedOrderPublicKey_SignatureDoesNotVerify() => AlgorithmConformanceTestCases.Assert_Ed25519_MixedOrderPublicKey_SignatureDoesNotVerify(_backend);
 
-    // Kryoptic does not take these curves, and answers C_GenerateKeyPair with CKR_GENERAL_ERROR rather than CKR_CURVE_NOT_SUPPORTED.
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdsaCurves), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void Ecdsa_OnTheCurve_VerifiesUnderBcl(string curve) => AlgorithmConformanceTestCases.Assert_Ecdsa_OnTheCurve_VerifiesUnderBcl(_backend, curve, keyGenRefused: CKR.CKR_GENERAL_ERROR);
+    public void Ecdsa_OnTheCurve_VerifiesUnderBcl(string curve) => AlgorithmConformanceTestCases.Assert_Ecdsa_OnTheCurve_VerifiesUnderBcl(_backend, curve);
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.DigestVectors), MemberType = typeof(AlgorithmConformanceTestCases))]
@@ -74,13 +73,12 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesKeyWrap_ExplicitDefaultIv_GivesTheSameBlob() => AlgorithmConformanceTestCases.Assert_AesKeyWrap_ExplicitDefaultIv_GivesTheSameBlob(_backend);
 
-    [Theory(SkipUnless = nameof(KryopticBackendFixture.TamperedKeyWrapRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers a tampered AES key wrap blob with CKR_DEVICE_ERROR or CKR_DATA_LEN_RANGE")]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.AesKeyWrapTampering), MemberType = typeof(AlgorithmConformanceTestCases))]
     public void AesKeyWrap_TamperedBlob_IsRefused(string tampering) => AlgorithmConformanceTestCases.Assert_AesKeyWrap_TamperedBlob_IsRefused(_backend, tampering);
 
-    // Kryoptic unwraps under a generic secret as if it were the AES key of that value.
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void AesKeyWrap_UnwrapWithAGenericSecret_IsRefused() => AlgorithmConformanceTestCases.Assert_AesKeyWrap_UnwrapWithAGenericSecret_IsRefused(_backend, acceptsAGenericSecret: true);
+    public void AesKeyWrap_UnwrapWithAGenericSecret_IsRefused() => AlgorithmConformanceTestCases.Assert_AesKeyWrap_UnwrapWithAGenericSecret_IsRefused(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void MlKem_DecapsulationUnderAnotherKey_GivesAnotherSecret() => AlgorithmConformanceTestCases.Assert_MlKem_DecapsulationUnderAnotherKey_GivesAnotherSecret(_backend);
@@ -91,7 +89,7 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void DigestState_SavedAndRestored_FinishesTheDigest() => AlgorithmConformanceTestCases.Assert_DigestState_SavedAndRestored_FinishesTheDigest(_backend, unsaveable: CKR.CKR_STATE_UNSAVEABLE);
 
-    [Fact(SkipUnless = nameof(KryopticBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers an RSA-OAEP blob of the wrong length with CKR_DEVICE_ERROR")]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.OaepBlobLengthRefusalAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Kryoptic answers an RSA-OAEP blob of the wrong length with CKR_ENCRYPTED_DATA_INVALID")]
     public void RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange() => AlgorithmConformanceTestCases.Assert_RsaOaep_UnwrapOfABlobNotKBytes_IsWrappedKeyLenRange(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
@@ -118,12 +116,7 @@ public sealed class AlgorithmConformanceTests_Kryoptic(KryopticBackendFixture ba
 
     [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [MemberData(nameof(AlgorithmConformanceTestCases.EcdhParameterFaults), MemberType = typeof(AlgorithmConformanceTestCases))]
-    public void Ecdh_ParameterOutOfRange_IsRefused(string fault)
-    {
-        if (fault == "a DER length that lies" && !KryopticBackendFixture.KryopticRefusesAMalformedEcdhPeerAsInvalid)
-            Assert.Skip("Kryoptic refuses a DER peer value whose length lies with CKR_DEVICE_ERROR");
-        AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
-    }
+    public void Ecdh_ParameterOutOfRange_IsRefused(string fault) => AlgorithmConformanceTestCases.Assert_Ecdh_ParameterOutOfRange_IsRefused(_backend, fault);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Derive_AesKeyOfAnInvalidLength_IsRefused() => AlgorithmConformanceTestCases.Assert_Derive_AesKeyOfAnInvalidLength_IsRefused(_backend);
