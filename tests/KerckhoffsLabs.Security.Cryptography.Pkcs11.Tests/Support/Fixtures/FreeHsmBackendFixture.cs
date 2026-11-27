@@ -84,6 +84,14 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the IKE base-key-type case: see <see cref="FreeHsmRefusesAGenericSecretIkeBaseKey"/>.</summary>
     public static bool IkeBaseKeyTypeCheckAvailable => FreeHsmAvailable && FreeHsmRefusesAGenericSecretIkeBaseKey;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_CONCATENATE_BASE_AND_KEY)</c> ignores the second key's <c>CKA_ALLOWED_MECHANISMS</c>:
+    /// a second key whose list leaves the mechanism out is concatenated anyway, and only the base key's list is
+    /// checked. PKCS#11 v3.2 §4.8 Table 26: the list names the mechanisms "allowed to be used with this key",
+    /// which we read as covering both keys of the derivation (BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced).
+    /// </summary>
+    public const bool FreeHsmChecksTheSecondKeysAllowedMechanisms = false;
+
     public FreeHsmBackendFixture()
     {
         string? libPath = Settings.FreeHsmLibraryPath ?? BuiltLibraryPath();

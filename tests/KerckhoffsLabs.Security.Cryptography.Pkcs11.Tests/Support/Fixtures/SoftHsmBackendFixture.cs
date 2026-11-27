@@ -251,6 +251,15 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the Ed25519ctx and Ed25519ph cases: see <see cref="SoftHsmTakesEdDsaParams"/>.</summary>
     public static bool EdDsaParamsAvailable => SoftHsmAvailable && SoftHsmTakesEdDsaParams;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_CONCATENATE_BASE_AND_KEY)</c> ignores the second key's <c>CKA_ALLOWED_MECHANISMS</c>:
+    /// a second key whose list leaves the mechanism out is concatenated anyway, and only the base key's list is
+    /// checked, as pkcs11-check found (https://github.com/mingulov/pkcs11-check, 0.3.1, #56.1). PKCS#11 v3.2 §4.8
+    /// Table 26: the list names the mechanisms "allowed to be used with this key", which we read as covering both
+    /// keys of the derivation (BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced).
+    /// </summary>
+    public const bool SoftHsmChecksTheSecondKeysAllowedMechanisms = false;
+
     public SoftHsmBackendFixture()
     {
         string? libPath = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();

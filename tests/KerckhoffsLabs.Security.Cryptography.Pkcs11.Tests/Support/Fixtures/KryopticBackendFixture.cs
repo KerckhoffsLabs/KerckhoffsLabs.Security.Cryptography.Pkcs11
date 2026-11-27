@@ -213,6 +213,24 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     public static bool NullOaepLabelRefusalAvailable => KryopticAvailable && KryopticRefusesANullOaepLabel;
 
     /// <summary>
+    /// False while <c>C_DeriveKey(CKM_CONCATENATE_BASE_AND_KEY)</c> ignores the second key's <c>CKA_ALLOWED_MECHANISMS</c>:
+    /// a second key whose list leaves the mechanism out is concatenated anyway, and only the base key's list is
+    /// checked. PKCS#11 v3.2 §4.8 Table 26: the list names the mechanisms "allowed to be used with this key",
+    /// which we read as covering both keys of the derivation (BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced).
+    /// </summary>
+    public const bool KryopticChecksTheSecondKeysAllowedMechanisms = false;
+
+    /// <summary>
+    /// False while a one-byte key made from a sensitive, unextractable key can be digested:
+    /// <c>CKM_EXTRACT_KEY_FROM_KEY</c> and <c>CKM_XOR_BASE_AND_DATA</c> with <c>CKA_VALUE_LEN</c> 1 make a sensitive
+    /// key, as §6.43 requires, but <c>C_DigestKey</c> takes it, and its SHA-256 gives the byte away among 256
+    /// candidates: a byte of the protected key per call. Refusing the one-byte derivation from a protected key, or
+    /// the digest of a key made from one, would close it. After pkcs11-check's 1-byte recovery oracle
+    /// (https://github.com/mingulov/pkcs11-check, test_misc_kdf.py, 0.3.1).
+    /// </summary>
+    public const bool KryopticKeepsAProtectedKeysBytesFromADigest = false;
+
+    /// <summary>
     /// False while <c>C_DeriveKey(CKM_HKDF_DERIVE)</c> with SHA-256 and <c>CKA_VALUE_LEN</c> 8161 (255 x 32 + 1, past
     /// RFC 5869's limit) answers <c>CKR_DEVICE_ERROR</c>; 2^32 + 1 and a salt key that is no secret key are refused as
     /// they should be. PKCS#11 v3.2 §6.62.3 (RFC 5869), §4.1 and §5.1.6: <c>CKR_ATTRIBUTE_VALUE_INVALID</c>,
