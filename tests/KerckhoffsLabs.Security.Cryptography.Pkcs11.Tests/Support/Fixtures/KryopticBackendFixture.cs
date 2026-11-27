@@ -62,8 +62,15 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
 
     private const int SlotNumber = 0;
 
+    // A second slot, with a token store of its own, which TokenAdministrationTestCases initialize at will.
+    private const int ScratchSlotNumber = 1;
+
     private readonly string _configPath = string.Empty;
     private readonly string _dbPath = string.Empty;
+    private readonly string _scratchDbPath = string.Empty;
+
+    /// <inheritdoc/>
+    public NativeCULong? ScratchSlotId => _scratchDbPath.Length > 0 ? (NativeCULong)ScratchSlotNumber : null;
 
     public static bool KryopticAvailable =>
         (Settings.KryopticLibraryPath is { } p && File.Exists(p)) ||
@@ -257,12 +264,18 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
         _configPath = Path.Join(nativeDir, "kryoptic.conf");
         _dbPath = Path.Join(nativeDir, "kryoptic-token.sql");
         try { File.Delete(_dbPath); } catch { /* best-effort */ }
+        _scratchDbPath = Path.Join(nativeDir, "kryoptic-scratch-token.sql");
+        try { File.Delete(_scratchDbPath); } catch { /* best-effort */ }
 
         File.WriteAllText(_configPath,
             "[[slots]]\n" +
             $"slot = {SlotNumber}\n" +
             "dbtype = \"sqlite\"\n" +
-            $"dbargs = \"{_dbPath.Replace("\\", "\\\\")}\"\n");
+            $"dbargs = \"{_dbPath.Replace("\\", "\\\\")}\"\n" +
+            "\n[[slots]]\n" +
+            $"slot = {ScratchSlotNumber}\n" +
+            "dbtype = \"sqlite\"\n" +
+            $"dbargs = \"{_scratchDbPath.Replace("\\", "\\\\")}\"\n");
 
         // libkryoptic_pkcs11.so reads KRYOPTIC_CONF via getenv() at C_Initialize time, same
         // caveat as SoftHSM2_CONF: .NET's Environment.SetEnvironmentVariable does not propagate
@@ -301,6 +314,7 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
         try { Library?.Dispose(); } catch { /* best-effort */ }
         try { if (_configPath.Length > 0) File.Delete(_configPath); } catch { /* best-effort */ }
         try { if (_dbPath.Length > 0) File.Delete(_dbPath); } catch { /* best-effort */ }
+        try { if (_scratchDbPath.Length > 0) File.Delete(_scratchDbPath); } catch { /* best-effort */ }
     }
 
     // -----------------------------------------------------------------------

@@ -33,6 +33,12 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public ReadOnlyMemory<byte> UserPin { get; } = Encoding.UTF8.GetBytes(Settings.UserPin);
     public string TokenLabel { get; } = Settings.BouncyHsmTokenLabel;
 
+    // The label the server gives the scratch token; the cases relabel it when they initialize it.
+    private const string ScratchTokenLabel = "kl-scratch";
+
+    /// <inheritdoc/>
+    public NativeCULong? ScratchSlotId { get; }
+
     /// <summary>
     /// The second token, on the same server and library: one that simulates a qualified area, where the server marks
     /// a generated private key that is private, sign-only, sensitive and not extractable <c>CKA_ALWAYS_AUTHENTICATE</c>
@@ -397,6 +403,15 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
                         Settings.BouncyHsmQualifiedSoPin, Settings.BouncyHsmQualifiedSignaturePin);
                     return true;
                 }, out string? qualifiedFailure);
+            // The scratch token TokenAdministrationTestCases initialize afresh with C_InitToken, which takes the SO PIN
+            // the server gave it. Its failure stays its own: those cases skip.
+            bool scratchCreated = TrySetUp(() =>
+                {
+                    _server.CreateSlot(ScratchTokenLabel, Settings.UserPin, Settings.ScratchSoPin);
+                    return true;
+                }, out string? scratchFailure);
+            if (!scratchCreated)
+                Console.Error.WriteLine($"BouncyHsm's scratch token could not be set up: {scratchFailure}");
 
             string config = $"Server=127.0.0.1; Port={_server.TcpPort}; LogTarget=ErrorConsole; LogLevel=ERROR;";
             Environment.SetEnvironmentVariable("BOUNCY_HSM_CFG_STRING", config);
@@ -408,6 +423,11 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
                 ?? throw new InvalidOperationException($"BouncyHsm token '{TokenLabel}' did not appear in the slot list.");
             SlotId = (NativeCULong)slot.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(slot.GetMechanismList());
+            if (scratchCreated)
+            {
+                ScratchSlotId = Library.GetSlotList().Where(s => s.GetTokenInfo().Label == ScratchTokenLabel)
+                    .Select(s => (NativeCULong?)(NativeCULong)s.SlotId.Value).FirstOrDefault();
+            }
 
             Pkcs11Library library = Library;
             string libraryPath = LibraryPath;

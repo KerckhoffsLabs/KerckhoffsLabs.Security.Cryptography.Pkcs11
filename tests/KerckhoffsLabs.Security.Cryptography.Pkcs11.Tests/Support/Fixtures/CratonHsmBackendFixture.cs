@@ -64,6 +64,12 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
 
     private const int SlotNumber = 0;
 
+    // The second of the two slots the configuration asks for: TokenAdministrationTestCases' to initialize at will.
+    private const int ScratchSlotNumber = 1;
+
+    /// <inheritdoc/>
+    public NativeCULong? ScratchSlotId { get; }
+
     private readonly string _configPath = string.Empty;
 
     public static bool CratonHsmAvailable =>
@@ -342,7 +348,7 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
         File.WriteAllText(_configPath,
             "[token]\n" +
             "persist_objects = false\n" +
-            "slot_count = 1\n" +
+            "slot_count = 2\n" +
             "\n" +
             "[security]\n" +
             "pbkdf2_iterations = 100000\n" +
@@ -385,6 +391,8 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
 
             SlotId = (NativeCULong)slot.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(slot.GetMechanismList());
+            if (Library.GetSlotList(tokenPresent: false).Any(s => s.SlotId.Value == ScratchSlotNumber))
+                ScratchSlotId = (NativeCULong)ScratchSlotNumber;
         }
         catch
         {

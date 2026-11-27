@@ -33,6 +33,11 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// Populated at fixture construction. Empty when SoftHSM is unavailable.</summary>
     public IReadOnlySet<CKM> SupportedMechanisms { get; } = new HashSet<CKM>();
 
+    /// <inheritdoc/>
+    // The free slot SoftHSM2 always offers next to its initialized tokens. Initializing its token keeps the slot's id
+    // and makes SoftHSM2 offer a new free slot, so the id stays the scratch slot's for the run.
+    public NativeCULong? ScratchSlotId { get; }
+
     /// <summary>True when <paramref name="mechanism"/> appears in the token's mechanism list.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
@@ -328,6 +333,9 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
                 ?? throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
             SlotId = (NativeCULong)found.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(found.GetMechanismList());
+            ScratchSlotId = Library.GetSlotList(tokenPresent: false)
+                .Where(s => !s.GetTokenInfo().TokenFlags.TokenInitialized)
+                .Select(s => (NativeCULong?)(NativeCULong)s.SlotId.Value).FirstOrDefault();
         }
         catch
         {

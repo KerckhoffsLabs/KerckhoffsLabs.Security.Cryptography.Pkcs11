@@ -45,6 +45,12 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
 
     private const int SlotNumber = 0;
 
+    // FreeHSM offers four slots; the second is TokenAdministrationTestCases' to initialize at will.
+    private const int ScratchSlotNumber = 1;
+
+    /// <inheritdoc/>
+    public NativeCULong? ScratchSlotId { get; }
+
     private readonly string _stateDir = string.Empty;
 
     public static bool FreeHsmAvailable =>
@@ -91,6 +97,21 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
     /// which we read as covering both keys of the derivation (BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced).
     /// </summary>
     public const bool FreeHsmChecksTheSecondKeysAllowedMechanisms = false;
+
+    /// <summary>
+    /// False while <c>C_SetPIN</c> checks the old PIN and stores the new one under two separate holds of the token's
+    /// lock: <c>fhsm_token_set_pin</c> in <c>src/fhsm_token.c</c> verifies the old PIN (<c>token_verify_pin_dek</c>)
+    /// before it takes <c>t-&gt;mu</c> to store the new one. Four sessions changing the user PIN from the same old PIN at
+    /// once see two, three or all four calls answer <c>CKR_OK</c> (3 runs in 4 at v2.8.0), and the PIN left is the last
+    /// one stored. PKCS#11 v3.2 §5.4: a module initialized with <c>CKF_OS_LOCKING_OK</c> may be called from several
+    /// threads, so the outcome must be one the calls could have had in some order, where only the first finds the old
+    /// PIN. The library sends one PIN to a slot at a time, so its own <c>SetPinWithPin</c> is not affected. Not yet
+    /// reported upstream. No tripwire: the race is not lost every time.
+    /// </summary>
+    public const bool FreeHsmSetsAPinAtomically = false;
+
+    /// <summary>Gate for the raw concurrent <c>C_SetPIN</c> case: see <see cref="FreeHsmSetsAPinAtomically"/>.</summary>
+    public static bool AtomicSetPinAvailable => FreeHsmAvailable && FreeHsmSetsAPinAtomically;
 
     public FreeHsmBackendFixture()
     {
@@ -141,6 +162,8 @@ public sealed class FreeHsmBackendFixture : IPkcs11Backend, IDisposable
 
             SlotId = (NativeCULong)slot.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(slot.GetMechanismList());
+            if (Library.GetSlotList(tokenPresent: false).Any(s => s.SlotId.Value == ScratchSlotNumber))
+                ScratchSlotId = (NativeCULong)ScratchSlotNumber;
         }
         catch (Exception e) when (e is Pkcs11Exception or InvalidOperationException)
         {
