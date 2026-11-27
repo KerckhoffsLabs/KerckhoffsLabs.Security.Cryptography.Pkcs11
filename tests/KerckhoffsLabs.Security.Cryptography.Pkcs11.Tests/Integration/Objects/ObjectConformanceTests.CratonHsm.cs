@@ -148,4 +148,23 @@ public sealed class ObjectConformanceTests_CratonHsm(CratonHsmBackendFixture bac
     public void MismatchedCurve25519Key_IsRefused(string row) =>
         ObjectConformanceTestCases.Assert_MismatchedCurve25519Key_IsRefused(_backend, row,
             acceptedBecause: "Craton HSM stores an Ed25519 or X25519 private key whose CKA_EC_PARAMS name the other curve, or whose CKA_VALUE is 31 or 33 bytes (craton-co/craton-hsm-core#109).");
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitiveCopyGuesses), MemberType = typeof(ObjectConformanceTestCases))]
+    public void CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(string guess) => ObjectConformanceTestCases.Assert_CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(_backend, guess);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.SecretKeyValueSearchAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Craton HSM does not find a secret key by its CKA_VALUE")]
+    public void SearchBySensitiveValue_AnswersAsRecorded() => ObjectConformanceTestCases.Assert_SearchBySensitiveValue_AnswersAsRecorded(_backend, matchesTheSensitiveValue: true);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn() => ObjectConformanceTestCases.Assert_UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn(_backend);
+
+    // Craton HSM copies a public key whose template restates its unchanged public value: lenient, not wrong.
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.PublicKeyCopies), MemberType = typeof(ObjectConformanceTestCases))]
+    public void PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(string row)
+        => ObjectConformanceTestCases.Assert_PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(_backend, row, ObjectConformanceTestCases.PublicKeyCopyAnswer.BothCopied);
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void EcPublicKey_IsFoundByItsParamsAndByItsPoint() => ObjectConformanceTestCases.Assert_EcPublicKey_IsFoundByItsParamsAndByItsPoint(_backend);
 }

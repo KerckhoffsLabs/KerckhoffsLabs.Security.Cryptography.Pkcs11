@@ -250,6 +250,16 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool CopyableAvailable => CratonHsmAvailable && CratonHsmKeepsCkaCopyable;
 
     /// <summary>
+    /// False while <c>C_FindObjects</c> does not find a secret key by its <c>CKA_VALUE</c>, even a non-sensitive one:
+    /// a template of the key's <c>CKA_LABEL</c> and its exact <c>CKA_VALUE</c> finds nothing. PKCS#11 v3.2 §5.7.7: an
+    /// object matches when every attribute of the template equals its own.
+    /// </summary>
+    public const bool CratonHsmFindsASecretKeyByItsValue = false;
+
+    /// <summary>Gate for the search by a sensitive key's value: see <see cref="CratonHsmFindsASecretKeyByItsValue"/>.</summary>
+    public static bool SecretKeyValueSearchAvailable => CratonHsmAvailable && CratonHsmFindsASecretKeyByItsValue;
+
+    /// <summary>
     /// False while <c>C_GenerateKeyPair</c> with a <c>CKA_UNIQUE_ID</c> in the private key's template makes the key
     /// pair, though the token does not report <c>CKA_UNIQUE_ID</c> at all. PKCS#11 v3.2 §4.4.1: a
     /// <c>CKA_UNIQUE_ID</c> in the template of an operation that creates objects "MUST fail"

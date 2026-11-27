@@ -114,4 +114,13 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
             "Craton HSM no longer lets a copy change CKA_ALLOWED_MECHANISMS: set " +
             "CratonHsmBackendFixture.CratonHsmKeepsAllowedMechanismsOnACopy to true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    public void SecretKeyValueSearch_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => ObjectConformanceTestCases.Assert_SearchBySensitiveValue_AnswersAsRecorded(_backend, matchesTheSensitiveValue: false));
+        Assert.True(failure is XunitException and not SkipException && failure.Message.Contains("did not find a non-sensitive key", StringComparison.Ordinal),
+            "Craton HSM now finds a non-sensitive secret key by its CKA_VALUE: set " +
+            "CratonHsmBackendFixture.CratonHsmFindsASecretKeyByItsValue to true, record its answer for a sensitive key, and delete this test.");
+    }
 }

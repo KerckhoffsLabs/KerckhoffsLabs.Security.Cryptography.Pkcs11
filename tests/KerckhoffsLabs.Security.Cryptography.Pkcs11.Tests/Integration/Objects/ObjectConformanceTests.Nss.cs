@@ -132,4 +132,21 @@ public sealed class ObjectConformanceTests_Nss(NssBackendFixture backend)
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(ObjectConformanceTestCases.MismatchedCurve25519Keys), MemberType = typeof(ObjectConformanceTestCases))]
     public void MismatchedCurve25519Key_IsRefused(string row) => ObjectConformanceTestCases.Assert_MismatchedCurve25519Key_IsRefused(_backend, row);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitiveCopyGuesses), MemberType = typeof(ObjectConformanceTestCases))]
+    public void CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(string guess) => ObjectConformanceTestCases.Assert_CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(_backend, guess);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void SearchBySensitiveValue_AnswersAsRecorded() => ObjectConformanceTestCases.Assert_SearchBySensitiveValue_AnswersAsRecorded(_backend, matchesTheSensitiveValue: true);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn() => ObjectConformanceTestCases.Assert_UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn(_backend);
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.PublicKeyCopies), MemberType = typeof(ObjectConformanceTestCases))]
+    public void PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(string row) => ObjectConformanceTestCases.Assert_PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(_backend, row);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void EcPublicKey_IsFoundByItsParamsAndByItsPoint() => ObjectConformanceTestCases.Assert_EcPublicKey_IsFoundByItsParamsAndByItsPoint(_backend);
 }

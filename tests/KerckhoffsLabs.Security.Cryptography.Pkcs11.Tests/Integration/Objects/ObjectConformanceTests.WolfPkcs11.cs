@@ -117,4 +117,22 @@ public sealed class ObjectConformanceTests_WolfPkcs11(WolfPkcs11BackendFixture b
     [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
     [MemberData(nameof(ObjectConformanceTestCases.MismatchedCurve25519Keys), MemberType = typeof(ObjectConformanceTestCases))]
     public void MismatchedCurve25519Key_IsRefused(string row) => ObjectConformanceTestCases.Assert_MismatchedCurve25519Key_IsRefused(_backend, row);
+
+    [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitiveCopyGuesses), MemberType = typeof(ObjectConformanceTestCases))]
+    public void CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(string guess) => ObjectConformanceTestCases.Assert_CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(_backend, guess);
+
+    // wolfPKCS11 does not find a sensitive key by its CKA_VALUE, which closes the guess oracle a byte-exact match would open.
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void SearchBySensitiveValue_AnswersAsRecorded() => ObjectConformanceTestCases.Assert_SearchBySensitiveValue_AnswersAsRecorded(_backend, matchesTheSensitiveValue: false);
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn() => ObjectConformanceTestCases.Assert_UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn(_backend);
+
+    [Theory(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    [MemberData(nameof(ObjectConformanceTestCases.PublicKeyCopies), MemberType = typeof(ObjectConformanceTestCases))]
+    public void PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(string row) => ObjectConformanceTestCases.Assert_PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(_backend, row);
+
+    [Fact(SkipUnless = nameof(WolfPkcs11BackendFixture.WolfPkcs11Available), SkipType = typeof(WolfPkcs11BackendFixture), Skip = "Requires " + nameof(WolfPkcs11BackendFixture.WolfPkcs11Available))]
+    public void EcPublicKey_IsFoundByItsParamsAndByItsPoint() => ObjectConformanceTestCases.Assert_EcPublicKey_IsFoundByItsParamsAndByItsPoint(_backend);
 }
