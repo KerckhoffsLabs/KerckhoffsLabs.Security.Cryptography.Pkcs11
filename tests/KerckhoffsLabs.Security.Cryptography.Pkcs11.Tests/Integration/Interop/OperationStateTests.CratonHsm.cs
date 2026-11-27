@@ -33,6 +33,10 @@ public sealed class OperationStateTests_CratonHsm(CratonHsmBackendFixture backen
     {
         if (misuse == "ECDH derive from an AES key" && !CratonHsmBackendFixture.CratonHsmChecksTheDeriveBaseKeyType)
             Assert.Skip("Craton HSM derives an ECDH key from an AES key");
+        if (misuse is "ECDSA sign with an AES key" or "ECDSA verify with an AES key" or "AES-CBC encrypt with an EC public key"
+            or "RSA verify-recover with an AES key"
+            && !CratonHsmBackendFixture.CratonHsmChecksTheKeyTypeOfAnInit)
+            Assert.Skip("Craton HSM takes a key of the wrong type that has the usage (CratonHsmBackendFixture.CratonHsmChecksTheKeyTypeOfAnInit)");
         OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
     }
 

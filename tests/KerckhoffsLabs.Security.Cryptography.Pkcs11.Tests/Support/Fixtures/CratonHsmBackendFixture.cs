@@ -227,6 +227,17 @@ public sealed class CratonHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool CratonHsmChecksTheDeriveBaseKeyType = false;
 
     /// <summary>
+    /// False while an Init takes a key of the wrong type that has the usage the operation needs:
+    /// <c>C_SignInit</c> and <c>C_VerifyInit</c> with <c>CKM_ECDSA</c> and an AES key with <c>CKA_SIGN</c> or
+    /// <c>CKA_VERIFY</c>, <c>C_VerifyRecoverInit</c> with <c>CKM_RSA_PKCS</c> and an AES key with
+    /// <c>CKA_VERIFY_RECOVER</c>, and <c>C_EncryptInit</c> with <c>CKM_AES_CBC</c> and an EC public key with
+    /// <c>CKA_ENCRYPT</c>, answer <c>CKR_OK</c>. Without the usage the Init is refused with
+    /// <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>, so the usage is checked and the type is not. PKCS#11 v3.2 §5.1.6:
+    /// <c>CKR_KEY_TYPE_INCONSISTENT</c>.
+    /// </summary>
+    public const bool CratonHsmChecksTheKeyTypeOfAnInit = false;
+
+    /// <summary>
     /// False while malformed attribute values are taken: <c>C_CreateObject</c> of a data object with a 4-byte
     /// <c>CKA_TOKEN</c>, a <c>{NULL, 1}</c> <c>CKA_TOKEN</c> or a <c>{NULL, 16}</c> <c>CKA_VALUE</c> answers
     /// <c>CKR_OK</c>, and a search with a 4-byte <c>CKA_TOKEN</c> of zeros finds a session object. PKCS#11 v3.2
