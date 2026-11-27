@@ -78,6 +78,8 @@ public sealed class ObjectConformanceTests_OpenCryptoki(OpenCryptokiBackendFixtu
     {
         if (inconsistent == "EC key pair with an RSA private key" && !OpenCryptokiBackendFixture.OpenCryptokiChecksAPrivateKeyTypeOfZero)
             Assert.Skip("opencryptoki does not see CKK_RSA (0) in an EC key pair's private template, and fails later with CKR_TEMPLATE_INCOMPLETE");
+        if (inconsistent == "AES key generated as CKK_RSA" && !OpenCryptokiBackendFixture.OpenCryptokiRefusesAnAesKeyGeneratedAsRsa)
+            Assert.Skip("opencryptoki generates an AES key whose template asks for CKK_RSA (0)");
         ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
     }
 
