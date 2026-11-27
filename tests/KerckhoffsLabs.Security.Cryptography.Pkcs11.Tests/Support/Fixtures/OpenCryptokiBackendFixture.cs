@@ -180,6 +180,14 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
     public const bool OpenCryptokiChecksAPrivateKeyTypeOfZero = false;
 
     /// <summary>
+    /// False while <c>C_GenerateKey(CKM_AES_KEY_GEN)</c> with <c>CKA_KEY_TYPE = CKK_RSA</c> in the template makes a key.
+    /// CKK_RSA is 0; the same template with <c>CKK_EC</c> or <c>CKK_ML_DSA</c> is refused with
+    /// <c>CKR_TEMPLATE_INCONSISTENT</c>, as PKCS#11 v3.2 §5.18.1 asks for a key type the mechanism does not make. Seen
+    /// on v3.28.0 in CI (PR #406).
+    /// </summary>
+    public const bool OpenCryptokiRefusesAnAesKeyGeneratedAsRsa = false;
+
+    /// <summary>
     /// False while <c>C_GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN)</c> with a <c>CKA_PUBLIC_EXPONENT</c> longer than a
     /// <c>CK_ULONG</c> (2^64 + 65537, nine bytes) answers <c>CKR_ATTRIBUTE_VALUE_INVALID</c>
     /// (<c>usr/lib/common/mech_openssl.c:188-191</c>). The value is a valid big integer (§4, Table 12), so §4.1.1 point 2

@@ -7,7 +7,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
@@ -905,7 +907,8 @@ internal static class ObjectConformanceTestCases
 
     public static TheoryData<string> InconsistentTemplates =>
     [
-        "AES key generated as CKK_GENERIC_SECRET", "AES key generated as CKO_DATA", "EC key pair with an RSA private key",
+        "AES key generated as CKK_GENERIC_SECRET", "AES key generated as CKO_DATA", "AES key generated as CKO_PRIVATE_KEY",
+        "AES key generated as CKK_RSA", "AES key generated as CKK_EC", "AES key generated as CKK_ML_DSA", "EC key pair with an RSA private key",
         "EC key pair with a private-key class for the public key", "secret key of type CKK_EC", "private key of type CKK_AES",
         "data object from an HKDF derive",
     ];
@@ -918,7 +921,10 @@ internal static class ObjectConformanceTestCases
     // key; CKM_HKDF_DATA is the one that makes a data object, §6.62.4), so a template asking for CKO_DATA
     // contradicts it. C_CreateObject and C_DeriveKey may also answer CKR_ATTRIBUTE_VALUE_INVALID: neither says
     // which code a class or key type that does not fit the object takes, and §4.1.1 point 2 (a value that is not
-    // valid for the attribute) can be read to cover it. Nothing carries the case's label after.
+    // valid for the attribute) can be read to cover it. Nothing carries the case's label after. A row that generates
+    // an AES key first generates a legal one from the same template less the contradiction, so the refusal is the
+    // contradiction's. The CKO_PRIVATE_KEY, CKK_RSA, CKK_EC and CKK_ML_DSA rows follow pkcs11-check's GenerateKey
+    // malformed rows (https://github.com/mingulov/pkcs11-check, ckr/test_ckr_object.py, 0.3.1).
     internal static void Assert_InconsistentTemplate_IsTemplateInconsistent(IPkcs11Backend backend, string inconsistent)
     {
         if (inconsistent.StartsWith("AES key generated", StringComparison.Ordinal))
@@ -949,10 +955,14 @@ internal static class ObjectConformanceTestCases
             using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
             using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
             using var attrEcParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+            using var attrMlDsa = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_ML_DSA);
+            using var attrControlLabel = new ObjectAttribute(CKA.CKA_LABEL, label + "-control");
 
             var created = new List<ObjectHandle>();
             try
             {
+                if (inconsistent.StartsWith("AES key generated", StringComparison.Ordinal))
+                    created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrLen32, attrToken, attrControlLabel, attrEncrypt, attrSensitive]));
                 Action refused;
                 switch (inconsistent)
                 {
@@ -961,6 +971,18 @@ internal static class ObjectConformanceTestCases
                         break;
                     case "AES key generated as CKO_DATA":
                         refused = () => created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrData, attrLen32, attrToken, attrLabel]));
+                        break;
+                    case "AES key generated as CKO_PRIVATE_KEY":
+                        refused = () => created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrPrivate, attrLen32, attrToken, attrLabel, attrEncrypt, attrSensitive]));
+                        break;
+                    case "AES key generated as CKK_RSA":
+                        refused = () => created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrRsa, attrLen32, attrToken, attrLabel, attrEncrypt, attrSensitive]));
+                        break;
+                    case "AES key generated as CKK_EC":
+                        refused = () => created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrEc, attrLen32, attrToken, attrLabel, attrEncrypt, attrSensitive]));
+                        break;
+                    case "AES key generated as CKK_ML_DSA":
+                        refused = () => created.Add(session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [attrMlDsa, attrLen32, attrToken, attrLabel, attrEncrypt, attrSensitive]));
                         break;
                     case "EC key pair with an RSA private key":
                         refused = () => GenerateEcKeyPair([attrToken, attrLabel, attrVerify, attrEcParams], [attrRsa, attrToken, attrLabel, attrSign, attrSensitive]);
@@ -1466,6 +1488,420 @@ internal static class ObjectConformanceTestCases
                 Assert.NotEmpty(left);
             else
                 Assert.True(left.Count == 0, $"{refused}: C_GenerateKeyPair returned {rv} and left {left.Count} object(s) behind.");
+        });
+    }
+
+    // === Copy and search as a guess oracle ======================================
+
+    /// <summary>The secret a copy template guesses: "<c>AES CKA_VALUE</c>", "<c>RSA CKA_PRIVATE_EXPONENT</c>".</summary>
+    public static TheoryData<string> SensitiveCopyGuesses => ["AES CKA_VALUE", "RSA CKA_PRIVATE_EXPONENT"];
+
+    // C_CopyObject of a sensitive key with its secret in the template must not tell a right guess from a wrong one.
+    // The secret is not modifiable (§4.1.3 lets a copy change only the modifiable attributes and four storage ones),
+    // so both templates should be refused with CKR_ATTRIBUTE_READ_ONLY; whatever the answer, it must be the same for
+    // the right and the wrong guess: the same refusal, with no object made, or two copies that both kept the
+    // original key. A right guess accepted and a wrong one refused (or two different refusal codes) confirms the
+    // guess without CKA_VALUE ever being read. A copy that took the guessed value is a key the template changed,
+    // and fails too. A backend that refuses even a copy whose template only restates the key's CKA_LABEL leaves nothing
+    // to compare, and skips (pkcs11-check's control uses an empty template, which SoftHSM2 refuses for its NULL
+    // pointer alone). The kept key is checked by use: an AES-ECB (or, without ECB, AES-CBC) block, or an RSA signature, compared with the BCL's
+    // under the original key. After pkcs11-check's sealed guess-confirm legs
+    // (https://github.com/mingulov/pkcs11-check, _copy_mutability.py, 0.3.1).
+    internal static void Assert_CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(IPkcs11Backend backend, string guess)
+    {
+        bool aes = guess.StartsWith("AES", StringComparison.Ordinal);
+        bool ecb = backend.Supports(CKM.CKM_AES_ECB);
+        backend.RequireMechanism(!aes ? CKM.CKM_SHA256_RSA_PKCS : ecb ? CKM.CKM_AES_ECB : CKM.CKM_AES_CBC);
+        WithSession(backend, session =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            string label = $"kl-copy-guess-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            byte[] block = RandomNumberGenerator.GetBytes(16);
+            byte[] message = "kl copy guess"u8.ToArray();
+            using var rsa = aes ? null : RSA.Create(2048);
+            RSAParameters rsaKey = rsa?.ExportParameters(includePrivateParameters: true) ?? default;
+            byte[] secret = aes ? RandomNumberGenerator.GetBytes(32) : rsaKey.D!;
+            byte[] wrong = (byte[])secret.Clone();
+            wrong[^1] ^= 0x01;
+            CKA attribute = aes ? CKA.CKA_VALUE : CKA.CKA_PRIVATE_EXPONENT;
+
+            ObjectHandle key = aes ? CreateGuessedAesKey(session, secret) : CreateSensitiveRsaKey(session, rsaKey);
+            var copies = new List<ObjectHandle>();
+            try
+            {
+                Exception? control = Record.Exception(() => copies.Add(session.CopyObject(key, [attrLabel])));
+                if (control is Pkcs11Exception refusedControl)
+                    Assert.Skip($"{guess}: the backend refuses even a copy of a sensitive key that changes nothing ({refusedControl.ReturnValue}).");
+                if (control is not null)
+                    throw control;
+                Assert.True(KeepsTheOriginal(copies[0]), $"{guess}: a copy that changes nothing does not hold the original key.");
+                foreach (ObjectHandle copy in copies)
+                    session.DestroyObject(copy);
+                copies.Clear();
+
+                (ObjectHandle? Copy, CKR? Refusal) right = CopyWith(secret);
+                (ObjectHandle? Copy, CKR? Refusal) wrongGuess = CopyWith(wrong);
+                Assert.True(right.Refusal == wrongGuess.Refusal,
+                    $"{guess}: the right guess was {Describe(right)} and the wrong one {Describe(wrongGuess)}; the copy confirms the guess.");
+                if (right.Copy is { } rightCopy)
+                {
+                    Assert.True(KeepsTheOriginal(rightCopy), $"{guess}: the copy with the right value does not hold the original key.");
+                    Assert.True(KeepsTheOriginal(wrongGuess.Copy!.Value), $"{guess}: the copy with a wrong value took it.");
+                }
+                Assert.True(session.FindAllObjects([attrLabel]).Count == 1 + copies.Count,
+                    $"{guess}: a refused copy left an object behind.");
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in copies.Concat(session.FindAllObjects([attrLabel])).Append(key).DistinctBy(h => h.ObjectId))
+                    session.DestroyObject(handle);
+            }
+
+            (ObjectHandle?, CKR?) CopyWith(byte[] value)
+            {
+                using var attrGuess = new ObjectAttribute(attribute, value);
+                try
+                {
+                    ObjectHandle copy = session.CopyObject(key, [attrGuess]);
+                    copies.Add(copy);
+                    return (copy, null);
+                }
+                catch (Pkcs11Exception ex)
+                {
+                    return (null, ex.ReturnValue);
+                }
+            }
+
+            bool KeepsTheOriginal(ObjectHandle copy)
+            {
+                if (aes)
+                {
+                    using var bcl = Aes.Create();
+                    bcl.Key = secret;
+                    byte[] iv = RandomNumberGenerator.GetBytes(16);
+#pragma warning disable KLPKCS11009 // one unpadded block, the known answer that proves which key the copy holds
+                    return ecb
+                        ? session.Encrypt(new Mechanism(CKM.CKM_AES_ECB), copy, block).AsSpan().SequenceEqual(bcl.EncryptEcb(block, PaddingMode.None))
+                        : session.Encrypt(new Mechanism(CKM.CKM_AES_CBC, iv), copy, block).AsSpan().SequenceEqual(bcl.EncryptCbc(block, iv, PaddingMode.None));
+#pragma warning restore KLPKCS11009
+                }
+                byte[] signature = session.Sign(new Mechanism(CKM.CKM_SHA256_RSA_PKCS), copy, message);
+                return rsa!.VerifyData(message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            }
+
+            ObjectHandle CreateSensitiveRsaKey(Pkcs11SessionCore core, RSAParameters k)
+            {
+                using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+                using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+                using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+                using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+                using var n = new ObjectAttribute(CKA.CKA_MODULUS, k.Modulus!);
+                using var e = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, k.Exponent!);
+                using var d = new ObjectAttribute(CKA.CKA_PRIVATE_EXPONENT, k.D!);
+                using var p = new ObjectAttribute(CKA.CKA_PRIME_1, k.P!);
+                using var q = new ObjectAttribute(CKA.CKA_PRIME_2, k.Q!);
+                using var dp = new ObjectAttribute(CKA.CKA_EXPONENT_1, k.DP!);
+                using var dq = new ObjectAttribute(CKA.CKA_EXPONENT_2, k.DQ!);
+                using var iq = new ObjectAttribute(CKA.CKA_COEFFICIENT, k.InverseQ!);
+                return core.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrSign, attrLabel, n, e, d, p, q, dp, dq, iq]);
+            }
+
+            ObjectHandle CreateGuessedAesKey(Pkcs11SessionCore core, byte[] value)
+            {
+                using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+                using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+                using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+                using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
+                return core.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrEncrypt, attrLabel, attrValue]);
+            }
+
+            static string Describe((ObjectHandle? Copy, CKR? Refusal) leg) => leg.Refusal is { } rv ? $"refused with {rv}" : "copied";
+        });
+    }
+
+    // C_FindObjects compares the template's attributes with each object's byte for byte (§5.7.7 has no exception for
+    // a sensitive attribute), so a search for a sensitive key's CKA_VALUE either finds it, which confirms a guessed
+    // value without the value ever being read, or does not, which a module may do to close that oracle. PKCS#11 does
+    // not settle which, so the answer is recorded per backend (matchesTheSensitiveValue), not judged: a change is
+    // noticed either way. A non-sensitive key, the calibration, must be found by its value, and neither key by a
+    // wrong one. After pkcs11-check's sealed-find probes (https://github.com/mingulov/pkcs11-check,
+    // test_sensitivity.py, 0.3.1).
+    internal static void Assert_SearchBySensitiveValue_AnswersAsRecorded(IPkcs11Backend backend, bool matchesTheSensitiveValue)
+    {
+        WithSession(backend, session =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            string label = $"kl-sealed-find-{Guid.NewGuid():N}";
+            using var attrOpenLabel = new ObjectAttribute(CKA.CKA_LABEL, label + "-open");
+            using var attrSealedLabel = new ObjectAttribute(CKA.CKA_LABEL, label + "-sealed");
+            byte[] openValue = RandomNumberGenerator.GetBytes(32);
+            byte[] sealedValue = RandomNumberGenerator.GetBytes(32);
+            ObjectHandle open = CreateAesKey(attrOpenLabel, openValue, sensitive: false);
+            ObjectHandle sealedKey;
+            try
+            {
+                sealedKey = CreateAesKey(attrSealedLabel, sealedValue, sensitive: true);
+            }
+            catch
+            {
+                session.DestroyObject(open);
+                throw;
+            }
+            try
+            {
+                Assert.True(Found(attrOpenLabel, openValue), "A search did not find a non-sensitive key by its CKA_VALUE.");
+                Assert.False(Found(attrOpenLabel, RandomNumberGenerator.GetBytes(32)), "A search found a non-sensitive key by a wrong CKA_VALUE.");
+                Assert.False(Found(attrSealedLabel, RandomNumberGenerator.GetBytes(32)), "A search found a sensitive key by a wrong CKA_VALUE.");
+                bool matched = Found(attrSealedLabel, sealedValue);
+                Assert.True(matched == matchesTheSensitiveValue, matched
+                    ? "A search now finds a sensitive key by its CKA_VALUE, which confirms a guess: record it for this backend."
+                    : "A search no longer finds a sensitive key by its CKA_VALUE: record it for this backend.");
+            }
+            finally
+            {
+                session.DestroyObject(sealedKey);
+                session.DestroyObject(open);
+            }
+
+            bool Found(ObjectAttribute attrLabel, byte[] value)
+            {
+                using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
+                return session.FindAllObjects([attrLabel, attrValue]).Count > 0;
+            }
+
+            ObjectHandle CreateAesKey(ObjectAttribute attrLabel, byte[] value, bool sensitive)
+            {
+                using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+                using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, sensitive);
+                using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, !sensitive);
+                using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+                using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, value);
+                return session.CreateObject([attrClass, attrKeyType, attrToken, attrSensitive, attrExtractable, attrEncrypt, attrLabel, attrValue]);
+            }
+        });
+    }
+
+    // === CKA_UNIQUE_ID of derived and unwrapped keys ============================
+
+    // Every object the token makes gets a CKA_UNIQUE_ID of its own (§4.4.1), whichever call made it: two keys derived
+    // from one base (CKM_AES_ECB_ENCRYPT_DATA), and two unwrapped from one blob (CKM_AES_KEY_WRAP), have non-empty
+    // values distinct from each other and from the keys they came from. A leg runs where the token has its mechanism;
+    // with neither, or without CKA_UNIQUE_ID, the case skips. Assert_UniqueId_IsTheTokensAndReadOnly covers
+    // C_CreateObject and C_CopyObject. After pkcs11-check's derive and unwrap UNIQUE_ID legs
+    // (https://github.com/mingulov/pkcs11-check, test_object_identity.py, 0.3.1).
+    internal static void Assert_UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn(IPkcs11Backend backend)
+    {
+        bool derive = backend.Supports(CKM.CKM_AES_ECB_ENCRYPT_DATA);
+        bool unwrap = backend.Supports(CKM.CKM_AES_KEY_WRAP);
+        if (!derive && !unwrap)
+            Assert.Skip("The backend has neither CKM_AES_ECB_ENCRYPT_DATA nor CKM_AES_KEY_WRAP.");
+        WithSession(backend, session =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            string label = $"kl-unique-id-made-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var attrLen16 = new ObjectAttribute(CKA.CKA_VALUE_LEN, 16UL);
+            using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            var made = new List<ObjectHandle>();
+            try
+            {
+                ObjectHandle probe = CreateDataObject(session, label, [0x01]);
+                made.Add(probe);
+                using (var read = session.GetAttributeValue(probe, [CKA.CKA_UNIQUE_ID]))
+                {
+                    if (read[0].CannotBeRead)
+                        Assert.Skip("The backend does not report CKA_UNIQUE_ID.");
+                }
+
+                var groups = new List<(string What, ObjectHandle Handle)>();
+                if (derive)
+                {
+                    using var attrDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+                    using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(16));
+                    ObjectHandle baseKey = session.CreateObject([attrClass, attrKeyType, attrToken, attrLabel, attrDerive, attrValue]);
+                    made.Add(baseKey);
+                    groups.Add(("the derive's base key", baseKey));
+                    for (int i = 0; i < 2; i++)
+                    {
+                        using var buffers = new NativeBuffers();
+                        byte[] data = RandomNumberGenerator.GetBytes(16);
+                        Mechanism mechanism = RawParameter.From(CKM.CKM_AES_ECB_ENCRYPT_DATA,
+                            new CK_KEY_DERIVATION_STRING_DATA { Data = buffers.Of(data), Len = (NativeCULong)(ulong)data.Length });
+                        ObjectHandle derived = session.DeriveKey(mechanism, baseKey, [attrClass, attrKeyType, attrToken, attrLabel, attrLen16, attrEncrypt]);
+                        made.Add(derived);
+                        groups.Add(($"derived key {i + 1}", derived));
+                    }
+                }
+                if (unwrap)
+                {
+                    using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+                    using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+                    using var attrExtractable = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+                    using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
+                    using var attrKek = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+                    using var attrTarget = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(16));
+                    ObjectHandle kek = session.CreateObject([attrClass, attrKeyType, attrToken, attrLabel, attrWrap, attrUnwrap, attrKek]);
+                    made.Add(kek);
+                    ObjectHandle target = session.CreateObject([attrClass, attrKeyType, attrToken, attrLabel, attrExtractable, attrSensitive, attrEncrypt, attrTarget]);
+                    made.Add(target);
+                    groups.Add(("the key-encryption key", kek));
+                    groups.Add(("the wrapped key", target));
+                    byte[] blob = session.WrapKey(new Mechanism(CKM.CKM_AES_KEY_WRAP), kek, target);
+                    for (int i = 0; i < 2; i++)
+                    {
+                        ObjectHandle unwrapped = session.UnwrapKey(new Mechanism(CKM.CKM_AES_KEY_WRAP), kek, blob, [attrClass, attrKeyType, attrToken, attrLabel, attrEncrypt]);
+                        made.Add(unwrapped);
+                        groups.Add(($"unwrapped key {i + 1}", unwrapped));
+                    }
+                }
+
+                var seen = new Dictionary<string, string>();
+                foreach ((string what, ObjectHandle handle) in groups)
+                {
+                    byte[] id = Read(session, handle, CKA.CKA_UNIQUE_ID);
+                    Assert.True(id.Length > 0, $"{what} has an empty CKA_UNIQUE_ID.");
+                    string hex = Convert.ToHexString(id);
+                    Assert.True(seen.TryAdd(hex, what), $"{what} has the CKA_UNIQUE_ID of {seen.GetValueOrDefault(hex)}.");
+                }
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in made.Concat(session.FindAllObjects([attrLabel])).DistinctBy(h => h.ObjectId))
+                    session.DestroyObject(handle);
+            }
+        });
+    }
+
+    // === Copying a public key ===================================================
+
+    /// <summary>The public keys copied: "<c>RSA CKA_MODULUS</c>", "<c>EC CKA_EC_POINT</c>".</summary>
+    public static TheoryData<string> PublicKeyCopies => ["RSA CKA_MODULUS", "EC CKA_EC_POINT"];
+
+    /// <summary>What a backend answers to a public key's copy that changes nothing, and to one that also restates its public value.</summary>
+    internal enum PublicKeyCopyAnswer
+    {
+        /// <summary>Both templates make a copy that keeps the key.</summary>
+        BothCopied,
+        /// <summary>The plain template makes a copy; restating the unmodifiable value is refused, as §4.1.3 reads.</summary>
+        RestatedRefused,
+        /// <summary>Both are refused, the same way.</summary>
+        BothRefused,
+    }
+
+    // A copy whose template only restates the key's CKA_LABEL, and one that also restates its public value unchanged,
+    // ask for the same object. A restated CKA_MODULUS or CKA_EC_POINT is no change, but §4.1.3 lets a copy template
+    // hold only modifiable attributes and four storage ones, so a module refuses it (CKR_ATTRIBUTE_READ_ONLY) while
+    // copying the plain template; one that takes both is lenient, not wrong. Which answer a backend gives is recorded
+    // (expected), not judged; what fails is a copy whose public value differs from the original's, a refused copy
+    // that leaves an object, or two refusals with different codes. pkcs11-check's plain leg is an empty template,
+    // which SoftHSM2 refuses for its NULL pointer alone; restating CKA_LABEL keeps the leg about the key.
+    // After pkcs11-check's empty/restated copy compare (https://github.com/mingulov/pkcs11-check,
+    // _copy_mutability.py, 0.3.1).
+    internal static void Assert_PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(IPkcs11Backend backend, string row, PublicKeyCopyAnswer expected = PublicKeyCopyAnswer.RestatedRefused)
+    {
+        WithSession(backend, session =>
+        {
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            bool rsaRow = row.StartsWith("RSA", StringComparison.Ordinal);
+            using var rsa = RSA.Create(2048);
+            using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            RSAParameters rsaKey = rsa.ExportParameters(includePrivateParameters: false);
+            ECParameters ecKey = ecdsa.ExportParameters(includePrivateParameters: false);
+            ObjectHandle key = rsaRow
+                ? TestKeys.ImportRsaPublicKey(session, rsaKey.Modulus!, rsaKey.Exponent!)
+                : TestKeys.ImportEcP256PublicKey(session, ecKey.Q.X!, ecKey.Q.Y!);
+            CKA attribute = rsaRow ? CKA.CKA_MODULUS : CKA.CKA_EC_POINT;
+            string label = $"kl-public-copy-{Guid.NewGuid():N}";
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            var copies = new List<ObjectHandle>();
+            try
+            {
+                Set(session, key, attrLabel);
+                byte[] original = Read(session, key, attribute);
+                using var attrRestated = new ObjectAttribute(attribute, original);
+                CKR? plain = CopyWith([attrLabel]);
+                CKR? restated = CopyWith([attrLabel, attrRestated]);
+                foreach (ObjectHandle copy in copies)
+                    Assert.True(Read(session, copy, attribute).AsSpan().SequenceEqual(original), $"{row}: a copy has another {attribute}.");
+                Assert.True(session.FindAllObjects([attrLabel]).Count == 1 + copies.Count, $"{row}: a refused copy left an object behind.");
+                if (plain is { } a && restated is { } b)
+                    Assert.True(a == b, $"{row}: the plain template was refused with {a} and the restated one with {b}.");
+                PublicKeyCopyAnswer answer = (plain, restated) switch
+                {
+                    (null, null) => PublicKeyCopyAnswer.BothCopied,
+                    (null, not null) => PublicKeyCopyAnswer.RestatedRefused,
+                    (not null, not null) => PublicKeyCopyAnswer.BothRefused,
+                    _ => throw new Xunit.Sdk.XunitException($"{row}: the restated template was copied, and the plain one refused with {plain}."),
+                };
+                Assert.True(answer == expected,
+                    $"{row}: the backend now answers {answer} (plain: {plain?.ToString() ?? "copied"}, restated: {restated?.ToString() ?? "copied"}), recorded as {expected}.");
+            }
+            finally
+            {
+                foreach (ObjectHandle handle in copies.Concat(session.FindAllObjects([attrLabel])).Append(key).DistinctBy(h => h.ObjectId))
+                    session.DestroyObject(handle);
+            }
+
+            CKR? CopyWith(List<ObjectAttribute> template)
+            {
+                try
+                {
+                    copies.Add(session.CopyObject(key, template));
+                    return null;
+                }
+                catch (Pkcs11Exception ex)
+                {
+                    return ex.ReturnValue;
+                }
+            }
+        });
+    }
+
+    // === Searching by an EC key's parameters or point ===========================
+
+    // A search template matches an object whose attributes equal it byte for byte (§5.7.7), each attribute on its own:
+    // an EC public key is found by CKA_EC_PARAMS alone, and by CKA_EC_POINT alone, given the exact bytes the token
+    // reports for it (a token may re-encode what it was given), and by neither once the value is another curve's or
+    // another key's. After pkcs11-check's separate EC searches (https://github.com/mingulov/pkcs11-check,
+    // _exact_search.py, 0.3.1).
+    internal static void Assert_EcPublicKey_IsFoundByItsParamsAndByItsPoint(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        WithSession(backend, session =>
+        {
+            (ObjectHandle publicKey, ObjectHandle privateKey) = TestKeys.GenerateEcP256KeyPair(session);
+            try
+            {
+                byte[] ecParams = Read(session, publicKey, CKA.CKA_EC_PARAMS);
+                byte[] ecPoint = Read(session, publicKey, CKA.CKA_EC_POINT);
+                using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+                ECParameters other = ecdsa.ExportParameters(includePrivateParameters: false);
+
+                Assert.True(FindsTheKey(CKA.CKA_EC_PARAMS, ecParams), "A search by the key's CKA_EC_PARAMS alone does not find it.");
+                Assert.True(FindsTheKey(CKA.CKA_EC_POINT, ecPoint), "A search by the key's CKA_EC_POINT alone does not find it.");
+                Assert.False(FindsTheKey(CKA.CKA_EC_PARAMS, TestKeys.EcP384Oid), "A search by another curve's CKA_EC_PARAMS finds the key.");
+                Assert.False(FindsTheKey(CKA.CKA_EC_POINT, TestKeys.DerEcPoint(other.Q.X!, other.Q.Y!)), "A search by another key's CKA_EC_POINT finds the key.");
+            }
+            finally
+            {
+                session.DestroyObject(privateKey);
+                session.DestroyObject(publicKey);
+            }
+
+            bool FindsTheKey(CKA attribute, byte[] value)
+            {
+                using var attrValue = new ObjectAttribute(attribute, value);
+                return session.FindAllObjects([attrValue]).Any(h => h.ObjectId == publicKey.ObjectId);
+            }
         });
     }
 }

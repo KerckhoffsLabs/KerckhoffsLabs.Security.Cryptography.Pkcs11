@@ -90,7 +90,7 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
     [MemberData(nameof(ObjectConformanceTestCases.InconsistentTemplates), MemberType = typeof(ObjectConformanceTestCases))]
     public void InconsistentTemplate_IsTemplateInconsistent(string inconsistent)
     {
-        if (inconsistent is "AES key generated as CKO_DATA" or "EC key pair with a private-key class for the public key"
+        if (inconsistent is "AES key generated as CKO_DATA" or "AES key generated as CKO_PRIVATE_KEY" or "EC key pair with a private-key class for the public key"
             && !SoftHsmBackendFixture.SoftHsmReportsAContradictoryClassAsInconsistent)
             Assert.Skip("SoftHSM2 answers a class the generation mechanism does not make with CKR_ATTRIBUTE_VALUE_INVALID");
         ObjectConformanceTestCases.Assert_InconsistentTemplate_IsTemplateInconsistent(_backend, inconsistent);
@@ -155,4 +155,22 @@ public sealed class ObjectConformanceTests_SoftHsm(SoftHsmBackendFixture backend
             acceptedBecause: row.StartsWith("Ed25519", StringComparison.Ordinal)
                 ? "SoftHSM stores an Ed25519 private key whose CKA_EC_PARAMS name X25519, or whose CKA_VALUE is 31 or 33 bytes (softhsm/SoftHSMv2#932)."
                 : null);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.SensitiveCopyGuesses), MemberType = typeof(ObjectConformanceTestCases))]
+    public void CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(string guess) => ObjectConformanceTestCases.Assert_CopyWithAGuess_AnswersTheSameForARightAndAWrongGuess(_backend, guess);
+
+    // SoftHSM2 finds a sensitive key by its CKA_VALUE, byte for byte as §5.7.7 reads: a search confirms a guessed value.
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void SearchBySensitiveValue_AnswersAsRecorded() => ObjectConformanceTestCases.Assert_SearchBySensitiveValue_AnswersAsRecorded(_backend, matchesTheSensitiveValue: true);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn() => ObjectConformanceTestCases.Assert_UniqueId_OfDerivedAndUnwrappedKeys_IsTheirOwn(_backend);
+
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [MemberData(nameof(ObjectConformanceTestCases.PublicKeyCopies), MemberType = typeof(ObjectConformanceTestCases))]
+    public void PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(string row) => ObjectConformanceTestCases.Assert_PublicKeyCopy_PlainAndRestated_AnswerAsRecorded(_backend, row);
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void EcPublicKey_IsFoundByItsParamsAndByItsPoint() => ObjectConformanceTestCases.Assert_EcPublicKey_IsFoundByItsParamsAndByItsPoint(_backend);
 }
