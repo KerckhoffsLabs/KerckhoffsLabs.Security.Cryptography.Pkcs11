@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 using Xunit.Sdk;
 
@@ -122,5 +123,18 @@ public sealed class CratonHsmQuirkTests(CratonHsmBackendFixture backend)
         Assert.True(failure is XunitException and not SkipException && failure.Message.Contains("did not find a non-sensitive key", StringComparison.Ordinal),
             "Craton HSM now finds a non-sensitive secret key by its CKA_VALUE: set " +
             "CratonHsmBackendFixture.CratonHsmFindsASecretKeyByItsValue to true, record its answer for a sensitive key, and delete this test.");
+    }
+
+    [Theory(SkipUnless = nameof(CratonHsmBackendFixture.CratonHsmAvailable), SkipType = typeof(CratonHsmBackendFixture), Skip = "Requires " + nameof(CratonHsmBackendFixture.CratonHsmAvailable))]
+    [InlineData("ECDSA sign with an AES key")]
+    [InlineData("ECDSA verify with an AES key")]
+    [InlineData("AES-CBC encrypt with an EC public key")]
+    [InlineData("RSA verify-recover with an AES key")]
+    public void KeyTypeOfAnInit_QuirkStillPresent(string misuse)
+    {
+        Exception? failure = Record.Exception(() => OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse));
+        Assert.True(failure is XunitException and not SkipException,
+            $"Craton HSM now refuses {misuse} when the key has the usage: set " +
+            "CratonHsmBackendFixture.CratonHsmChecksTheKeyTypeOfAnInit to true and delete this test.");
     }
 }

@@ -194,4 +194,23 @@ public sealed class NssQuirkTests(NssBackendFixture backend)
             "NssBackendFixture.NssRecordsAGeneratedKeysMechanism true and delete this test.");
     }
 #pragma warning restore KLPKCS11008, KLPKCS11009
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void SecondKeysAllowedMechanisms_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced(_backend, "excludes it"));
+        Assert.True(failure is XunitException and not SkipException,
+            "NSS now refuses CKM_CONCATENATE_BASE_AND_KEY with a second key whose CKA_ALLOWED_MECHANISMS leaves it out: make " +
+            "NssBackendFixture.NssChecksTheSecondKeysAllowedMechanisms true and delete this test.");
+    }
+
+    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    [MemberData(nameof(BaseKeyProtectionTestCases.OneByteDerivations), MemberType = typeof(BaseKeyProtectionTestCases))]
+    public void OneByteKeyDigest_QuirkStillPresent(string derivation)
+    {
+        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_OneByteKeyFromAProtectedKey_GivesNoByteAway(_backend, derivation));
+        Assert.True(failure is XunitException and not SkipException,
+            $"NSS no longer gives a byte of a protected key away through a one-byte key ({derivation}): make " +
+            "NssBackendFixture.NssKeepsAProtectedKeysBytesFromADigest true and delete this test.");
+    }
 }

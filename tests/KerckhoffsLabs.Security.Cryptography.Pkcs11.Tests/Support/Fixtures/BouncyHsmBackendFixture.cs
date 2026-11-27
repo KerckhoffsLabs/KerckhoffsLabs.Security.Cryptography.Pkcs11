@@ -249,6 +249,37 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent = false;
 
     /// <summary>
+    /// False while <c>C_DeriveKey(CKM_CONCATENATE_BASE_AND_KEY)</c> ignores the second key's <c>CKA_ALLOWED_MECHANISMS</c>:
+    /// a second key whose list leaves the mechanism out is concatenated anyway, and only the base key's list is
+    /// checked. PKCS#11 v3.2 §4.8 Table 26: the list names the mechanisms "allowed to be used with this key", which we
+    /// read as covering both keys of the derivation (BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced).
+    /// Not yet reported upstream. BouncyHsmQuirkTests.SecondKeysAllowedMechanisms_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmChecksTheSecondKeysAllowedMechanisms = false;
+
+    /// <summary>
+    /// False while a one-byte key made from a sensitive, unextractable key can be digested:
+    /// <c>CKM_EXTRACT_KEY_FROM_KEY</c> and <c>CKM_XOR_BASE_AND_DATA</c> with <c>CKA_VALUE_LEN</c> 1 make a sensitive
+    /// key, as §6.43 requires, but <c>C_DigestKey</c> takes it, and its SHA-256 gives the byte away among 256
+    /// candidates: a byte of the protected key per call. Refusing the one-byte derivation from a protected key, or
+    /// the digest of a key made from one, would close it. After pkcs11-check's 1-byte recovery oracle
+    /// (https://github.com/mingulov/pkcs11-check, test_misc_kdf.py, 0.3.1). Not yet reported upstream. BouncyHsmQuirkTests.OneByteKeyDigest_QuirkStillPresent
+    /// fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmKeepsAProtectedKeysBytesFromADigest = false;
+
+    /// <summary>
+    /// False while a key of the wrong type is refused with <c>CKR_KEY_FUNCTION_NOT_PERMITTED</c>, even when it has the
+    /// usage the operation needs: BouncyHsm gives every key a default <c>CKA_ALLOWED_MECHANISMS</c> of its own type's
+    /// mechanisms (<c>KeyObject.GetAllovedMechanism</c>), and <c>CheckAllowedMechanism</c> runs before the key's type is
+    /// looked at, in C_SignInit, C_VerifyInit, C_EncryptInit and C_DeriveKey. The key is refused, as it must be, with
+    /// another code: PKCS#11 v3.2 §5.1.6 answers a key of the wrong type with <c>CKR_KEY_TYPE_INCONSISTENT</c>, and an
+    /// absent <c>CKA_ALLOWED_MECHANISMS</c> restricts nothing (§4.8 Table 26). Not yet reported upstream.
+    /// BouncyHsmQuirkTests.KeyOfTheWrongType_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmReportsAKeyOfTheWrongTypeAsInconsistent = false;
+
+    /// <summary>
     /// False while <c>C_EncryptInit</c> / <c>C_DecryptInit</c> with <c>CKM_AES_CTR</c> accept a
     /// <c>CK_AES_CTR_PARAMS.ulCounterBits</c> of 0 or above 128. PKCS#11 v3.2 §6.11.2 takes 1 to 128, and anything
     /// else is <c>CKR_MECHANISM_PARAM_INVALID</c>. Seen since BouncyHsm took <c>CK_AES_CTR_PARAMS</c> (8592a1d1).

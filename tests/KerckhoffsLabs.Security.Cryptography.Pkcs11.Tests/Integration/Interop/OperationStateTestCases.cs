@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -413,12 +414,17 @@ internal static class OperationStateTestCases
         "ECDH derive from an AES key", "HKDF derive from an EC private key",
     ];
 
-    // Init with a key the mechanism cannot use answers CKR_KEY_TYPE_INCONSISTENT (§5.1.6). A module may answer
-    // CKR_KEY_FUNCTION_NOT_PERMITTED instead, since the key also lacks the usage the mechanism needs. The
-    // library checks no mechanism against a key before the call, so the module is the only guard. The derive
-    // rows give the base key CKA_DERIVE, so that only its type is wrong (CKM_ECDH1_DERIVE takes an EC private
-    // key, §6.3.17; CKM_HKDF_DERIVE a generic secret or HKDF key, §6.62.3), and check that C_DeriveKey made no
-    // key.
+    // Init with a key the mechanism cannot use answers CKR_KEY_TYPE_INCONSISTENT (§5.1.6). The library checks no
+    // mechanism against a key before the call, so the module is the only guard. Each key is given the usage the
+    // operation needs, so that only its type is wrong: an AES key CKA_SIGN, CKA_VERIFY or CKA_VERIFY_RECOVER, an
+    // EC public key CKA_ENCRYPT, and the derive rows' base key CKA_DERIVE (CKM_ECDH1_DERIVE takes an EC private
+    // key, §6.3.17; CKM_HKDF_DERIVE a generic secret or HKDF key, §6.62.3). A key that broke both rules would let
+    // a module that checks only the usage pass with CKR_KEY_FUNCTION_NOT_PERMITTED, having never looked at the
+    // type. Where the module refuses to make such a key, and for the RSA rows, whose key is of a class without
+    // the attribute (no CKA_VERIFY_RECOVER on a private key, no CKA_SIGN_RECOVER on a public one), the key lacks
+    // the usage too and CKR_KEY_FUNCTION_NOT_PERMITTED is accepted as well. After pkcs11-check's single-fault
+    // probe keys (https://github.com/mingulov/pkcs11-check, _probes/ckr_raw_attrs.py, 0.3.1). The derive rows
+    // also check that C_DeriveKey made no key.
     internal static void Assert_KeyOfTheWrongType_IsRefused(IPkcs11Backend backend, string misuse, CKR[]? alsoAccepted = null)
     {
         bool recover = misuse.Contains("-recover", StringComparison.Ordinal);
@@ -430,15 +436,27 @@ internal static class OperationStateTestCases
             backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
         else
             backend.RequireMechanisms([CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDSA, CKM.CKM_AES_CBC]);
-        CKR[] accepted = [CKR.CKR_KEY_TYPE_INCONSISTENT, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED, .. alsoAccepted ?? []];
+        CKR[] typeOnly = [CKR.CKR_KEY_TYPE_INCONSISTENT, .. alsoAccepted ?? []];
+        CKR[] typeAndUsage = [.. typeOnly, CKR.CKR_KEY_FUNCTION_NOT_PERMITTED];
         WithSession(backend, (lowLevel, sid, session) =>
         {
             if (misuse.Contains("derive", StringComparison.Ordinal))
             {
-                AssertDeriveFromTheWrongKeyType(lowLevel, sid, session, misuse, accepted);
+                AssertDeriveFromTheWrongKeyType(lowLevel, sid, session, misuse, typeOnly);
                 return;
             }
-            ObjectHandle aesKey = TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
+            // The usage the operation needs, given to the key of the wrong type; none for the RSA rows.
+            CKA? usage = misuse switch
+            {
+                "ECDSA sign with an AES key" => CKA.CKA_SIGN,
+                "ECDSA verify with an AES key" => CKA.CKA_VERIFY,
+                "RSA verify-recover with an AES key" => CKA.CKA_VERIFY_RECOVER,
+                "AES-CBC encrypt with an EC public key" => CKA.CKA_ENCRYPT,
+                _ => null,
+            };
+            bool onEcPublicKey = usage == CKA.CKA_ENCRYPT;
+            ObjectHandle? singleFault = usage is { } u ? TryCreateWithUsage(session, u, onEcPublicKey) : null;
+            ObjectHandle aesKey = singleFault is { } k && !onEcPublicKey ? k : TestKeys.CreateAes256Key(session, RandomNumberGenerator.GetBytes(32));
             ObjectHandle pub, priv;
             using var rsa = RSA.Create(2048);
             try
@@ -448,8 +466,11 @@ internal static class OperationStateTestCases
             catch
             {
                 session.DestroyObject(aesKey);
+                if (singleFault is { } created && onEcPublicKey)
+                    session.DestroyObject(created);
                 throw;
             }
+            ObjectHandle ecPublic = onEcPublicKey && singleFault is { } e ? e : pub;
             try
             {
                 var pkcs1 = new Mechanism(CKM.CKM_RSA_PKCS);
@@ -457,22 +478,54 @@ internal static class OperationStateTestCases
                 {
                     "ECDSA sign with an AES key" => Init(lowLevel.C_SignInit, sid, new Mechanism(CKM.CKM_ECDSA), aesKey),
                     "ECDSA verify with an AES key" => Init(lowLevel.C_VerifyInit, sid, new Mechanism(CKM.CKM_ECDSA), aesKey),
-                    "AES-CBC encrypt with an EC public key" => Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_AES_CBC, Iv), pub),
+                    "AES-CBC encrypt with an EC public key" => Init(lowLevel.C_EncryptInit, sid, new Mechanism(CKM.CKM_AES_CBC, Iv), ecPublic),
                     "RSA verify-recover with an AES key" => Init(lowLevel.C_VerifyRecoverInit, sid, pkcs1, aesKey),
                     "RSA verify-recover with an RSA private key" => Init(lowLevel.C_VerifyRecoverInit, sid, pkcs1, priv),
                     "RSA sign-recover with an RSA public key" => Init(lowLevel.C_SignRecoverInit, sid, pkcs1, pub),
                     _ => throw new ArgumentOutOfRangeException(nameof(misuse), misuse, null),
                 };
-                AssertRvIn(accepted, rv, misuse);
+                AssertRvIn(singleFault is null ? typeAndUsage : typeOnly, rv,
+                    singleFault is null ? misuse : $"{misuse}, the key having {usage}");
                 AssertDigestStillRuns(lowLevel, sid);
             }
             finally
             {
+                if (onEcPublicKey && singleFault is { } created)
+                    session.DestroyObject(created);
                 session.DestroyObject(priv);
                 session.DestroyObject(pub);
                 session.DestroyObject(aesKey);
             }
         });
+    }
+
+    // An AES-256 key, or an imported P-256 public key, with the usage attribute given true; null when the module
+    // refuses to make it, and the row falls back to a key that lacks the usage as well.
+    private static ObjectHandle? TryCreateWithUsage(Pkcs11SessionCore session, CKA usage, bool ecPublicKey)
+    {
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrUsage = new ObjectAttribute(usage, true);
+        try
+        {
+            if (ecPublicKey)
+            {
+                using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+                ECPoint q = ecdsa.ExportParameters(includePrivateParameters: false).Q;
+                using var attrPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+                using var attrEc = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+                using var attrParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, TestKeys.EcP256Oid);
+                using var attrPoint = new ObjectAttribute(CKA.CKA_EC_POINT, TestKeys.DerEcPoint(q.X!, q.Y!));
+                return session.CreateObject([attrPublic, attrEc, attrToken, attrParams, attrPoint, attrUsage]);
+            }
+            using var attrSecret = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var attrAes = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, RandomNumberGenerator.GetBytes(32));
+            return session.CreateObject([attrSecret, attrAes, attrToken, attrValue, attrUsage]);
+        }
+        catch (Pkcs11Exception)
+        {
+            return null;
+        }
     }
 
     private static void AssertDeriveFromTheWrongKeyType(LowLevelPkcs11Library lowLevel, NativeCULong sid, Pkcs11SessionCore session, string misuse, CKR[] accepted)
