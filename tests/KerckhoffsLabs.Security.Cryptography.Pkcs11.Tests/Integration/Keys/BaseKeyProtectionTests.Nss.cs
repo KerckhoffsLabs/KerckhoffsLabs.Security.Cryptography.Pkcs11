@@ -26,9 +26,19 @@ public sealed class BaseKeyProtectionTests_Nss(NssBackendFixture backend)
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(BaseKeyProtectionTestCases.SecondKeyMechanismLists), MemberType = typeof(BaseKeyProtectionTestCases))]
-    public void SecondKeysAllowedMechanisms_AreEnforced(string list) => BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced(_backend, list);
+    public void SecondKeysAllowedMechanisms_AreEnforced(string list)
+    {
+        if (list == "excludes it" && !NssBackendFixture.NssChecksTheSecondKeysAllowedMechanisms)
+            Assert.Skip("NSS ignores the second key's CKA_ALLOWED_MECHANISMS (NssBackendFixture.NssChecksTheSecondKeysAllowedMechanisms).");
+        BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced(_backend, list);
+    }
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [MemberData(nameof(BaseKeyProtectionTestCases.OneByteDerivations), MemberType = typeof(BaseKeyProtectionTestCases))]
-    public void OneByteKeyFromAProtectedKey_GivesNoByteAway(string derivation) => BaseKeyProtectionTestCases.Assert_OneByteKeyFromAProtectedKey_GivesNoByteAway(_backend, derivation);
+    public void OneByteKeyFromAProtectedKey_GivesNoByteAway(string derivation)
+    {
+        if (!NssBackendFixture.NssKeepsAProtectedKeysBytesFromADigest)
+            Assert.Skip("NSS digests a one-byte key made from a protected key (NssBackendFixture.NssKeepsAProtectedKeysBytesFromADigest).");
+        BaseKeyProtectionTestCases.Assert_OneByteKeyFromAProtectedKey_GivesNoByteAway(_backend, derivation);
+    }
 }

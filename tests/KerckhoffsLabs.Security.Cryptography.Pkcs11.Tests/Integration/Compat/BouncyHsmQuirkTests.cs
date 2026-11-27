@@ -575,4 +575,34 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"(got {(ex as Pkcs11Exception)?.ReturnValue.ToString() ?? ex?.GetType().Name ?? "no exception"}): delete " +
             "this test and BouncyHsmBackendFixture.BouncyHsmTakesAlwaysAuthenticateInATemplate (harrison314/BouncyHsm#145).");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void SecondKeysAllowedMechanisms_QuirkStillPresent()
+    {
+        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced(_backend, "excludes it"));
+        Assert.True(failure is XunitException and not SkipException,
+            "BouncyHsm now refuses CKM_CONCATENATE_BASE_AND_KEY with a second key whose CKA_ALLOWED_MECHANISMS leaves it out: make " +
+            "BouncyHsmBackendFixture.BouncyHsmChecksTheSecondKeysAllowedMechanisms true and delete this test.");
+    }
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [MemberData(nameof(BaseKeyProtectionTestCases.OneByteDerivations), MemberType = typeof(BaseKeyProtectionTestCases))]
+    public void OneByteKeyDigest_QuirkStillPresent(string derivation)
+    {
+        Exception? failure = Record.Exception(() => BaseKeyProtectionTestCases.Assert_OneByteKeyFromAProtectedKey_GivesNoByteAway(_backend, derivation));
+        Assert.True(failure is XunitException and not SkipException,
+            $"BouncyHsm no longer gives a byte of a protected key away through a one-byte key ({derivation}): make " +
+            "BouncyHsmBackendFixture.BouncyHsmKeepsAProtectedKeysBytesFromADigest true and delete this test.");
+    }
+
+    [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [InlineData("ECDSA sign with an AES key")]
+    [InlineData("ECDH derive from an AES key")]
+    public void KeyOfTheWrongType_QuirkStillPresent(string misuse)
+    {
+        Exception? failure = Record.Exception(() => OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse));
+        Assert.True(failure is XunitException and not SkipException,
+            $"BouncyHsm now answers {misuse} with CKR_KEY_TYPE_INCONSISTENT: make " +
+            "BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongTypeAsInconsistent true and delete this test.");
+    }
 }

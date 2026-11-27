@@ -19,9 +19,19 @@ public sealed class BaseKeyProtectionTests_BouncyHsm(BouncyHsmBackendFixture bac
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(BaseKeyProtectionTestCases.SecondKeyMechanismLists), MemberType = typeof(BaseKeyProtectionTestCases))]
-    public void SecondKeysAllowedMechanisms_AreEnforced(string list) => BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced(_backend, list);
+    public void SecondKeysAllowedMechanisms_AreEnforced(string list)
+    {
+        if (list == "excludes it" && !BouncyHsmBackendFixture.BouncyHsmChecksTheSecondKeysAllowedMechanisms)
+            Assert.Skip("BouncyHsm ignores the second key's CKA_ALLOWED_MECHANISMS (BouncyHsmBackendFixture.BouncyHsmChecksTheSecondKeysAllowedMechanisms).");
+        BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced(_backend, list);
+    }
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     [MemberData(nameof(BaseKeyProtectionTestCases.OneByteDerivations), MemberType = typeof(BaseKeyProtectionTestCases))]
-    public void OneByteKeyFromAProtectedKey_GivesNoByteAway(string derivation) => BaseKeyProtectionTestCases.Assert_OneByteKeyFromAProtectedKey_GivesNoByteAway(_backend, derivation);
+    public void OneByteKeyFromAProtectedKey_GivesNoByteAway(string derivation)
+    {
+        if (!BouncyHsmBackendFixture.BouncyHsmKeepsAProtectedKeysBytesFromADigest)
+            Assert.Skip("BouncyHsm digests a one-byte key made from a protected key (BouncyHsmBackendFixture.BouncyHsmKeepsAProtectedKeysBytesFromADigest).");
+        BaseKeyProtectionTestCases.Assert_OneByteKeyFromAProtectedKey_GivesNoByteAway(_backend, derivation);
+    }
 }

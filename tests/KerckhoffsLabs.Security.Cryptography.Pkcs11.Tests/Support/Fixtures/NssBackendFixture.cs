@@ -233,6 +233,26 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// takes a secret key (or a data object, §6.62.3). PKCS#11 v3.2 §5.1.6: <c>CKR_KEY_TYPE_INCONSISTENT</c>.</summary>
     public const bool NssChecksTheHkdfBaseKeyType = false;
 
+    /// <summary>
+    /// False while <c>C_DeriveKey(CKM_CONCATENATE_BASE_AND_KEY)</c> ignores the second key's <c>CKA_ALLOWED_MECHANISMS</c>:
+    /// a second key whose list leaves the mechanism out is concatenated anyway, and only the base key's list is
+    /// checked. PKCS#11 v3.2 §4.8 Table 26: the list names the mechanisms "allowed to be used with this key", which we
+    /// read as covering both keys of the derivation (BaseKeyProtectionTestCases.Assert_SecondKeysAllowedMechanisms_AreEnforced).
+    /// Not yet reported upstream. NssQuirkTests.SecondKeysAllowedMechanisms_QuirkStillPresent fails once it is fixed.
+    /// </summary>
+    public const bool NssChecksTheSecondKeysAllowedMechanisms = false;
+
+    /// <summary>
+    /// False while a one-byte key made from a sensitive, unextractable key can be digested:
+    /// <c>CKM_EXTRACT_KEY_FROM_KEY</c> and <c>CKM_XOR_BASE_AND_DATA</c> with <c>CKA_VALUE_LEN</c> 1 make a sensitive
+    /// key, as §6.43 requires, but <c>C_DigestKey</c> takes it, and its SHA-256 gives the byte away among 256
+    /// candidates: a byte of the protected key per call. Refusing the one-byte derivation from a protected key, or
+    /// the digest of a key made from one, would close it. After pkcs11-check's 1-byte recovery oracle
+    /// (https://github.com/mingulov/pkcs11-check, test_misc_kdf.py, 0.3.1). Not yet reported upstream. NssQuirkTests.OneByteKeyDigest_QuirkStillPresent
+    /// fails once it is fixed.
+    /// </summary>
+    public const bool NssKeepsAProtectedKeysBytesFromADigest = false;
+
     /// <summary>False while <c>C_WrapKey</c> with a data object as the wrapping key, and <c>C_UnwrapKey</c> with a
     /// certificate as the unwrapping key, answer <c>CKR_KEY_TYPE_INCONSISTENT</c> (<c>sftk_InitGeneric</c>). PKCS#11
     /// v3.2 §5.1.6 names the wrapping (unwrapping) key's own codes: <c>CKR_WRAPPING_KEY_HANDLE_INVALID</c> or

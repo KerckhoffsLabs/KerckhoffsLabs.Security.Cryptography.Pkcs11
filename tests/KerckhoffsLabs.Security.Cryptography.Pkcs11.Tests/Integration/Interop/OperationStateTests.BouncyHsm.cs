@@ -38,7 +38,10 @@ public sealed class OperationStateTests_BouncyHsm(BouncyHsmBackendFixture backen
         if ((misuse.EndsWith("with an RSA private key", StringComparison.Ordinal) || misuse.EndsWith("with an RSA public key", StringComparison.Ordinal))
             && !BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongClassAsInconsistent)
             Assert.Skip("BouncyHsm answers an RSA key of the wrong class with CKR_KEY_HANDLE_INVALID");
-        OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse);
+        // BouncyHsm refuses a key of the wrong type with CKR_KEY_FUNCTION_NOT_PERMITTED, its default
+        // CKA_ALLOWED_MECHANISMS being checked first (BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongTypeAsInconsistent).
+        OperationStateTestCases.Assert_KeyOfTheWrongType_IsRefused(_backend, misuse,
+            BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongTypeAsInconsistent ? null : [CKR.CKR_KEY_FUNCTION_NOT_PERMITTED]);
     }
 
     [Theory(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
