@@ -605,4 +605,34 @@ public sealed class BouncyHsmQuirkTests(BouncyHsmBackendFixture backend)
             $"BouncyHsm now answers {misuse} with CKR_KEY_TYPE_INCONSISTENT: make " +
             "BouncyHsmBackendFixture.BouncyHsmReportsAKeyOfTheWrongTypeAsInconsistent true and delete this test.");
     }
+
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    public void UserPinAfterInitToken_QuirkStillPresent()
+    {
+        Pkcs11Slot slot = TokenAdministrationTestCases.ProvisionScratch(_backend, "kl-quirk-reinit-1",
+            TokenAdministrationTestCases.ScratchUserPin);
+        using (var soPin = new SecurePin(TokenAdministrationTestCases.ScratchSoPin))
+            slot.InitTokenWithPin(soPin, "kl-quirk-reinit-2");
+        bool stillInitialized = slot.GetTokenInfo().TokenFlags.UserPinInitialized;
+        bool oldPinLogsIn;
+        try
+        {
+            using Pkcs11Login login = TokenAdministrationTestCases.LogIn(slot, TokenAdministrationTestCases.ScratchUserPin);
+            oldPinLogsIn = true;
+        }
+        catch (Pkcs11Exception)
+        {
+            oldPinLogsIn = false;
+        }
+        finally
+        {
+            slot.ForgetRefusedPins();
+        }
+
+        Assert.True(stillInitialized && oldPinLogsIn,
+            "BouncyHsm's C_InitToken now disables the user " +
+            $"(CKF_USER_PIN_INITIALIZED {(stillInitialized ? "still set" : "cleared")}, old user PIN " +
+            $"{(oldPinLogsIn ? "still logs in" : "refused")}): set " +
+            "BouncyHsmBackendFixture.BouncyHsmDisablesTheUserOnInitToken to true and delete this test.");
+    }
 }

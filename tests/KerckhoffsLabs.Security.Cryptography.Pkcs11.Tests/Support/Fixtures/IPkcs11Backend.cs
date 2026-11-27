@@ -69,6 +69,14 @@ public interface IPkcs11Backend
         return login.OpenSession(SessionAccess.ReadWrite);
     }
 
+    /// <summary>
+    /// A second slot of the module, which cases that initialize a token (<c>C_InitToken</c>), log it out or change its
+    /// PIN use instead of the fixture's token, which other cases share. Its token may be uninitialized or initialized:
+    /// each such case initializes it afresh, with an SO PIN of its own. <see langword="null"/> (the default) when the
+    /// fixture has none, and those cases skip.
+    /// </summary>
+    NativeCULong? ScratchSlotId => null;
+
     /// <summary>True if the backend can generate and operate ML-DSA (FIPS 204) keys. Defaults to the
     /// advertised <see cref="CKM.CKM_ML_DSA"/>; SoftHSM overrides this with a build marker because the
     /// real capability depends on the OpenSSL it was built against, not just the mechanism list.</summary>

@@ -37,6 +37,13 @@ public static class Settings
         Environment.GetEnvironmentVariable("PKCS11_TEST_SO_PIN") ?? "11111111";
 
     /// <summary>
+    /// SO PIN of a fixture's scratch token (<c>IPkcs11Backend.ScratchSlotId</c>), which the token
+    /// administration cases initialize afresh with it. A fixture that must create that token initialized (BouncyHsm)
+    /// gives it this SO PIN, so the cases' <c>C_InitToken</c> takes it.
+    /// </summary>
+    public const string ScratchSoPin = "kl-so-1357";
+
+    /// <summary>
     /// Optional path to a system-installed opencryptoki PKCS#11 library — a second, independent real
     /// backend for cross-implementation coverage. Tests skip when this resolves to null; the token is
     /// provisioned out-of-band (by CI), not by the fixture.
