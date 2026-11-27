@@ -32,8 +32,8 @@ internal static class TokenAdministrationTestCases
 
     // The scratch token's PINs (Settings.ScratchSoPin is the SO's): letters, digits and a hyphen, which every
     // backend's PIN rules take (Craton HSM's want two character classes and three distinct bytes).
-    private static ReadOnlySpan<byte> ScratchSoPin => Encoding.ASCII.GetBytes(Settings.ScratchSoPin);
-    private static ReadOnlySpan<byte> ScratchUserPin => "kl-user-2468"u8;
+    internal static ReadOnlySpan<byte> ScratchSoPin => Encoding.ASCII.GetBytes(Settings.ScratchSoPin);
+    internal static ReadOnlySpan<byte> ScratchUserPin => "kl-user-2468"u8;
 
     // The PINs the concurrent C_SetPIN cases race to, one per thread (as pkcs11-check's _QC11C_RACE_PINS).
     private static readonly byte[][] RacePins =
@@ -53,7 +53,7 @@ internal static class TokenAdministrationTestCases
 
     // Initializes the scratch token afresh (C_InitToken), then sets its user PIN as the SO (C_InitPIN). Whatever the
     // token held before, a factory-state token with a user PIN of userPin; the label is new each time.
-    private static Pkcs11Slot ProvisionScratch(IPkcs11Backend backend, string label, ReadOnlySpan<byte> userPin)
+    internal static Pkcs11Slot ProvisionScratch(IPkcs11Backend backend, string label, ReadOnlySpan<byte> userPin)
     {
         Pkcs11Slot slot = ScratchSlot(backend);
         using (var soPin = new SecurePin(ScratchSoPin))
@@ -67,7 +67,7 @@ internal static class TokenAdministrationTestCases
 
     private static string NewLabel(string what) => $"kl-{what}-{Guid.NewGuid():N}"[..24];
 
-    private static Pkcs11Login LogIn(Pkcs11Slot slot, ReadOnlySpan<byte> pin)
+    internal static Pkcs11Login LogIn(Pkcs11Slot slot, ReadOnlySpan<byte> pin)
     {
         using var securePin = new SecurePin(pin);
         return slot.Login(TokenUser.User, securePin);
@@ -173,7 +173,12 @@ internal static class TokenAdministrationTestCases
     /// on) is the new token's user PIN once the SO sets it, and logs in; the token's old user PIN is refused by the
     /// module, not by the library.
     /// </summary>
-    internal static void Assert_ReinitializedToken_KeepsNothingFromBefore(IPkcs11Backend backend)
+    /// <param name="backend">The backend.</param>
+    /// <param name="initTokenDisablesTheUser">
+    /// <see langword="false"/> on a module whose <c>C_InitToken</c> leaves the user PIN as it was (a gap the backend's
+    /// quirk tests track): <c>CKF_USER_PIN_INITIALIZED</c> is then not asserted cleared.
+    /// </param>
+    internal static void Assert_ReinitializedToken_KeepsNothingFromBefore(IPkcs11Backend backend, bool initTokenDisablesTheUser = true)
     {
         if (!backend.RequiresUserLogin)
             Assert.Skip("The backend's token has no login.");
@@ -205,7 +210,8 @@ internal static class TokenAdministrationTestCases
         TokenInfo info = slot.GetTokenInfo();
         Assert.Equal(secondLabel, info.Label);
         Assert.True(info.TokenFlags.TokenInitialized);
-        Assert.False(info.TokenFlags.UserPinInitialized, "C_InitToken left the user PIN initialized.");
+        if (initTokenDisablesTheUser)
+            Assert.False(info.TokenFlags.UserPinInitialized, "C_InitToken left the user PIN initialized.");
         using (Pkcs11Session publicSession = slot.OpenSession(SessionAccess.ReadOnly))
             Assert.Equal(0, CountLabelled(publicSession, objectLabel));
 

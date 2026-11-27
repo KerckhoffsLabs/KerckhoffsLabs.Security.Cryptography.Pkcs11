@@ -93,6 +93,29 @@ public sealed class BouncyHsmBackendFixture : IPkcs11Backend, IDisposable
     public const bool BouncyHsmDestroysPrivateSessionObjectsOnLogout = false;
 
     /// <summary>
+    /// False while <c>C_InitToken</c> on an initialized token leaves its user PIN as it was: <c>InitTokenHandler</c>
+    /// destroys the objects and <c>ResetTokenCommand</c> sets the new label and resets the monotonic counter, but
+    /// neither clears the user PIN, so <c>CKF_USER_PIN_INITIALIZED</c> stays set and the old user PIN still logs in.
+    /// PKCS#11 v3.2 §5.5.4: once a token is initialized, "access by the normal user is disabled until the SO sets the
+    /// normal user's PIN". Not yet reported upstream. BouncyHsmQuirkTests.UserPinAfterInitToken_QuirkStillPresent fails
+    /// once it is fixed.
+    /// </summary>
+    public const bool BouncyHsmDisablesTheUserOnInitToken = false;
+
+    /// <summary>
+    /// False while <c>C_SetPIN</c> checks the old PIN and stores the new one as two separate steps:
+    /// <c>SetPinHandler</c> awaits <c>Persistence.ValidatePin</c>, then <c>Persistence.SetPin</c>, with nothing held
+    /// across the two. Four sessions changing the user PIN from the same old PIN at once see several calls answer
+    /// <c>CKR_OK</c> (three of four in a local run at v2.4.0), where only the first may (PKCS#11 v3.2 §5.4, a module
+    /// called from several threads). The library sends one PIN to a slot at a time, so its own <c>SetPinWithPin</c> is
+    /// not affected. Not yet reported upstream. No tripwire: the race is not lost every time.
+    /// </summary>
+    public const bool BouncyHsmSetsAPinAtomically = false;
+
+    /// <summary>Gate for the raw concurrent <c>C_SetPIN</c> case: see <see cref="BouncyHsmSetsAPinAtomically"/>.</summary>
+    public static bool AtomicSetPinAvailable => BouncyHsmAvailable && BouncyHsmSetsAPinAtomically;
+
+    /// <summary>
     /// False while <c>C_SetPIN</c> takes a new PIN outside the token's own PIN length range: with <c>C_GetTokenInfo</c>
     /// reporting [4, 512] (v2.4.0 reports <c>ulMinPinLen</c> correctly), <c>C_SetPIN</c> to a 3-byte PIN answers
     /// <c>CKR_OK</c>. PKCS#11 v3.2 §5.6.7: <c>CKR_PIN_LEN_RANGE</c>. <c>C_Login</c> with such a PIN is refused.

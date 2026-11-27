@@ -15,13 +15,14 @@ public sealed class TokenAdministrationTests_BouncyHsm(BouncyHsmBackendFixture b
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ReinitializedToken_KeepsNothingFromBefore() =>
-        TokenAdministrationTestCases.Assert_ReinitializedToken_KeepsNothingFromBefore(_backend);
+        TokenAdministrationTestCases.Assert_ReinitializedToken_KeepsNothingFromBefore(_backend,
+            initTokenDisablesTheUser: BouncyHsmBackendFixture.BouncyHsmDisablesTheUserOnInitToken);
 
     [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
     public void ConcurrentSetPin_ThroughTheLibrary_OneWins() =>
         TokenAdministrationTestCases.Assert_ConcurrentSetPin_ThroughTheLibrary_OneWins(_backend);
 
-    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.BouncyHsmAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.BouncyHsmAvailable))]
+    [Fact(SkipUnless = nameof(BouncyHsmBackendFixture.AtomicSetPinAvailable), SkipType = typeof(BouncyHsmBackendFixture), Skip = "Requires " + nameof(BouncyHsmBackendFixture.AtomicSetPinAvailable))]
     public void ConcurrentSetPin_AtTheModule_Linearizes() =>
         TokenAdministrationTestCases.Assert_ConcurrentSetPin_AtTheModule_Linearizes(_backend);
 }
