@@ -263,9 +263,9 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
         string nativeDir = Path.GetDirectoryName(libPath)!;
         _configPath = Path.Join(nativeDir, "kryoptic.conf");
         _dbPath = Path.Join(nativeDir, "kryoptic-token.sql");
-        try { File.Delete(_dbPath); } catch { /* best-effort */ }
+        try { File.Delete(_dbPath); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* best-effort */ }
         _scratchDbPath = Path.Join(nativeDir, "kryoptic-scratch-token.sql");
-        try { File.Delete(_scratchDbPath); } catch { /* best-effort */ }
+        try { File.Delete(_scratchDbPath); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* best-effort */ }
 
         File.WriteAllText(_configPath,
             "[[slots]]\n" +
@@ -312,9 +312,9 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     public void Dispose()
     {
         try { Library?.Dispose(); } catch { /* best-effort */ }
-        try { if (_configPath.Length > 0) File.Delete(_configPath); } catch { /* best-effort */ }
-        try { if (_dbPath.Length > 0) File.Delete(_dbPath); } catch { /* best-effort */ }
-        try { if (_scratchDbPath.Length > 0) File.Delete(_scratchDbPath); } catch { /* best-effort */ }
+        try { if (_configPath.Length > 0) File.Delete(_configPath); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        try { if (_dbPath.Length > 0) File.Delete(_dbPath); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        try { if (_scratchDbPath.Length > 0) File.Delete(_scratchDbPath); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* best-effort */ }
     }
 
     // -----------------------------------------------------------------------

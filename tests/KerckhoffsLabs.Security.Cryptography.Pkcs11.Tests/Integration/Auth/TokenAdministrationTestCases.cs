@@ -253,32 +253,25 @@ internal static class TokenAdministrationTestCases
         {
             using (Pkcs11Login login = LogIn(slot, ScratchUserPin))
             {
-                Pkcs11Session[] sessions = [.. RacePins.Select(_ => login.OpenSession())];
-                try
+                // Each racer opens its own session before the barrier, so only the C_SetPIN calls overlap.
+                using var barrier = new Barrier(RacePins.Length);
+                Task[] racers = [.. Enumerable.Range(0, RacePins.Length).Select(i => Task.Factory.StartNew(() =>
                 {
-                    using var barrier = new Barrier(RacePins.Length);
-                    Task[] racers = [.. Enumerable.Range(0, RacePins.Length).Select(i => Task.Factory.StartNew(() =>
+                    using Pkcs11Session session = login.OpenSession();
+                    using var oldPin = new SecurePin(ScratchUserPin);
+                    using var newPin = new SecurePin(RacePins[i]);
+                    barrier.SignalAndWait(TimeSpan.FromSeconds(30));
+                    try
                     {
-                        using var oldPin = new SecurePin(ScratchUserPin);
-                        using var newPin = new SecurePin(RacePins[i]);
-                        barrier.SignalAndWait(TimeSpan.FromSeconds(30));
-                        try
-                        {
-                            sessions[i].SetPinWithPin(oldPin, newPin);
-                            succeeded[i] = true;
-                        }
-                        catch (Pkcs11Exception ex)
-                        {
-                            outcomes[i] = ex;
-                        }
-                    }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default))];
-                    Assert.True(Task.WaitAll(racers, TimeSpan.FromSeconds(60)), "A C_SetPIN race did not finish: a thread hangs.");
-                }
-                finally
-                {
-                    foreach (Pkcs11Session session in sessions)
-                        session.Dispose();
-                }
+                        session.SetPinWithPin(oldPin, newPin);
+                        succeeded[i] = true;
+                    }
+                    catch (Pkcs11Exception ex)
+                    {
+                        outcomes[i] = ex;
+                    }
+                }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default))];
+                Assert.True(Task.WaitAll(racers, TimeSpan.FromSeconds(60)), "A C_SetPIN race did not finish: a thread hangs.");
             }
 
             int winner = Assert.Single(Enumerable.Range(0, RacePins.Length), i => succeeded[i]);
