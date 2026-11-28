@@ -714,8 +714,8 @@ public sealed partial class Pkcs11Session : IDisposable
         var result = new List<Pkcs11Certificate>();
         try
         {
-            foreach ((ObjectHandle handle, _) in SearchFamily(filter, Certificates))
-                result.Add(HydrateCertificateFromHandle(handle));
+            foreach (ObjectCandidate match in SearchFamily(filter, Certificates, readCandidates: false))
+                result.Add(HydrateCertificateFromHandle(match.Handle));
         }
         catch
         {
@@ -1535,8 +1535,9 @@ public sealed partial class Pkcs11Session : IDisposable
     private Pkcs11Key? FindUniqueKey(ObjectTemplate filter)
         => FindUnique(filter, Keys, GroupKeyHalves, HydrateKeyGroup);
 
+    // Matches of a family without pairs are told apart by count alone, so none is read until the one is built.
     private Pkcs11Object? FindUniqueObject(ObjectTemplate filter, ObjectFamily family)
-        => FindUnique(filter, family, EachOnItsOwn, matched => HydrateObjectFromHandle(matched[0].Handle));
+        => FindUnique(filter, family, group: null, matched => HydrateObjectFromHandle(matched[0].Handle));
 
     /// <summary>
     /// The family of the class <paramref name="filter"/> names, for the generic object lookups: any class
@@ -1560,7 +1561,7 @@ public sealed partial class Pkcs11Session : IDisposable
             ?? throw new Pkcs11ObjectNotFoundException(Pkcs11Operations.OpFindObjects, $"No certificate {criteria} was found on the token.");
 
     private Pkcs11Certificate? FindUniqueCertificate(ObjectTemplate filter)
-        => FindUnique(filter, Certificates, EachOnItsOwn, matched => HydrateCertificateFromHandle(matched[0].Handle));
+        => FindUnique(filter, Certificates, group: null, matched => HydrateCertificateFromHandle(matched[0].Handle));
 
     /// <summary>An object a lookup matched, with the attributes that decide which result it belongs to.</summary>
     private sealed record ObjectCandidate(ObjectHandle Handle, CKO Class, CKK? KeyType, byte[] Id, string? Label, bool? Private);
@@ -1569,20 +1570,20 @@ public sealed partial class Pkcs11Session : IDisposable
     /// Runs a lookup that must identify one object of <paramref name="family"/>: searches with
     /// <see cref="SearchFamily"/>, groups the matches into results with <paramref name="group"/> and
     /// builds the one result with <paramref name="hydrate"/>, or returns <see langword="null"/> when
-    /// nothing matched.
+    /// nothing matched. Without <paramref name="group"/>, each match is a result of its own and is not read:
+    /// <paramref name="hydrate"/> gets a candidate that carries only its handle and class.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="filter"/> contradicts the family.</exception>
     /// <exception cref="Pkcs11AmbiguousObjectException">The matches form more than one result.</exception>
     private T? FindUnique<T>(
         ObjectTemplate filter, ObjectFamily family,
-        Func<List<ObjectCandidate>, List<List<ObjectCandidate>>> group, Func<List<ObjectCandidate>, T> hydrate)
+        Func<List<ObjectCandidate>, List<List<ObjectCandidate>>>? group, Func<List<ObjectCandidate>, T> hydrate)
         where T : class
     {
         using var lease = _core.AcquireExclusive(); // see FindKeys
-        List<ObjectCandidate> candidates =
-            [.. SearchFamily(filter, family).Select(match => ReadCandidate(match.Handle, match.Class))];
+        List<ObjectCandidate> candidates = SearchFamily(filter, family, readCandidates: group is not null);
 
-        List<List<ObjectCandidate>> results = group(candidates);
+        List<List<ObjectCandidate>> results = group is null ? EachOnItsOwn(candidates) : group(candidates);
         return results.Count switch
         {
             0 => null,
@@ -1598,16 +1599,24 @@ public sealed partial class Pkcs11Session : IDisposable
         => [.. candidates.Select(c => new List<ObjectCandidate> { c })];
 
     /// <summary>
-    /// Every object of <paramref name="family"/> that matches <paramref name="filter"/>, with its class.
+    /// Every object of <paramref name="family"/> that matches <paramref name="filter"/>, with its class, and, with
+    /// <paramref name="readCandidates"/>, the attributes that group it (<see cref="ReadCandidate"/>).
     /// </summary>
     /// <remarks>
-    /// PKCS#11 has no "class is one of" filter, so a search across a family is one search per class,
-    /// which is also what keeps objects of other families out. A <c>CKA_CLASS</c> in
-    /// <paramref name="filter"/> narrows the search to that class and must belong to the family; the
-    /// family's fixed attribute is added unless the filter already names it, with the same value.
+    /// <para>
+    /// A <c>CKA_CLASS</c> in <paramref name="filter"/> narrows the search to that class and must belong to the
+    /// family; the family's fixed attribute is added unless the filter already names it, with the same value.
+    /// </para>
+    /// <para>
+    /// PKCS#11 has no "class is one of" filter. A family of one class is searched with that class. A family of
+    /// several whose candidates are read anyway (the keys) is searched once, without a class, and each match's class
+    /// comes with that read; objects of other families are dropped there, as <see cref="FindKeys"/> does. That is
+    /// one search instead of one per class. A family whose candidates are not read is searched once per class,
+    /// which is what keeps other families out.
+    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="filter"/> names a class outside the family, or another value for its fixed attribute.</exception>
-    private List<(ObjectHandle Handle, CKO Class)> SearchFamily(ObjectTemplate filter, ObjectFamily family)
+    private List<ObjectCandidate> SearchFamily(ObjectTemplate filter, ObjectFamily family, bool readCandidates)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -1625,12 +1634,26 @@ public sealed partial class Pkcs11Session : IDisposable
                     $"A {family.Name} has {fixedAttribute.Type} = 0x{family.FixedValue:X}; the filter asks for 0x{given.GetValueAsUlong():X}.", nameof(filter));
         }
 
-        List<(ObjectHandle, CKO)> matches = [];
+        List<ObjectCandidate> matches = [];
+        if (readCandidates && classes.Length > 1)
+        {
+            foreach (ObjectHandle handle in _core.FindAllObjects([.. criteria]))
+            {
+                if (ReadCandidate(handle, knownClass: null) is { } candidate && Array.IndexOf(classes, candidate.Class) >= 0)
+                    matches.Add(candidate);
+            }
+            return matches;
+        }
+
         foreach (CKO objectClass in classes)
         {
             using var classAttribute = new ObjectAttribute(CKA.CKA_CLASS, objectClass);
             foreach (ObjectHandle handle in _core.FindAllObjects([.. criteria, classAttribute]))
-                matches.Add((handle, objectClass));
+            {
+                matches.Add(readCandidates
+                    ? ReadCandidate(handle, objectClass)!
+                    : new ObjectCandidate(handle, objectClass, KeyType: null, Id: [], Label: null, Private: null));
+            }
         }
         return matches;
     }
@@ -1649,9 +1672,24 @@ public sealed partial class Pkcs11Session : IDisposable
             : throw new ArgumentException($"The filter's CKA_CLASS {objectClass} is not a {family.Name} class.", nameof(filter));
     }
 
-    private ObjectCandidate ReadCandidate(ObjectHandle handle, CKO objectClass)
+    /// <summary>
+    /// The attributes that group a key match and build the key from it: its type, id, label and <c>CKA_PRIVATE</c>,
+    /// and its class unless the search gave it (<paramref name="knownClass"/>), in one generic read. A value the token
+    /// does not report is left unknown rather than failing the lookup; <see langword="null"/> when the class itself
+    /// was asked for and could not be read, which leaves the object out of the family.
+    /// </summary>
+    private ObjectCandidate? ReadCandidate(ObjectHandle handle, CKO? knownClass)
     {
-        using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_PRIVATE]);
+        using var attrs = knownClass is null
+            ? _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_PRIVATE, CKA.CKA_CLASS])
+            : _core.GetAttributeValue(handle, [CKA.CKA_KEY_TYPE, CKA.CKA_ID, CKA.CKA_LABEL, CKA.CKA_PRIVATE]);
+        CKO objectClass;
+        if (knownClass is { } given)
+            objectClass = given;
+        else if (attrs[4].CannotBeRead)
+            return null;
+        else
+            objectClass = (CKO)attrs[4].GetValueAsUlong();
         CKK? keyType = attrs[0].CannotBeRead ? null : (CKK)attrs[0].GetValueAsUlong();
         byte[] id = attrs[1].CannotBeRead ? [] : attrs[1].GetValueAsByteArray();
         string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
@@ -1690,9 +1728,16 @@ public sealed partial class Pkcs11Session : IDisposable
 
     private Pkcs11Key HydrateKeyGroup(List<ObjectCandidate> key)
     {
-        // One half matched: the other is found by CKA_ID on first use, as for any opened key.
+        // One half, or a secret key, matched: built from what its candidate read gave, unless the token did not
+        // report its key type; a half's other half is found by CKA_ID on first use, as for any opened key.
         if (key.Count == 1)
-            return HydrateKeyFromHandle(key[0].Handle);
+        {
+            ObjectCandidate only = key[0];
+            return only.KeyType is { } keyType
+                ? BuildKey(only.Handle, new KeyIdentity(only.Class, keyType, only.Label, only.Id,
+                    PrivateObjectLogin.IsPrivate(only.Private, only.Class)))
+                : HydrateKeyFromHandle(only.Handle);
+        }
 
         ObjectCandidate privateHalf = key.Find(c => c.Class == CKO.CKO_PRIVATE_KEY)!;
         ObjectCandidate publicHalf = key.Find(c => c.Class == CKO.CKO_PUBLIC_KEY)!;
@@ -1724,9 +1769,11 @@ public sealed partial class Pkcs11Session : IDisposable
     /// failing on the <c>CKA_KEY_TYPE</c> it does not have.
     /// </summary>
     private Pkcs11Key? HydrateKeyFromHandle(ObjectHandle handle, bool keysOnly)
+        => ReadKeyIdentity(handle, keysOnly) is { } identity ? BuildKey(handle, identity) : null;
+
+    /// <summary>A <see cref="Pkcs11Key"/> over <paramref name="handle"/>, from an identity already read.</summary>
+    private Pkcs11Key BuildKey(ObjectHandle handle, KeyIdentity identity)
     {
-        if (ReadKeyIdentity(handle, keysOnly) is not { } identity)
-            return null;
         (CKO objectClass, CKK keyType, string? label, byte[] id, bool isPrivate) = identity;
 
         ObjectHandle privateHandle = ObjectHandle.Invalid;
