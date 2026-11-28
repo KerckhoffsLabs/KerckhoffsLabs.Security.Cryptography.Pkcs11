@@ -23,14 +23,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Costs;
 /// the lengths of its label and id, then the label and id at those lengths (one call when both are empty, as here: the
 /// keys have a label and no id unless the test gives one, and the second call then reads only the label). See
 /// <c>ObjectIdentityReader</c>.</description></item>
-/// <item><description>The <c>Open*</c> lookups refuse an ambiguous match, so they first read every candidate with the
-/// generic two-call reader, then build the object from the match. When the filter names no class,
-/// <see cref="Pkcs11Session.OpenKey(string)"/> searches once per key class (public, private, secret).</description></item>
+/// <item><description><see cref="Pkcs11Session.OpenKey(string)"/> refuses an ambiguous match, so it reads every
+/// candidate (class, type, id, label, <c>CKA_PRIVATE</c>) with the generic two-call reader, pairs the halves, and builds
+/// the key from what it read. A filter that names no class is searched once, without one, and matches that are not
+/// keys are dropped by the class read, as <see cref="Pkcs11Session.FindKeys"/> does.</description></item>
+/// <item><description><see cref="Pkcs11Session.OpenCertificate(string)"/> and
+/// <see cref="Pkcs11Session.OpenObject(ObjectTemplate)"/> tell matches apart by count, so only the one match is
+/// read, when it is built.</description></item>
 /// </list>
 /// <para>
-/// <c>OpenKey</c> regressed with #24 and is still 13 calls where <c>FindKeys</c> returns the same pair in 7 (see
-/// API_PERFORMANCE.md, Status Refresh 2026-11-28, finding 2). These pins record today's cost so that the fix, and any
-/// other change to a lookup, has to state its effect by updating them.
+/// <c>OpenKey</c> was 13 calls for a pair after #24 (three searches, every candidate read, a single key read twice);
+/// it is now 7, as <c>FindKeys</c>. A change to a lookup's cost states its effect by updating these pins.
 /// </para>
 /// </remarks>
 [Collection(FakeModuleCollection.Name)]
@@ -57,13 +60,13 @@ public sealed class LookupCallCountTests : IDisposable
 
     // === OpenKey ===========================================================
 
-    // 3 searches (one per key class) + 2 candidates × 2 generic reads; the key is built from the candidates.
+    // One search + 2 candidates × 2 generic reads; the key is built from the candidates.
     [Fact]
     public void OpenKey_ByLabel_OfAPair()
     {
         GeneratePair(PairLabel, PairId).Dispose();
 
-        Assert.Equal("C_FindObjects×3, C_FindObjectsFinal×3, C_FindObjectsInit×3, C_GetAttributeValue×4",
+        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×4",
             NativeCalls.Of(_token, () => _session.OpenKey(PairLabel).Dispose()));
     }
 
@@ -72,17 +75,17 @@ public sealed class LookupCallCountTests : IDisposable
     {
         GeneratePair(PairLabel, PairId).Dispose();
 
-        Assert.Equal("C_FindObjects×3, C_FindObjectsFinal×3, C_FindObjectsInit×3, C_GetAttributeValue×4",
+        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×4",
             NativeCalls.Of(_token, () => _session.OpenKey(PairId).Dispose()));
     }
 
-    // 3 searches + 1 candidate × 2 generic reads + the identity read of the match (2): a single key is read twice.
+    // One search + the candidate's generic read (2): a single key is built from its candidate, not read again.
     [Fact]
     public void OpenKey_ByLabel_OfASecretKey()
     {
         _session.GenerateAesKey(256, "secret").Dispose();
 
-        Assert.Equal("C_FindObjects×3, C_FindObjectsFinal×3, C_FindObjectsInit×3, C_GetAttributeValue×4",
+        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×2",
             NativeCalls.Of(_token, () => _session.OpenKey("secret").Dispose()));
     }
 
@@ -92,11 +95,11 @@ public sealed class LookupCallCountTests : IDisposable
         using (Pkcs11Key pair = GeneratePair("lone", [0x0C]))
             _session.Core.DestroyObject(pair.PublicHandle);
 
-        Assert.Equal("C_FindObjects×3, C_FindObjectsFinal×3, C_FindObjectsInit×3, C_GetAttributeValue×4",
+        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×2",
             NativeCalls.Of(_token, () => _session.OpenKey("lone").Dispose()));
     }
 
-    // A filter that names the class makes one search: 3 + the candidate (2) + the identity read of the match (2).
+    // A filter that names the class searches that class: one search + the candidate (2).
     [Fact]
     public void OpenKey_ByAFilterThatNamesTheClass()
     {
@@ -104,7 +107,7 @@ public sealed class LookupCallCountTests : IDisposable
         using ObjectTemplate filter = ObjectTemplate.Empty()
             .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PRIVATE_KEY).Label(PairLabel).Build();
 
-        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×4",
+        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×2",
             NativeCalls.Of(_token, () => _session.OpenKey(filter).Dispose()));
     }
 
@@ -163,19 +166,19 @@ public sealed class LookupCallCountTests : IDisposable
 
     // === OpenCertificate / OpenObject ======================================
 
-    // One search + the candidate read (2) + the certificate's own read of its value, label, id and CKA_PRIVATE (2).
+    // One search + the certificate's read of its value, label, id and CKA_PRIVATE (2).
     [Fact]
     public void OpenCertificate_ByLabel()
     {
         using (X509Certificate2 certificate = SelfSigned())
             _session.ImportCertificate(certificate, "cert", [0x0D]).Dispose();
 
-        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×4",
+        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×2",
             NativeCalls.Of(_token, () => _session.OpenCertificate("cert").Dispose()));
     }
 
-    // One search + the candidate read (2) + the identity read of the match, which falls back to the generic reader (3):
-    // a data object has no CKA_ID, so the module answers CKR_ATTRIBUTE_TYPE_INVALID for it, as a token does.
+    // One search + the identity read of the match, which falls back to the generic reader (3): a data object has no
+    // CKA_ID, so the module answers CKR_ATTRIBUTE_TYPE_INVALID for it, as a token does.
     [Fact]
     public void OpenObject_ByLabel_OfADataObject()
     {
@@ -183,7 +186,7 @@ public sealed class LookupCallCountTests : IDisposable
             _session.CreateObject(data).Dispose();
         using ObjectTemplate filter = ObjectTemplate.ForData().Label("blob").Build();
 
-        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×5",
+        Assert.Equal("C_FindObjects×1, C_FindObjectsFinal×1, C_FindObjectsInit×1, C_GetAttributeValue×3",
             NativeCalls.Of(_token, () => _session.OpenObject(filter).Dispose()));
     }
 
