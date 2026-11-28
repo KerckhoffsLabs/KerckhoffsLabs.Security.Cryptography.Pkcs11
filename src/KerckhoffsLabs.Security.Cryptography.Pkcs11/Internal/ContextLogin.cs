@@ -54,10 +54,7 @@ internal sealed class ContextLogin : IDisposable
         if (source.IsPinpad)
             return new ContextLogin(source, pin: null, key, refusedPinLifetime);
 
-        SecurePin pin;
-        // Caller code, run on the library's behalf: nothing it does on this thread is the library's own read-back.
-        using (Pkcs11SessionCore.CallOutScope.Enter())
-            pin = source.PinFor(key);
+        SecurePin pin = source.PinFor(key);
         if (pin.IsDisposed)
         {
             throw new InvalidOperationException(

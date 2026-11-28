@@ -1082,6 +1082,17 @@ public sealed partial class Pkcs11Session : IDisposable
         return HydrateKeyFromHandle(handle);
     }
 
+    /// <summary><see cref="GenerateKey(Mechanism, ObjectTemplate)"/> for the ephemeral key of an open secret read-back.</summary>
+    internal Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template, KeyMaterial.IReadBackGrant readBack)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(template);
+
+        var handle = _core.GenerateKey(mechanism, [.. template.Attributes], readBack);
+        return HydrateKeyFromHandle(handle);
+    }
+
     /// <summary>
     /// Runs an on-token password-based KDF and returns <paramref name="length"/> bytes of its output: the PKCS#11
     /// counterpart of <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{byte}, ReadOnlySpan{byte}, int, HashAlgorithmName, int)"/>.
@@ -1133,7 +1144,7 @@ public sealed partial class Pkcs11Session : IDisposable
         // plaintext KDF output (a FIPS-style policy) relies on.
         using SecretReadBack readBack = BeginReadBack(KeyMaterialExportKind.KdfOutput);
         using ObjectTemplate template = SecretReadBack.ExtractableSecretTemplate(length);
-        return readBack.Read(() => GenerateKey(mechanism, template), length, ReadBackFailures.KdfOutput);
+        return readBack.Read(grant => GenerateKey(mechanism, template, grant), length, ReadBackFailures.KdfOutput);
     }
 
     /// <summary>

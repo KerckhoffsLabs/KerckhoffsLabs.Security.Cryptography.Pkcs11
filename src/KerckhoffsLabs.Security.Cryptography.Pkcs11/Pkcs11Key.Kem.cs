@@ -59,9 +59,9 @@ public sealed partial class Pkcs11Key
             // key from here; the ciphertext is checked with the secret, so a bad one fails the read-back (zeroing
             // the secret and destroying the key) rather than following it.
             byte[] value = readBack.Read(
-                () =>
+                grant =>
                 {
-                    EncapsulationResult encapsulated = EncapsulateKey(mechanism, template, ciphertextLength);
+                    EncapsulationResult encapsulated = EncapsulateKey(mechanism, template, ciphertextLength, grant);
                     ct = encapsulated.Ciphertext;
                     return encapsulated.SharedSecret;
                 },
@@ -89,7 +89,7 @@ public sealed partial class Pkcs11Key
     /// Prefer <see cref="DecapsulateKey(Mechanism, ReadOnlySpan{byte}, ObjectTemplate)"/> where the secret can stay
     /// on the token. The policy judges this key too
     /// (<see cref="KeyMaterialExportRequest.PrivateKey"/>): over a long-lived key, decapsulating a recorded
-    /// ciphertext returns what <see cref="DecapsulateKey"/> kept on the token, so by default only session keys are
+    /// ciphertext returns what <see cref="DecapsulateKey(Mechanism, ReadOnlySpan{byte}, ObjectTemplate)"/> kept on the token, so by default only session keys are
     /// covered (<see cref="PrivateKeyScope"/>).
     /// </para>
     /// <para>
@@ -128,10 +128,10 @@ public sealed partial class Pkcs11Key
             // A span cannot be captured; the ciphertext is public, so a copy is harmless.
             byte[] ct = ciphertext.ToArray();
             byte[] value = readBack.Read(
-                () => library.MlKemDecapsulateOmitsValueLen switch
+                grant => library.MlKemDecapsulateOmitsValueLen switch
                 {
-                    bool omit => DecapsulateSecretKey(mechanism, ct, length, includeValueLen: !omit),
-                    null => DecapsulateSecretKeyProbing(mechanism, ct, length, library),
+                    bool omit => DecapsulateSecretKey(mechanism, ct, length, includeValueLen: !omit, grant),
+                    null => DecapsulateSecretKeyProbing(mechanism, ct, length, library, grant),
                 },
                 length,
                 KemSecretFailures);
@@ -147,17 +147,18 @@ public sealed partial class Pkcs11Key
     // First decapsulation against a module: try the conventional CKA_VALUE_LEN form, fall back to omitting it on
     // SoftHSM's read-only rejection, and record the form that worked on the library so later calls skip the probe
     // (and its failed, side-effect-free first attempt).
-    private Pkcs11Key DecapsulateSecretKeyProbing(Mechanism mechanism, byte[] ciphertext, int length, Pkcs11Library library)
+    private Pkcs11Key DecapsulateSecretKeyProbing(
+        Mechanism mechanism, byte[] ciphertext, int length, Pkcs11Library library, KeyMaterial.IReadBackGrant readBack)
     {
         try
         {
-            Pkcs11Key sharedKey = DecapsulateSecretKey(mechanism, ciphertext, length, includeValueLen: true);
+            Pkcs11Key sharedKey = DecapsulateSecretKey(mechanism, ciphertext, length, includeValueLen: true, readBack);
             library.MlKemDecapsulateOmitsValueLen = false;
             return sharedKey;
         }
         catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
         {
-            Pkcs11Key sharedKey = DecapsulateSecretKey(mechanism, ciphertext, length, includeValueLen: false);
+            Pkcs11Key sharedKey = DecapsulateSecretKey(mechanism, ciphertext, length, includeValueLen: false, readBack);
             library.MlKemDecapsulateOmitsValueLen = true;
             return sharedKey;
         }
@@ -165,10 +166,11 @@ public sealed partial class Pkcs11Key
 
     // One decapsulation attempt. The secret's length is fixed by the parameter set, so a token that refuses to be
     // told it (unwrap semantics, where CKA_VALUE_LEN is read-only) can be left to work it out.
-    private Pkcs11Key DecapsulateSecretKey(Mechanism mechanism, byte[] ciphertext, int length, bool includeValueLen)
+    private Pkcs11Key DecapsulateSecretKey(
+        Mechanism mechanism, byte[] ciphertext, int length, bool includeValueLen, KeyMaterial.IReadBackGrant readBack)
     {
         using ObjectTemplate template = KemSecretTemplate(length, includeValueLen);
-        return DecapsulateKey(mechanism, ciphertext, template);
+        return DecapsulateKey(mechanism, ciphertext, template, readBack);
     }
 
     // A session-scoped, extractable, non-sensitive generic secret, so its CKA_VALUE can be read back.
