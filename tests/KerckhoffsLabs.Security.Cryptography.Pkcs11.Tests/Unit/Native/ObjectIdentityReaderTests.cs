@@ -82,8 +82,8 @@ public sealed class ObjectIdentityReaderTests
         Assert.Equal(default, mark, MarkComparer.Instance);
     }
 
-    // CKR_ATTRIBUTE_SENSITIVE with nothing usable: each part is unknown, and the label, reported as
-    // CK_UNAVAILABLE_INFORMATION without CKR_BUFFER_TOO_SMALL, is not read again.
+    // CKR_ATTRIBUTE_SENSITIVE with nothing usable: each part is unknown, and the label, whose length came back as
+    // CK_UNAVAILABLE_INFORMATION, is not read.
     [Fact]
     public void ReadSessionObjectMark_NothingReported_GivesUnknownParts_WithoutReadingTheLabelAgain()
     {
@@ -100,35 +100,33 @@ public sealed class ObjectIdentityReaderTests
         Assert.Equal(1, module.Calls["C_GetAttributeValue"]);
     }
 
-    // A label longer than the stack buffer answers CKR_BUFFER_TOO_SMALL, and is read again on its own.
+    // The first call asks for the label's length alone, and the second reads it into a buffer of exactly that length,
+    // so a label longer than any fixed buffer is read whole (a module that copies whatever it has cannot overrun it).
     [Fact]
-    public void ReadSessionObjectMark_LongLabel_IsReadAgainOnItsOwn()
+    public void ReadSessionObjectMark_LongLabel_IsReadAtItsReportedLength()
     {
         byte[] label = LongLabel();
-        SessionObjectMark mark = ReadMark((call, template) =>
-            call == 0 ? WriteMark(template, label) : Attributes.Bytes(ref template[0], label));
+        using var module = new TemplateAnswerModule((_, template) => WriteMark(template, label));
+
+        SessionObjectMark mark = module.With(library => ObjectIdentityReader.ReadSessionObjectMark(library, Session, Object));
 
         Assert.Equal(label, mark.Label);
+        Assert.Equal(2, module.Calls["C_GetAttributeValue"]);
     }
 
-    public static TheoryData<string> LongLabelFailures => ["query fails", "too long", "read fails", "length changes"];
+    public static TheoryData<string> LongLabelFailures => ["too long", "read fails", "length changes"];
 
-    // The second read of a long label is given up, leaving it unknown, when the length query fails or reports more
-    // than LongLabelLimit, or the read fails or comes back at another length than the query gave.
+    // The label is left unknown, and the rest of the mark kept, when its reported length is over MaxValueLength (it is
+    // then not read at all), or the read fails or comes back at another length than the first call gave.
     [Theory]
     [MemberData(nameof(LongLabelFailures))]
-    public void ReadSessionObjectMark_LongLabelThatCannotBeReadAgain_IsUnknown(string failure)
+    public void ReadSessionObjectMark_LabelThatCannotBeRead_IsUnknown(string failure)
     {
         byte[] label = LongLabel();
         SessionObjectMark mark = ReadMark((call, template) => call switch
         {
+            0 when failure == "too long" => WriteMark(template, label, reportedLength: ObjectIdentityReader.MaxValueLength + 1),
             0 => WriteMark(template, label),
-            1 => failure switch
-            {
-                "query fails" => CKR.CKR_DEVICE_ERROR,
-                "too long" => Length(template, ObjectIdentityReader.LongLabelLimit + 1),
-                _ => Attributes.Bytes(ref template[0], label),
-            },
             _ => failure switch
             {
                 "read fails" => CKR.CKR_DEVICE_ERROR,
@@ -138,6 +136,7 @@ public sealed class ObjectIdentityReaderTests
 
         Assert.Null(mark.Label);
         Assert.Equal(CKO.CKO_DATA, mark.ObjectClass);
+        Assert.False(mark.IsToken);
     }
 
     // === SessionObjectMark.Matches ========================================
@@ -193,12 +192,25 @@ public sealed class ObjectIdentityReaderTests
         return CKR.CKR_OK;
     }
 
-    // CKA_TOKEN false, CKA_CLASS CKO_DATA, and the label: CKR_BUFFER_TOO_SMALL when it does not fit.
-    private static CKR WriteMark(Span<CK_ATTRIBUTE> template, byte[] label)
+    // CKA_TOKEN false, CKA_CLASS CKO_DATA, and the label (its length alone for a null pointer), for whichever of them
+    // the call asks; reportedLength, when given, replaces the label's length.
+    private static CKR WriteMark(Span<CK_ATTRIBUTE> template, byte[] label, int? reportedLength = null)
     {
-        Attributes.Bool(ref Attributes.Find(template, CKA.CKA_TOKEN), false);
-        Attributes.Ulong(ref Attributes.Find(template, CKA.CKA_CLASS), (ulong)CKO.CKO_DATA);
-        return Attributes.Bytes(ref Attributes.Find(template, CKA.CKA_LABEL), label);
+        CKR rv = CKR.CKR_OK;
+        foreach (ref CK_ATTRIBUTE attribute in template)
+        {
+            switch ((CKA)(ulong)attribute.type)
+            {
+                case CKA.CKA_TOKEN: Attributes.Bool(ref attribute, false); break;
+                case CKA.CKA_CLASS: Attributes.Ulong(ref attribute, (ulong)CKO.CKO_DATA); break;
+                case CKA.CKA_LABEL:
+                    rv = Attributes.Bytes(ref attribute, label);
+                    if (reportedLength is int length)
+                        attribute.valueLen = (NativeCULong)(ulong)length;
+                    break;
+            }
+        }
+        return rv;
     }
 
     // Answers with a length alone, whatever the buffer.
@@ -208,7 +220,8 @@ public sealed class ObjectIdentityReaderTests
         return CKR.CKR_OK;
     }
 
-    private static byte[] LongLabel() => [.. Enumerable.Repeat((byte)'L', ObjectIdentityReader.LabelCapacity + 72)];
+    // Longer than the 128-byte buffer the label was once read into.
+    private static byte[] LongLabel() => [.. Enumerable.Repeat((byte)'L', 200)];
 
     // The mark is a record over byte arrays, so its own equality compares the labels by reference.
     private sealed class MarkComparer : IEqualityComparer<SessionObjectMark>
