@@ -104,6 +104,14 @@ public sealed class OperationCostGuardTests
         => AssertAllocationSlope(maxBuffersPerInput: 1, (session, data) =>
             session.Encrypt(Gcm(), new ObjectHandle(1), data));
 
+    // Two: the module is handed a buffer of the ciphertext's length, so a token that needs at least that much
+    // (SoftHSM for AEAD) answers in one call; then the plaintext, shorter by the tag, is copied out at its length
+    // (ReportedLength.Trim). CP-003 takes the first from a zeroed pool and brings this to 1.
+    [Fact]
+    public void Decrypt_AllocatesTwoInputSizedBuffers()
+        => AssertAllocationSlope(maxBuffersPerInput: 2, (session, data) =>
+            session.Decrypt(Gcm(), new ObjectHandle(1), data, checkInput: null));
+
     // One call for the lengths and one for the values: a value that fits its buffer needs no third.
     [Fact]
     public void GetAttributeValue_MakesALengthCallAndAValueCall()
@@ -165,9 +173,9 @@ public sealed class OperationCostGuardTests
     }
 
     /// <summary>
-    /// A module whose operations need no keys: fixed-size signatures and digests, and an encryption
-    /// that returns the plaintext followed by a 16-byte tag, the shape of AES-GCM's output. Every
-    /// attribute reads as eight zero bytes.
+    /// A module whose operations need no keys: fixed-size signatures and digests, an encryption that
+    /// returns the plaintext followed by a 16-byte tag, the shape of AES-GCM's output, and a decryption
+    /// that drops it. Every attribute reads as eight zero bytes.
     /// </summary>
     private sealed class EchoModule : FakeModule
     {
@@ -181,6 +189,7 @@ public sealed class OperationCostGuardTests
         protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => CKR.CKR_OK;
         protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
 
         protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
@@ -209,6 +218,23 @@ public sealed class OperationCostGuardTests
                 data.CopyTo(encryptedData.Span);
             }
             encryptedDataLen = (NativeCULong)(ulong)length;
+            return CKR.CKR_OK;
+        }
+
+        // The inverse of C_Encrypt: the ciphertext without its trailing tag.
+        protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
+        {
+            int length = Math.Max(0, encryptedData.Length - TagLength);
+            if (!data.IsNull)
+            {
+                if (data.Span.Length < length)
+                {
+                    dataLen = (NativeCULong)(ulong)length;
+                    return CKR.CKR_BUFFER_TOO_SMALL;
+                }
+                encryptedData[..length].CopyTo(data.Span);
+            }
+            dataLen = (NativeCULong)(ulong)length;
             return CKR.CKR_OK;
         }
 

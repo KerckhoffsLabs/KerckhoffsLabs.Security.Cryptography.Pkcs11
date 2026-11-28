@@ -303,8 +303,25 @@ internal sealed partial class ManagedSoftToken : FakeModule
         attrs.TryAdd((ulong)CKA.CKA_TOKEN, [0]);
     }
 
+    /// <summary>
+    /// Whether every object stored reports the common attributes a template may leave out, at the token's default, as
+    /// a compliant token does: <c>CKA_PRIVATE</c> (true for private and secret keys, false for any other class),
+    /// <c>CKA_LABEL</c> (empty) and, for keys and certificates, <c>CKA_ID</c> (empty). Off by default, where an object
+    /// made without them lacks them, so the library's one-call identity read finds them unreadable and falls back to
+    /// its generic reader. Call-count tests turn it on to measure what a compliant token costs.
+    /// </summary>
+    public bool ReportsDefaultAttributes { get; init; }
+
     private ulong Store(Dictionary<ulong, byte[]> attrs)
     {
+        if (ReportsDefaultAttributes && attrs.TryGetValue((ulong)CKA.CKA_CLASS, out var classValue))
+        {
+            var objectClass = (CKO)ToUlong(classValue);
+            attrs.TryAdd((ulong)CKA.CKA_PRIVATE, [objectClass is CKO.CKO_PRIVATE_KEY or CKO.CKO_SECRET_KEY ? (byte)1 : (byte)0]);
+            attrs.TryAdd((ulong)CKA.CKA_LABEL, []);
+            if (objectClass is CKO.CKO_PUBLIC_KEY or CKO.CKO_PRIVATE_KEY or CKO.CKO_SECRET_KEY or CKO.CKO_CERTIFICATE)
+                attrs.TryAdd((ulong)CKA.CKA_ID, []);
+        }
         ulong handle = _nextHandle++;
         _objects[handle] = attrs;
         return handle;
