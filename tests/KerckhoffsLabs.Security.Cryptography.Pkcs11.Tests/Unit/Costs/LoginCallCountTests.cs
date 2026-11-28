@@ -53,15 +53,9 @@ public sealed class LoginCallCountTests : IDisposable
     public void Login_Cold()
     {
         Pkcs11Login? login = null;
-        try
-        {
-            Assert.Equal("C_GetSessionInfo×2, C_GetTokenInfo×2, C_Login×1, C_OpenSession×1",
-                NativeCalls.Of(_token, () => login = _slot.Login(TokenUser.User, Pin)));
-        }
-        finally
-        {
-            login?.Dispose();
-        }
+        string calls = NativeCalls.Of(_token, () => login = _slot.Login(TokenUser.User, Pin));
+        using (login)
+            Assert.Equal("C_GetSessionInfo×2, C_GetTokenInfo×2, C_Login×1, C_OpenSession×1", calls);
     }
 
     // The last holder's release: C_Logout on the anchor, which then closes.
